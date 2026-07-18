@@ -41,6 +41,55 @@ def _panel(ax, img, title, *, mask=None, roi=None, log=False):
     ax.set_yticks([])
 
 
+def _plot_weisskoff(ax, wk, fs=10):
+    """Standard Weisskoff plot: measured CV vs the ideal 1/N (slope -1) line."""
+    ax.loglog(wk.roi_sizes, wk.cv, "o-", ms=3, label="measured")
+    ax.loglog(wk.roi_sizes, wk.cv[0] * wk.roi_sizes[0] / wk.roi_sizes,
+              "--", color="gray", label="ideal 1/N")
+    ax.set_xlabel("ROI width (voxels)")
+    ax.set_ylabel("CV")
+    ax.set_title(f"Weisskoff (RDC {wk.rdc:.1f})", fontsize=fs)
+    ax.legend(fontsize=fs - 2)
+
+
+def _plot_rdc(ax, wk, fs=10):
+    """RDC vs ROI size: pooled single-voxel CV / ROI-averaged CV, vs identity."""
+    r, rdc = wk.roi_sizes, wk.rdc_curve
+    ax.plot(r, r, "k-", lw=0.8, label="ideal (RDC = width)")
+    ax.plot(r, rdc, "r.-", ms=4, label="measured")
+    ax.axhline(float(rdc.max()), ls="--", color="gray", lw=0.8)
+    ax.set_ylim(0, 1.5 * float(rdc.max()))
+    ax.set_xlabel("ROI width (voxels)")
+    ax.set_ylabel("RDC")
+    ax.set_title("RDC vs ROI size", fontsize=fs)
+    ax.legend(fontsize=fs - 2, loc="upper left")
+
+
+def _plot_signal(ax, t, signal, trend, fs=10):
+    ax.plot(t, signal, lw=0.5, label="ROI signal")
+    ax.plot(t, trend, "r", lw=1.2, label="trend")
+    ax.set_xlabel("time (s)")
+    ax.set_ylabel("intensity")
+    ax.set_title("ROI mean signal", fontsize=fs)
+    ax.legend(fontsize=fs - 2)
+
+
+def _plot_residual(ax, t, resid, fs=10):
+    ax.plot(t, resid, lw=0.5)
+    ax.axhline(0, color="gray", lw=0.5)
+    ax.set_xlabel("time (s)")
+    ax.set_ylabel("residual")
+    ax.set_title("ROI mean residual", fontsize=fs)
+
+
+def _plot_spectrum(ax, resid, tr, fs=10):
+    freqs = np.fft.rfftfreq(resid.size, d=tr)
+    ax.plot(freqs[1:], np.abs(np.fft.rfft(resid))[1:], lw=0.7)  # skip DC
+    ax.set_xlabel("frequency (Hz)")
+    ax.set_ylabel("magnitude")
+    ax.set_title("residual spectrum", fontsize=fs)
+
+
 def _summary_page(result, title):
     images, geom, roi, m = result.images, result.geom, result.roi, result.metrics
     fig = Figure(figsize=(8.5, 11))
@@ -82,18 +131,8 @@ def _analysis_page(result, title):
     images, roi, wk = result.images, result.roi, result.metrics.weisskoff
     fig = Figure(figsize=(8.5, 11))
     fig.suptitle(f"{title} — stability", fontsize=13, fontweight="bold", y=0.98)
-    gs = fig.add_gridspec(2, 2, hspace=0.3, wspace=0.25,
+    gs = fig.add_gridspec(3, 2, hspace=0.35, wspace=0.25,
                           left=0.1, right=0.94, top=0.92, bottom=0.07)
-
-    # Weisskoff plot: measured CV vs the ideal 1/N (slope -1) line
-    ax = fig.add_subplot(gs[0, 0])
-    ax.loglog(wk.roi_sizes, wk.cv, "o-", ms=3, label="measured")
-    ideal = wk.cv[0] * wk.roi_sizes[0] / wk.roi_sizes
-    ax.loglog(wk.roi_sizes, ideal, "--", color="gray", label="ideal 1/N")
-    ax.set_xlabel("ROI width (voxels)")
-    ax.set_ylabel("CV")
-    ax.set_title(f"Weisskoff  (RDC = {wk.rdc:.1f})", fontsize=10)
-    ax.legend(fontsize=8)
 
     n = images.center_slice.shape[-1]
     t = np.arange(n) * images.tr
@@ -101,28 +140,11 @@ def _analysis_page(result, title):
     trend = _roi_series(images.trend, roi)
     resid = _roi_series(images.fluctuations, roi)
 
-    ax = fig.add_subplot(gs[0, 1])
-    ax.plot(t, signal, lw=0.5, label="ROI signal")
-    ax.plot(t, trend, "r", lw=1.2, label="trend")
-    ax.set_xlabel("time (s)")
-    ax.set_ylabel("intensity")
-    ax.set_title("ROI mean signal", fontsize=10)
-    ax.legend(fontsize=8)
-
-    ax = fig.add_subplot(gs[1, 0])
-    ax.plot(t, resid, lw=0.5)
-    ax.axhline(0, color="gray", lw=0.5)
-    ax.set_xlabel("time (s)")
-    ax.set_ylabel("residual")
-    ax.set_title("ROI mean residual", fontsize=10)
-
-    ax = fig.add_subplot(gs[1, 1])
-    freqs = np.fft.rfftfreq(n, d=images.tr)
-    mag = np.abs(np.fft.rfft(resid))
-    ax.plot(freqs[1:], mag[1:], lw=0.7)  # skip DC
-    ax.set_xlabel("frequency (Hz)")
-    ax.set_ylabel("magnitude")
-    ax.set_title("residual spectrum", fontsize=10)
+    _plot_weisskoff(fig.add_subplot(gs[0, 0]), wk)
+    _plot_rdc(fig.add_subplot(gs[0, 1]), wk)
+    _plot_signal(fig.add_subplot(gs[1, 0]), t, signal, trend)
+    _plot_residual(fig.add_subplot(gs[1, 1]), t, resid)
+    _plot_spectrum(fig.add_subplot(gs[2, :]), resid, images.tr)
     return fig
 
 
@@ -131,9 +153,9 @@ def _one_page(result, title):
     wk = m.weisskoff
     fig = Figure(figsize=(8.5, 11))
     fig.suptitle(title, fontsize=13, fontweight="bold", y=0.985)
-    gs = fig.add_gridspec(4, 4, height_ratios=[0.32, 1.0, 1.0, 1.0],
-                          hspace=0.45, wspace=0.35,
-                          left=0.08, right=0.95, top=0.94, bottom=0.06)
+    gs = fig.add_gridspec(5, 4, height_ratios=[0.3, 0.85, 1.0, 1.0, 0.9],
+                          hspace=0.55, wspace=0.4,
+                          left=0.08, right=0.95, top=0.94, bottom=0.05)
 
     ax = fig.add_subplot(gs[0, :])
     ax.axis("off")
@@ -165,35 +187,11 @@ def _one_page(result, title):
     trend = _roi_series(images.trend, roi)
     resid = _roi_series(images.fluctuations, roi)
 
-    ax = fig.add_subplot(gs[2, :2])
-    ax.loglog(wk.roi_sizes, wk.cv, "o-", ms=3, label="measured")
-    ax.loglog(wk.roi_sizes, wk.cv[0] * wk.roi_sizes[0] / wk.roi_sizes,
-              "--", color="gray", label="ideal 1/N")
-    ax.set_xlabel("ROI width")
-    ax.set_ylabel("CV")
-    ax.set_title(f"Weisskoff (RDC={wk.rdc:.1f})", fontsize=9)
-    ax.legend(fontsize=7)
-
-    ax = fig.add_subplot(gs[2, 2:])
-    ax.plot(t, signal, lw=0.5)
-    ax.plot(t, trend, "r", lw=1.2)
-    ax.set_xlabel("time (s)")
-    ax.set_ylabel("intensity")
-    ax.set_title("ROI signal + trend", fontsize=9)
-
-    ax = fig.add_subplot(gs[3, :2])
-    ax.plot(t, resid, lw=0.5)
-    ax.axhline(0, color="gray", lw=0.5)
-    ax.set_xlabel("time (s)")
-    ax.set_ylabel("residual")
-    ax.set_title("ROI residual", fontsize=9)
-
-    ax = fig.add_subplot(gs[3, 2:])
-    freqs = np.fft.rfftfreq(n, d=images.tr)
-    ax.plot(freqs[1:], np.abs(np.fft.rfft(resid))[1:], lw=0.7)
-    ax.set_xlabel("frequency (Hz)")
-    ax.set_ylabel("magnitude")
-    ax.set_title("residual spectrum", fontsize=9)
+    _plot_weisskoff(fig.add_subplot(gs[2, :2]), wk, fs=9)
+    _plot_rdc(fig.add_subplot(gs[2, 2:]), wk, fs=9)
+    _plot_signal(fig.add_subplot(gs[3, :2]), t, signal, trend, fs=9)
+    _plot_residual(fig.add_subplot(gs[3, 2:]), t, resid, fs=9)
+    _plot_spectrum(fig.add_subplot(gs[4, :]), resid, images.tr, fs=9)
     return fig
 
 

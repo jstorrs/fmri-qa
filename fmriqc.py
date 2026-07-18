@@ -141,12 +141,23 @@ class ROI:
 
 @dataclass(frozen=True, eq=False)
 class WeisskoffResult:
-    """Weisskoff/RDC analysis: the CV-vs-ROI-size curve and its scalar RDC."""
+    """Weisskoff/RDC analysis over a range of ROI sizes.
+
+    `cv` is the ROI-averaged CV and `cv1` the single-voxel CV pooled within each
+    ROI size; `rdc_curve = cv1 / cv` is the effective decorrelation factor at
+    each size (ideal = ROI width). `rdc` is the scalar value at the full ROI.
+    """
 
     roi_sizes: NDArray
     cv: NDArray
+    cv1: NDArray
     cv1_pooled: float
     rdc: float
+
+    @property
+    def rdc_curve(self) -> NDArray:
+        """RDC at each ROI size: pooled single-voxel CV / ROI-averaged CV."""
+        return self.cv1 / self.cv
 
 
 @dataclass(frozen=True)
@@ -327,30 +338,42 @@ def _roi_cv(fluctuations: NDArray, mean_image: NDArray,
     roi_fluct = fluctuations[*roi].mean(axis=(0, 1))
     return float(np.std(roi_fluct, mean=0) / mean_image[*roi].mean())
 
+def _roi_cv1(fluctuation_noise: NDArray, mean_image: NDArray,
+             roi_center: NDArray, k: int) -> float:
+    """Single-voxel CV pooled over a k x k ROI: RMS(noise) / ROI mean signal."""
+    roi = roi_indexes(roi_center, k)
+    s = fluctuation_noise[*roi]
+    return float(np.sqrt(np.mean(s**2)) / mean_image[*roi].mean())
+
 def weisskoff(images: "QAImages", roi: ROI) -> WeisskoffResult:
     """Weisskoff plot + radius of decorrelation over a resolved ROI.
 
-    Grows a sub-ROI from 1x1 up to `roi.size` and measures the CV of its (already
-    detrended) mean fluctuation. `cv1_pooled` is the single-voxel CV pooled over
-    the full ROI; `rdc = cv1_pooled / cv[-1]`.
+    For each ROI size, `cv` is the CV of the ROI-mean fluctuation and `cv1` is
+    the single-voxel CV pooled within the ROI; `rdc_curve = cv1 / cv`.
+    `cv1_pooled` is the pooled CV over the full ROI and `rdc = cv1_pooled/cv[-1]`.
     """
     # derived images are properties; read each once rather than per ROI size
     fluctuations, mean_image = images.fluctuations, images.mean_image
+    noise = images.fluctuation_noise
     # include size so cv[-1] is measured at the ROI the single-voxel CV pools over
     roi_sizes = np.arange(1, roi.size + 1, 2)
     cv = np.array([
         _roi_cv(fluctuations, mean_image, roi.center, int(k))
         for k in roi_sizes
     ])
+    cv1 = np.array([
+        _roi_cv1(noise, mean_image, roi.center, int(k))
+        for k in roi_sizes
+    ])
 
     idx = roi.index
-    s = images.fluctuation_noise[*idx]
-    mu = mean_image[*idx]
-    cv1_pooled = float(np.sqrt(np.mean(s**2)) / np.mean(mu))
+    s = noise[*idx]
+    cv1_pooled = float(np.sqrt(np.mean(s**2)) / mean_image[*idx].mean())
 
     return WeisskoffResult(
         roi_sizes=roi_sizes,
         cv=cv,
+        cv1=cv1,
         cv1_pooled=cv1_pooled,
         rdc=cv1_pooled / cv[-1],
     )
