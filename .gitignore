@@ -1,0 +1,19 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Data / DICOM / BIDS (large binary inputs, not versioned)
+data/
+bids/
+QA_FMRI_2025-10-07a/
+*.zip
