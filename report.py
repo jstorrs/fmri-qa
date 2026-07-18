@@ -126,14 +126,98 @@ def _analysis_page(result, title):
     return fig
 
 
-def add_report_pages(pdf: PdfPages, result: "q.QAResult", title: str = "") -> None:
-    """Append the two report pages for one scan to an open `PdfPages`."""
-    pdf.savefig(_summary_page(result, title))
-    pdf.savefig(_analysis_page(result, title))
+def _one_page(result, title):
+    images, geom, roi, m = result.images, result.geom, result.roi, result.metrics
+    wk = m.weisskoff
+    fig = Figure(figsize=(8.5, 11))
+    fig.suptitle(title, fontsize=13, fontweight="bold", y=0.985)
+    gs = fig.add_gridspec(4, 4, height_ratios=[0.32, 1.0, 1.0, 1.0],
+                          hspace=0.45, wspace=0.35,
+                          left=0.08, right=0.95, top=0.94, bottom=0.06)
+
+    ax = fig.add_subplot(gs[0, :])
+    ax.axis("off")
+    pe = _AXIS_LETTER.get(images.pe_axis, "?")
+    line1 = (f"TR {images.tr:.3g}s   voxel {images.voxel_size:.3g}mm   "
+             f"frames {images.center_slice.shape[-1]}   PE {pe}   "
+             f"detrend {images.detrend_method}   "
+             f"ROI {roi.size}x{roi.size} @ ({int(roi.center[0])},{int(roi.center[1])})")
+    line2 = (f"SNR {m.snr:.1f}   SFNR {m.sfnr:.1f}   RDC {m.rdc:.2f}   "
+             f"ghost {m.ghost_ratio:.4f}   drift {m.drift_pct:.3f}%   "
+             f"fluct {m.percent_fluctuation:.3f}%")
+    ax.text(0.0, 0.75, line1, fontsize=8.5, family="monospace", va="top")
+    ax.text(0.0, 0.25, line2, fontsize=10.5, family="monospace", va="top",
+            fontweight="bold")
+
+    sfnr_img = np.where(geom.phantom_mask,
+                        images.mean_image / (images.fluctuation_noise + 1e-9), 0.0)
+    _panel(fig.add_subplot(gs[1, 0]), images.mean_image, "signal",
+           mask=geom.phantom_mask, roi=roi)
+    _panel(fig.add_subplot(gs[1, 1]), sfnr_img, "SFNR", roi=roi)
+    _panel(fig.add_subplot(gs[1, 2]), images.fluctuation_noise, "fluct noise (log)",
+           mask=geom.phantom_mask, roi=roi, log=True)
+    _panel(fig.add_subplot(gs[1, 3]), images.static_noise, "static noise",
+           mask=geom.phantom_mask, roi=roi)
+
+    n = images.center_slice.shape[-1]
+    t = np.arange(n) * images.tr
+    signal = _roi_series(images.center_slice, roi)
+    trend = _roi_series(images.trend, roi)
+    resid = _roi_series(images.fluctuations, roi)
+
+    ax = fig.add_subplot(gs[2, :2])
+    ax.loglog(wk.roi_sizes, wk.cv, "o-", ms=3, label="measured")
+    ax.loglog(wk.roi_sizes, wk.cv[0] * wk.roi_sizes[0] / wk.roi_sizes,
+              "--", color="gray", label="ideal 1/N")
+    ax.set_xlabel("ROI width")
+    ax.set_ylabel("CV")
+    ax.set_title(f"Weisskoff (RDC={wk.rdc:.1f})", fontsize=9)
+    ax.legend(fontsize=7)
+
+    ax = fig.add_subplot(gs[2, 2:])
+    ax.plot(t, signal, lw=0.5)
+    ax.plot(t, trend, "r", lw=1.2)
+    ax.set_xlabel("time (s)")
+    ax.set_ylabel("intensity")
+    ax.set_title("ROI signal + trend", fontsize=9)
+
+    ax = fig.add_subplot(gs[3, :2])
+    ax.plot(t, resid, lw=0.5)
+    ax.axhline(0, color="gray", lw=0.5)
+    ax.set_xlabel("time (s)")
+    ax.set_ylabel("residual")
+    ax.set_title("ROI residual", fontsize=9)
+
+    ax = fig.add_subplot(gs[3, 2:])
+    freqs = np.fft.rfftfreq(n, d=images.tr)
+    ax.plot(freqs[1:], np.abs(np.fft.rfft(resid))[1:], lw=0.7)
+    ax.set_xlabel("frequency (Hz)")
+    ax.set_ylabel("magnitude")
+    ax.set_title("residual spectrum", fontsize=9)
+    return fig
 
 
-def write_report(items, pdf_path) -> None:
-    """Write a combined PDF: two pages per scan.
+REPORT_LAYOUTS = ("one", "two")
+
+
+def add_report_pages(pdf: PdfPages, result: "q.QAResult", title: str = "",
+                     layout: str = "one") -> None:
+    """Append a scan's report page(s) to an open `PdfPages`.
+
+    `layout="one"` renders a single condensed page; `layout="two"` renders a
+    summary page and a separate stability page.
+    """
+    if layout == "one":
+        pdf.savefig(_one_page(result, title))
+    elif layout == "two":
+        pdf.savefig(_summary_page(result, title))
+        pdf.savefig(_analysis_page(result, title))
+    else:
+        raise ValueError(f"unknown layout {layout!r}; choose from {REPORT_LAYOUTS}")
+
+
+def write_report(items, pdf_path, layout: str = "one") -> None:
+    """Write a combined PDF, one scan after another.
 
     `items` is an iterable of `(title, QAResult)`, or a single `QAResult`.
     """
@@ -141,4 +225,4 @@ def write_report(items, pdf_path) -> None:
         items = [("", items)]
     with PdfPages(pdf_path) as pdf:
         for title, result in items:
-            add_report_pages(pdf, result, title)
+            add_report_pages(pdf, result, title, layout)

@@ -35,7 +35,12 @@ def main(argv=None):
     )
     parser.add_argument(
         "--pdf", metavar="FILE", default=None,
-        help="Write a multi-page PDF report (two pages per scan) to FILE.",
+        help="Write a PDF report to FILE.",
+    )
+    parser.add_argument(
+        "--pdf-layout", choices=("one", "two"), default="one",
+        help="Report layout: 'one' condensed page or 'two' pages per scan "
+             "(default: one).",
     )
     args = parser.parse_args(argv)
 
@@ -76,8 +81,9 @@ def main(argv=None):
     if args.pdf and reports:
         import report as report_mod
 
-        report_mod.write_report(reports, args.pdf)
-        print(f"# wrote {args.pdf} ({len(reports)} scan(s), {2 * len(reports)} pages)")
+        report_mod.write_report(reports, args.pdf, layout=args.pdf_layout)
+        pages = len(reports) * (1 if args.pdf_layout == "one" else 2)
+        print(f"# wrote {args.pdf} ({len(reports)} scan(s), {pages} pages)")
 
     return 1 if failed else 0
 
