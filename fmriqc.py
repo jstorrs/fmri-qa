@@ -157,8 +157,23 @@ class QAMetrics:
     sfnr: float
     rdc: float
     ghost_ratio: float
+    drift_pct: float
+    percent_fluctuation: float
     weisskoff: WeisskoffResult
-    # TODO: drift_pct once settled in the notebooks.
+
+
+@dataclass(frozen=True, eq=False)
+class QAResult:
+    """Full QA output: the intermediate objects plus the scalar metrics.
+
+    Returned by `run_qa`. `metrics` holds the scalars; `images`/`geom`/`roi` are
+    retained so a report can render the images, curves, and time series.
+    """
+
+    images: QAImages
+    geom: PhantomGeometry
+    roi: ROI
+    metrics: QAMetrics
 
 
 # --------------------------------------------------------------------------- #
@@ -412,6 +427,20 @@ def sfnr(images: "QAImages", roi: ROI) -> float:
     sfnr_image = images.mean_image[*idx] / images.fluctuation_noise[*idx]
     return float(sfnr_image.mean())
 
+def drift_percent(images: "QAImages", roi: ROI) -> float:
+    """Peak-to-peak of the ROI-mean fitted trend, as % of the ROI mean signal."""
+    idx = roi.index
+    trend_roi = images.trend[*idx].mean(axis=(0, 1))
+    signal = images.mean_image[*idx].mean()
+    return float(100.0 * (trend_roi.max() - trend_roi.min()) / signal)
+
+def percent_fluctuation(images: "QAImages", roi: ROI) -> float:
+    """SD of the ROI-mean residual, as % of the ROI mean signal (fBIRN)."""
+    idx = roi.index
+    resid_roi = images.fluctuations[*idx].mean(axis=(0, 1))
+    signal = images.mean_image[*idx].mean()
+    return float(100.0 * np.std(resid_roi, mean=0) / signal)
+
 def _ghost_masks(phantom_mask: NDArray, pe_axis: int,
                  radius: int) -> tuple[NDArray, NDArray]:
     """Non-overlapping (signal, ghost) masks for a candidate PE axis.
@@ -533,7 +562,7 @@ def run_qa(
     detrend: str = "poly",
     center: str = "image",
     roi_size: int = FBIRN_ROI_SIZE,
-) -> QAMetrics:
+) -> QAResult:
     """Full pipeline: scan -> preprocess -> phantom -> Weisskoff/RDC + ghost ratio.
 
     `pe_axis=None` estimates the phase-encode axis from the ghost regions.
@@ -559,10 +588,13 @@ def run_qa(
     if pe_axis is None:
         pe_axis = estimate_pe_axis(images.mean_image, geom.phantom_mask)
     gr = ghost_ratio(images.mean_image, geom.phantom_mask, pe_axis=pe_axis)
-    return QAMetrics(
+    metrics = QAMetrics(
         snr=snr(images, roi),
         sfnr=sfnr(images, roi),
         rdc=wk.rdc,
         ghost_ratio=gr,
+        drift_pct=drift_percent(images, roi),
+        percent_fluctuation=percent_fluctuation(images, roi),
         weisskoff=wk,
     )
+    return QAResult(images=images, geom=geom, roi=roi, metrics=metrics)

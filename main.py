@@ -6,23 +6,6 @@ import fmriqc as q
 _AXIS_LETTER = {0: "i", 1: "j", 2: "k", None: "?"}
 
 
-def _run_one(path, trim_sec, pe_axis, detrend, center, roi_size):
-    scan = q.QAScan.from_nifti(path)
-    metrics = q.run_qa(
-        scan, trim_sec=trim_sec, pe_axis=pe_axis,
-        detrend=detrend, center=center, roi_size=roi_size,
-    )
-    axis = pe_axis if pe_axis is not None else scan.pe_axis
-    return {
-        "path": path,
-        "pe_axis": _AXIS_LETTER.get(axis, "?"),
-        "snr": metrics.snr,
-        "sfnr": metrics.sfnr,
-        "rdc": metrics.rdc,
-        "ghost_ratio": metrics.ghost_ratio,
-    }
-
-
 def main(argv=None):
     parser = argparse.ArgumentParser(
         prog="fmri-qa",
@@ -50,6 +33,10 @@ def main(argv=None):
         "--roi-size", type=int, default=q.FBIRN_ROI_SIZE,
         help=f"Fixed summary/Weisskoff ROI side in voxels (default: {q.FBIRN_ROI_SIZE}).",
     )
+    parser.add_argument(
+        "--pdf", metavar="FILE", default=None,
+        help="Write a multi-page PDF report (two pages per scan) to FILE.",
+    )
     args = parser.parse_args(argv)
 
     print(
@@ -58,28 +45,39 @@ def main(argv=None):
     )
     header = (
         f"{'scan':40s} {'PE':>3s} "
-        f"{'SNR':>9s} {'SFNR':>9s} {'RDC':>8s} {'ghost':>8s}"
+        f"{'SNR':>9s} {'SFNR':>9s} {'RDC':>8s} {'drift%':>8s} {'ghost':>8s}"
     )
     print(header)
     print("-" * len(header))
 
     failed = False
+    reports = []
     for path in args.paths:
         name = path.rsplit("/", 1)[-1]
         try:
-            r = _run_one(
-                path, args.trim_sec, args.pe_axis,
-                args.detrend, args.center, args.roi_size,
+            scan = q.QAScan.from_nifti(path)
+            result = q.run_qa(
+                scan, trim_sec=args.trim_sec, pe_axis=args.pe_axis,
+                detrend=args.detrend, center=args.center, roi_size=args.roi_size,
             )
         except Exception as exc:  # noqa: BLE001 - report and continue the batch
             failed = True
             print(f"{name:40s} ERROR: {exc}", file=sys.stderr)
             continue
+        m = result.metrics
+        axis = args.pe_axis if args.pe_axis is not None else scan.pe_axis
         print(
-            f"{name:40s} {r['pe_axis']:>3s} "
-            f"{r['snr']:>9.1f} {r['sfnr']:>9.1f} "
-            f"{r['rdc']:>8.3f} {r['ghost_ratio']:>8.4f}"
+            f"{name:40s} {_AXIS_LETTER.get(axis, '?'):>3s} "
+            f"{m.snr:>9.1f} {m.sfnr:>9.1f} {m.rdc:>8.3f} "
+            f"{m.drift_pct:>8.3f} {m.ghost_ratio:>8.4f}"
         )
+        reports.append((name, result))
+
+    if args.pdf and reports:
+        import report as report_mod
+
+        report_mod.write_report(reports, args.pdf)
+        print(f"# wrote {args.pdf} ({len(reports)} scan(s), {2 * len(reports)} pages)")
 
     return 1 if failed else 0
 
