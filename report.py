@@ -42,10 +42,17 @@ def _panel(ax, img, title, *, mask=None, roi=None, log=False):
 
 
 def _plot_weisskoff(ax, wk, fs=10):
-    """Standard Weisskoff plot: measured CV vs the ideal 1/N (slope -1) line."""
+    """Standard Weisskoff plot: measured CV vs the ideal slope=-1 line.
+
+    The ideal line is anchored at `cv1_pooled` (the single-voxel CV pooled over
+    the whole ROI), the same cv(1) estimate the RDC uses, rather than at the
+    single-voxel `cv[0]`. That makes the graphical RDC — where the measured
+    plateau meets this line — equal the reported RDC, and it is robust to the
+    intensity non-uniformity that biases a single-voxel anchor.
+    """
     ax.loglog(wk.roi_sizes, wk.cv, "o-", ms=3, label="measured")
-    ax.loglog(wk.roi_sizes, wk.cv[0] * wk.roi_sizes[0] / wk.roi_sizes,
-              "--", color="gray", label="ideal 1/N")
+    ax.loglog(wk.roi_sizes, wk.cv1_pooled / wk.roi_sizes,
+              "--", color="gray", label="ideal (pooled cv1)")
     ax.set_xlabel("ROI width (voxels)")
     ax.set_ylabel("CV")
     ax.set_title(f"Weisskoff (RDC {wk.rdc:.1f})", fontsize=fs)
