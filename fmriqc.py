@@ -468,26 +468,30 @@ def percent_fluctuation(images: "QAImages", roi: ROI) -> float:
 
 def _ghost_masks(phantom_mask: NDArray, pe_axis: int,
                  radius: int) -> tuple[NDArray, NDArray]:
-    """Non-overlapping (signal, ghost) masks for a candidate PE axis.
+    """Region-matched (signal, ghost) masks for a candidate PE axis.
 
-    The ghost is the phantom rolled half the FOV along `pe_axis`. Each mask is
-    eroded and has the dilated other region and the image border removed, so the
-    two never touch.
+    The ghost is the phantom rolled half the FOV along `pe_axis`; the ghost mask
+    keeps the part of it that lands clear of the phantom (eroded, with the dilated
+    phantom and the image border removed). The signal mask is that same ghost mask
+    rolled back half the FOV onto the phantom, so the ratio compares each ghost
+    patch against the exact tissue that produced it. The phantom/PE-ghost overlap
+    zone -- where signal and ghost are superimposed and cannot be separated -- is
+    thereby excluded from both masks.
     """
-    ghost = np.roll(phantom_mask, phantom_mask.shape[pe_axis] // 2, axis=pe_axis)
+    shift = phantom_mask.shape[pe_axis] // 2
+    ghost = np.roll(phantom_mask, shift, axis=pe_axis)
 
     canvas = np.ones_like(phantom_mask)
     canvas[(0, -1), :] = 0
     canvas[:, (0, -1)] = 0
 
-    def carve(keep, drop):
-        return (
-            morphology.isotropic_erosion(keep, radius)
-            & ~morphology.isotropic_dilation(drop, radius)
-            & canvas
-        )
-
-    return carve(phantom_mask, ghost), carve(ghost, phantom_mask)
+    ghost_mask = (
+        morphology.isotropic_erosion(ghost, radius)
+        & ~morphology.isotropic_dilation(phantom_mask, radius)
+        & canvas
+    )
+    signal_mask = np.roll(ghost_mask, -shift, axis=pe_axis)
+    return signal_mask, ghost_mask
 
 def ghost_ratio(
     mean_image: NDArray,
