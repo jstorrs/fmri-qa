@@ -129,8 +129,10 @@ def _panel_fig(img, title, *, mask=None, roi=None, log=False, aspect=1.15):
     return fig
 
 
-_GHOST_SRC_RGB = (0.20, 0.85, 1.0)  # signal source region (cyan)
-_GHOST_RGB = (1.0, 0.30, 0.30)  # ghost region (red)
+_GHOST_SRC_RGB = (0.20, 0.85, 1.0)  # PE signal source region (cyan)
+_GHOST_RGB = (1.0, 0.30, 0.30)  # PE ghost region (red)
+_RO_SRC_RGB = (0.45, 1.0, 0.35)  # RO signal source region (green)
+_RO_GHOST_RGB = (1.0, 0.72, 0.15)  # RO ghost region (amber)
 
 
 def _overlay(ax, mask, rgb, alpha=0.45):
@@ -141,23 +143,33 @@ def _overlay(ax, mask, rgb, alpha=0.45):
 
 
 def _ghost_panel_fig(mean_image, phantom_mask, pe_axis, *, aspect=1.15):
-    """Mean image with the N/2 ghost region and the signal region that feeds it.
+    """Mean image with the region-matched ghost/signal masks for both axes.
 
-    Draws the exact masks the ghost metrics average: the ghost patch (where the
-    phantom rolled half the FOV lands clear of the phantom) and its source on the
-    phantom (that patch rolled back), so the reported ghost %/ACRg can be checked
-    against where the ghost actually falls. Blank if the PE axis is unknown.
+    Draws the exact masks the ghost metrics average: for each in-plane axis, the
+    ghost patch (where the phantom rolled half the FOV lands clear of the phantom)
+    and its source on the phantom (that patch rolled back). The PE pair (cyan/red)
+    feeds ghost%; the readout pair (green/amber) feeds RO% -- the background-
+    relative baseline whose difference from ghost% is ACRg -- so both reported
+    percentages can be checked against where they are sampled. Blank if the PE
+    axis is unknown.
     """
     fig = Figure(figsize=(2.0, 2.0 * aspect))
     ax = fig.add_subplot(111)
     ax.imshow(mean_image, cmap="gray", vmin=0, vmax=np.percentile(mean_image, 99))
     if pe_axis in (0, 1):
-        signal_mask, ghost_mask = q._ghost_masks(phantom_mask, pe_axis, 3)
+        valid_mask = q.edge_valid_mask(mean_image)
+        ro_axis = 1 - pe_axis
+        ro_signal, ro_ghost = q._ghost_masks(phantom_mask, ro_axis, 3, valid_mask)
+        signal_mask, ghost_mask = q._ghost_masks(phantom_mask, pe_axis, 3, valid_mask)
+        _overlay(ax, ro_signal, _RO_SRC_RGB)
+        _overlay(ax, ro_ghost, _RO_GHOST_RGB)
         _overlay(ax, signal_mask, _GHOST_SRC_RGB)
         _overlay(ax, ghost_mask, _GHOST_RGB)
         ax.legend(
-            handles=[Patch(color=_GHOST_SRC_RGB, label="signal"),
-                     Patch(color=_GHOST_RGB, label="ghost")],
+            handles=[Patch(color=_GHOST_SRC_RGB, label="PE signal"),
+                     Patch(color=_GHOST_RGB, label="PE ghost"),
+                     Patch(color=_RO_SRC_RGB, label="RO signal"),
+                     Patch(color=_RO_GHOST_RGB, label="RO ghost")],
             fontsize=5, loc="lower right", framealpha=0.6, handlelength=1.0,
             borderpad=0.3, labelspacing=0.2,
         )
@@ -243,7 +255,8 @@ def _header(c, result, title, *, meta_fs, metric_fs):
              f"detrend {images.detrend_method}   "
              f"ROI {roi.size}x{roi.size} @ ({int(roi.center[0])},{int(roi.center[1])})")
     line2 = (f"SNR {m.snr:.1f}   SFNR {m.sfnr:.1f}   RDC {m.rdc:.2f}   "
-             f"ghost {m.ghost_pct:.2f}%   ACRg {m.acr_ghost_pct:.2f}%   "
+             f"ghost {m.ghost_pct:.2f}%   RO {m.ro_ghost_pct:.2f}%   "
+             f"ACRg {m.acr_ghost_pct:.2f}%   "
              f"drift {m.drift_pct:.3f}%   fluct {m.percent_fluctuation:.3f}%")
 
     y = _PAGE_H - 34

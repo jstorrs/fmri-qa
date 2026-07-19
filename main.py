@@ -51,7 +51,7 @@ def main(argv=None):
     header = (
         f"{'scan':40s} {'PE':>3s} "
         f"{'SNR':>9s} {'SFNR':>9s} {'RDC':>8s} {'drift%':>8s} "
-        f"{'ghost%':>8s} {'ACRg%':>8s}"
+        f"{'ghost%':>8s} {'RO%':>8s} {'ACRg%':>8s}"
     )
     print(header)
     print("-" * len(header))
@@ -75,7 +75,8 @@ def main(argv=None):
         print(
             f"{name:40s} {_AXIS_LETTER.get(axis, '?'):>3s} "
             f"{m.snr:>9.1f} {m.sfnr:>9.1f} {m.rdc:>8.3f} "
-            f"{m.drift_pct:>8.3f} {m.ghost_pct:>8.3f} {m.acr_ghost_pct:>8.3f}"
+            f"{m.drift_pct:>8.3f} {m.ghost_pct:>8.3f} {m.ro_ghost_pct:>8.3f} "
+            f"{m.acr_ghost_pct:>8.3f}"
         )
         reports.append((name, result))
 

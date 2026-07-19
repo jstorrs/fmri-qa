@@ -104,6 +104,15 @@ class QAImages:
         return self.center_slice.max(axis=-1)
 
     @property
+    def valid_mask(self) -> NDArray:
+        """(X, Y) real-data mask: True except on entirely-zeroed image edges.
+
+        Detected from the time-MIP so a voxel that is ever nonzero counts as
+        valid (see `edge_valid_mask`).
+        """
+        return edge_valid_mask(self.mip)
+
+    @property
     def static_noise(self) -> NDArray:
         """(X, Y) odd/even difference (FBIRN static spatial noise)."""
         return odd_even_difference(self.center_slice)
@@ -167,8 +176,9 @@ class QAMetrics:
     snr: float
     sfnr: float
     rdc: float
-    ghost_pct: float  # fBIRN percent ghost: 100 * (mean ghost / mean signal)
-    acr_ghost_pct: float  # ACR/AAPM percent-signal-ghosting
+    ghost_pct: float  # fBIRN percent ghost along PE: 100 * (mean ghost / mean signal)
+    ro_ghost_pct: float  # same along the readout axis: background-relative baseline
+    acr_ghost_pct: float  # ACR/AAPM-equivalent percent-signal-ghosting: |PE% - RO%|
     pe_axis: int | None  # phase-encode axis actually used for the ghost masks
     drift_pct: float
     percent_fluctuation: float
@@ -467,29 +477,49 @@ def percent_fluctuation(images: "QAImages", roi: ROI) -> float:
     signal = images.mean_image[*idx].mean()
     return float(100.0 * np.std(resid_roi, mean=0) / signal)
 
-def _ghost_masks(phantom_mask: NDArray, pe_axis: int,
-                 radius: int) -> tuple[NDArray, NDArray]:
+def edge_valid_mask(image: NDArray) -> NDArray:
+    """(X, Y) bool mask of real data, clearing only entirely-zeroed image edges.
+
+    Some vendors (e.g. Siemens) null one outer image row/column to encode the
+    phase-encode direction. A fully-zero border carries no signal and must not
+    enter ROI averages or ghost statistics, but blanket-trimming one voxel on
+    every side needlessly discards valid data on the other three. Each of the
+    four edges is tested independently and only the zeroed ones are cleared.
+
+    Pass the time-MIP for the most permissive test: a voxel that is nonzero in
+    any frame counts as valid, so only a genuinely dead line is trimmed.
+    """
+    valid = np.ones(image.shape[:2], dtype=bool)
+    if not image[0, :].any():
+        valid[0, :] = False
+    if not image[-1, :].any():
+        valid[-1, :] = False
+    if not image[:, 0].any():
+        valid[:, 0] = False
+    if not image[:, -1].any():
+        valid[:, -1] = False
+    return valid
+
+def _ghost_masks(phantom_mask: NDArray, pe_axis: int, radius: int,
+                 valid_mask: NDArray) -> tuple[NDArray, NDArray]:
     """Region-matched (signal, ghost) masks for a candidate PE axis.
 
     The ghost is the phantom rolled half the FOV along `pe_axis`; the ghost mask
     keeps the part of it that lands clear of the phantom (eroded, with the dilated
-    phantom and the image border removed). The signal mask is that same ghost mask
-    rolled back half the FOV onto the phantom, so the ratio compares each ghost
-    patch against the exact tissue that produced it. The phantom/PE-ghost overlap
-    zone -- where signal and ghost are superimposed and cannot be separated -- is
-    thereby excluded from both masks.
+    phantom and any invalid image edge removed). The signal mask is that same
+    ghost mask rolled back half the FOV onto the phantom, so the ratio compares
+    each ghost patch against the exact tissue that produced it. The phantom/PE-
+    ghost overlap zone -- where signal and ghost are superimposed and cannot be
+    separated -- is thereby excluded from both masks. `valid_mask` (see
+    `edge_valid_mask`) drops the ghost pixels that wrap onto a zeroed edge.
     """
     shift = phantom_mask.shape[pe_axis] // 2
     ghost = np.roll(phantom_mask, shift, axis=pe_axis)
 
-    canvas = np.ones_like(phantom_mask)
-    canvas[(0, -1), :] = 0
-    canvas[:, (0, -1)] = 0
-
     ghost_mask = (
         morphology.isotropic_erosion(ghost, radius)
         & ~morphology.isotropic_dilation(phantom_mask, radius)
-        & canvas
+        & valid_mask
     )
     signal_mask = np.roll(ghost_mask, -shift, axis=pe_axis)
     return signal_mask, ghost_mask
@@ -499,15 +529,19 @@ def ghost_ratio(
     phantom_mask: NDArray,
     pe_axis: int = 0,
     radius: int = 3,
+    valid_mask: NDArray | None = None,
 ) -> float:
     """fBIRN Nyquist ghost-to-signal ratio (mean ghost / mean signal).
 
     The fBIRN "percent ghost" is 100x this value. The ghost is located by rolling
     the phantom half the FOV along the phase-encode axis; `pe_axis` and the
     erosion/dilation `radius` are acquisition-dependent and should be verified per
-    protocol.
+    protocol. `valid_mask` excludes zeroed image edges (see `edge_valid_mask`);
+    it defaults to detecting them from `mean_image`.
     """
-    signal_mask, ghost_mask = _ghost_masks(phantom_mask, pe_axis, radius)
+    if valid_mask is None:
+        valid_mask = edge_valid_mask(mean_image)
+    signal_mask, ghost_mask = _ghost_masks(phantom_mask, pe_axis, radius, valid_mask)
     return float(mean_image[ghost_mask].mean() / mean_image[signal_mask].mean())
 
 def acr_ghosting_ratio(
@@ -515,22 +549,33 @@ def acr_ghosting_ratio(
     phantom_mask: NDArray,
     pe_axis: int = 0,
     radius: int = 3,
+    valid_mask: NDArray | None = None,
 ) -> float:
-    """ACR/AAPM ghosting ratio, evaluated over the shifted-phantom ghost masks.
+    """ACR/AAPM-equivalent ghosting ratio from region-matched percent ghosts.
 
-    The ACR/AAPM "percent-signal-ghosting" contrasts the ghost that appears along
-    the phase-encode axis against the frequency axis, where there is none, so the
-    background level cancels: ratio = |ghost_pe - ghost_freq| / signal. Rather
-    than ACR's four background ellipses, the ghost regions are the phantom rolled
-    half the FOV along each in-plane axis (`_ghost_masks`), and `signal` is the
-    phantom itself. 100x this value is the percent-signal-ghosting.
+    The classic ACR/AAPM "percent-signal-ghosting" subtracts a background estimate
+    (the frequency axis, which carries no N/2 ghost) from the phase-encode ghost,
+    normalized by the central signal: |ghost_pe - ghost_freq| / signal. This builds
+    the same contrast in fBIRN region-matched space: `ghost_ratio` is evaluated
+    independently along the PE and frequency axes -- each ghost patch normalized by
+    the exact tissue that produced it (`_ghost_masks`), with the phantom/ghost
+    overlap zone excluded from both -- and the ACR-equivalent is the absolute
+    difference of the two ratios.
+
+    Because each direction carries its own matched denominator, the frequency-axis
+    ratio is a genuine background-relative-to-signal baseline; subtracting it cancels
+    the background exactly as ACR intends, without ACR's single-signal assumption
+    (for a uniform phantom the two denominators coincide and this reduces to the
+    classic form). 100x this value is the percent-signal-ghosting. `valid_mask`
+    excludes zeroed image edges (see `edge_valid_mask`); it defaults to detecting
+    them from `mean_image`.
     """
+    if valid_mask is None:
+        valid_mask = edge_valid_mask(mean_image)
     freq_axis = 1 - pe_axis
-    signal_mask, ghost_pe = _ghost_masks(phantom_mask, pe_axis, radius)
-    _, ghost_freq = _ghost_masks(phantom_mask, freq_axis, radius)
-    signal = mean_image[signal_mask].mean()
-    return float(abs(mean_image[ghost_pe].mean() - mean_image[ghost_freq].mean())
-                 / signal)
+    pe = ghost_ratio(mean_image, phantom_mask, pe_axis, radius, valid_mask)
+    ro = ghost_ratio(mean_image, phantom_mask, freq_axis, radius, valid_mask)
+    return abs(pe - ro)
 
 def _pe_axis_from_header(header) -> int | None:
     """PE axis from the NIfTI `dim_info` phase field, or None if unset/invalid.
@@ -552,18 +597,19 @@ def phase_encode_axis(data: NDArray, radius: int = 3) -> int:
 @overload
 def estimate_pe_axis(
     mean_image: NDArray, phantom_mask: NDArray, radius: int = ...,
-    return_ratios: Literal[False] = ...,
+    return_ratios: Literal[False] = ..., *, valid_mask: NDArray | None = ...,
 ) -> int: ...
 @overload
 def estimate_pe_axis(
     mean_image: NDArray, phantom_mask: NDArray, radius: int = ...,
-    *, return_ratios: Literal[True],
+    *, return_ratios: Literal[True], valid_mask: NDArray | None = ...,
 ) -> tuple[int, dict[int, float]]: ...
 def estimate_pe_axis(
     mean_image: NDArray,
     phantom_mask: NDArray,
     radius: int = 3,
     return_ratios: bool = False,
+    valid_mask: NDArray | None = None,
 ) -> int | tuple[int, dict[int, float]]:
     """Guess the phase-encode axis from where the Nyquist ghost actually lands.
 
@@ -576,7 +622,8 @@ def estimate_pe_axis(
     verify against the acquisition's known PE direction before trusting it.
     """
     ratios = {
-        axis: ghost_ratio(mean_image, phantom_mask, pe_axis=axis, radius=radius)
+        axis: ghost_ratio(mean_image, phantom_mask, pe_axis=axis, radius=radius,
+                          valid_mask=valid_mask)
         for axis in (0, 1)
     }
     best = max(ratios, key=ratios.__getitem__)
@@ -636,18 +683,27 @@ def run_qa(
         )
 
     wk = weisskoff(images, roi)
+    mean_image = images.mean_image
+    valid_mask = images.valid_mask
     if pe_axis is None:
         pe_axis = images.pe_axis
     if pe_axis is None:
-        pe_axis = estimate_pe_axis(images.mean_image, geom.phantom_mask)
-    mean_image = images.mean_image
+        pe_axis = estimate_pe_axis(mean_image, geom.phantom_mask,
+                                   valid_mask=valid_mask)
+    # Region-matched percent ghost on each in-plane axis; the ACR-equivalent is
+    # their difference (see `acr_ghosting_ratio`). Computing both here avoids
+    # re-deriving the PE ratio inside `acr_ghosting_ratio`.
+    pe_ratio = ghost_ratio(mean_image, geom.phantom_mask, pe_axis=pe_axis,
+                           valid_mask=valid_mask)
+    ro_ratio = ghost_ratio(mean_image, geom.phantom_mask, pe_axis=1 - pe_axis,
+                           valid_mask=valid_mask)
     metrics = QAMetrics(
         snr=snr(images, roi),
         sfnr=sfnr(images, roi),
         rdc=wk.rdc,
-        ghost_pct=100.0 * ghost_ratio(mean_image, geom.phantom_mask, pe_axis=pe_axis),
-        acr_ghost_pct=100.0 * acr_ghosting_ratio(
-            mean_image, geom.phantom_mask, pe_axis=pe_axis),
+        ghost_pct=100.0 * pe_ratio,
+        ro_ghost_pct=100.0 * ro_ratio,
+        acr_ghost_pct=100.0 * abs(pe_ratio - ro_ratio),
         pe_axis=pe_axis,
         drift_pct=drift_percent(images, roi),
         percent_fluctuation=percent_fluctuation(images, roi),
