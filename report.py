@@ -230,9 +230,10 @@ def _plot_weisskoff(ax, wk, fs=9):
     where the measured plateau meets this line — equal the reported RDC, and is
     robust to the intensity non-uniformity that biases a single-voxel anchor.
     """
-    ax.loglog(wk.roi_sizes, wk.cv, "o-", ms=3, label="measured")
+    # Measured data on top (zorder), but first in the legend (call order).
+    ax.loglog(wk.roi_sizes, wk.cv, "o-", ms=3, label="measured", zorder=3)
     ax.loglog(wk.roi_sizes, wk.cv1_pooled / wk.roi_sizes,
-              "--", color="gray", label="ideal (pooled cv1)")
+              "--", color="gray", label="ideal (pooled cv1)", zorder=2)
     ax.set_xlabel("ROI width (voxels)")
     ax.set_ylabel("CV")
     ax.set_title(f"Weisskoff (RDC {wk.rdc:.1f})", fontsize=fs)
@@ -242,9 +243,11 @@ def _plot_weisskoff(ax, wk, fs=9):
 def _plot_rdc(ax, wk, fs=9):
     """RDC vs ROI size: pooled single-voxel CV / ROI-averaged CV, vs identity."""
     r, rdc = wk.roi_sizes, wk.rdc_curve
-    ax.plot(r, r, "k-", lw=0.8, label="ideal (RDC = width)")
-    ax.plot(r, rdc, "r.-", ms=4, label="measured")
-    ax.axhline(float(rdc.max()), ls="--", color="gray", lw=0.8)
+    # Match the Weisskoff plot: measured is C0/"o-" on top and first in the
+    # legend; the ideal reference is a gray dashed line beneath it.
+    ax.plot(r, rdc, "o-", ms=3, label="measured", zorder=3)
+    ax.plot(r, r, "--", color="gray", label="ideal (RDC = width)", zorder=2)
+    ax.axhline(float(rdc.max()), ls="--", color="gray", lw=0.8, zorder=1)
     ax.set_ylim(0, 1.5 * float(rdc.max()))
     ax.set_xlabel("ROI width (voxels)")
     ax.set_ylabel("RDC")
