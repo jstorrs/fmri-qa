@@ -167,7 +167,8 @@ class QAMetrics:
     snr: float
     sfnr: float
     rdc: float
-    ghost_ratio: float
+    ghost_pct: float  # fBIRN percent ghost: 100 * (mean ghost / mean signal)
+    acr_ghost_pct: float  # ACR/AAPM percent-signal-ghosting
     drift_pct: float
     percent_fluctuation: float
     weisskoff: WeisskoffResult
@@ -494,14 +495,37 @@ def ghost_ratio(
     pe_axis: int = 0,
     radius: int = 3,
 ) -> float:
-    """Nyquist ghost-to-signal ratio.
+    """fBIRN Nyquist ghost-to-signal ratio (mean ghost / mean signal).
 
-    NOTE: still tuning. The ghost is located by rolling the phantom half the FOV
-    along the phase-encode axis; `pe_axis` and the erosion/dilation `radius` are
-    acquisition-dependent and should be verified per protocol.
+    The fBIRN "percent ghost" is 100x this value. The ghost is located by rolling
+    the phantom half the FOV along the phase-encode axis; `pe_axis` and the
+    erosion/dilation `radius` are acquisition-dependent and should be verified per
+    protocol.
     """
     signal_mask, ghost_mask = _ghost_masks(phantom_mask, pe_axis, radius)
     return float(mean_image[ghost_mask].mean() / mean_image[signal_mask].mean())
+
+def acr_ghosting_ratio(
+    mean_image: NDArray,
+    phantom_mask: NDArray,
+    pe_axis: int = 0,
+    radius: int = 3,
+) -> float:
+    """ACR/AAPM ghosting ratio, evaluated over the shifted-phantom ghost masks.
+
+    The ACR/AAPM "percent-signal-ghosting" contrasts the ghost that appears along
+    the phase-encode axis against the frequency axis, where there is none, so the
+    background level cancels: ratio = |ghost_pe - ghost_freq| / signal. Rather
+    than ACR's four background ellipses, the ghost regions are the phantom rolled
+    half the FOV along each in-plane axis (`_ghost_masks`), and `signal` is the
+    phantom itself. 100x this value is the percent-signal-ghosting.
+    """
+    freq_axis = 1 - pe_axis
+    signal_mask, ghost_pe = _ghost_masks(phantom_mask, pe_axis, radius)
+    _, ghost_freq = _ghost_masks(phantom_mask, freq_axis, radius)
+    signal = mean_image[signal_mask].mean()
+    return float(abs(mean_image[ghost_pe].mean() - mean_image[ghost_freq].mean())
+                 / signal)
 
 def _pe_axis_from_header(header) -> int | None:
     """PE axis from the NIfTI `dim_info` phase field, or None if unset/invalid.
@@ -611,12 +635,14 @@ def run_qa(
         pe_axis = images.pe_axis
     if pe_axis is None:
         pe_axis = estimate_pe_axis(images.mean_image, geom.phantom_mask)
-    gr = ghost_ratio(images.mean_image, geom.phantom_mask, pe_axis=pe_axis)
+    mean_image = images.mean_image
     metrics = QAMetrics(
         snr=snr(images, roi),
         sfnr=sfnr(images, roi),
         rdc=wk.rdc,
-        ghost_ratio=gr,
+        ghost_pct=100.0 * ghost_ratio(mean_image, geom.phantom_mask, pe_axis=pe_axis),
+        acr_ghost_pct=100.0 * acr_ghosting_ratio(
+            mean_image, geom.phantom_mask, pe_axis=pe_axis),
         drift_pct=drift_percent(images, roi),
         percent_fluctuation=percent_fluctuation(images, roi),
         weisskoff=wk,

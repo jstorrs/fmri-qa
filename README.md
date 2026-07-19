@@ -3,8 +3,8 @@
 Phantom fMRI quality-assurance metrics, following the Glover/fBIRN stability
 protocol (Friedman & Glover, 2006). Given a 4-D phantom time series it reports
 SNR, SFNR, the Weisskoff radius of decorrelation (RDC), drift, temporal
-fluctuation, and the Nyquist ghost ratio, and can render a one-page PDF report
-per scan.
+fluctuation, and two Nyquist-ghost measures (fBIRN percent ghost and the
+ACR/AAPM ghosting ratio), and can render a one-page PDF report per scan.
 
 ## Metrics
 
@@ -18,7 +18,8 @@ fBIRN size) on a single slice.
 | **RDC** | Weisskoff radius of decorrelation: `cv1_pooled / cv[full ROI]` |
 | **drift %** | peak-to-peak of the ROI-mean fitted trend, as % of mean signal |
 | **fluctuation %** | SD of the ROI-mean residual, as % of mean signal |
-| **ghost** | Nyquist ghost-to-signal ratio (mean ghost region / mean signal region) |
+| **ghost %** | fBIRN percent ghost: `100 × mean ghost region / mean signal region` |
+| **ACRg %** | ACR/AAPM percent-signal-ghosting: `100 × \|ghost_pe − ghost_freq\| / signal`, over the N/2-shifted phantom masks |
 
 Drift is removed before the noise metrics are measured, using either a Legendre
 polynomial (`--detrend poly`, default) or a least-squares B-spline
@@ -56,10 +57,10 @@ uv run main.py [options] scan.nii.gz [more.nii.gz ...]
 
 ```
 # detrend=poly  trim_sec=5.0  center=image  roi_size=21
-scan                                      PE       SNR      SFNR      RDC   drift%    ghost
--------------------------------------------------------------------------------------------
-FBIRN_QA_fMRI_flip77_13.nii.gz             j     467.3     452.0   10.953    0.303   0.0415
-ABCD_QA_fMRI_16.nii.gz                     j      76.7      75.3   13.355    0.682   0.0513
+scan                                      PE       SNR      SFNR      RDC   drift%   ghost%    ACRg%
+----------------------------------------------------------------------------------------------------
+FBIRN_QA_fMRI_flip77_13.nii.gz             j     467.3     452.0   10.953    0.303    4.153    0.606
+ABCD_QA_fMRI_16.nii.gz                     j      76.7      75.3   13.355    0.682    5.126    2.378
 ```
 
 Options:
@@ -105,7 +106,7 @@ The pipeline is a linear chain of small functions, each usable on its own:
 
 ```
 QAScan → preprocess → QAImages → detect_phantom → resolve_roi
-       → {weisskoff, snr, sfnr, ghost_ratio}
+       → {weisskoff, snr, sfnr, ghost_ratio, acr_ghosting_ratio}
 ```
 
 `preprocess` trims the series, selects the slice, detrends per voxel, and

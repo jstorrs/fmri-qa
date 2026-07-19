@@ -204,8 +204,8 @@ def _header(c, result, title, *, meta_fs, metric_fs):
              f"detrend {images.detrend_method}   "
              f"ROI {roi.size}x{roi.size} @ ({int(roi.center[0])},{int(roi.center[1])})")
     line2 = (f"SNR {m.snr:.1f}   SFNR {m.sfnr:.1f}   RDC {m.rdc:.2f}   "
-             f"ghost {m.ghost_ratio:.4f}   drift {m.drift_pct:.3f}%   "
-             f"fluct {m.percent_fluctuation:.3f}%")
+             f"ghost {m.ghost_pct:.2f}%   ACRg {m.acr_ghost_pct:.2f}%   "
+             f"drift {m.drift_pct:.3f}%   fluct {m.percent_fluctuation:.3f}%")
 
     y = _PAGE_H - 34
     if title:
