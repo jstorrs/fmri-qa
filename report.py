@@ -86,10 +86,19 @@ def _roi_series(arr, roi):
     return arr[roi.index].mean(axis=(0, 1))
 
 
-def _draw_roi(ax, roi):
+def _draw_roi(ax, roi, *, pad=0.5):
+    """Outline the ROI just outside its pixels so the stroke doesn't cover them.
+
+    The ROI's outer boundary in imshow coordinates runs from `start - 0.5` to
+    `stop - 0.5`; drawing the box on that boundary centers the stroke on it, so
+    half the line width falls inward and hides the edge ROI pixels. `pad` (in
+    pixels) pushes the rectangle out into the excluded gutter so the whole stroke
+    clears the ROI.
+    """
     (r, c) = roi.index
     ax.add_patch(Rectangle(
-        (c.start - 0.5, r.start - 0.5), c.stop - c.start, r.stop - r.start,
+        (c.start - 0.5 - pad, r.start - 0.5 - pad),
+        (c.stop - c.start) + 2 * pad, (r.stop - r.start) + 2 * pad,
         edgecolor="red", facecolor="none", lw=1.3,
     ))
 
