@@ -169,6 +169,7 @@ class QAMetrics:
     rdc: float
     ghost_pct: float  # fBIRN percent ghost: 100 * (mean ghost / mean signal)
     acr_ghost_pct: float  # ACR/AAPM percent-signal-ghosting
+    pe_axis: int | None  # phase-encode axis actually used for the ghost masks
     drift_pct: float
     percent_fluctuation: float
     weisskoff: WeisskoffResult
@@ -647,6 +648,7 @@ def run_qa(
         ghost_pct=100.0 * ghost_ratio(mean_image, geom.phantom_mask, pe_axis=pe_axis),
         acr_ghost_pct=100.0 * acr_ghosting_ratio(
             mean_image, geom.phantom_mask, pe_axis=pe_axis),
+        pe_axis=pe_axis,
         drift_pct=drift_percent(images, roi),
         percent_fluctuation=percent_fluctuation(images, roi),
         weisskoff=wk,

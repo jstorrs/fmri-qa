@@ -16,7 +16,7 @@ matplotlib.use("Agg")  # headless; no display needed
 
 import numpy as np
 from matplotlib.figure import Figure
-from matplotlib.patches import Rectangle
+from matplotlib.patches import Patch, Rectangle
 from reportlab.graphics.shapes import Group, Image
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
@@ -129,6 +129,45 @@ def _panel_fig(img, title, *, mask=None, roi=None, log=False, aspect=1.15):
     return fig
 
 
+_GHOST_SRC_RGB = (0.20, 0.85, 1.0)  # signal source region (cyan)
+_GHOST_RGB = (1.0, 0.30, 0.30)  # ghost region (red)
+
+
+def _overlay(ax, mask, rgb, alpha=0.45):
+    """Tint the True pixels of `mask` with a translucent color over the image."""
+    rgba = np.zeros((*mask.shape, 4))
+    rgba[mask] = (*rgb, alpha)
+    ax.imshow(rgba)
+
+
+def _ghost_panel_fig(mean_image, phantom_mask, pe_axis, *, aspect=1.15):
+    """Mean image with the N/2 ghost region and the signal region that feeds it.
+
+    Draws the exact masks the ghost metrics average: the ghost patch (where the
+    phantom rolled half the FOV lands clear of the phantom) and its source on the
+    phantom (that patch rolled back), so the reported ghost %/ACRg can be checked
+    against where the ghost actually falls. Blank if the PE axis is unknown.
+    """
+    fig = Figure(figsize=(2.0, 2.0 * aspect))
+    ax = fig.add_subplot(111)
+    ax.imshow(mean_image, cmap="gray", vmin=0, vmax=np.percentile(mean_image, 99))
+    if pe_axis in (0, 1):
+        signal_mask, ghost_mask = q._ghost_masks(phantom_mask, pe_axis, 3)
+        _overlay(ax, signal_mask, _GHOST_SRC_RGB)
+        _overlay(ax, ghost_mask, _GHOST_RGB)
+        ax.legend(
+            handles=[Patch(color=_GHOST_SRC_RGB, label="signal"),
+                     Patch(color=_GHOST_RGB, label="ghost")],
+            fontsize=5, loc="lower right", framealpha=0.6, handlelength=1.0,
+            borderpad=0.3, labelspacing=0.2,
+        )
+    ax.set_title("N/2 ghost", fontsize=9)
+    ax.set_xticks([])
+    ax.set_yticks([])
+    fig.subplots_adjust(left=0.02, right=0.98, bottom=0.02, top=0.90)
+    return fig
+
+
 def _plot_fig(draw, figsize):
     """Run an ax-drawing callback on a fresh constrained-layout figure."""
     fig = Figure(figsize=figsize, layout="constrained")
@@ -198,7 +237,7 @@ def _plot_spectrum(ax, resid, tr, fs=9):
 def _header(c, result, title, *, meta_fs, metric_fs):
     """Draw the title + metadata/metric lines; return the y below them."""
     images, roi, m = result.images, result.roi, result.metrics
-    pe = _AXIS_LETTER.get(images.pe_axis, "?")
+    pe = _AXIS_LETTER.get(m.pe_axis, "?")
     line1 = (f"TR {images.tr:.3g}s   voxel {images.voxel_size:.3g}mm   "
              f"frames {images.center_slice.shape[-1]}   PE {pe}   "
              f"detrend {images.detrend_method}   "
@@ -221,8 +260,8 @@ def _header(c, result, title, *, meta_fs, metric_fs):
 
 
 def _panel_figs(result):
-    """The four summary image panels, in row order."""
-    images, geom, roi = result.images, result.geom, result.roi
+    """The summary image panels, in row order (last is the N/2 ghost overlay)."""
+    images, geom, roi, m = result.images, result.geom, result.roi, result.metrics
     sfnr_img = np.where(geom.phantom_mask,
                         images.mean_image / (images.fluctuation_noise + 1e-9), 0.0)
     return [
@@ -233,17 +272,29 @@ def _panel_figs(result):
                    mask=geom.phantom_mask, roi=roi, log=True),
         _panel_fig(images.static_noise, "static noise",
                    mask=geom.phantom_mask, roi=roi),
+        _ghost_panel_fig(images.mean_image, geom.phantom_mask, m.pe_axis),
     ]
 
 
-def _panel_row(c, figs, top):
-    """Draw four panels across the content width; return the y below them."""
-    gap = 8.0
-    pw = (_CONTENT_W - 3 * gap) / 4
+def _panel_row(c, figs, top, *, gap=8.0):
+    """Draw the panels in one row across the content width; return the y below."""
+    n = len(figs)
+    pw = (_CONTENT_W - (n - 1) * gap) / n
     ph = pw * 1.15
     for i, fig in enumerate(figs):
         _draw_fig(c, fig, _MARGIN + i * (pw + gap), top, pw, ph)
     return top - ph
+
+
+def _panel_grid(c, figs, top, *, ncol, gap=14.0):
+    """Draw the panels in a grid of `ncol` columns; return the y below the grid."""
+    pw = (_CONTENT_W - (ncol - 1) * gap) / ncol
+    ph = pw * 1.15
+    for i, fig in enumerate(figs):
+        r, col = divmod(i, ncol)
+        _draw_fig(c, fig, _MARGIN + col * (pw + gap), top - r * (ph + gap), pw, ph)
+    rows = -(-len(figs) // ncol)  # ceil
+    return top - rows * ph - (rows - 1) * gap
 
 
 def _timeseries(result):
@@ -284,17 +335,9 @@ def _one_page(c, result, title):
 
 
 def _summary_page(c, result, title):
-    y = _header(c, result, title, meta_fs=9.0, metric_fs=11.0)
-    # Two large image rows: signal/SFNR then fluct-noise/static-noise.
-    figs = _panel_figs(result)
-    gap = 16.0
-    half = (_CONTENT_W - gap) / 2
-    ph = half * 1.05
-    y -= 8
-    for row in (figs[:2], figs[2:]):
-        for i, fig in enumerate(row):
-            _draw_fig(c, fig, _MARGIN + i * (half + gap), y, half, ph)
-        y -= ph + 14
+    y = _header(c, result, title, meta_fs=9.0, metric_fs=10.0)
+    # Five image panels (signal, SFNR, fluct/static noise, N/2 ghost) in a grid.
+    _panel_grid(c, _panel_figs(result), y - 8, ncol=3)
 
 
 def _analysis_page(c, result, title):
