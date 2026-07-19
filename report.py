@@ -20,6 +20,7 @@ from matplotlib.patches import Rectangle
 from reportlab.graphics.shapes import Group, Image
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
+from scipy.spatial import ConvexHull
 from svglib import svglib as _svglib
 from svglib.svglib import svg2rlg
 
@@ -89,8 +90,24 @@ def _draw_roi(ax, roi):
     (r, c) = roi.index
     ax.add_patch(Rectangle(
         (c.start - 0.5, r.start - 0.5), c.stop - c.start, r.stop - r.start,
-        edgecolor="red", facecolor="none", lw=1.0,
+        edgecolor="red", facecolor="none", lw=1.3,
     ))
+
+
+def _draw_hull(ax, mask, *, color="tab:cyan", lw=1.0):
+    """Outline the convex hull of a boolean mask as a closed polygon.
+
+    The hull smooths the ragged phantom-mask boundary into a clean convex
+    outline. `imshow` maps column -> x and row -> y, so the mask's (row, col)
+    pixel coordinates plot as (col, row).
+    """
+    ys, xs = np.nonzero(mask)
+    if xs.size < 3:
+        return
+    pts = np.column_stack([xs, ys]).astype(float)
+    verts = ConvexHull(pts).vertices
+    loop = np.append(verts, verts[0])  # close the polygon
+    ax.plot(pts[loop, 0], pts[loop, 1], color=color, lw=lw)
 
 
 def _panel_fig(img, title, *, mask=None, roi=None, log=False, aspect=1.15):
@@ -102,7 +119,7 @@ def _panel_fig(img, title, *, mask=None, roi=None, log=False, aspect=1.15):
     vmin, vmax = (np.percentile(finite, [2, 98]) if finite.size else (0, 1))
     ax.imshow(data, cmap="gray", vmin=vmin, vmax=vmax)
     if mask is not None:
-        ax.contour(mask, levels=[0.5], colors="tab:cyan", linewidths=0.6)
+        _draw_hull(ax, mask, lw=1.0)
     if roi is not None:
         _draw_roi(ax, roi)
     ax.set_title(title, fontsize=9)
