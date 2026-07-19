@@ -1,12 +1,11 @@
 """Multi-page PDF QA reports rendered from `fmriqc.QAResult` objects.
 
 The page layout (title, metadata, metric line, and the placement grid) is drawn
-natively with ReportLab; the individual image panels and stability plots are
-rendered by matplotlib as SVG and embedded as vector drawings. Keeping the
-plotting in matplotlib preserves the scientific figures while letting ReportLab
-own the page composition and text, and the SVG path keeps the axes, curves, and
-labels as crisp vectors (the phantom images inside `imshow` remain raster, as
-they inherently are).
+natively with ReportLab; every matplotlib figure — the image panels and the
+stability plots — is embedded as vector SVG (via svglib) so the axes, curves,
+and labels stay crisp. The phantom images inside `imshow` are inherently raster
+and ride along inside the SVG. See `_patch_svglib_image_alignment` for the one
+svglib defect this has to work around.
 """
 
 import io
@@ -18,8 +17,10 @@ matplotlib.use("Agg")  # headless; no display needed
 import numpy as np
 from matplotlib.figure import Figure
 from matplotlib.patches import Rectangle
+from reportlab.graphics.shapes import Group, Image
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
+from svglib import svglib as _svglib
 from svglib.svglib import svg2rlg
 
 import fmriqc as q
@@ -34,6 +35,33 @@ _CONTENT_W = _PAGE_W - 2 * _MARGIN
 # --------------------------------------------------------------------------- #
 # matplotlib panels/plots -> embeddable vector drawings
 # --------------------------------------------------------------------------- #
+
+def _patch_svglib_image_alignment():
+    """Fix svglib truncating embedded-image geometry to whole points.
+
+    svglib's `convertImage` builds the ReportLab `Image` from `int(x)`,
+    `int(y + height)`, `int(width)`, `int(height)` while flipping the enclosing
+    group by the *un*-truncated `(y + height) * 2`. For an `imshow` panel the
+    raster then lands up to a point off from the mask contour and ROI box (which
+    keep full precision), so the phantom outline visibly drifts off the image.
+    This reinstates the method verbatim without the `int()` casts. Pinned to the
+    svglib in `uv.lock`; revisit on upgrade.
+    """
+    def convertImage(self, node):
+        x, y, width, height = self.convert_length_attrs(
+            node, "x", "y", "width", "height")
+        image = node._resolved_target
+        image = Image(x, y + height, width, height, image)
+        group = Group(image)
+        group.translate(0, (y + height) * 2)
+        group.scale(1, -1)
+        return group
+
+    _svglib.Svg2RlgShapeConverter.convertImage = convertImage
+
+
+_patch_svglib_image_alignment()
+
 
 def _draw_fig(c, fig, x, top, w, h):
     """Embed a matplotlib `Figure` as vector SVG in a box, top-aligned/centered.
