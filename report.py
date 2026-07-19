@@ -284,30 +284,68 @@ def _plot_spectrum(ax, resid, tr, fs=9):
 # ReportLab page composition
 # --------------------------------------------------------------------------- #
 
-def _header(c, result, title, *, meta_fs, metric_fs):
-    """Draw the title + metadata/metric lines; return the y below them."""
+_TILE_H = 34.0  # metric-tile height (pt)
+_TILE_GAP = 6.0
+
+
+def _metric_tiles(m):
+    """(label, value) pairs for the header metric tiles, in display order."""
+    return [
+        ("SNR", f"{m.snr:.1f}"),
+        ("SFNR", f"{m.sfnr:.1f}"),
+        ("RDC", f"{m.rdc:.2f}"),
+        ("ghost", f"{m.ghost_pct:.2f}%"),
+        ("RO", f"{m.ro_ghost_pct:.2f}%"),
+        ("ACRg", f"{m.acr_ghost_pct:.2f}%"),
+        ("drift", f"{m.drift_pct:.3f}%"),
+        ("fluct", f"{m.percent_fluctuation:.3f}%"),
+    ]
+
+
+def _draw_tiles(c, tiles, top):
+    """Draw the metric tiles as an even strip across the content width."""
+    n = len(tiles)
+    tw = (_CONTENT_W - (n - 1) * _TILE_GAP) / n
+    bottom = top - _TILE_H
+    for i, (label, value) in enumerate(tiles):
+        x = _MARGIN + i * (tw + _TILE_GAP)
+        cx = x + tw / 2
+        c.setFillGray(0.96)
+        c.setStrokeGray(0.80)
+        c.setLineWidth(0.5)
+        c.rect(x, bottom, tw, _TILE_H, stroke=1, fill=1)
+        c.setFillGray(0.10)
+        c.setFont("Helvetica-Bold", 12)
+        c.drawCentredString(cx, bottom + 18, value)
+        c.setFillGray(0.45)
+        c.setFont("Helvetica", 6.5)
+        c.drawCentredString(cx, bottom + 6, label)
+    c.setFillGray(0.0)
+    return bottom
+
+
+def _header(c, result, title):
+    """Draw the scan name, metadata line, and metric tiles; return the y below."""
     images, roi, m = result.images, result.roi, result.metrics
     pe = _AXIS_LETTER.get(m.pe_axis, "?")
-    line1 = (f"TR {images.tr:.3g}s   voxel {images.voxel_size:.3g}mm   "
-             f"frames {images.center_slice.shape[-1]}   PE {pe}   "
-             f"detrend {images.detrend_method}   "
-             f"ROI {roi.size}x{roi.size} @ ({int(roi.center[0])},{int(roi.center[1])})")
-    line2 = (f"SNR {m.snr:.1f}   SFNR {m.sfnr:.1f}   RDC {m.rdc:.2f}   "
-             f"ghost {m.ghost_pct:.2f}%   RO {m.ro_ghost_pct:.2f}%   "
-             f"ACRg {m.acr_ghost_pct:.2f}%   "
-             f"drift {m.drift_pct:.3f}%   fluct {m.percent_fluctuation:.3f}%")
+    meta = (f"TR {images.tr:.3g}s  ·  voxel {images.voxel_size:.3g}mm  ·  "
+            f"{images.center_slice.shape[-1]} frames  ·  PE {pe}  ·  "
+            f"detrend {images.detrend_method}  ·  "
+            f"ROI {roi.size}×{roi.size} @ "
+            f"({int(roi.center[0])},{int(roi.center[1])})")
 
-    y = _PAGE_H - 34
+    y = _PAGE_H - 32
     if title:
         c.setFont("Helvetica-Bold", 14)
-        c.drawCentredString(_PAGE_W / 2, y, title)
-    y -= 24
-    c.setFont("Courier", meta_fs)
-    c.drawString(_MARGIN, y, line1)
-    y -= 16
-    c.setFont("Courier-Bold", metric_fs)
-    c.drawString(_MARGIN, y, line2)
-    return y - 14
+        c.drawString(_MARGIN, y, title)
+        y -= 15
+    c.setFont("Helvetica", 8.5)
+    c.setFillGray(0.40)
+    c.drawString(_MARGIN, y, meta)
+    c.setFillGray(0.0)
+
+    bottom = _draw_tiles(c, _metric_tiles(m), y - 11)
+    return bottom - 10
 
 
 def _panel_figs(result):
@@ -360,7 +398,7 @@ def _timeseries(result):
 
 def _one_page(c, result, title):
     wk = result.metrics.weisskoff
-    y = _header(c, result, title, meta_fs=8.3, metric_fs=10.0)
+    y = _header(c, result, title)
 
     y = _panel_row(c, _panel_figs(result), y - 6)
 
@@ -386,7 +424,7 @@ def _one_page(c, result, title):
 
 
 def _summary_page(c, result, title):
-    y = _header(c, result, title, meta_fs=9.0, metric_fs=10.0)
+    y = _header(c, result, title)
     # Five image panels (signal, SFNR, fluct/static noise, N/2 ghost) in a grid.
     _panel_grid(c, _panel_figs(result), y - 8, ncol=3)
 
