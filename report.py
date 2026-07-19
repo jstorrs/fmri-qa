@@ -86,20 +86,35 @@ def _roi_series(arr, roi):
     return arr[roi.index].mean(axis=(0, 1))
 
 
-def _draw_roi(ax, roi, *, pad=0.5):
+def _data_per_point(ax):
+    """Length of one typographic point (1/72 in) in axes data units.
+
+    `imshow` uses equal aspect, so x and y share a scale; `apply_aspect` finalizes
+    that scaling first so the measured transform is the one that will render. The
+    figure dpi cancels, making the result resolution-independent -- call only
+    after the axes position (subplots_adjust) is final.
+    """
+    ax.apply_aspect()
+    (x0, x1) = ax.transData.transform([(0, 0), (1, 0)])[:, 0]
+    return (ax.figure.dpi / 72.0) / abs(x1 - x0)
+
+
+def _draw_roi(ax, roi, *, lw=1.3):
     """Outline the ROI just outside its pixels so the stroke doesn't cover them.
 
     The ROI's outer boundary in imshow coordinates runs from `start - 0.5` to
-    `stop - 0.5`; drawing the box on that boundary centers the stroke on it, so
-    half the line width falls inward and hides the edge ROI pixels. `pad` (in
-    pixels) pushes the rectangle out into the excluded gutter so the whole stroke
-    clears the ROI.
+    `stop - 0.5`. The stroke is centered on the path, so drawing on that boundary
+    spills half the line width inward and hides the edge ROI pixels. Pad outward
+    by exactly half the line width -- converted from points to data units via the
+    axes scale -- so the stroke's inner edge lands back on the boundary and every
+    ROI pixel stays visible.
     """
     (r, c) = roi.index
+    pad = 0.5 * lw * _data_per_point(ax)
     ax.add_patch(Rectangle(
         (c.start - 0.5 - pad, r.start - 0.5 - pad),
         (c.stop - c.start) + 2 * pad, (r.stop - r.start) + 2 * pad,
-        edgecolor="red", facecolor="none", lw=1.3,
+        edgecolor="red", facecolor="none", lw=lw,
     ))
 
 
@@ -127,14 +142,16 @@ def _panel_fig(img, title, *, mask=None, roi=None, log=False, aspect=1.15):
     finite = data[np.isfinite(data)]
     vmin, vmax = (np.percentile(finite, [2, 98]) if finite.size else (0, 1))
     ax.imshow(data, cmap="gray", vmin=vmin, vmax=vmax, interpolation="nearest")
+    ax.set_xticks([])
+    ax.set_yticks([])
+    # Fix the axes box before drawing the ROI: its pad is derived from the axes
+    # scale (see `_draw_roi`/`_data_per_point`), which subplots_adjust finalizes.
+    fig.subplots_adjust(left=0.02, right=0.98, bottom=0.02, top=0.90)
     if mask is not None:
         _draw_hull(ax, mask, lw=1.0)
     if roi is not None:
         _draw_roi(ax, roi)
     ax.set_title(title, fontsize=9)
-    ax.set_xticks([])
-    ax.set_yticks([])
-    fig.subplots_adjust(left=0.02, right=0.98, bottom=0.02, top=0.90)
     return fig
 
 
