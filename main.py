@@ -3,7 +3,7 @@ import sys
 
 import fmriqc as q
 
-_AXIS_LETTER = {0: "i", 1: "j", 2: "k", None: "?"}
+_PE_LABEL = {0: "row", 1: "col", 2: "k", None: "?"}  # DICOM row/col (i->row, j->col)
 
 
 def main(argv=None):
@@ -71,9 +71,14 @@ def main(argv=None):
             print(f"{name:40s} ERROR: {exc}", file=sys.stderr)
             continue
         m = result.metrics
-        axis = args.pe_axis if args.pe_axis is not None else scan.pe_axis
+        # Prefer the sidecar's DICOM row/col; fall back to the axis mapping.
+        if args.pe_axis is None and result.meta and result.meta.pe_dir:
+            pe = result.meta.pe_dir
+        else:
+            axis = args.pe_axis if args.pe_axis is not None else scan.pe_axis
+            pe = _PE_LABEL.get(axis, "?")
         print(
-            f"{name:40s} {_AXIS_LETTER.get(axis, '?'):>3s} "
+            f"{name:40s} {pe:>3s} "
             f"{m.snr:>9.1f} {m.sfnr:>9.1f} {m.rdc:>8.3f} "
             f"{m.drift_pct:>8.3f} {m.ghost_pct:>8.3f} {m.ro_ghost_pct:>8.3f} "
             f"{m.acr_ghost_pct:>8.3f}"

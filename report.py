@@ -26,7 +26,7 @@ from svglib.svglib import svg2rlg
 
 import fmriqc as q
 
-_AXIS_LETTER = {0: "i", 1: "j", 2: "k"}
+_PE_ROWCOL = {0: "row", 1: "col"}  # DICOM row/col fallback when meta is absent
 
 _PAGE_W, _PAGE_H = letter  # 612 x 792 pt
 _MARGIN = 40.0
@@ -324,27 +324,81 @@ def _draw_tiles(c, tiles, top):
     return bottom
 
 
-def _header(c, result, title):
-    """Draw the scan name, metadata line, and metric tiles; return the y below."""
-    images, roi, m = result.images, result.roi, result.metrics
-    pe = _AXIS_LETTER.get(m.pe_axis, "?")
-    meta = (f"TR {images.tr:.3g}s  ·  voxel {images.voxel_size:.3g}mm  ·  "
-            f"{images.center_slice.shape[-1]} frames  ·  PE {pe}  ·  "
-            f"detrend {images.detrend_method}  ·  "
-            f"ROI {roi.size}×{roi.size} @ "
-            f"({int(roi.center[0])},{int(roi.center[1])})")
+def _acquisition_line(result):
+    """The sequence/geometry metadata string. Sidecar-only fields are omitted."""
+    images, m, meta = result.images, result.metrics, result.meta
+    parts = [f"TR {images.tr:.3g}s"]
+    if meta and meta.te is not None:
+        parts.append(f"TE {meta.te * 1000:.0f}ms")
+    if meta and meta.flip_angle is not None:
+        parts.append(f"flip {meta.flip_angle:g}°")
+    if meta:
+        vr, vc, spacing = meta.voxel_mm
+        parts.append(f"{vr:.3g}×{vc:.3g}mm")
+        thk = meta.slice_thickness if meta.slice_thickness is not None else spacing
+        parts.append(f"{thk:g}mm slice")
+        parts.append(f"{meta.matrix[0]}×{meta.matrix[1]} px")
+    parts.append(f"{images.center_slice.shape[-1]} frames")
+    pe = meta.pe_dir if meta and meta.pe_dir else _PE_ROWCOL.get(m.pe_axis, "?")
+    parts.append(f"PE {pe}")
+    detrend = f"detrend {images.detrend_method}"
+    if images.detrend_order is not None:
+        unit = "deg" if images.detrend_method == "poly" else "knots"
+        detrend += f" ({unit} {images.detrend_order})"
+    parts.append(detrend)
+    return "   ·   ".join(parts)
 
+
+def _provenance_line(meta):
+    """The scanner/coil/software/time string; empty without a sidecar."""
+    if meta is None:
+        return ""
+    parts = []
+    if meta.serial:
+        parts.append(f"SN {meta.serial}")
+    if meta.coil:
+        parts.append(f"coil {meta.coil}")
+    if meta.software:
+        parts.append(meta.software)
+    if meta.datetime:
+        parts.append(meta.datetime)
+    return "   ·   ".join(parts)
+
+
+def _device_line(meta):
+    """Manufacturer/model/field-strength for the title row; empty if unknown."""
+    if meta is None:
+        return ""
+    dev = " ".join(x for x in (meta.manufacturer, meta.model) if x)
+    if meta.field_strength is not None:
+        dev = f"{dev}   ·   {meta.field_strength:g}T".strip(" ·")
+    return dev
+
+
+def _header(c, result, title):
+    """Draw the scan name, metadata lines, and metric tiles; return the y below."""
     y = _PAGE_H - 32
     if title:
         c.setFont("Helvetica-Bold", 14)
         c.drawString(_MARGIN, y, title)
-        y -= 15
-    c.setFont("Helvetica", 8.5)
+    device = _device_line(result.meta)
+    if device:
+        c.setFont("Helvetica", 9)
+        c.setFillGray(0.40)
+        c.drawRightString(_PAGE_W - _MARGIN, y, device)
+    if title or device:
+        y -= 14
+
+    c.setFont("Helvetica", 8.3)
     c.setFillGray(0.40)
-    c.drawString(_MARGIN, y, meta)
+    c.drawString(_MARGIN, y, _acquisition_line(result))
+    prov = _provenance_line(result.meta)
+    if prov:
+        y -= 11
+        c.drawString(_MARGIN, y, prov)
     c.setFillGray(0.0)
 
-    bottom = _draw_tiles(c, _metric_tiles(m), y - 11)
+    bottom = _draw_tiles(c, _metric_tiles(result.metrics), y - 12)
     return bottom - 10
 
 

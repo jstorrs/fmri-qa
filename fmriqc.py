@@ -1,3 +1,4 @@
+import json
 import warnings
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -28,6 +29,99 @@ ROI_CENTER_MODES = ("image", "phantom")
 # Core types
 # --------------------------------------------------------------------------- #
 
+# DICOM in-plane phase-encode axis -> row/col: NIfTI i (axis 0) is the DICOM
+# row direction, j (axis 1) the column direction (verified against dcm2niix
+# InPlanePhaseEncodingDirectionDICOM on a Siemens acquisition).
+_PE_ROWCOL = {0: "row", 1: "col"}
+
+
+@dataclass(frozen=True)
+class ScanMeta:
+    """Human-readable acquisition metadata for the report header.
+
+    Geometry (`voxel_mm`, `matrix`, `tr`) comes from the NIfTI header and is
+    always present. The rest comes from the BIDS JSON sidecar written alongside
+    the NIfTI (dcm2niix) and is `None` when no sidecar is found. `voxel_mm` is
+    (row, col, slice-spacing) from the header zooms; `slice_thickness` is the
+    excited slab from the sidecar (the zoom is spacing, which includes any gap).
+    `pe_dir` is the DICOM row/col direction.
+    """
+
+    voxel_mm: tuple[float, float, float]
+    matrix: tuple[int, int]
+    tr: float
+    te: float | None = None            # s
+    flip_angle: float | None = None    # degrees
+    slice_thickness: float | None = None  # mm
+    pe_dir: str | None = None          # "row" / "col"
+    coil: str | None = None
+    manufacturer: str | None = None
+    model: str | None = None
+    serial: str | None = None
+    field_strength: float | None = None  # tesla
+    software: str | None = None
+    datetime: str | None = None        # acquisition date and/or time
+    series: str | None = None
+
+
+def _load_sidecar(path: str | Path) -> dict:
+    """Parse the BIDS JSON sidecar beside `path` (.nii/.nii.gz -> .json); {} if none."""
+    p = Path(path)
+    name = p.name
+    for ext in (".nii.gz", ".nii"):
+        if name.endswith(ext):
+            name = name[: -len(ext)]
+            break
+    sidecar = p.with_name(name + ".json")
+    if sidecar.is_file():
+        with open(sidecar) as f:
+            return json.load(f)
+    return {}
+
+
+def _acq_datetime(sidecar: dict) -> str | None:
+    """Acquisition date/time from the sidecar, seconds-precision; None if absent.
+
+    Siemens often anonymizes the date away, leaving only `AcquisitionTime`.
+    """
+    if dt := sidecar.get("AcquisitionDateTime"):
+        return str(dt).split(".")[0].replace("T", " ")
+    date, time = sidecar.get("AcquisitionDate"), sidecar.get("AcquisitionTime")
+    time = str(time).split(".")[0] if time else None
+    return " ".join(x for x in (date, time) if x) or None
+
+
+def _pe_direction(pe_axis: int | None, sidecar: dict) -> str | None:
+    """DICOM row/col phase-encode direction, preferring the sidecar."""
+    if dicom := sidecar.get("InPlanePhaseEncodingDirectionDICOM"):
+        return str(dicom).lower()
+    if ped := sidecar.get("PhaseEncodingDirection"):
+        return _PE_ROWCOL.get({"i": 0, "j": 1}.get(str(ped)[0], -1))
+    return _PE_ROWCOL.get(pe_axis) if pe_axis is not None else None
+
+
+def _scan_meta(img, sidecar: dict, pe_axis: int | None) -> ScanMeta:
+    """Assemble `ScanMeta` from the NIfTI header and (optional) BIDS sidecar."""
+    zooms = img.header.get_zooms()
+    return ScanMeta(
+        voxel_mm=(float(zooms[0]), float(zooms[1]), float(zooms[2])),
+        matrix=(int(img.shape[0]), int(img.shape[1])),
+        tr=float(zooms[3]),
+        te=sidecar.get("EchoTime"),
+        flip_angle=sidecar.get("FlipAngle"),
+        slice_thickness=sidecar.get("SliceThickness"),
+        pe_dir=_pe_direction(pe_axis, sidecar),
+        coil=sidecar.get("ReceiveCoilName"),
+        manufacturer=sidecar.get("Manufacturer"),
+        model=sidecar.get("ManufacturersModelName"),
+        serial=sidecar.get("DeviceSerialNumber"),
+        field_strength=sidecar.get("MagneticFieldStrength"),
+        software=sidecar.get("SoftwareVersions"),
+        datetime=_acq_datetime(sidecar),
+        series=sidecar.get("SeriesDescription"),
+    )
+
+
 @dataclass(frozen=True, eq=False)
 class QAScan:
     """A raw QA acquisition plus the header metadata the pipeline needs.
@@ -36,13 +130,14 @@ class QAScan:
     read from the header `dim_info` phase field. When `dim_info` is missing or
     invalid a warning is emitted and it falls back to the Nyquist-ghost estimate
     (or `None` if `estimate_pe=False`). Polarity is dropped (unneeded here).
+    `meta` holds the human-readable acquisition metadata for the report.
     """
 
     data: NDArray  # (X, Y, Z, T)
     tr: float
-    voxel_size: float
     affine: NDArray | None = None
     pe_axis: int | None = None
+    meta: ScanMeta | None = None
 
     @classmethod
     def from_nifti(cls, path: str | Path, estimate_pe: bool = True) -> "QAScan":
@@ -61,9 +156,9 @@ class QAScan:
         return cls(
             data=data,
             tr=float(zooms[3]),
-            voxel_size=float(zooms[0]),
             affine=img.affine,
             pe_axis=pe_axis,
+            meta=_scan_meta(img, _load_sidecar(path), pe_axis),
         )
 
 
@@ -84,9 +179,9 @@ class QAImages:
     center_slice: NDArray  # (X, Y, T) trimmed center slice (raw signal)
     fluctuations: NDArray  # (X, Y, T) detrended residuals
     tr: float
-    voxel_size: float
     pe_axis: int | None = None
     detrend_method: str = "poly"
+    detrend_order: int | None = None  # poly degree / spline interior-knot count
 
     @property
     def trend(self) -> NDArray:
@@ -190,13 +285,15 @@ class QAResult:
     """Full QA output: the intermediate objects plus the scalar metrics.
 
     Returned by `run_qa`. `metrics` holds the scalars; `images`/`geom`/`roi` are
-    retained so a report can render the images, curves, and time series.
+    retained so a report can render the images, curves, and time series; `meta`
+    carries the acquisition metadata (from the scan) for the report header.
     """
 
     images: QAImages
     geom: PhantomGeometry
     roi: ROI
     metrics: QAMetrics
+    meta: ScanMeta | None = None
 
 
 # --------------------------------------------------------------------------- #
@@ -315,18 +412,19 @@ def poly_residuals(y: NDArray, degree: int) -> NDArray:
 DETREND_METHODS = ("poly", "spline")
 
 def detrend_fn(center_slice: NDArray, tr: float,
-               method: str = "poly") -> Callable[[NDArray], NDArray]:
-    """Build a detrender `f(y) -> residuals` for the chosen `method`.
+               method: str = "poly") -> tuple[Callable[[NDArray], NDArray], int]:
+    """Build a detrender `f(y) -> residuals` and its fit order for `method`.
 
     Complexity (poly degree / spline nodes) is derived once from the timeseries
-    length and `tr`, then applied to the full slice and each ROI timeseries.
+    length and `tr`, then applied to the full slice and each ROI timeseries. The
+    returned order is that complexity, surfaced for the report.
     """
     if method == "poly":
         degree = poly_degree(center_slice, tr)
-        return lambda y: poly_residuals(y, degree)
+        return (lambda y: poly_residuals(y, degree)), degree
     if method == "spline":
         n_nodes = spline_nodes(center_slice, tr)
-        return lambda y: spline_residuals(y, n_nodes)
+        return (lambda y: spline_residuals(y, n_nodes)), n_nodes
     raise ValueError(f"unknown detrend method {method!r}; choose from {DETREND_METHODS}")
 
 
@@ -645,14 +743,15 @@ def preprocess(scan: QAScan, trim_sec: float = 5.0, detrend: str = "poly",
     """
     data = trim_initial(scan.data, scan.tr, trim_sec)
     center_slice = extract_center_slice(data, center)
-    fluctuations = detrend_fn(center_slice, scan.tr, detrend)(center_slice)
+    detrend_op, detrend_order = detrend_fn(center_slice, scan.tr, detrend)
+    fluctuations = detrend_op(center_slice)
     return QAImages(
         center_slice=center_slice,
         fluctuations=fluctuations,
         tr=float(scan.tr),
-        voxel_size=float(scan.voxel_size),
         pe_axis=scan.pe_axis,
         detrend_method=detrend,
+        detrend_order=detrend_order,
     )
 
 def run_qa(
@@ -709,4 +808,5 @@ def run_qa(
         percent_fluctuation=percent_fluctuation(images, roi),
         weisskoff=wk,
     )
-    return QAResult(images=images, geom=geom, roi=roi, metrics=metrics)
+    return QAResult(images=images, geom=geom, roi=roi, metrics=metrics,
+                    meta=scan.meta)
