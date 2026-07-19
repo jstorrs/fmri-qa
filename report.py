@@ -117,7 +117,7 @@ def _panel_fig(img, title, *, mask=None, roi=None, log=False, aspect=1.15):
     data = np.log(np.clip(img, 1e-9, None)) if log else img
     finite = data[np.isfinite(data)]
     vmin, vmax = (np.percentile(finite, [2, 98]) if finite.size else (0, 1))
-    ax.imshow(data, cmap="gray", vmin=vmin, vmax=vmax)
+    ax.imshow(data, cmap="gray", vmin=vmin, vmax=vmax, interpolation="nearest")
     if mask is not None:
         _draw_hull(ax, mask, lw=1.0)
     if roi is not None:
@@ -140,7 +140,7 @@ def _overlay(ax, mask, rgb, alpha=0.45):
     """Tint the True pixels of `mask` with a translucent color over the image."""
     rgba = np.zeros((*mask.shape, 4))
     rgba[mask] = (*rgb, alpha)
-    ax.imshow(rgba)
+    ax.imshow(rgba, interpolation="nearest")
 
 
 def _ghost_panel_fig(mean_image, phantom_mask, pe_axis, *, aspect=1.15):
@@ -157,7 +157,8 @@ def _ghost_panel_fig(mean_image, phantom_mask, pe_axis, *, aspect=1.15):
     """
     fig = Figure(figsize=(2.0, 2.0 * aspect))
     ax = fig.add_subplot(111)
-    ax.imshow(mean_image, cmap="gray", vmin=0, vmax=np.percentile(mean_image, 99))
+    ax.imshow(mean_image, cmap="gray", vmin=0, vmax=np.percentile(mean_image, 99),
+              interpolation="nearest")
     valid_mask = q.edge_valid_mask(mean_image)
     handles = []
     if pe_axis in (0, 1):
