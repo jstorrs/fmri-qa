@@ -1,17 +1,45 @@
-"""Multi-page PDF QA reports rendered from `fmriqc.QAResult` objects."""
+"""Multi-page PDF QA reports rendered from `fmriqc.QAResult` objects.
+
+The page layout (title, metadata, metric line, and the placement grid) is drawn
+natively with ReportLab; the individual image panels and stability plots are
+rendered by matplotlib and embedded as raster images. Keeping the plotting in
+matplotlib preserves the scientific figures while letting ReportLab own the
+page composition and text.
+"""
+
+import io
 
 import matplotlib
 
 matplotlib.use("Agg")  # headless; no display needed
 
 import numpy as np
-from matplotlib.backends.backend_pdf import PdfPages
 from matplotlib.figure import Figure
 from matplotlib.patches import Rectangle
+from reportlab.lib.pagesizes import letter
+from reportlab.lib.utils import ImageReader
+from reportlab.pdfgen import canvas
 
 import fmriqc as q
 
 _AXIS_LETTER = {0: "i", 1: "j", 2: "k"}
+
+_PAGE_W, _PAGE_H = letter  # 612 x 792 pt
+_MARGIN = 40.0
+_CONTENT_W = _PAGE_W - 2 * _MARGIN
+_FIG_DPI = 200
+
+
+# --------------------------------------------------------------------------- #
+# matplotlib panels/plots -> embeddable images
+# --------------------------------------------------------------------------- #
+
+def _reader(fig) -> ImageReader:
+    """Rasterize a matplotlib `Figure` to a ReportLab `ImageReader`."""
+    buf = io.BytesIO()
+    fig.savefig(buf, format="png", dpi=_FIG_DPI)
+    buf.seek(0)
+    return ImageReader(buf)
 
 
 def _roi_series(arr, roi):
@@ -27,7 +55,10 @@ def _draw_roi(ax, roi):
     ))
 
 
-def _panel(ax, img, title, *, mask=None, roi=None, log=False):
+def _panel_fig(img, title, *, mask=None, roi=None, log=False, aspect=1.15):
+    """A single labelled image panel as a square-ish figure."""
+    fig = Figure(figsize=(2.0, 2.0 * aspect))
+    ax = fig.add_subplot(111)
     data = np.log(np.clip(img, 1e-9, None)) if log else img
     finite = data[np.isfinite(data)]
     vmin, vmax = (np.percentile(finite, [2, 98]) if finite.size else (0, 1))
@@ -39,16 +70,24 @@ def _panel(ax, img, title, *, mask=None, roi=None, log=False):
     ax.set_title(title, fontsize=9)
     ax.set_xticks([])
     ax.set_yticks([])
+    fig.subplots_adjust(left=0.02, right=0.98, bottom=0.02, top=0.90)
+    return _reader(fig)
 
 
-def _plot_weisskoff(ax, wk, fs=10):
-    """Standard Weisskoff plot: measured CV vs the ideal slope=-1 line.
+def _plot_fig(draw, figsize):
+    """Run an ax-drawing callback on a fresh constrained-layout figure."""
+    fig = Figure(figsize=figsize, layout="constrained")
+    draw(fig.add_subplot(111))
+    return _reader(fig)
 
-    The ideal line is anchored at `cv1_pooled` (the single-voxel CV pooled over
-    the whole ROI), the same cv(1) estimate the RDC uses, rather than at the
-    single-voxel `cv[0]`. That makes the graphical RDC — where the measured
-    plateau meets this line — equal the reported RDC, and it is robust to the
-    intensity non-uniformity that biases a single-voxel anchor.
+
+def _plot_weisskoff(ax, wk, fs=9):
+    """Measured CV vs the ideal slope=-1 line, anchored at the pooled cv1.
+
+    Anchoring the ideal line at `cv1_pooled` (the single-voxel CV pooled over the
+    whole ROI) rather than at the single-voxel `cv[0]` makes the graphical RDC —
+    where the measured plateau meets this line — equal the reported RDC, and is
+    robust to the intensity non-uniformity that biases a single-voxel anchor.
     """
     ax.loglog(wk.roi_sizes, wk.cv, "o-", ms=3, label="measured")
     ax.loglog(wk.roi_sizes, wk.cv1_pooled / wk.roi_sizes,
@@ -59,7 +98,7 @@ def _plot_weisskoff(ax, wk, fs=10):
     ax.legend(fontsize=fs - 2)
 
 
-def _plot_rdc(ax, wk, fs=10):
+def _plot_rdc(ax, wk, fs=9):
     """RDC vs ROI size: pooled single-voxel CV / ROI-averaged CV, vs identity."""
     r, rdc = wk.roi_sizes, wk.rdc_curve
     ax.plot(r, r, "k-", lw=0.8, label="ideal (RDC = width)")
@@ -72,7 +111,7 @@ def _plot_rdc(ax, wk, fs=10):
     ax.legend(fontsize=fs - 2, loc="upper left")
 
 
-def _plot_signal(ax, t, signal, trend, fs=10):
+def _plot_signal(ax, t, signal, trend, fs=9):
     ax.plot(t, signal, lw=0.5, label="ROI signal")
     ax.plot(t, trend, "r", lw=1.2, label="trend")
     ax.set_xlabel("time (s)")
@@ -81,7 +120,7 @@ def _plot_signal(ax, t, signal, trend, fs=10):
     ax.legend(fontsize=fs - 2)
 
 
-def _plot_residual(ax, t, resid, fs=10):
+def _plot_residual(ax, t, resid, fs=9):
     ax.plot(t, resid, lw=0.5)
     ax.axhline(0, color="gray", lw=0.5)
     ax.set_xlabel("time (s)")
@@ -89,7 +128,7 @@ def _plot_residual(ax, t, resid, fs=10):
     ax.set_title("ROI mean residual", fontsize=fs)
 
 
-def _plot_spectrum(ax, resid, tr, fs=10):
+def _plot_spectrum(ax, resid, tr, fs=9):
     freqs = np.fft.rfftfreq(resid.size, d=tr)
     ax.plot(freqs[1:], np.abs(np.fft.rfft(resid))[1:], lw=0.7)  # skip DC
     ax.set_xlabel("frequency (Hz)")
@@ -97,75 +136,19 @@ def _plot_spectrum(ax, resid, tr, fs=10):
     ax.set_title("residual spectrum", fontsize=fs)
 
 
-def _summary_page(result, title):
-    images, geom, roi, m = result.images, result.geom, result.roi, result.metrics
-    fig = Figure(figsize=(8.5, 11))
-    fig.suptitle(title, fontsize=13, fontweight="bold", y=0.98)
-    gs = fig.add_gridspec(3, 2, height_ratios=[0.5, 1.0, 1.0],
-                          hspace=0.3, wspace=0.15,
-                          left=0.06, right=0.94, top=0.92, bottom=0.05)
+# --------------------------------------------------------------------------- #
+# ReportLab page composition
+# --------------------------------------------------------------------------- #
 
-    ax = fig.add_subplot(gs[0, :])
-    ax.axis("off")
-    pe = _AXIS_LETTER.get(images.pe_axis, "?")
-    meta = (
-        f"TR {images.tr:.3g} s     voxel {images.voxel_size:.3g} mm     "
-        f"frames {images.center_slice.shape[-1]}     PE axis {pe}     "
-        f"detrend {images.detrend_method}     "
-        f"ROI {roi.size}x{roi.size} @ ({int(roi.center[0])},{int(roi.center[1])})"
-    )
-    metrics = (
-        f"SNR {m.snr:.1f}      SFNR {m.sfnr:.1f}      RDC {m.rdc:.2f}\n"
-        f"ghost {m.ghost_ratio:.4f}      drift {m.drift_pct:.3f} %      "
-        f"fluctuation {m.percent_fluctuation:.3f} %"
-    )
-    ax.text(0.0, 0.75, meta, fontsize=9, family="monospace", va="top")
-    ax.text(0.0, 0.30, metrics, fontsize=11, family="monospace", va="top")
-
-    sfnr_img = np.where(geom.phantom_mask,
-                        images.mean_image / (images.fluctuation_noise + 1e-9), 0.0)
-    _panel(fig.add_subplot(gs[1, 0]), images.mean_image, "signal (temporal mean)",
-           mask=geom.phantom_mask, roi=roi)
-    _panel(fig.add_subplot(gs[1, 1]), sfnr_img, "SFNR", roi=roi)
-    _panel(fig.add_subplot(gs[2, 0]), images.fluctuation_noise,
-           "fluctuation noise (log)", mask=geom.phantom_mask, roi=roi, log=True)
-    _panel(fig.add_subplot(gs[2, 1]), images.static_noise,
-           "static spatial noise", mask=geom.phantom_mask, roi=roi)
-    return fig
+def _draw_image(c, reader, x, top, w, h):
+    """Place `reader` in a box of width `w`, height `h` with its top at `top`."""
+    c.drawImage(reader, x, top - h, width=w, height=h,
+                preserveAspectRatio=True, anchor="n", mask="auto")
 
 
-def _analysis_page(result, title):
-    images, roi, wk = result.images, result.roi, result.metrics.weisskoff
-    fig = Figure(figsize=(8.5, 11))
-    fig.suptitle(f"{title} — stability", fontsize=13, fontweight="bold", y=0.98)
-    gs = fig.add_gridspec(3, 2, hspace=0.35, wspace=0.25,
-                          left=0.1, right=0.94, top=0.92, bottom=0.07)
-
-    n = images.center_slice.shape[-1]
-    t = np.arange(n) * images.tr
-    signal = _roi_series(images.center_slice, roi)
-    trend = _roi_series(images.trend, roi)
-    resid = _roi_series(images.fluctuations, roi)
-
-    _plot_weisskoff(fig.add_subplot(gs[0, 0]), wk)
-    _plot_rdc(fig.add_subplot(gs[0, 1]), wk)
-    _plot_signal(fig.add_subplot(gs[1, 0]), t, signal, trend)
-    _plot_residual(fig.add_subplot(gs[1, 1]), t, resid)
-    _plot_spectrum(fig.add_subplot(gs[2, :]), resid, images.tr)
-    return fig
-
-
-def _one_page(result, title):
-    images, geom, roi, m = result.images, result.geom, result.roi, result.metrics
-    wk = m.weisskoff
-    fig = Figure(figsize=(8.5, 11))
-    fig.suptitle(title, fontsize=13, fontweight="bold", y=0.985)
-    gs = fig.add_gridspec(5, 4, height_ratios=[0.3, 0.85, 1.0, 1.0, 0.9],
-                          hspace=0.55, wspace=0.4,
-                          left=0.08, right=0.95, top=0.94, bottom=0.05)
-
-    ax = fig.add_subplot(gs[0, :])
-    ax.axis("off")
+def _header(c, result, title, *, meta_fs, metric_fs):
+    """Draw the title + metadata/metric lines; return the y below them."""
+    images, roi, m = result.images, result.roi, result.metrics
     pe = _AXIS_LETTER.get(images.pe_axis, "?")
     line1 = (f"TR {images.tr:.3g}s   voxel {images.voxel_size:.3g}mm   "
              f"frames {images.center_slice.shape[-1]}   PE {pe}   "
@@ -174,49 +157,143 @@ def _one_page(result, title):
     line2 = (f"SNR {m.snr:.1f}   SFNR {m.sfnr:.1f}   RDC {m.rdc:.2f}   "
              f"ghost {m.ghost_ratio:.4f}   drift {m.drift_pct:.3f}%   "
              f"fluct {m.percent_fluctuation:.3f}%")
-    ax.text(0.0, 0.75, line1, fontsize=8.5, family="monospace", va="top")
-    ax.text(0.0, 0.25, line2, fontsize=10.5, family="monospace", va="top",
-            fontweight="bold")
 
+    y = _PAGE_H - 34
+    if title:
+        c.setFont("Helvetica-Bold", 14)
+        c.drawCentredString(_PAGE_W / 2, y, title)
+    y -= 24
+    c.setFont("Courier", meta_fs)
+    c.drawString(_MARGIN, y, line1)
+    y -= 16
+    c.setFont("Courier-Bold", metric_fs)
+    c.drawString(_MARGIN, y, line2)
+    return y - 14
+
+
+def _panel_readers(result):
+    """The four summary image panels, in row order."""
+    images, geom, roi = result.images, result.geom, result.roi
     sfnr_img = np.where(geom.phantom_mask,
                         images.mean_image / (images.fluctuation_noise + 1e-9), 0.0)
-    _panel(fig.add_subplot(gs[1, 0]), images.mean_image, "signal",
-           mask=geom.phantom_mask, roi=roi)
-    _panel(fig.add_subplot(gs[1, 1]), sfnr_img, "SFNR", roi=roi)
-    _panel(fig.add_subplot(gs[1, 2]), images.fluctuation_noise, "fluct noise (log)",
-           mask=geom.phantom_mask, roi=roi, log=True)
-    _panel(fig.add_subplot(gs[1, 3]), images.static_noise, "static noise",
-           mask=geom.phantom_mask, roi=roi)
+    return [
+        _panel_fig(images.mean_image, "signal",
+                   mask=geom.phantom_mask, roi=roi),
+        _panel_fig(sfnr_img, "SFNR", roi=roi),
+        _panel_fig(images.fluctuation_noise, "fluct noise (log)",
+                   mask=geom.phantom_mask, roi=roi, log=True),
+        _panel_fig(images.static_noise, "static noise",
+                   mask=geom.phantom_mask, roi=roi),
+    ]
 
+
+def _panel_row(c, readers, top):
+    """Draw four panels across the content width; return the y below them."""
+    gap = 8.0
+    pw = (_CONTENT_W - 3 * gap) / 4
+    ph = pw * 1.15
+    for i, reader in enumerate(readers):
+        _draw_image(c, reader, _MARGIN + i * (pw + gap), top, pw, ph)
+    return top - ph
+
+
+def _timeseries(result):
+    images, roi = result.images, result.roi
     n = images.center_slice.shape[-1]
     t = np.arange(n) * images.tr
-    signal = _roi_series(images.center_slice, roi)
-    trend = _roi_series(images.trend, roi)
-    resid = _roi_series(images.fluctuations, roi)
+    return (t,
+            _roi_series(images.center_slice, roi),
+            _roi_series(images.trend, roi),
+            _roi_series(images.fluctuations, roi))
 
-    _plot_weisskoff(fig.add_subplot(gs[2, :2]), wk, fs=9)
-    _plot_rdc(fig.add_subplot(gs[2, 2:]), wk, fs=9)
-    _plot_signal(fig.add_subplot(gs[3, :2]), t, signal, trend, fs=9)
-    _plot_residual(fig.add_subplot(gs[3, 2:]), t, resid, fs=9)
-    _plot_spectrum(fig.add_subplot(gs[4, :]), resid, images.tr, fs=9)
-    return fig
+
+def _one_page(c, result, title):
+    wk = result.metrics.weisskoff
+    y = _header(c, result, title, meta_fs=8.3, metric_fs=10.0)
+
+    y = _panel_row(c, _panel_readers(result), y - 6)
+
+    t, signal, trend, resid = _timeseries(result)
+    gap, row_h = 16.0, 150.0
+    half = (_CONTENT_W - gap) / 2
+
+    y -= 10
+    _draw_image(c, _plot_fig(lambda ax: _plot_weisskoff(ax, wk), (3.6, 2.5)),
+                _MARGIN, y, half, row_h)
+    _draw_image(c, _plot_fig(lambda ax: _plot_rdc(ax, wk), (3.6, 2.5)),
+                _MARGIN + half + gap, y, half, row_h)
+    y -= row_h + 6
+
+    _draw_image(c, _plot_fig(lambda ax: _plot_signal(ax, t, signal, trend),
+                             (3.6, 2.5)), _MARGIN, y, half, row_h)
+    _draw_image(c, _plot_fig(lambda ax: _plot_residual(ax, t, resid), (3.6, 2.5)),
+                _MARGIN + half + gap, y, half, row_h)
+    y -= row_h + 6
+
+    _draw_image(c, _plot_fig(lambda ax: _plot_spectrum(ax, resid, result.images.tr),
+                             (7.2, 1.9)), _MARGIN, y, _CONTENT_W, 120.0)
+
+
+def _summary_page(c, result, title):
+    y = _header(c, result, title, meta_fs=9.0, metric_fs=11.0)
+    # Two large image rows: signal/SFNR then fluct-noise/static-noise.
+    readers = _panel_readers(result)
+    gap = 16.0
+    half = (_CONTENT_W - gap) / 2
+    ph = half * 1.05
+    y -= 8
+    for row in (readers[:2], readers[2:]):
+        for i, reader in enumerate(row):
+            _draw_image(c, reader, _MARGIN + i * (half + gap), y, half, ph)
+        y -= ph + 14
+
+
+def _analysis_page(c, result, title):
+    wk = result.metrics.weisskoff
+    t, signal, trend, resid = _timeseries(result)
+
+    y = _PAGE_H - 34
+    c.setFont("Helvetica-Bold", 13)
+    c.drawCentredString(_PAGE_W / 2, y, f"{title} — stability" if title else "stability")
+    y -= 24
+
+    gap, row_h = 16.0, 200.0
+    half = (_CONTENT_W - gap) / 2
+    _draw_image(c, _plot_fig(lambda ax: _plot_weisskoff(ax, wk, fs=10), (3.6, 3.0)),
+                _MARGIN, y, half, row_h)
+    _draw_image(c, _plot_fig(lambda ax: _plot_rdc(ax, wk, fs=10), (3.6, 3.0)),
+                _MARGIN + half + gap, y, half, row_h)
+    y -= row_h + 12
+
+    _draw_image(c, _plot_fig(lambda ax: _plot_signal(ax, t, signal, trend, fs=10),
+                             (3.6, 3.0)), _MARGIN, y, half, row_h)
+    _draw_image(c, _plot_fig(lambda ax: _plot_residual(ax, t, resid, fs=10),
+                             (3.6, 3.0)), _MARGIN + half + gap, y, half, row_h)
+    y -= row_h + 12
+
+    _draw_image(c, _plot_fig(lambda ax: _plot_spectrum(ax, resid, result.images.tr, fs=10),
+                             (7.2, 2.2)), _MARGIN, y, _CONTENT_W, 150.0)
 
 
 REPORT_LAYOUTS = ("one", "two")
 
 
-def add_report_pages(pdf: PdfPages, result: "q.QAResult", title: str = "",
+def add_report_pages(c: canvas.Canvas, result: "q.QAResult", title: str = "",
                      layout: str = "one") -> None:
-    """Append a scan's report page(s) to an open `PdfPages`.
+    """Draw a scan's report page(s) onto an open ReportLab `Canvas`.
 
     `layout="one"` renders a single condensed page; `layout="two"` renders a
-    summary page and a separate stability page.
+    summary page and a separate stability page. Each page is finalized with
+    `showPage()`.
     """
     if layout == "one":
-        pdf.savefig(_one_page(result, title))
+        _one_page(c, result, title)
+        c.showPage()
     elif layout == "two":
-        pdf.savefig(_summary_page(result, title))
-        pdf.savefig(_analysis_page(result, title))
+        _summary_page(c, result, title)
+        c.showPage()
+        _analysis_page(c, result, title)
+        c.showPage()
     else:
         raise ValueError(f"unknown layout {layout!r}; choose from {REPORT_LAYOUTS}")
 
@@ -228,6 +305,7 @@ def write_report(items, pdf_path, layout: str = "one") -> None:
     """
     if isinstance(items, q.QAResult):
         items = [("", items)]
-    with PdfPages(pdf_path) as pdf:
-        for title, result in items:
-            add_report_pages(pdf, result, title, layout)
+    c = canvas.Canvas(str(pdf_path), pagesize=letter)
+    for title, result in items:
+        add_report_pages(c, result, title, layout)
+    c.save()
