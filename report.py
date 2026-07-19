@@ -2,9 +2,11 @@
 
 The page layout (title, metadata, metric line, and the placement grid) is drawn
 natively with ReportLab; the individual image panels and stability plots are
-rendered by matplotlib and embedded as raster images. Keeping the plotting in
-matplotlib preserves the scientific figures while letting ReportLab own the
-page composition and text.
+rendered by matplotlib as SVG and embedded as vector drawings. Keeping the
+plotting in matplotlib preserves the scientific figures while letting ReportLab
+own the page composition and text, and the SVG path keeps the axes, curves, and
+labels as crisp vectors (the phantom images inside `imshow` remain raster, as
+they inherently are).
 """
 
 import io
@@ -17,8 +19,8 @@ import numpy as np
 from matplotlib.figure import Figure
 from matplotlib.patches import Rectangle
 from reportlab.lib.pagesizes import letter
-from reportlab.lib.utils import ImageReader
 from reportlab.pdfgen import canvas
+from svglib.svglib import svg2rlg
 
 import fmriqc as q
 
@@ -27,19 +29,27 @@ _AXIS_LETTER = {0: "i", 1: "j", 2: "k"}
 _PAGE_W, _PAGE_H = letter  # 612 x 792 pt
 _MARGIN = 40.0
 _CONTENT_W = _PAGE_W - 2 * _MARGIN
-_FIG_DPI = 200
 
 
 # --------------------------------------------------------------------------- #
-# matplotlib panels/plots -> embeddable images
+# matplotlib panels/plots -> embeddable vector drawings
 # --------------------------------------------------------------------------- #
 
-def _reader(fig) -> ImageReader:
-    """Rasterize a matplotlib `Figure` to a ReportLab `ImageReader`."""
+def _draw_fig(c, fig, x, top, w, h):
+    """Embed a matplotlib `Figure` as vector SVG in a box, top-aligned/centered.
+
+    The figure is scaled uniformly to fit `w` x `h` (preserving aspect) with its
+    top edge at `top` and centered horizontally within the box.
+    """
     buf = io.BytesIO()
-    fig.savefig(buf, format="png", dpi=_FIG_DPI)
+    fig.savefig(buf, format="svg")
     buf.seek(0)
-    return ImageReader(buf)
+    drawing = svg2rlg(buf)
+    scale = min(w / drawing.width, h / drawing.height)
+    dw, dh = drawing.width * scale, drawing.height * scale
+    drawing.scale(scale, scale)
+    drawing.width, drawing.height = dw, dh
+    drawing.drawOn(c, x + (w - dw) / 2, top - dh)
 
 
 def _roi_series(arr, roi):
@@ -71,14 +81,14 @@ def _panel_fig(img, title, *, mask=None, roi=None, log=False, aspect=1.15):
     ax.set_xticks([])
     ax.set_yticks([])
     fig.subplots_adjust(left=0.02, right=0.98, bottom=0.02, top=0.90)
-    return _reader(fig)
+    return fig
 
 
 def _plot_fig(draw, figsize):
     """Run an ax-drawing callback on a fresh constrained-layout figure."""
     fig = Figure(figsize=figsize, layout="constrained")
     draw(fig.add_subplot(111))
-    return _reader(fig)
+    return fig
 
 
 def _plot_weisskoff(ax, wk, fs=9):
@@ -140,12 +150,6 @@ def _plot_spectrum(ax, resid, tr, fs=9):
 # ReportLab page composition
 # --------------------------------------------------------------------------- #
 
-def _draw_image(c, reader, x, top, w, h):
-    """Place `reader` in a box of width `w`, height `h` with its top at `top`."""
-    c.drawImage(reader, x, top - h, width=w, height=h,
-                preserveAspectRatio=True, anchor="n", mask="auto")
-
-
 def _header(c, result, title, *, meta_fs, metric_fs):
     """Draw the title + metadata/metric lines; return the y below them."""
     images, roi, m = result.images, result.roi, result.metrics
@@ -171,7 +175,7 @@ def _header(c, result, title, *, meta_fs, metric_fs):
     return y - 14
 
 
-def _panel_readers(result):
+def _panel_figs(result):
     """The four summary image panels, in row order."""
     images, geom, roi = result.images, result.geom, result.roi
     sfnr_img = np.where(geom.phantom_mask,
@@ -187,13 +191,13 @@ def _panel_readers(result):
     ]
 
 
-def _panel_row(c, readers, top):
+def _panel_row(c, figs, top):
     """Draw four panels across the content width; return the y below them."""
     gap = 8.0
     pw = (_CONTENT_W - 3 * gap) / 4
     ph = pw * 1.15
-    for i, reader in enumerate(readers):
-        _draw_image(c, reader, _MARGIN + i * (pw + gap), top, pw, ph)
+    for i, fig in enumerate(figs):
+        _draw_fig(c, fig, _MARGIN + i * (pw + gap), top, pw, ph)
     return top - ph
 
 
@@ -211,40 +215,40 @@ def _one_page(c, result, title):
     wk = result.metrics.weisskoff
     y = _header(c, result, title, meta_fs=8.3, metric_fs=10.0)
 
-    y = _panel_row(c, _panel_readers(result), y - 6)
+    y = _panel_row(c, _panel_figs(result), y - 6)
 
     t, signal, trend, resid = _timeseries(result)
     gap, row_h = 16.0, 150.0
     half = (_CONTENT_W - gap) / 2
 
     y -= 10
-    _draw_image(c, _plot_fig(lambda ax: _plot_weisskoff(ax, wk), (3.6, 2.5)),
+    _draw_fig(c, _plot_fig(lambda ax: _plot_weisskoff(ax, wk), (3.6, 2.5)),
                 _MARGIN, y, half, row_h)
-    _draw_image(c, _plot_fig(lambda ax: _plot_rdc(ax, wk), (3.6, 2.5)),
+    _draw_fig(c, _plot_fig(lambda ax: _plot_rdc(ax, wk), (3.6, 2.5)),
                 _MARGIN + half + gap, y, half, row_h)
     y -= row_h + 6
 
-    _draw_image(c, _plot_fig(lambda ax: _plot_signal(ax, t, signal, trend),
+    _draw_fig(c, _plot_fig(lambda ax: _plot_signal(ax, t, signal, trend),
                              (3.6, 2.5)), _MARGIN, y, half, row_h)
-    _draw_image(c, _plot_fig(lambda ax: _plot_residual(ax, t, resid), (3.6, 2.5)),
+    _draw_fig(c, _plot_fig(lambda ax: _plot_residual(ax, t, resid), (3.6, 2.5)),
                 _MARGIN + half + gap, y, half, row_h)
     y -= row_h + 6
 
-    _draw_image(c, _plot_fig(lambda ax: _plot_spectrum(ax, resid, result.images.tr),
+    _draw_fig(c, _plot_fig(lambda ax: _plot_spectrum(ax, resid, result.images.tr),
                              (7.2, 1.9)), _MARGIN, y, _CONTENT_W, 120.0)
 
 
 def _summary_page(c, result, title):
     y = _header(c, result, title, meta_fs=9.0, metric_fs=11.0)
     # Two large image rows: signal/SFNR then fluct-noise/static-noise.
-    readers = _panel_readers(result)
+    figs = _panel_figs(result)
     gap = 16.0
     half = (_CONTENT_W - gap) / 2
     ph = half * 1.05
     y -= 8
-    for row in (readers[:2], readers[2:]):
-        for i, reader in enumerate(row):
-            _draw_image(c, reader, _MARGIN + i * (half + gap), y, half, ph)
+    for row in (figs[:2], figs[2:]):
+        for i, fig in enumerate(row):
+            _draw_fig(c, fig, _MARGIN + i * (half + gap), y, half, ph)
         y -= ph + 14
 
 
@@ -259,19 +263,19 @@ def _analysis_page(c, result, title):
 
     gap, row_h = 16.0, 200.0
     half = (_CONTENT_W - gap) / 2
-    _draw_image(c, _plot_fig(lambda ax: _plot_weisskoff(ax, wk, fs=10), (3.6, 3.0)),
+    _draw_fig(c, _plot_fig(lambda ax: _plot_weisskoff(ax, wk, fs=10), (3.6, 3.0)),
                 _MARGIN, y, half, row_h)
-    _draw_image(c, _plot_fig(lambda ax: _plot_rdc(ax, wk, fs=10), (3.6, 3.0)),
+    _draw_fig(c, _plot_fig(lambda ax: _plot_rdc(ax, wk, fs=10), (3.6, 3.0)),
                 _MARGIN + half + gap, y, half, row_h)
     y -= row_h + 12
 
-    _draw_image(c, _plot_fig(lambda ax: _plot_signal(ax, t, signal, trend, fs=10),
+    _draw_fig(c, _plot_fig(lambda ax: _plot_signal(ax, t, signal, trend, fs=10),
                              (3.6, 3.0)), _MARGIN, y, half, row_h)
-    _draw_image(c, _plot_fig(lambda ax: _plot_residual(ax, t, resid, fs=10),
+    _draw_fig(c, _plot_fig(lambda ax: _plot_residual(ax, t, resid, fs=10),
                              (3.6, 3.0)), _MARGIN + half + gap, y, half, row_h)
     y -= row_h + 12
 
-    _draw_image(c, _plot_fig(lambda ax: _plot_spectrum(ax, resid, result.images.tr, fs=10),
+    _draw_fig(c, _plot_fig(lambda ax: _plot_spectrum(ax, resid, result.images.tr, fs=10),
                              (7.2, 2.2)), _MARGIN, y, _CONTENT_W, 150.0)
 
 
