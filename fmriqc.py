@@ -65,7 +65,12 @@ class ScanMeta:
 
 
 def _load_sidecar(path: str | Path) -> dict:
-    """Parse the BIDS JSON sidecar beside `path` (.nii/.nii.gz -> .json); {} if none."""
+    """Parse the required BIDS JSON sidecar beside `path` (.nii/.nii.gz -> .json).
+
+    dcm2niix writes this alongside every NIfTI it converts, so a missing sidecar
+    means the input did not go through the expected conversion; we refuse it
+    rather than silently dropping metadata. Raises `FileNotFoundError` if absent.
+    """
     p = Path(path)
     name = p.name
     for ext in (".nii.gz", ".nii"):
@@ -73,10 +78,14 @@ def _load_sidecar(path: str | Path) -> dict:
             name = name[: -len(ext)]
             break
     sidecar = p.with_name(name + ".json")
-    if sidecar.is_file():
-        with open(sidecar) as f:
-            return json.load(f)
-    return {}
+    if not sidecar.is_file():
+        raise FileNotFoundError(
+            f"required BIDS JSON sidecar not found: {sidecar} "
+            f"(convert the DICOM with dcm2niix so a .json is written alongside "
+            f"the NIfTI)"
+        )
+    with open(sidecar) as f:
+        return json.load(f)
 
 
 def _acq_datetime(sidecar: dict) -> str | None:
@@ -130,7 +139,8 @@ class QAScan:
     read from the header `dim_info` phase field. When `dim_info` is missing or
     invalid a warning is emitted and it falls back to the Nyquist-ghost estimate
     (or `None` if `estimate_pe=False`). Polarity is dropped (unneeded here).
-    `meta` holds the human-readable acquisition metadata for the report.
+    `meta` holds the human-readable acquisition metadata for the report; it is
+    built from the BIDS JSON sidecar, which `from_nifti` requires.
     """
 
     data: NDArray  # (X, Y, Z, T)
@@ -141,6 +151,7 @@ class QAScan:
 
     @classmethod
     def from_nifti(cls, path: str | Path, estimate_pe: bool = True) -> "QAScan":
+        sidecar = _load_sidecar(path)  # required; raises before the data load
         img = nib.load(str(path))
         zooms = img.header.get_zooms()
         data = img.get_fdata()
@@ -158,7 +169,7 @@ class QAScan:
             tr=float(zooms[3]),
             affine=img.affine,
             pe_axis=pe_axis,
-            meta=_scan_meta(img, _load_sidecar(path), pe_axis),
+            meta=_scan_meta(img, sidecar, pe_axis),
         )
 
 
