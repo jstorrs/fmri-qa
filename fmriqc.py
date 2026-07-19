@@ -355,8 +355,9 @@ def weisskoff(images: "QAImages", roi: ROI) -> WeisskoffResult:
     # derived images are properties; read each once rather than per ROI size
     fluctuations, mean_image = images.fluctuations, images.mean_image
     noise = images.fluctuation_noise
-    # include size so cv[-1] is measured at the ROI the single-voxel CV pools over
-    roi_sizes = np.arange(1, roi.size + 1, 2)
+    # every integer width 1..roi.size, per the fBIRN/Glover Weisskoff protocol
+    # (Friedman & Glover 2006); cv[-1] is at the full ROI the pooled cv1 spans
+    roi_sizes = np.arange(1, roi.size + 1)
     cv = np.array([
         _roi_cv(fluctuations, mean_image, roi.center, int(k))
         for k in roi_sizes
