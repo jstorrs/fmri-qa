@@ -100,6 +100,20 @@ def _acq_datetime(sidecar: dict) -> str | None:
     return " ".join(x for x in (date, time) if x) or None
 
 
+def _pe_axis_from_sidecar(sidecar: dict) -> int | None:
+    """PE axis (0/1/2) from the sidecar, or None if it carries no PE field.
+
+    `PhaseEncodingDirection` (BIDS i/j/k, with an optional polarity we drop) maps
+    straight to the array axis; `InPlanePhaseEncodingDirectionDICOM` (ROW/COL) is
+    the DICOM fallback (row = i = axis 0, col = j = axis 1).
+    """
+    if ped := sidecar.get("PhaseEncodingDirection"):
+        return {"i": 0, "j": 1, "k": 2}.get(str(ped)[0])
+    if dicom := sidecar.get("InPlanePhaseEncodingDirectionDICOM"):
+        return {"ROW": 0, "COL": 1}.get(str(dicom).upper())
+    return None
+
+
 def _pe_direction(pe_axis: int | None, sidecar: dict) -> str | None:
     """DICOM row/col phase-encode direction, preferring the sidecar."""
     if dicom := sidecar.get("InPlanePhaseEncodingDirectionDICOM"):
@@ -135,12 +149,13 @@ def _scan_meta(img, sidecar: dict, pe_axis: int | None) -> ScanMeta:
 class QAScan:
     """A raw QA acquisition plus the header metadata the pipeline needs.
 
-    `pe_axis` is the phase-encode axis as a NIfTI voxel-array index (0/1/2),
-    read from the header `dim_info` phase field. When `dim_info` is missing or
-    invalid a warning is emitted and it falls back to the Nyquist-ghost estimate
-    (or `None` if `estimate_pe=False`). Polarity is dropped (unneeded here).
-    `meta` holds the human-readable acquisition metadata for the report; it is
-    built from the BIDS JSON sidecar, which `from_nifti` requires.
+    `pe_axis` is the phase-encode axis as a NIfTI voxel-array index (0/1/2). It
+    comes from the sidecar `PhaseEncodingDirection` (authoritative), falling back
+    to the header `dim_info` phase field, then — only if both are absent — to the
+    Nyquist-ghost estimate (with a warning; `None` if `estimate_pe=False`).
+    Polarity is dropped (unneeded here). `meta` holds the human-readable
+    acquisition metadata for the report; both are built from the BIDS JSON
+    sidecar, which `from_nifti` requires.
     """
 
     data: NDArray  # (X, Y, Z, T)
@@ -156,9 +171,11 @@ class QAScan:
         zooms = img.header.get_zooms()
         data = img.get_fdata()
 
-        pe_axis = _pe_axis_from_header(img.header)
+        pe_axis = _pe_axis_from_sidecar(sidecar)
         if pe_axis is None:
-            msg = f"{path}: NIfTI dim_info has no valid phase-encode axis"
+            pe_axis = _pe_axis_from_header(img.header)
+        if pe_axis is None:
+            msg = f"{path}: no phase-encode axis in sidecar or NIfTI dim_info"
             if estimate_pe:
                 pe_axis = phase_encode_axis(data)
                 msg += f"; falling back to ghost estimate (axis {pe_axis})"
