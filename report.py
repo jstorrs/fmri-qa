@@ -133,6 +133,7 @@ _GHOST_SRC_RGB = (0.20, 0.85, 1.0)  # PE signal source region (cyan)
 _GHOST_RGB = (1.0, 0.30, 0.30)  # PE ghost region (red)
 _RO_SRC_RGB = (0.45, 1.0, 0.35)  # RO signal source region (green)
 _RO_GHOST_RGB = (1.0, 0.72, 0.15)  # RO ghost region (amber)
+_INVALID_RGB = (1.0, 0.15, 0.90)  # zeroed image edge, excluded from stats (magenta)
 
 
 def _overlay(ax, mask, rgb, alpha=0.45):
@@ -150,14 +151,16 @@ def _ghost_panel_fig(mean_image, phantom_mask, pe_axis, *, aspect=1.15):
     and its source on the phantom (that patch rolled back). The PE pair (cyan/red)
     feeds ghost%; the readout pair (green/amber) feeds RO% -- the background-
     relative baseline whose difference from ghost% is ACRg -- so both reported
-    percentages can be checked against where they are sampled. Blank if the PE
-    axis is unknown.
+    percentages can be checked against where they are sampled. Any zeroed image
+    edge dropped from the statistics (magenta) is marked when present. The ghost
+    pairs are blank if the PE axis is unknown.
     """
     fig = Figure(figsize=(2.0, 2.0 * aspect))
     ax = fig.add_subplot(111)
     ax.imshow(mean_image, cmap="gray", vmin=0, vmax=np.percentile(mean_image, 99))
+    valid_mask = q.edge_valid_mask(mean_image)
+    handles = []
     if pe_axis in (0, 1):
-        valid_mask = q.edge_valid_mask(mean_image)
         ro_axis = 1 - pe_axis
         ro_signal, ro_ghost = q._ghost_masks(phantom_mask, ro_axis, 3, valid_mask)
         signal_mask, ghost_mask = q._ghost_masks(phantom_mask, pe_axis, 3, valid_mask)
@@ -165,13 +168,18 @@ def _ghost_panel_fig(mean_image, phantom_mask, pe_axis, *, aspect=1.15):
         _overlay(ax, ro_ghost, _RO_GHOST_RGB)
         _overlay(ax, signal_mask, _GHOST_SRC_RGB)
         _overlay(ax, ghost_mask, _GHOST_RGB)
+        handles += [Patch(color=_GHOST_SRC_RGB, label="PE signal"),
+                    Patch(color=_GHOST_RGB, label="PE ghost"),
+                    Patch(color=_RO_SRC_RGB, label="RO signal"),
+                    Patch(color=_RO_GHOST_RGB, label="RO ghost")]
+    invalid = ~valid_mask
+    if invalid.any():
+        _overlay(ax, invalid, _INVALID_RGB, alpha=0.9)
+        handles.append(Patch(color=_INVALID_RGB, label="invalid edge"))
+    if handles:
         ax.legend(
-            handles=[Patch(color=_GHOST_SRC_RGB, label="PE signal"),
-                     Patch(color=_GHOST_RGB, label="PE ghost"),
-                     Patch(color=_RO_SRC_RGB, label="RO signal"),
-                     Patch(color=_RO_GHOST_RGB, label="RO ghost")],
-            fontsize=5, loc="lower right", framealpha=0.6, handlelength=1.0,
-            borderpad=0.3, labelspacing=0.2,
+            handles=handles, fontsize=5, loc="lower right", framealpha=0.6,
+            handlelength=1.0, borderpad=0.3, labelspacing=0.2,
         )
     ax.set_title("N/2 ghost", fontsize=9)
     ax.set_xticks([])
