@@ -49,6 +49,14 @@ The project uses [uv](https://docs.astral.sh/uv/) and Python 3.13:
 uv sync
 ```
 
+The QA metrics and CLI need only the core dependencies installed above. The
+exploratory notebooks (DICOM conversion, BIDS, and interactive viewers) pull in
+a heavier stack — install it with the `notebooks` extra:
+
+```bash
+uv sync --extra notebooks
+```
+
 ## Command line
 
 ```bash

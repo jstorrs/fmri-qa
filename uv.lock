@@ -441,43 +441,50 @@ name = "fmri-qa"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
+    { name = "matplotlib" },
+    { name = "nibabel" },
+    { name = "numpy" },
+    { name = "reportlab" },
+    { name = "scikit-image" },
+    { name = "scipy" },
+    { name = "svglib" },
+]
+
+[package.optional-dependencies]
+notebooks = [
     { name = "dcm2bids" },
     { name = "dcm2niix" },
     { name = "ipympl" },
     { name = "ipython" },
     { name = "ipywidgets" },
     { name = "jupyterlab" },
-    { name = "matplotlib" },
-    { name = "nibabel" },
     { name = "nilearn" },
     { name = "niwidgets" },
-    { name = "numpy" },
     { name = "pydicom" },
-    { name = "reportlab" },
     { name = "scikit-fem" },
-    { name = "scikit-image" },
-    { name = "svglib" },
 ]
 
 [package.metadata]
 requires-dist = [
-    { name = "dcm2bids", specifier = ">=3.2.0" },
-    { name = "dcm2niix", specifier = ">=1.0.20250506" },
-    { name = "ipympl", specifier = ">=0.9.8" },
-    { name = "ipython", specifier = ">=9.6.0" },
-    { name = "ipywidgets", specifier = ">=8.1.7" },
-    { name = "jupyterlab", specifier = ">=4.4.10" },
+    { name = "dcm2bids", marker = "extra == 'notebooks'", specifier = ">=3.2.0" },
+    { name = "dcm2niix", marker = "extra == 'notebooks'", specifier = ">=1.0.20250506" },
+    { name = "ipympl", marker = "extra == 'notebooks'", specifier = ">=0.9.8" },
+    { name = "ipython", marker = "extra == 'notebooks'", specifier = ">=9.6.0" },
+    { name = "ipywidgets", marker = "extra == 'notebooks'", specifier = ">=8.1.7" },
+    { name = "jupyterlab", marker = "extra == 'notebooks'", specifier = ">=4.4.10" },
     { name = "matplotlib", specifier = ">=3.10.7" },
     { name = "nibabel", specifier = ">=5.3.2" },
-    { name = "nilearn", specifier = ">=0.12.1" },
-    { name = "niwidgets", specifier = ">=0.2.1" },
+    { name = "nilearn", marker = "extra == 'notebooks'", specifier = ">=0.12.1" },
+    { name = "niwidgets", marker = "extra == 'notebooks'", specifier = ">=0.2.1" },
     { name = "numpy", specifier = ">=2.3.4" },
-    { name = "pydicom", specifier = ">=3.0.1" },
+    { name = "pydicom", marker = "extra == 'notebooks'", specifier = ">=3.0.1" },
     { name = "reportlab", specifier = ">=5.0.0" },
-    { name = "scikit-fem", specifier = ">=12.0.2" },
+    { name = "scikit-fem", marker = "extra == 'notebooks'", specifier = ">=12.0.2" },
     { name = "scikit-image", specifier = ">=0.25.2" },
+    { name = "scipy", specifier = ">=1.16.2" },
     { name = "svglib", specifier = ">=2.0.2" },
 ]
+provides-extras = ["notebooks"]
 
 [[package]]
 name = "fonttools"
