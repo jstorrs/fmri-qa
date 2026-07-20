@@ -10,6 +10,7 @@ import numpy as np
 from numpy.typing import NDArray
 from scipy.interpolate import make_lsq_spline
 from scipy import ndimage
+from scipy.special import erfcinv
 from skimage import filters, morphology, segmentation
 
 # Detrend cutoff period (s). Drift slower than this is removed before noise is
@@ -21,6 +22,10 @@ SPLINE_CUTOFF_S = 256.0
 # Plausible ADC saturation rails. A clipped magnitude image piles up at a
 # hardware 2**n - 1 ceiling; only these n are realistic for MR (12-bit -> 4095).
 SATURATION_BITS = range(8, 17)  # 255 .. 65535
+
+# Per-voxel tail probability for the outlier test (3dToutcount default): a clean
+# voxel flags a sample this often by chance, so ~qthr is the expected fraction.
+OUTLIER_QTHR = 0.001
 
 # Fixed summary-ROI side (voxels). Glover/fBIRN uses 21; user-configurable.
 FBIRN_ROI_SIZE = 21
@@ -347,6 +352,36 @@ class SaturationResult:
 
 
 @dataclass(frozen=True)
+class OutlierResult:
+    """Per-TR outlier-voxel fraction (AFNI 3dToutcount) over the phantom mask.
+
+    `fraction[t]` is the share of masked voxels whose detrended residual is a
+    statistical outlier at frame `t` -- a temporal-stability trace that spikes on
+    a bad volume. `qthr` is the per-voxel chance level, so a clean run hovers
+    near `qthr` and a spike stands well above it.
+    """
+
+    fraction: NDArray  # (n_t,) outlier-voxel fraction per frame
+    n_voxels: int      # masked voxels (the fraction denominator)
+    qthr: float        # per-voxel tail probability (expected chance fraction)
+
+    @property
+    def max_fraction(self) -> float:
+        """Worst single-frame outlier fraction."""
+        return float(self.fraction.max())
+
+    @property
+    def mean_fraction(self) -> float:
+        """Mean outlier fraction across frames."""
+        return float(self.fraction.mean())
+
+    @property
+    def worst_volume(self) -> int:
+        """Frame index (within the analyzed series) with the most outliers."""
+        return int(np.argmax(self.fraction))
+
+
+@dataclass(frozen=True)
 class QAMetrics:
     """Settled scalar QA metrics for one scan."""
 
@@ -361,6 +396,7 @@ class QAMetrics:
     percent_fluctuation: float
     weisskoff: WeisskoffResult
     saturation: SaturationResult
+    outliers: OutlierResult
 
 
 @dataclass(frozen=True, eq=False)
@@ -521,6 +557,34 @@ def detrend_fn(center_slice: NDArray, tr: float,
 def fluctuation_noise(residuals: NDArray) -> NDArray:
     """Temporal RMS of detrended residuals (std about zero) over the last axis."""
     return np.std(residuals, axis=-1, mean=0)
+
+def outlier_fraction(fluctuations: NDArray, mask: NDArray,
+                     qthr: float = OUTLIER_QTHR) -> OutlierResult:
+    """Per-TR outlier-voxel fraction over `mask`, following AFNI 3dToutcount.
+
+    For each masked voxel the robust spread of its detrended residual is
+    `sigma = sqrt(pi/2) * MAD` (MAD = median |residual|); a frame is an outlier
+    for that voxel when `|residual| > alpha * sigma`, with
+    `alpha = Q^-1(qthr / n_t)` the normal upper-tail quantile that makes a clean
+    voxel flag a frame with probability `qthr`. `fraction[t]` is the share of
+    masked voxels flagged at frame `t`. Constant voxels (`MAD = 0`) never flag.
+
+    `fluctuations` is the per-voxel *detrended* residual (3dToutcount detrends
+    first); passing `QAImages.fluctuations` reuses the pipeline's Legendre
+    detrend, as afni_proc.py recommends before outlier classification (its trend
+    fit is L1 vs. our L2 -- a minor difference for a stable phantom).
+    """
+    resid = fluctuations[mask]                       # (n_vox, n_t)
+    n_vox, n_t = resid.shape
+    mad = np.median(np.abs(resid), axis=1)            # (n_vox,)
+    alpha = float(np.sqrt(2.0) * erfcinv(2.0 * qthr / n_t))  # Q^-1(qthr / n_t)
+    thr = alpha * np.sqrt(np.pi / 2.0) * mad          # per-voxel outlier threshold
+    is_out = (np.abs(resid) > thr[:, None]) & (mad > 0)[:, None]
+    return OutlierResult(
+        fraction=is_out.sum(axis=0) / n_vox,
+        n_voxels=int(n_vox),
+        qthr=qthr,
+    )
 
 def _roi_cv(fluctuations: NDArray, mean_image: NDArray,
             roi_center: NDArray, k: int) -> float:
@@ -957,6 +1021,7 @@ def run_qa(
         percent_fluctuation=percent_fluctuation(images, roi),
         weisskoff=wk,
         saturation=saturation,
+        outliers=outlier_fraction(images.fluctuations, geom.phantom_mask),
     )
     return QAResult(images=images, geom=geom, roi=roi, metrics=metrics,
                     meta=scan.meta)

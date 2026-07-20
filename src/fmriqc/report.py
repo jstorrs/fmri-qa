@@ -272,6 +272,20 @@ def _plot_residual(ax, t, resid, fs=9):
     ax.set_title("ROI mean residual", fontsize=fs)
 
 
+def _plot_outliers(ax, t, outl, fs=9):
+    """Per-TR outlier-voxel fraction (3dToutcount) with the chance-level line.
+
+    A clean run hovers near `qthr` (the per-voxel chance fraction, dashed); a
+    frame standing well above it flags a bad volume.
+    """
+    ax.plot(t, 100.0 * outl.fraction, lw=0.7)
+    ax.axhline(100.0 * outl.qthr, color="gray", ls="--", lw=0.6, label="chance")
+    ax.set_xlabel("time (s)")
+    ax.set_ylabel("outliers (%)")
+    ax.set_title("outlier fraction", fontsize=fs)
+    ax.legend(fontsize=fs - 2)
+
+
 def _plot_spectrum(ax, resid, tr, fs=9):
     freqs = np.fft.rfftfreq(resid.size, d=tr)
     ax.plot(freqs[1:], np.abs(np.fft.rfft(resid))[1:], lw=0.7)  # skip DC
@@ -299,6 +313,7 @@ def _metric_tiles(m):
         ("ACRg", f"{m.acr_ghost_pct:.2f}%"),
         ("drift", f"{m.drift_pct:.3f}%"),
         ("fluct", f"{m.percent_fluctuation:.3f}%"),
+        ("outl", f"{100.0 * m.outliers.max_fraction:.2f}%"),
     ]
 
 
@@ -484,7 +499,10 @@ def _one_page(c, result, title):
     y -= row_h + 6
 
     _draw_fig(c, _plot_fig(lambda ax: _plot_spectrum(ax, resid, result.images.tr),
-                             (7.2, 1.9)), _MARGIN, y, _CONTENT_W, 120.0)
+                             (3.6, 1.9)), _MARGIN, y, half, 120.0)
+    _draw_fig(c, _plot_fig(
+        lambda ax: _plot_outliers(ax, t, result.metrics.outliers), (3.6, 1.9)),
+              _MARGIN + half + gap, y, half, 120.0)
 
 
 def _summary_page(c, result, title):
@@ -517,7 +535,10 @@ def _analysis_page(c, result, title):
     y -= row_h + 12
 
     _draw_fig(c, _plot_fig(lambda ax: _plot_spectrum(ax, resid, result.images.tr, fs=10),
-                             (7.2, 2.2)), _MARGIN, y, _CONTENT_W, 150.0)
+                             (3.6, 2.2)), _MARGIN, y, half, 150.0)
+    _draw_fig(c, _plot_fig(
+        lambda ax: _plot_outliers(ax, t, result.metrics.outliers, fs=10),
+        (3.6, 2.2)), _MARGIN + half + gap, y, half, 150.0)
 
 
 REPORT_LAYOUTS = ("one", "two")

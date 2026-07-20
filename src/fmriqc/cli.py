@@ -51,7 +51,8 @@ def main(argv=None):
     header = (
         f"{'scan':40s} {'PE':>3s} "
         f"{'SNR':>9s} {'SFNR':>9s} {'RDC':>8s} {'drift%':>8s} "
-        f"{'ghost%':>8s} {'RO%':>8s} {'ACRg%':>8s} {'clip':>6s} {'clipPre':>8s}"
+        f"{'ghost%':>8s} {'RO%':>8s} {'ACRg%':>8s} {'outl%':>7s} "
+        f"{'clip':>6s} {'clipPre':>8s}"
     )
     print(header)
     print("-" * len(header))
@@ -82,11 +83,14 @@ def main(argv=None):
         # warm-up volumes -- reported apart because they don't reach the stats.
         sat = m.saturation
         clip = f"{sat.n_clipped_kept}{'!' if sat.clipped_kept else ''}"
+        # outl%: worst single-frame outlier-voxel fraction (3dToutcount); a clean
+        # run sits near the per-voxel chance level (qthr, ~0.1%).
+        outl = 100.0 * m.outliers.max_fraction
         print(
             f"{name:40s} {pe:>3s} "
             f"{m.snr:>9.1f} {m.sfnr:>9.1f} {m.rdc:>8.3f} "
             f"{m.drift_pct:>8.3f} {m.ghost_pct:>8.3f} {m.ro_ghost_pct:>8.3f} "
-            f"{m.acr_ghost_pct:>8.3f} {clip:>6s} {sat.n_clipped_pre:>8d}"
+            f"{m.acr_ghost_pct:>8.3f} {outl:>7.3f} {clip:>6s} {sat.n_clipped_pre:>8d}"
         )
         reports.append((name, result))
 

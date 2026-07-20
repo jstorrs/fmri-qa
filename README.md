@@ -20,6 +20,7 @@ fBIRN size) on a single slice.
 | **fluctuation %** | SD of the ROI-mean residual, as % of mean signal |
 | **ghost %** | fBIRN percent ghost: `100 × mean ghost region / mean signal region` |
 | **ACRg %** | ACR/AAPM percent-signal-ghosting: `100 × \|ghost_pe − ghost_freq\| / signal`, over the N/2-shifted phantom masks |
+| **outl %** | worst-frame outlier-voxel fraction (AFNI 3dToutcount): `100 × max_t (outlier voxels / phantom voxels)`; a clean run sits near the 0.1% chance level |
 | **clip** / **clipPre** | ADC-saturation counts: voxel·time samples pinned at the inferred `2ⁿ−1` rail, in the analyzed data (`clip`) vs. the dropped warm-up volumes (`clipPre`); `0` when none |
 
 Drift is removed before the noise metrics are measured, using either a Legendre
@@ -58,6 +59,20 @@ deliberately acquire through the approach to steady state. A lone sample on the
 rail is likely just a bright voxel; a pile-up across a volume is real
 saturation.
 
+## Outliers
+
+The `outl %` metric is a per-frame temporal-stability check, following AFNI's
+`3dToutcount`. For each phantom voxel the robust spread of its detrended
+residual is `σ = √(π/2)·MAD`, and a frame counts as an outlier for that voxel
+when `|residual| > α·σ`, with `α = Q⁻¹(qthr / n_frames)` chosen so a clean voxel
+flags a frame with probability `qthr` (0.001). The per-frame outlier fraction is
+then the share of phantom voxels flagged; a stable run hovers near the 0.1%
+chance level, and a frame standing well above it marks a bad volume. The
+detrended residuals are the pipeline's Legendre-detrended fluctuations (as
+afni_proc.py recommends detrending before outlier classification); the full
+per-frame trace is plotted in the PDF report and `outl %` reports its worst
+frame.
+
 ## Install
 
 The project uses [uv](https://docs.astral.sh/uv/) and Python 3.13:
@@ -82,10 +97,10 @@ uv run fmri-qa [options] scan.nii.gz [more.nii.gz ...]
 
 ```
 # detrend=poly  trim_sec=5.0  center=image  roi_size=21
-scan                                      PE       SNR      SFNR      RDC   drift%   ghost%      RO%    ACRg%   clip  clipPre
------------------------------------------------------------------------------------------------------------------------------
-FBIRN_QA_fMRI_flip77_13.nii.gz           col     467.3     452.0   10.953    0.303    4.092    4.059    0.033      0        0
-ABCD_QA_fMRI_16.nii.gz                   col      76.7      75.3   13.355    0.682    5.074    3.192    1.882      0       68
+scan                                      PE       SNR      SFNR      RDC   drift%   ghost%      RO%    ACRg%   outl%   clip  clipPre
+-------------------------------------------------------------------------------------------------------------------------------------
+FBIRN_QA_fMRI_flip77_13.nii.gz           col     467.3     452.0   10.953    0.303    4.092    4.059    0.033   0.211      0        0
+ABCD_QA_fMRI_16.nii.gz                   col      76.7      75.3   13.355    0.682    5.074    3.192    1.882   0.077      0       68
 ```
 
 Options:
@@ -113,8 +128,8 @@ uv run fmri-qa --pdf qa.pdf data/*_fMRI_*.nii.gz
 Each page carries the metadata and metrics, the four summary images (signal,
 SFNR, fluctuation noise, static spatial noise) with the phantom mask and ROI
 overlaid, the Weisskoff plot, the ROI signal with its fitted trend, and the
-residual time course and spectrum. `--pdf-layout two` splits these across a
-summary page and a stability page.
+residual time course, spectrum, and per-frame outlier fraction. `--pdf-layout
+two` splits these across a summary page and a stability page.
 
 ## Library
 

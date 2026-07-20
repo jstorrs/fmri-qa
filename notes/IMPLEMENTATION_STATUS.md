@@ -83,16 +83,11 @@ Ranked by value for phantom QA.
 
 **High**
 
-1. **Temporal outlier fraction (`3dToutcount`).** The #1 phantom check in
-   `AFNI_procpy_best_practices.md` / `AFNI_qa_ideas.md`. Per-voxel median/L1
-   detrend → `sigma = sqrt(π/2)·MAD` → outlier if `|r| > Q⁻¹(0.001/N)·sigma` →
-   per-TR fraction. Catches transient instabilities the summary metrics average
-   away. Full spec in `AFNI_outliers.md`.
-2. **Despiking (`3dDespike`).** No spike handling before the noise metrics — a
+1. **Despiking (`3dDespike`).** No spike handling before the noise metrics — a
    single spike inflates fluctuation / SFNR / RDC. Full algorithm (basis
    `2·corder+3`, `fsig = sqrt(π/2)·median|e|`, tanh smash c1=2.5 / c2=4.0) in
    `AFNI_detrend_despike.md`. Could be an optional pre-step.
-3. **Scalar spike scores.** Match `cran-fmriqa`: `tc_outlier = max|detrended ROI
+2. **Scalar spike scores.** Match `cran-fmriqa`: `tc_outlier = max|detrended ROI
    series| / MAD` and `spec_outlier = max(FFT mag) / MAD`. ~2 lines each; the
    residual series and its spectrum already exist in `report.py`.
 
@@ -121,6 +116,13 @@ Ranked by value for phantom QA.
 
 **Done since first review**
 
+- **Temporal outlier fraction (`3dToutcount`)** (was High gap #1): the notes'
+  top phantom check. `outlier_fraction` computes the per-frame outlier-voxel
+  fraction over the phantom mask — per-voxel `sigma = sqrt(π/2)·MAD`, outlier if
+  `|r| > Q⁻¹(qthr/N)·sigma`, `qthr = 0.001` — on the pipeline's Legendre-
+  detrended fluctuations (afni_proc.py detrend-before-classify; our fit is L2
+  vs. AFNI's L1). Surfaced as the `outl%` column, a PDF tile, and a per-frame
+  trace plot. Validated: clean data sits at the `qthr` chance level.
 - **Saturation / clipping check** (was a gap): `detect_saturation` infers the
   `2**n - 1` rail and counts the pile-up over the full untrimmed series, split
   into analyzed (`clip`) vs. dropped warm-up (`clipPre`) volumes; surfaced as
@@ -133,6 +135,7 @@ Ranked by value for phantom QA.
 Highest leverage, fits the existing linear-chain architecture (operates on
 `QAImages.center_slice` / `fluctuations`):
 
-1. `3dToutcount`-style per-TR outlier fraction.
-2. The two cheap `cran` spike scores (`tc_outlier`, `spec_outlier`).
-3. Optional despike pre-step.
+1. The two cheap `cran` spike scores (`tc_outlier`, `spec_outlier`).
+2. Optional despike pre-step.
+
+(Done: `3dToutcount`-style per-TR outlier fraction; saturation/clipping check.)
