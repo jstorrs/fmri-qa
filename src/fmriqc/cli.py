@@ -52,7 +52,7 @@ def main(argv=None):
         f"{'scan':40s} {'PE':>3s} "
         f"{'SNR':>9s} {'SFNR':>9s} {'RDC':>8s} {'drift%':>8s} "
         f"{'ghost%':>8s} {'RO%':>8s} {'ACRg%':>8s} {'outl%':>7s} "
-        f"{'clip':>6s} {'clipPre':>8s}"
+        f"{'clip':>6s} {'clipPre':>8s} {'motn':>7s} {'scl%':>7s} {'shr%':>7s}"
     )
     print(header)
     print("-" * len(header))
@@ -86,11 +86,16 @@ def main(argv=None):
         # outl%: worst single-frame outlier-voxel fraction (3dToutcount); a clean
         # run sits near the per-voxel chance level (qthr, ~0.1%).
         outl = 100.0 * m.outliers.max_fraction
+        # motn/scl%/shr%: peak per-volume in-plane phantom motion vs the temporal
+        # mean (3dvolreg-style, rotation dropped) -- translation (voxels), and the
+        # gradient-heating scale/shear strain (percent).
+        mo = m.motion
         print(
             f"{name:40s} {pe:>3s} "
             f"{m.snr:>9.1f} {m.sfnr:>9.1f} {m.rdc:>8.3f} "
             f"{m.drift_pct:>8.3f} {m.ghost_pct:>8.3f} {m.ro_ghost_pct:>8.3f} "
-            f"{m.acr_ghost_pct:>8.3f} {outl:>7.3f} {clip:>6s} {sat.n_clipped_pre:>8d}"
+            f"{m.acr_ghost_pct:>8.3f} {outl:>7.3f} {clip:>6s} {sat.n_clipped_pre:>8d} "
+            f"{mo.max_translation:>7.3f} {mo.max_scale_pct:>7.3f} {mo.max_shear_pct:>7.3f}"
         )
         reports.append((name, result))
 

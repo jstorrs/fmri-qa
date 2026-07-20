@@ -71,9 +71,12 @@ off-protocol acquisitions, by design.
    across the plausible FBIRN TR range (2.0–3.0 s), matching `guide`/`cran`'s
    "discard first 2" while staying meaningful in wall-clock seconds for other
    TRs.
-3. **No motion correction.** GSQAP does not motion-correct the phantom series;
-   `3dvolreg` is a `bxh` extension, not part of the FBIRN protocol. Omitting it
-   is FBIRN-correct, not a gap.
+3. **No motion _correction_.** GSQAP does not motion-correct the phantom series;
+   resampling it (a `bxh` `3dvolreg` extension) is not part of the FBIRN
+   protocol, so the metrics stay measured on the acquired data — FBIRN-correct,
+   not a gap. We do, separately, _measure_ the per-volume in-plane deformation
+   as a diagnostic (see "Done since first review"), without altering the
+   analyzed series.
 
 ---
 
@@ -127,6 +130,15 @@ Ranked by value for phantom QA.
   `2**n - 1` rail and counts the pile-up over the full untrimmed series, split
   into analyzed (`clip`) vs. dropped warm-up (`clipPre`) volumes; surfaced as
   two CLI columns and a PDF annotation.
+- **In-plane phantom motion / deformation** (3dvolreg-style): `estimate_motion`
+  registers each volume to the temporal-mean image under a rotation-free 2-D
+  affine — translation + symmetric strain (anisotropic scale + shear), the only
+  degrees of freedom a rigid phantom has under gradient heating — by
+  forward-additive Lucas-Kanade over the phantom mask. Surfaced as the
+  `motn`/`scl%`/`shr%` columns, a PDF tile, and a per-frame translation/strain
+  trace; a slow monotonic strain ramp is the thermal-drift signature (visible on
+  ABCD). Diagnostic only — the analyzed series is not resampled, so this stays
+  FBIRN-correct.
 
 ---
 

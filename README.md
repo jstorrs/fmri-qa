@@ -22,6 +22,8 @@ fBIRN size) on a single slice.
 | **ACRg %** | ACR/AAPM percent-signal-ghosting: `100 × \|ghost_pe − ghost_freq\| / signal`, over the N/2-shifted phantom masks |
 | **outl %** | worst-frame outlier-voxel fraction (AFNI 3dToutcount): `100 × max_t (outlier voxels / phantom voxels)`; a clean run sits near the 0.1% chance level |
 | **clip** / **clipPre** | ADC-saturation counts: voxel·time samples pinned at the inferred `2ⁿ−1` rail, in the analyzed data (`clip`) vs. the dropped warm-up volumes (`clipPre`); `0` when none |
+| **motn** | peak per-volume in-plane translation of the phantom vs. its temporal mean (voxels), from a 3dvolreg-style registration |
+| **scl %** / **shr %** | peak per-volume scaling and shear strain of the phantom (percent) — the gradient-heating deformation the rotation-free motion model isolates |
 
 Drift is removed before the noise metrics are measured, using either a Legendre
 polynomial (`--detrend poly`, default) or a least-squares B-spline
@@ -73,6 +75,24 @@ afni_proc.py recommends detrending before outlier classification); the full
 per-frame trace is plotted in the PDF report and `outl %` reports its worst
 frame.
 
+## Motion
+
+The `motn` / `scl %` / `shr %` metrics come from a 3dvolreg-style per-volume
+registration of the phantom to its temporal-mean image, following AFNI's
+`3dvolreg` but with a model tailored to a rigid phantom. A stationary phantom
+cannot rotate, so the rotation degrees of freedom are dropped; what gradient
+heating *does* produce is a slow translation plus a scaling and shear of the
+image as the gradient calibration drifts. The registration therefore fits a 2-D
+affine restricted to translation + symmetric strain (anisotropic scale + shear)
+— five parameters, no rotation — per frame, by forward-additive Lucas-Kanade
+over the phantom mask, pivoting the strain at the phantom centroid so
+translation and deformation stay separable. `motn` is the peak translation
+magnitude (voxels), `scl %` the peak scaling, and `shr %` the peak shear; the
+full per-frame translation and strain traces are plotted in the PDF report,
+where a slow monotonic strain ramp is the thermal-drift signature. This is a
+diagnostic only — the analyzed series is **not** resampled from the fit, so the
+FBIRN metrics stay measured on the acquired data.
+
 ## Install
 
 The project uses [uv](https://docs.astral.sh/uv/) and Python 3.13:
@@ -97,10 +117,10 @@ uv run fmri-qa [options] scan.nii.gz [more.nii.gz ...]
 
 ```
 # detrend=poly  trim_sec=5.0  center=image  roi_size=21
-scan                                      PE       SNR      SFNR      RDC   drift%   ghost%      RO%    ACRg%   outl%   clip  clipPre
--------------------------------------------------------------------------------------------------------------------------------------
-FBIRN_QA_fMRI_flip77_13.nii.gz           col     467.3     452.0   10.953    0.303    4.092    4.059    0.033   0.211      0        0
-ABCD_QA_fMRI_16.nii.gz                   col      76.7      75.3   13.355    0.682    5.074    3.192    1.882   0.077      0       68
+scan                                      PE       SNR      SFNR      RDC   drift%   ghost%      RO%    ACRg%   outl%   clip  clipPre    motn    scl%    shr%
+-------------------------------------------------------------------------------------------------------------------------------------------------------------
+FBIRN_QA_fMRI_flip77_13.nii.gz           col     467.3     452.0   10.953    0.303    4.092    4.059    0.033   0.211      0        0   0.017   0.198   0.015
+ABCD_QA_fMRI_16.nii.gz                   col      76.7      75.3   13.355    0.682    5.074    3.192    1.882   0.077      0       68   0.025   0.268   0.034
 ```
 
 Options:
@@ -128,8 +148,9 @@ uv run fmri-qa --pdf qa.pdf data/*_fMRI_*.nii.gz
 Each page carries the metadata and metrics, the four summary images (signal,
 SFNR, fluctuation noise, static spatial noise) with the phantom mask and ROI
 overlaid, the Weisskoff plot, the ROI signal with its fitted trend, and the
-residual time course, spectrum, and per-frame outlier fraction. `--pdf-layout
-two` splits these across a summary page and a stability page.
+residual time course, spectrum, per-frame outlier fraction, and per-frame
+in-plane motion (translation and scale/shear strain). `--pdf-layout two` splits
+these across a summary page and a stability page.
 
 ## Library
 

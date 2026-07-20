@@ -286,6 +286,30 @@ def _plot_outliers(ax, t, outl, fs=9):
     ax.legend(fontsize=fs - 2)
 
 
+def _plot_motion(ax, t, motion, fs=9):
+    """Per-volume in-plane phantom motion: translation (voxels) + strain (%).
+
+    3dvolreg-style registration to the temporal mean with the rotation dropped
+    (a rigid phantom cannot rotate). Translation drifts on the left axis; the
+    scaling/shear strain -- the gradient-heating signature -- shares a right axis
+    in percent. A stable phantom stays flat near zero; a slow ramp is thermal.
+    """
+    ax.axhline(0, color="gray", lw=0.5)
+    ax.plot(t, motion.translation[:, 0], lw=0.7, color="tab:blue", label="trans0")
+    ax.plot(t, motion.translation[:, 1], lw=0.7, color="tab:cyan", label="trans1")
+    ax.set_xlabel("time (s)")
+    ax.set_ylabel("translation (vox)")
+    ax.set_title("in-plane motion", fontsize=fs)
+    ax2 = ax.twinx()
+    ax2.plot(t, motion.scale_pct[:, 0], lw=0.7, color="tab:red", label="scale0")
+    ax2.plot(t, motion.scale_pct[:, 1], lw=0.7, color="tab:orange", label="scale1")
+    ax2.plot(t, motion.shear_pct, lw=0.7, color="tab:green", label="shear")
+    ax2.set_ylabel("strain (%)")
+    h1, l1 = ax.get_legend_handles_labels()
+    h2, l2 = ax2.get_legend_handles_labels()
+    ax.legend(h1 + h2, l1 + l2, fontsize=fs - 4, ncol=2, loc="upper left")
+
+
 def _plot_spectrum(ax, resid, tr, fs=9):
     freqs = np.fft.rfftfreq(resid.size, d=tr)
     ax.plot(freqs[1:], np.abs(np.fft.rfft(resid))[1:], lw=0.7)  # skip DC
@@ -314,6 +338,7 @@ def _metric_tiles(m):
         ("drift", f"{m.drift_pct:.3f}%"),
         ("fluct", f"{m.percent_fluctuation:.3f}%"),
         ("outl", f"{100.0 * m.outliers.max_fraction:.2f}%"),
+        ("motn", f"{m.motion.max_translation:.2f}"),
     ]
 
 
@@ -498,11 +523,15 @@ def _one_page(c, result, title):
                 _MARGIN + half + gap, y, half, row_h)
     y -= row_h + 6
 
+    third = (_CONTENT_W - 2 * gap) / 3
     _draw_fig(c, _plot_fig(lambda ax: _plot_spectrum(ax, resid, result.images.tr),
-                             (3.6, 1.9)), _MARGIN, y, half, 120.0)
+                             (3.6, 2.0)), _MARGIN, y, third, 120.0)
     _draw_fig(c, _plot_fig(
-        lambda ax: _plot_outliers(ax, t, result.metrics.outliers), (3.6, 1.9)),
-              _MARGIN + half + gap, y, half, 120.0)
+        lambda ax: _plot_outliers(ax, t, result.metrics.outliers), (3.6, 2.0)),
+              _MARGIN + third + gap, y, third, 120.0)
+    _draw_fig(c, _plot_fig(
+        lambda ax: _plot_motion(ax, t, result.metrics.motion), (3.6, 2.0)),
+              _MARGIN + 2 * (third + gap), y, third, 120.0)
 
 
 def _summary_page(c, result, title):
@@ -534,11 +563,15 @@ def _analysis_page(c, result, title):
                              (3.6, 3.0)), _MARGIN + half + gap, y, half, row_h)
     y -= row_h + 12
 
+    third = (_CONTENT_W - 2 * gap) / 3
     _draw_fig(c, _plot_fig(lambda ax: _plot_spectrum(ax, resid, result.images.tr, fs=10),
-                             (3.6, 2.2)), _MARGIN, y, half, 150.0)
+                             (3.6, 2.2)), _MARGIN, y, third, 150.0)
     _draw_fig(c, _plot_fig(
         lambda ax: _plot_outliers(ax, t, result.metrics.outliers, fs=10),
-        (3.6, 2.2)), _MARGIN + half + gap, y, half, 150.0)
+        (3.6, 2.2)), _MARGIN + third + gap, y, third, 150.0)
+    _draw_fig(c, _plot_fig(
+        lambda ax: _plot_motion(ax, t, result.metrics.motion, fs=10),
+        (3.6, 2.2)), _MARGIN + 2 * (third + gap), y, third, 150.0)
 
 
 REPORT_LAYOUTS = ("one", "two")
