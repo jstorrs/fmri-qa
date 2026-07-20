@@ -318,6 +318,40 @@ def _plot_spectrum(ax, resid, tr, fs=9):
     ax.set_title("residual spectrum", fontsize=fs)
 
 
+def _plot_psf(ax, s, fs=9):
+    """Directional point-spread profiles (PE, RO) of the noise field (3dFWHMx).
+
+    Markers are the empirical PSF (the squared spatial autocorrelation of the
+    detrended noise field at each lag -- the point spread implied by the data
+    under the Gaussian random-field model); the line is the Gaussian PSF whose
+    FWHM is the Classic first-difference estimate for that axis. PE/RO asymmetry,
+    or empirical points falling off the Gaussian, flag anisotropic or non-Gaussian
+    reconstruction smoothing.
+    """
+    unit = "mm" if s.voxel_mm is not None else "vox"
+    if s.pe_axis is not None:
+        dirs = [("PE", s.pe_axis, "tab:blue"), ("RO", s.ro_axis, "tab:orange")]
+    else:  # no PE axis resolved -- fall back to raw array axes
+        dirs = [("axis0", 0, "tab:blue"), ("axis1", 1, "tab:orange")]
+    # Zoom to a few FWHM (but at least 3 voxels), so a narrow PSF isn't squashed
+    # by the full lag range -- coarse voxels decorrelate within ~1 voxel.
+    xmax = max(max(2.6 * s.fwhm_axis(a), 3.0 * s._mm_per(a)) for _, a, _ in dirs)
+    for name, axis, color in dirs:
+        x = s.displacement(axis)
+        fw = s.fwhm_axis(axis)
+        xs = np.linspace(0.0, xmax, 100)
+        ax.plot(xs, s.psf_model(xs, axis), "-", color=color, lw=1.1,
+                label=f"{name} {fw:.2f}{unit}")
+        vis = x <= xmax
+        ax.plot(x[vis], s.psf_empirical(axis)[vis], "o", ms=3, color=color)
+    ax.set_xlim(0, xmax)
+    ax.set_ylim(0, 1.03)
+    ax.set_xlabel(f"displacement ({unit})")
+    ax.set_ylabel("PSF")
+    ax.set_title("PSF (PE / RO)", fontsize=fs)
+    ax.legend(fontsize=fs - 2)
+
+
 # --------------------------------------------------------------------------- #
 # ReportLab page composition
 # --------------------------------------------------------------------------- #
@@ -530,15 +564,18 @@ def _one_page(c, result, title):
                 _MARGIN + half + gap, y, half, row_h)
     y -= row_h + 6
 
-    third = (_CONTENT_W - 2 * gap) / 3
+    quarter = (_CONTENT_W - 3 * gap) / 4
     _draw_fig(c, _plot_fig(lambda ax: _plot_spectrum(ax, resid, result.images.tr),
-                             (3.6, 2.0)), _MARGIN, y, third, 120.0)
+                             (3.0, 2.0)), _MARGIN, y, quarter, 120.0)
     _draw_fig(c, _plot_fig(
-        lambda ax: _plot_outliers(ax, t, result.metrics.outliers), (3.6, 2.0)),
-              _MARGIN + third + gap, y, third, 120.0)
+        lambda ax: _plot_outliers(ax, t, result.metrics.outliers), (3.0, 2.0)),
+              _MARGIN + quarter + gap, y, quarter, 120.0)
     _draw_fig(c, _plot_fig(
-        lambda ax: _plot_motion(ax, t, result.metrics.motion), (3.6, 2.0)),
-              _MARGIN + 2 * (third + gap), y, third, 120.0)
+        lambda ax: _plot_motion(ax, t, result.metrics.motion), (3.0, 2.0)),
+              _MARGIN + 2 * (quarter + gap), y, quarter, 120.0)
+    _draw_fig(c, _plot_fig(
+        lambda ax: _plot_psf(ax, result.metrics.smoothness), (3.0, 2.0)),
+              _MARGIN + 3 * (quarter + gap), y, quarter, 120.0)
 
 
 def _summary_page(c, result, title):
@@ -570,15 +607,18 @@ def _analysis_page(c, result, title):
                              (3.6, 3.0)), _MARGIN + half + gap, y, half, row_h)
     y -= row_h + 12
 
-    third = (_CONTENT_W - 2 * gap) / 3
+    quarter = (_CONTENT_W - 3 * gap) / 4
     _draw_fig(c, _plot_fig(lambda ax: _plot_spectrum(ax, resid, result.images.tr, fs=10),
-                             (3.6, 2.2)), _MARGIN, y, third, 150.0)
+                             (3.0, 2.2)), _MARGIN, y, quarter, 150.0)
     _draw_fig(c, _plot_fig(
         lambda ax: _plot_outliers(ax, t, result.metrics.outliers, fs=10),
-        (3.6, 2.2)), _MARGIN + third + gap, y, third, 150.0)
+        (3.0, 2.2)), _MARGIN + quarter + gap, y, quarter, 150.0)
     _draw_fig(c, _plot_fig(
         lambda ax: _plot_motion(ax, t, result.metrics.motion, fs=10),
-        (3.6, 2.2)), _MARGIN + 2 * (third + gap), y, third, 150.0)
+        (3.0, 2.2)), _MARGIN + 2 * (quarter + gap), y, quarter, 150.0)
+    _draw_fig(c, _plot_fig(
+        lambda ax: _plot_psf(ax, result.metrics.smoothness, fs=10),
+        (3.0, 2.2)), _MARGIN + 3 * (quarter + gap), y, quarter, 150.0)
 
 
 REPORT_LAYOUTS = ("one", "two")

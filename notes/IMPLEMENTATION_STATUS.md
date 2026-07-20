@@ -142,10 +142,16 @@ Ranked by value for phantom QA.
   first differences (AFNI's Classic `mri_estimate_FWHM_1dif`,
   `FWHM = sqrt(8 ln 2)·σ`), on the pipeline's detrended fluctuations with AFNI's
   `-unif` per-voxel median/MAD standardization, per frame over the phantom mask,
-  aggregated across frames by geometric mean (`-geom`). Surfaced as the `fwhm`
-  column (combined in-plane FWHM in mm) and a PDF tile. The ACF mixed-model
-  "effective FWHM" (the modern `3dFWHMx` default) is left as a follow-up; the
-  Classic estimator is the exact, direct RDC complement the note calls for.
+  aggregated across frames by geometric mean (`-geom`). Resolved to physical
+  directions with the PE axis: surfaced as the `fwPE`/`fwRO` columns (phase-
+  encode / readout FWHM in mm), a combined-FWHM PDF tile (AFNI `ccomb`), and
+  directional **point-spread curves** — the empirical PSF (squared spatial
+  autocorrelation of the noise field, the Gaussian-model point spread from AFNI's
+  empirical ACF) overlaid on the Gaussian PSF from the Classic FWHM, per PE/RO,
+  so anisotropic or non-Gaussian reconstruction smoothing is visible. The ACF
+  mixed-model "effective FWHM" (the modern `3dFWHMx` default) is left as a
+  follow-up; the Classic estimator is the exact, direct RDC complement the note
+  calls for.
 
 ---
 

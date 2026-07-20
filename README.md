@@ -24,7 +24,7 @@ fBIRN size) on a single slice.
 | **clip** / **clipPre** | ADC-saturation counts: voxel·time samples pinned at the inferred `2ⁿ−1` rail, in the analyzed data (`clip`) vs. the dropped warm-up volumes (`clipPre`); `0` when none |
 | **motn** | peak per-volume in-plane translation of the phantom vs. its temporal mean (voxels), from a 3dvolreg-style registration |
 | **scl %** / **shr %** | peak per-volume scaling and shear strain of the phantom (percent) — the gradient-heating deformation the rotation-free motion model isolates |
-| **fwhm** | spatial smoothness of the noise field (AFNI 3dFWHMx): combined Gaussian FWHM of the detrended fluctuations over the phantom, in mm (voxels if the voxel size is unknown) |
+| **fwPE** / **fwRO** | spatial smoothness of the noise field (AFNI 3dFWHMx): Gaussian FWHM of the detrended fluctuations over the phantom along the phase-encode and readout axes, in mm (voxels if the voxel size is unknown) |
 
 Drift is removed before the noise metrics are measured, using either a Legendre
 polynomial (`--detrend poly`, default) or a least-squares B-spline
@@ -96,20 +96,34 @@ FBIRN metrics stay measured on the acquired data.
 
 ## Smoothness
 
-The `fwhm` metric is the spatial smoothness of the noise field, following AFNI's
-`3dFWHMx`. The guide warns that the Weisskoff RDC is confounded by smoothness —
-a smoother noise field decorrelates more slowly and inflates the RDC — so an
-explicit FWHM complements it. For each in-plane axis the Gaussian FWHM is
-recovered from the variance of the noise field's forward first differences (the
-Classic `mri_estimate_FWHM_1dif` estimator): for a smoothed white-noise field
-the first-difference variance relates to the voxel variance by `arg = 1 −
-0.5·var_diff/var`, giving `σ = √(−1 / (4·ln arg))` and `FWHM = √(8 ln 2)·σ`. It
-is estimated on the pipeline's detrended fluctuations — each voxel robustly
-standardized over time (median removed, divided by its MAD, AFNI's `-unif`, so
-the estimate reflects correlation length rather than the spatially varying noise
-amplitude) — on each frame over the phantom mask, and aggregated across frames by
-geometric mean (AFNI `-geom`). `fwhm` reports the combined (geometric-mean)
-in-plane FWHM in mm; a larger value means a smoother noise field.
+The `fwPE` / `fwRO` metrics are the spatial smoothness of the noise field along
+the phase-encode and readout axes, following AFNI's `3dFWHMx`. The guide warns
+that the Weisskoff RDC is confounded by smoothness — a smoother noise field
+decorrelates more slowly and inflates the RDC — so an explicit FWHM complements
+it, and splitting it by direction exposes anisotropic reconstruction smoothing
+(the PE and RO axes are filtered differently). For each in-plane axis the
+Gaussian FWHM is recovered from the variance of the noise field's forward first
+differences (the Classic `mri_estimate_FWHM_1dif` estimator): for a smoothed
+white-noise field the first-difference variance relates to the voxel variance by
+`arg = 1 − 0.5·var_diff/var`, giving `σ = √(−1 / (4·ln arg))` and
+`FWHM = √(8 ln 2)·σ`. It is estimated on the pipeline's detrended fluctuations —
+each voxel robustly standardized over time (median removed, divided by its MAD,
+AFNI's `-unif`, so the estimate reflects correlation length rather than the
+spatially varying noise amplitude) — on each frame over the phantom mask, and
+aggregated across frames by geometric mean (AFNI `-geom`). The axes are labeled
+`PE`/`RO` from the phase-encode direction; `SmoothnessResult.fwhm` also exposes
+the combined (geometric-mean) FWHM (AFNI `ccomb`).
+
+### Point-spread curves
+
+The PDF report plots a directional **point-spread function** (PSF) alongside the
+FWHM numbers. Because the noise field is a PSF convolved with white noise, its
+normalized spatial autocorrelation is the autocorrelation of the PSF, which for a
+Gaussian equals `PSF²`; squaring the measured autocorrelation of the noise field
+at each lag therefore recovers the empirical point-spread profile. The report
+overlays those empirical points on the Gaussian PSF implied by the Classic FWHM,
+for both PE and RO — a narrower curve is a sharper direction, and empirical points
+falling off the Gaussian flag a non-Gaussian (e.g. long-tailed) point spread.
 
 ## Install
 
@@ -135,10 +149,10 @@ uv run fmri-qa [options] scan.nii.gz [more.nii.gz ...]
 
 ```
 # detrend=poly  trim_sec=5.0  center=image  roi_size=21
-scan                                      PE       SNR      SFNR      RDC   drift%   ghost%      RO%    ACRg%   outl%   clip  clipPre    motn    scl%    shr%    fwhm
----------------------------------------------------------------------------------------------------------------------------------------------------------------------
-FBIRN_QA_fMRI_flip77_13.nii.gz           col     467.3     452.0   10.953    0.303    4.092    4.059    0.033   0.211      0        0   0.017   0.198   0.015   2.441
-ABCD_QA_fMRI_16.nii.gz                   col      76.7      75.3   13.355    0.682    5.074    3.192    1.882   0.077      0       68   0.025   0.268   0.034   1.821
+scan                                      PE       SNR      SFNR      RDC   drift%   ghost%      RO%    ACRg%   outl%   clip  clipPre    motn    scl%    shr%   fwPE   fwRO
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+FBIRN_QA_fMRI_flip77_13.nii.gz           col     467.3     452.0   10.953    0.303    4.092    4.059    0.033   0.211      0        0   0.017   0.198   0.015   2.19   2.72
+ABCD_QA_fMRI_16.nii.gz                   col      76.7      75.3   13.355    0.682    5.074    3.192    1.882   0.077      0       68   0.025   0.268   0.034   1.53   2.17
 ```
 
 Options:
@@ -166,9 +180,10 @@ uv run fmri-qa --pdf qa.pdf data/*_fMRI_*.nii.gz
 Each page carries the metadata and metrics, the four summary images (signal,
 SFNR, fluctuation noise, static spatial noise) with the phantom mask and ROI
 overlaid, the Weisskoff plot, the ROI signal with its fitted trend, and the
-residual time course, spectrum, per-frame outlier fraction, and per-frame
-in-plane motion (translation and scale/shear strain). `--pdf-layout two` splits
-these across a summary page and a stability page.
+residual time course, spectrum, per-frame outlier fraction, per-frame in-plane
+motion (translation and scale/shear strain), and the directional PSF curves (PE
+and RO). `--pdf-layout two` splits these across a summary page and a stability
+page.
 
 ## Library
 
