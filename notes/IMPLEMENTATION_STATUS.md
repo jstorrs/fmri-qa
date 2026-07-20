@@ -7,9 +7,10 @@ against).
 
 **Summary:** the implementation is a faithful GSQAP **core (conformance
 Levels A + B)** — every scalar metric matches the guide, and detrending matches
-AFNI `3dDetrend` exactly. The gaps are the AFNI robustness/temporal-QA layer
-(`3dToutcount`, `3dDespike`, `3dFWHMx`) and Level C (longitudinal trending),
-none of which is implemented.
+AFNI `3dDetrend` exactly. Much of the AFNI robustness/temporal-QA layer is now
+also in place (`3dToutcount` outlier fraction, saturation, 3dvolreg-style motion,
+`3dFWHMx` Classic-FWHM smoothness); the remaining gaps are `3dDespike`, the
+ACF-model half of `3dFWHMx`, and Level C (longitudinal trending).
 
 **Design principle:** FBIRN is a specific, rigid protocol and its QA is adapted
 to it. On FBIRN-protocol data the pipeline must reproduce FBIRN results — that
@@ -96,24 +97,20 @@ Ranked by value for phantom QA.
 
 **Medium**
 
-4. **Spatial smoothness / FWHM (`3dFWHMx`).** Absent. The guide warns RDC is
-   confounded by smoothness; an FWHM (Classic first-difference
-   `FWHM = 2.35482·σ`, or the ACF mixed model) would complement RDC. Spec in
-   `3dFWHMx_algorithms.md`.
-5. **Ghost "top-10% voxels" statistic.** Our ghost uses the region *mean*; the
+3. **Ghost "top-10% voxels" statistic.** Our ghost uses the region *mean*; the
    Greve / `fmriqa_ghostiness.c` method also reports the top-10% ghost voxels
    (catches localized ghosts a mean dilutes).
 
 **Lower / larger scope**
 
-6. **Level C — longitudinal QA.** Guide's target is "B+C". We cover A+B (single
+4. **Level C — longitudinal QA.** Guide's target is "B+C". We cover A+B (single
    scan + batch table); no logging DB, trend plots, or ±k·SD control-limit
    flagging.
-7. **Background/air QA** (cran `max_bg_perc`), **`@radial_correlate`**
+5. **Background/air QA** (cran `max_bg_perc`), **`@radial_correlate`**
    structured-artifact detection, **hi/lo flip thermal-vs-instability split**
    (`bxh-fmriqa-hilo.md`, needs 2 scans) — genuinely out of the current
    single-scan scope; future directions.
-8. **FFT spectrum normalization.** `report.py._plot_spectrum` plots raw
+6. **FFT spectrum normalization.** `report.py._plot_spectrum` plots raw
    magnitude; `bxh` normalizes to percent-of-mean (`·100/m`) for cross-scan
    comparability. Cosmetic.
 
@@ -139,6 +136,16 @@ Ranked by value for phantom QA.
   trace; a slow monotonic strain ramp is the thermal-drift signature (visible on
   ABCD). Diagnostic only — the analyzed series is not resampled, so this stays
   FBIRN-correct.
+- **Spatial smoothness / FWHM (`3dFWHMx`)** (was Medium gap #4): the RDC
+  smoothness confound the guide warns about. `estimate_smoothness` recovers the
+  per-axis Gaussian FWHM of the noise field from the variance of its forward
+  first differences (AFNI's Classic `mri_estimate_FWHM_1dif`,
+  `FWHM = sqrt(8 ln 2)·σ`), on the pipeline's detrended fluctuations with AFNI's
+  `-unif` per-voxel median/MAD standardization, per frame over the phantom mask,
+  aggregated across frames by geometric mean (`-geom`). Surfaced as the `fwhm`
+  column (combined in-plane FWHM in mm) and a PDF tile. The ACF mixed-model
+  "effective FWHM" (the modern `3dFWHMx` default) is left as a follow-up; the
+  Classic estimator is the exact, direct RDC complement the note calls for.
 
 ---
 

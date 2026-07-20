@@ -339,7 +339,14 @@ def _metric_tiles(m):
         ("fluct", f"{m.percent_fluctuation:.3f}%"),
         ("outl", f"{100.0 * m.outliers.max_fraction:.2f}%"),
         ("motn", f"{m.motion.max_translation:.2f}"),
+        ("fwhm", _fwhm_label(m.smoothness)),
     ]
+
+
+def _fwhm_label(s):
+    """Combined FWHM tile text: mm when the voxel size is known, else voxels."""
+    unit = "mm" if s.voxel_mm is not None else "vox"
+    return f"{s.fwhm:.2f}{unit}"
 
 
 def _draw_tiles(c, tiles, top):

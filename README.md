@@ -24,6 +24,7 @@ fBIRN size) on a single slice.
 | **clip** / **clipPre** | ADC-saturation counts: voxel·time samples pinned at the inferred `2ⁿ−1` rail, in the analyzed data (`clip`) vs. the dropped warm-up volumes (`clipPre`); `0` when none |
 | **motn** | peak per-volume in-plane translation of the phantom vs. its temporal mean (voxels), from a 3dvolreg-style registration |
 | **scl %** / **shr %** | peak per-volume scaling and shear strain of the phantom (percent) — the gradient-heating deformation the rotation-free motion model isolates |
+| **fwhm** | spatial smoothness of the noise field (AFNI 3dFWHMx): combined Gaussian FWHM of the detrended fluctuations over the phantom, in mm (voxels if the voxel size is unknown) |
 
 Drift is removed before the noise metrics are measured, using either a Legendre
 polynomial (`--detrend poly`, default) or a least-squares B-spline
@@ -93,6 +94,23 @@ where a slow monotonic strain ramp is the thermal-drift signature. This is a
 diagnostic only — the analyzed series is **not** resampled from the fit, so the
 FBIRN metrics stay measured on the acquired data.
 
+## Smoothness
+
+The `fwhm` metric is the spatial smoothness of the noise field, following AFNI's
+`3dFWHMx`. The guide warns that the Weisskoff RDC is confounded by smoothness —
+a smoother noise field decorrelates more slowly and inflates the RDC — so an
+explicit FWHM complements it. For each in-plane axis the Gaussian FWHM is
+recovered from the variance of the noise field's forward first differences (the
+Classic `mri_estimate_FWHM_1dif` estimator): for a smoothed white-noise field
+the first-difference variance relates to the voxel variance by `arg = 1 −
+0.5·var_diff/var`, giving `σ = √(−1 / (4·ln arg))` and `FWHM = √(8 ln 2)·σ`. It
+is estimated on the pipeline's detrended fluctuations — each voxel robustly
+standardized over time (median removed, divided by its MAD, AFNI's `-unif`, so
+the estimate reflects correlation length rather than the spatially varying noise
+amplitude) — on each frame over the phantom mask, and aggregated across frames by
+geometric mean (AFNI `-geom`). `fwhm` reports the combined (geometric-mean)
+in-plane FWHM in mm; a larger value means a smoother noise field.
+
 ## Install
 
 The project uses [uv](https://docs.astral.sh/uv/) and Python 3.13:
@@ -117,10 +135,10 @@ uv run fmri-qa [options] scan.nii.gz [more.nii.gz ...]
 
 ```
 # detrend=poly  trim_sec=5.0  center=image  roi_size=21
-scan                                      PE       SNR      SFNR      RDC   drift%   ghost%      RO%    ACRg%   outl%   clip  clipPre    motn    scl%    shr%
--------------------------------------------------------------------------------------------------------------------------------------------------------------
-FBIRN_QA_fMRI_flip77_13.nii.gz           col     467.3     452.0   10.953    0.303    4.092    4.059    0.033   0.211      0        0   0.017   0.198   0.015
-ABCD_QA_fMRI_16.nii.gz                   col      76.7      75.3   13.355    0.682    5.074    3.192    1.882   0.077      0       68   0.025   0.268   0.034
+scan                                      PE       SNR      SFNR      RDC   drift%   ghost%      RO%    ACRg%   outl%   clip  clipPre    motn    scl%    shr%    fwhm
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------
+FBIRN_QA_fMRI_flip77_13.nii.gz           col     467.3     452.0   10.953    0.303    4.092    4.059    0.033   0.211      0        0   0.017   0.198   0.015   2.441
+ABCD_QA_fMRI_16.nii.gz                   col      76.7      75.3   13.355    0.682    5.074    3.192    1.882   0.077      0       68   0.025   0.268   0.034   1.821
 ```
 
 Options:

@@ -33,6 +33,9 @@ OUTLIER_QTHR = 0.001
 MOTION_MAX_ITER = 12
 MOTION_TOL = 1e-4
 
+# Gaussian FWHM per standard deviation: sqrt(8 ln 2) (AFNI 3dFWHMx uses 2.35482).
+SIGMA_TO_FWHM = float(np.sqrt(8.0 * np.log(2.0)))
+
 # Fixed summary-ROI side (voxels). Glover/fBIRN uses 21; user-configurable.
 FBIRN_ROI_SIZE = 21
 # ROI localization mode. "image": middle slice + image-center ROI (Glover).
@@ -453,6 +456,54 @@ class MotionResult:
 
 
 @dataclass(frozen=True)
+class SmoothnessResult:
+    """Spatial smoothness of the noise field over the phantom (AFNI 3dFWHMx).
+
+    The Gaussian FWHM of the detrended fluctuation (noise) field, estimated per
+    in-plane axis from the variance of first differences (AFNI's Classic
+    `mri_estimate_FWHM_1dif`): for a smoothed white-noise field the forward
+    first-difference variance relates to the voxel variance by
+    `arg = 1 - 0.5*var_diff/var`, giving `sigma = sqrt(-1/(4 ln arg))` and
+    `FWHM = sqrt(8 ln 2)*sigma`. Estimated on each fluctuation frame over the
+    phantom mask, then aggregated across frames by geometric mean (AFNI `-geom`).
+    A larger FWHM means a smoother noise field -- the spatial-correlation confound
+    the guide warns the Weisskoff RDC is measured against.
+
+    `fwhm_vox` is (axis 0, axis 1) in voxels; `voxel_mm` carries the in-plane
+    voxel size so the FWHM can be reported in mm. A NaN axis means the estimator
+    could not resolve smoothness there (too little correlation, or too few pairs).
+    """
+
+    fwhm_vox: tuple[float, float]
+    voxel_mm: tuple[float, float] | None = None
+
+    @property
+    def fwhm_mm(self) -> tuple[float, float] | None:
+        """(axis 0, axis 1) FWHM in mm, or None if voxel sizes are unknown."""
+        if self.voxel_mm is None:
+            return None
+        return (self.fwhm_vox[0] * self.voxel_mm[0],
+                self.fwhm_vox[1] * self.voxel_mm[1])
+
+    @property
+    def fwhm_combined_vox(self) -> float:
+        """Geometric mean of the per-axis FWHM over the resolved axes (voxels)."""
+        return _geomean(np.asarray(self.fwhm_vox))
+
+    @property
+    def fwhm_combined_mm(self) -> float | None:
+        """Geometric-mean FWHM in mm (AFNI `ccomb`); None without voxel sizes."""
+        mm = self.fwhm_mm
+        return _geomean(np.asarray(mm)) if mm is not None else None
+
+    @property
+    def fwhm(self) -> float:
+        """Combined FWHM in mm if the voxel size is known, else in voxels."""
+        mm = self.fwhm_combined_mm
+        return mm if mm is not None else self.fwhm_combined_vox
+
+
+@dataclass(frozen=True)
 class QAMetrics:
     """Settled scalar QA metrics for one scan."""
 
@@ -469,6 +520,7 @@ class QAMetrics:
     saturation: SaturationResult
     outliers: OutlierResult
     motion: MotionResult
+    smoothness: SmoothnessResult
 
 
 @dataclass(frozen=True, eq=False)
@@ -1083,6 +1135,76 @@ def estimate_motion(center_slice: NDArray, mask: NDArray,
 
 
 # --------------------------------------------------------------------------- #
+# Spatial smoothness (FWHM)
+# --------------------------------------------------------------------------- #
+
+def _geomean(x: NDArray) -> float:
+    """Geometric mean over the positive, finite entries; NaN if there are none."""
+    x = np.asarray(x, dtype=float)
+    x = x[np.isfinite(x) & (x > 0)]
+    return float(np.exp(np.mean(np.log(x)))) if x.size else float("nan")
+
+
+def _fwhm_1dif(image: NDArray, mask: NDArray) -> NDArray:
+    """Classic first-difference Gaussian FWHM (voxels) along each in-plane axis.
+
+    AFNI `mri_estimate_FWHM_1dif`: for each axis, the sample variance of forward
+    first differences over neighbor pairs that are *both* in `mask` relates to
+    the in-mask voxel variance as `arg = 1 - 0.5*var_diff/var`; then
+    `sigma = sqrt(-1/(4 ln arg))` and `FWHM = sqrt(8 ln 2)*sigma`, in voxel units
+    (multiply by the voxel size for mm). An axis whose `arg` leaves (0, 1) -- too
+    little correlation to resolve, or too few in-mask pairs -- yields NaN.
+    """
+    vals = image[mask]
+    out = np.full(2, np.nan)
+    if vals.size < 2:
+        return out
+    var = float(vals.var(ddof=1))
+    if var <= 0:
+        return out
+    for axis in (0, 1):
+        lo = [slice(None)] * image.ndim
+        hi = [slice(None)] * image.ndim
+        lo[axis], hi[axis] = slice(0, -1), slice(1, None)
+        pair = mask[tuple(lo)] & mask[tuple(hi)]  # both neighbors in-mask, in-bounds
+        if pair.sum() < 2:
+            continue
+        diff = (image[tuple(hi)] - image[tuple(lo)])[pair]
+        arg = 1.0 - 0.5 * float(diff.var(ddof=1)) / var
+        if 0.0 < arg < 1.0:
+            out[axis] = SIGMA_TO_FWHM * float(np.sqrt(-1.0 / (4.0 * np.log(arg))))
+    return out
+
+
+def estimate_smoothness(fluctuations: NDArray, mask: NDArray,
+                        voxel_mm: tuple[float, float] | None = None) -> SmoothnessResult:
+    """Spatial FWHM of the detrended noise field over the phantom (AFNI 3dFWHMx).
+
+    Follows `3dFWHMx` run on detrended residuals: each voxel time series is first
+    robustly standardized -- subtract its temporal median, divide by its MAD
+    (AFNI's `-unif`, which the `-detrend` path forces on) -- so the estimate
+    reflects the noise *correlation length* rather than its spatially varying
+    amplitude, and voxels that are constant over time (MAD = 0) are dropped from
+    the mask. The Classic first-difference FWHM (`_fwhm_1dif`) is then estimated
+    on each standardized fluctuation frame over the phantom mask and aggregated
+    across frames by geometric mean (AFNI `-geom`). `fluctuations` is (X, Y, T) --
+    `QAImages.fluctuations`, the same Legendre-detrended residual the noise
+    metrics are measured on; `voxel_mm` (in-plane, from the header) lets the FWHM
+    be reported in mm.
+    """
+    centered = fluctuations - np.median(fluctuations, axis=-1, keepdims=True)
+    mad = np.median(np.abs(centered), axis=-1)          # (X, Y)
+    work_mask = mask & (mad > 0)
+    scaled = centered / np.where(mad > 0, mad, 1.0)[..., None]
+
+    nt = scaled.shape[-1]
+    per = np.array([_fwhm_1dif(scaled[..., t], work_mask) for t in range(nt)])
+    fwhm_vox = (_geomean(per[:, 0]), _geomean(per[:, 1]))
+    vm = (float(voxel_mm[0]), float(voxel_mm[1])) if voxel_mm is not None else None
+    return SmoothnessResult(fwhm_vox=fwhm_vox, voxel_mm=vm)
+
+
+# --------------------------------------------------------------------------- #
 # Preprocessing & orchestration
 # --------------------------------------------------------------------------- #
 
@@ -1142,6 +1264,12 @@ def run_qa(
     motion = estimate_motion(images.center_slice, geom.phantom_mask,
                              voxel_mm=voxel_mm)
 
+    # Spatial smoothness (AFNI 3dFWHMx): the Gaussian FWHM of the detrended noise
+    # field over the phantom -- the correlation-length confound the guide warns
+    # the Weisskoff RDC is measured against.
+    smoothness = estimate_smoothness(images.fluctuations, geom.phantom_mask,
+                                     voxel_mm=voxel_mm)
+
     roi = resolve_roi(images, geom, roi_size, center)
     if not roi_fits(geom.phantom_mask, roi.index):
         warnings.warn(
@@ -1179,6 +1307,7 @@ def run_qa(
         saturation=saturation,
         outliers=outlier_fraction(images.fluctuations, geom.phantom_mask),
         motion=motion,
+        smoothness=smoothness,
     )
     return QAResult(images=images, geom=geom, roi=roi, metrics=metrics,
                     meta=scan.meta)
