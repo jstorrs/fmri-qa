@@ -106,10 +106,8 @@ Ranked by value for phantom QA.
 4. **Level C — longitudinal QA.** Guide's target is "B+C". We cover A+B (single
    scan + batch table); no logging DB, trend plots, or ±k·SD control-limit
    flagging.
-5. **Background/air QA** (cran `max_bg_perc`), **`@radial_correlate`**
-   structured-artifact detection, **hi/lo flip thermal-vs-instability split**
-   (`bxh-fmriqa-hilo.md`, needs 2 scans) — genuinely out of the current
-   single-scan scope; future directions.
+5. **Background/air QA** (cran `max_bg_perc`) and **`@radial_correlate`**
+   structured-artifact detection — future directions.
 6. **FFT spectrum normalization.** `report.py._plot_spectrum` plots raw
    magnitude; `bxh` normalizes to percent-of-mean (`·100/m`) for cross-scan
    comparability. Cosmetic.
@@ -152,6 +150,24 @@ Ranked by value for phantom QA.
   mixed-model "effective FWHM" (the modern `3dFWHMx` default) is left as a
   follow-up; the Classic estimator is the exact, direct RDC complement the note
   calls for.
+- **Thermal vs. instability split (hi/lo flip)** (was Lower gap #5): Greve's
+  high/low flip-angle separation (`bxh-fmriqa-hilo.md`). Because thermal
+  (additive) noise variance is signal-independent while instability
+  (multiplicative) variance scales with signal², two runs differing only in flip
+  angle separate the two: with `M = (mean_hi/mean_lo)²`,
+  `thermal_var = (M·var_lo − var_hi)/(M − 1)` and `instability_var = var_hi −
+  thermal_var` (Greve's `var_hi − var_lo` fallback when that goes negative),
+  giving `ThermalFSNR`/`InstabilityFSNR`. `run_hilo` reduces each scan to a
+  temporal-mean map and a temporal-SD-of-detrended-residual map over the whole
+  volume, pools them over the **shared** eroded phantom core (intersection of the
+  two `3dAutomask -erode 5`-style masks, so both means cover identical voxels),
+  and calls the pure-algebra `separate_noise`. This is the first **pair**-level
+  analysis, so it is exposed as a separate `fmri-qa-hilo HIGH LOW` command rather
+  than a batch-table column. Validated on the FBIRN flip77/flip10 pair: the
+  signal ratio (5.55) matches sin(77°)/sin(10°) = 5.6, and the near-equal
+  hi/lo variances correctly report a stable scanner (instability ≈ 4% of the
+  high-flip variance). The single-scan pipeline (and the FBIRN correctness bar)
+  is untouched — the data was always present; only the pair architecture was new.
 
 ---
 

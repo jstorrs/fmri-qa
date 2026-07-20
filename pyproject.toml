@@ -30,6 +30,7 @@ notebooks = [
 
 [project.scripts]
 fmri-qa = "fmriqc.cli:main"
+fmri-qa-hilo = "fmriqc.cli:hilo_main"
 
 [build-system]
 requires = ["hatchling"]

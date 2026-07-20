@@ -125,6 +125,56 @@ overlays those empirical points on the Gaussian PSF implied by the Classic FWHM,
 for both PE and RO — a narrower curve is a sharper direction, and empirical points
 falling off the Gaussian flag a non-Gaussian (e.g. long-tailed) point spread.
 
+## Thermal vs. instability noise (high/low flip)
+
+A separate `fmri-qa-hilo` command separates a phantom's noise into its **thermal**
+(additive, electronic) and **instability** (multiplicative: drift, gradient
+heating, physiological-like fluctuation) components, following Doug Greve's
+high/low flip-angle method. It needs two runs of the same acquisition that differ
+*only* in flip angle: thermal-noise variance is independent of signal level, while
+instability-noise variance scales with signal², so acquiring at a high and a low
+flip angle gives two equations that solve for the two components. With the squared
+signal ratio `M = (mean_high / mean_low)²`,
+
+```
+ThermalVar      = (M · VarLow − VarHigh) / (M − 1)
+InstabilityVar  = VarHigh − ThermalVar
+```
+
+(falling back to `ThermalVar = VarLow`, `InstabilityVar = VarHigh − VarLow` if the
+separation drives the instability variance negative), and
+`ThermalFSNR = MeanHigh / √ThermalVar`, `InstabilityFSNR = MeanHigh / √InstabilityVar`.
+Each scan is reduced to a temporal-mean map and a temporal-SD-of-detrended-residual
+map over the whole volume, and the statistics are pooled over the **shared** eroded
+phantom core — the intersection of the two runs' `3dAutomask -erode 5`-style masks,
+so both means cover identical voxels. A high `InstabilityFSNR` (small
+`InstabilityVar` relative to `VarHigh`) is a stable scanner.
+
+```bash
+uv run fmri-qa-hilo HIGH_flip.nii.gz LOW_flip.nii.gz
+```
+
+```
+# hi/lo flip-angle thermal/instability noise separation (Greve)
+# high = FBIRN_QA_fMRI_flip77_14.nii.gz (flip 77)
+# low  = FBIRN_QA_fMRI_flip10_15.nii.gz (flip 10)
+# core voxels = 20502
+ThermalFSNR                639.6224
+InstabilityFSNR           3083.9969
+MeanHigh                  1023.3249
+MeanLow                    184.3902
+VarHigh                      2.6697
+VarLow                       2.5632
+ThermalVar                   2.5596
+InstabilityVar               0.1101
+M                           30.8000
+InstabilityFraction          0.0412
+```
+
+Pass the high-flip scan first (a warning fires if the flip angles say otherwise).
+`--trim-sec`, `--detrend`, and `--erode` mirror the main command. This is a
+pair-level diagnostic, kept apart from the per-scan batch table.
+
 ## Install
 
 The project uses [uv](https://docs.astral.sh/uv/) and Python 3.13:
