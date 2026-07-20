@@ -52,7 +52,7 @@ uv sync
 ## Command line
 
 ```bash
-uv run main.py [options] scan.nii.gz [more.nii.gz ...]
+uv run fmri-qa [options] scan.nii.gz [more.nii.gz ...]
 ```
 
 ```
@@ -82,7 +82,7 @@ the batch continues; the process exits non-zero if any file failed.
 ### PDF report
 
 ```bash
-uv run main.py --pdf qa.pdf data/*_fMRI_*.nii.gz
+uv run fmri-qa --pdf qa.pdf data/*_fMRI_*.nii.gz
 ```
 
 Each page carries the metadata and metrics, the four summary images (signal,
@@ -113,4 +113,4 @@ QAScan → preprocess → QAImages → detect_phantom → resolve_roi
 returns a `QAImages` holding the center slice plus its fluctuations; the summary
 images (mean, MIP, static noise, fluctuation noise, trend) are derived
 properties. The full multi-slice volume can be discarded once `QAImages` exists.
-PDF rendering lives in `report.py` (imported only when `--pdf` is used).
+PDF rendering lives in `fmriqc/report.py` (imported only when `--pdf` is used).

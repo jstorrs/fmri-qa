@@ -86,7 +86,7 @@ def main(argv=None):
         reports.append((name, result))
 
     if args.pdf and reports:
-        import report as report_mod
+        from . import report as report_mod
 
         report_mod.write_report(reports, args.pdf, layout=args.pdf_layout)
         pages = len(reports) * (1 if args.pdf_layout == "one" else 2)
