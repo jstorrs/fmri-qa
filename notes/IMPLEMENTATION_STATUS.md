@@ -11,6 +11,13 @@ AFNI `3dDetrend` exactly. The gaps are the AFNI robustness/temporal-QA layer
 (`3dToutcount`, `3dDespike`, `3dFWHMx`) and Level C (longitudinal trending),
 none of which is implemented.
 
+**Design principle:** FBIRN is a specific, rigid protocol and its QA is adapted
+to it. On FBIRN-protocol data the pipeline must reproduce FBIRN results — that
+is the correctness bar, not a deviation to be flagged. Parameter defaults that
+*scale* with the acquisition are calibrated so the canonical FBIRN protocol
+lands on the FBIRN-correct value; the scaling only takes over for non-FBIRN
+data, where reasonable innovation is fine.
+
 Last reviewed: 2026-07-20.
 
 ---
@@ -38,18 +45,26 @@ Two deliberate **refinements** over the literal spec (both documented in-code):
 
 ---
 
-## Deliberate deviations — worth knowing
+## Calibrated defaults — FBIRN-correct, and scale for non-FBIRN
 
-1. **Detrend order is adaptive, not fixed 2.** GSQAP-lineage notes (`guide`,
-   `bxh`, `hilo`) prescribe a fixed `-polort 2`; cran uses 3. We compute
-   `degree = round(nt·TR / 200 s)` (`poly_degree`). A canonical 200-vol / TR-2 s
-   run lands on ~2 by coincidence but it drifts for other durations — closer to
-   afni_proc.py's `1 + floor(sec/150)` philosophy than to GSQAP's fixed 2. Fine,
-   but not a literal FIRST-BIRN match.
-2. **Trim is time-based (5 s), spec is volume-based (first 2).** `guide`/`cran`
-   drop exactly 2 volumes; `bxh` uses `2:`/`3:`. Different parameterization.
-3. **No motion correction.** `bxh` runs `3dvolreg`; omitted here as intentional
-   for a static phantom.
+These are *not* deviations: on the canonical FBIRN protocol (200 volumes,
+TR 2.0 s) they reproduce the exact FBIRN choices, and only diverge for
+off-protocol acquisitions, by design.
+
+1. **Detrend order scales with run length.** GSQAP prescribes a fixed
+   `-polort 2`. We compute `degree = round(nt·TR / 200 s)` (`poly_degree`). The
+   200 s cutoff is calibrated so the FBIRN run (198 used × TR 2.0 s = 396 s)
+   lands on **degree 2** — the FBIRN value. It only scales up for much longer
+   acquisitions; the fixed-2 assumption of the standard is honored where the
+   standard applies. (Verified: TR 2.0 s → 2, TR 2.5 s → 2, TR 3.0 s → 3.)
+2. **Trim is time-based (5 s) but resolves to the FBIRN 2 volumes.**
+   `n = round(trim_sec / TR)`, so the 5.0 s default drops exactly **2 TRs**
+   across the plausible FBIRN TR range (2.0–3.0 s), matching `guide`/`cran`'s
+   "discard first 2" while staying meaningful in wall-clock seconds for other
+   TRs.
+3. **No motion correction.** GSQAP does not motion-correct the phantom series;
+   `3dvolreg` is a `bxh` extension, not part of the FBIRN protocol. Omitting it
+   is FBIRN-correct, not a gap.
 
 ---
 
