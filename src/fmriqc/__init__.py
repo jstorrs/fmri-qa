@@ -18,6 +18,10 @@ from skimage import filters, morphology, segmentation
 POLY_CUTOFF_S = 200.0
 SPLINE_CUTOFF_S = 256.0
 
+# Plausible ADC saturation rails. A clipped magnitude image piles up at a
+# hardware 2**n - 1 ceiling; only these n are realistic for MR (12-bit -> 4095).
+SATURATION_BITS = range(8, 17)  # 255 .. 65535
+
 # Fixed summary-ROI side (voxels). Glover/fBIRN uses 21; user-configurable.
 FBIRN_ROI_SIZE = 21
 # ROI localization mode. "image": middle slice + image-center ROI (Glover).
@@ -163,6 +167,10 @@ class QAScan:
     affine: NDArray | None = None
     pe_axis: int | None = None
     meta: ScanMeta | None = None
+    # NIfTI scl_slope/scl_inter, so saturation can recover stored integers from
+    # `data` (in scaled image units). Default identity: `data` is already stored.
+    slope: float = 1.0
+    inter: float = 0.0
 
     @classmethod
     def from_nifti(cls, path: str | Path, estimate_pe: bool = True) -> "QAScan":
@@ -170,6 +178,7 @@ class QAScan:
         img = nib.load(str(path))
         zooms = img.header.get_zooms()
         data = img.get_fdata()
+        slope, inter = img.header.get_slope_inter()  # (None, None) when unscaled
 
         pe_axis = _pe_axis_from_sidecar(sidecar)
         if pe_axis is None:
@@ -187,6 +196,8 @@ class QAScan:
             affine=img.affine,
             pe_axis=pe_axis,
             meta=_scan_meta(img, sidecar, pe_axis),
+            slope=float(slope) if slope else 1.0,
+            inter=float(inter) if inter else 0.0,
         )
 
 
@@ -293,6 +304,49 @@ class WeisskoffResult:
 
 
 @dataclass(frozen=True)
+class SaturationResult:
+    """ADC-saturation (signal-clipping) check for one scan.
+
+    The clip ceiling is sequence-dependent and not recorded, so it is inferred:
+    a clipped magnitude image piles up on a hardware `2**n - 1` rail. `ceiling`
+    is that rail (in image units) when the series maximum sits on one, else
+    `None` -- a maximum that is not a `2**n - 1` value means no clipping.
+    """
+
+    ceiling: float | None      # clip level (image units); None if max is not a 2**n-1 rail
+    bits: int | None           # n such that the stored ceiling is 2**n - 1
+    n_clipped_pre: int         # clipped samples in the dropped warm-up volumes
+    n_clipped_kept: int        # clipped samples in the analyzed volumes (bias the metrics)
+    worst_volume: int | None   # volume index (full series) with the most clipped samples
+    worst_count: int           # clipped samples in that worst volume
+
+    @property
+    def n_clipped(self) -> int:
+        """Total voxel*time samples pinned at the ceiling, across the full series."""
+        return self.n_clipped_pre + self.n_clipped_kept
+
+    @property
+    def suspected(self) -> bool:
+        """True if the series maximum sits exactly on a 2**n-1 hardware rail."""
+        return self.ceiling is not None
+
+    @property
+    def clipped(self) -> bool:
+        """True if any sample reaches that rail, anywhere in the series."""
+        return self.n_clipped > 0
+
+    @property
+    def clipped_kept(self) -> bool:
+        """True if clipping falls in the analyzed data, where it biases the metrics.
+
+        Clips confined to the dropped warm-up volumes (`clipped and not
+        clipped_kept`) don't affect the statistics — and are expected for
+        sequences that deliberately acquire through the approach to steady state.
+        """
+        return self.n_clipped_kept > 0
+
+
+@dataclass(frozen=True)
 class QAMetrics:
     """Settled scalar QA metrics for one scan."""
 
@@ -306,6 +360,7 @@ class QAMetrics:
     drift_pct: float
     percent_fluctuation: float
     weisskoff: WeisskoffResult
+    saturation: SaturationResult
 
 
 @dataclass(frozen=True, eq=False)
@@ -328,9 +383,12 @@ class QAResult:
 # Preprocessing & phantom geometry
 # --------------------------------------------------------------------------- #
 
+def trim_count(tr: float, trim_sec: float) -> int:
+    """Number of initial (non-steady-state) volumes dropped for `trim_sec`."""
+    return max(int(round(trim_sec / tr)), 0)
+
 def trim_initial(data: NDArray, tr: float, trim_sec: float) -> NDArray:
-    n = max(int(round(trim_sec / tr)), 0)
-    return data[..., n:]
+    return data[..., trim_count(tr, trim_sec):]
 
 def segment_phantom(image: NDArray) -> NDArray:
     # mode="wrap": MRI images are periodic (FFT reconstruction), so the edge
@@ -757,6 +815,62 @@ def estimate_pe_axis(
 
 
 # --------------------------------------------------------------------------- #
+# Saturation (ADC clipping)
+# --------------------------------------------------------------------------- #
+
+def _saturation_bits(stored_max: float) -> int | None:
+    """Return n if `stored_max` is a `2**n - 1` rail for a plausible n, else None.
+
+    `stored_max` is the series maximum in stored-integer units; it must round to
+    an integer of the form `2**n - 1` (all low bits set) with n in
+    `SATURATION_BITS`. A non-integer or off-rail maximum means no clipping.
+    """
+    k = round(stored_max)
+    if abs(stored_max - k) > 1e-4 or k <= 0:
+        return None
+    if k & (k + 1):  # k+1 not a power of two -> k is not 2**n - 1
+        return None
+    n = k.bit_length()  # k = 2**n - 1  ->  bit_length is n
+    return n if n in SATURATION_BITS else None
+
+
+def detect_saturation(data: NDArray, slope: float = 1.0, inter: float = 0.0,
+                      trim: int = 0) -> SaturationResult:
+    """Detect ADC saturation (signal clipped at a `2**n - 1` rail) in a 4-D series.
+
+    The clip ceiling is sequence-dependent and unrecorded, so it is inferred
+    from the data: reconstructed magnitude images are stored as unsigned
+    integers, so a clipped acquisition piles up on the hardware rail `2**n - 1`
+    (12-bit ADC -> 4095 is the classic case). A series maximum that is not a
+    `2**n - 1` value means no clipping occurred and the check reports clean.
+
+    `slope`/`inter` recover the stored integer from scaled image units for the
+    rail test; the pile-up is then counted in image units, where every clipped
+    voxel shares the identical maximum value. The full untrimmed series is
+    checked because clipping is worst in the high-signal warm-up volumes -- but
+    the count is split at `trim` (the number of initial volumes the analysis
+    drops): clips in the first `trim` volumes (`n_clipped_pre`) don't reach the
+    statistics, while clips in the kept volumes (`n_clipped_kept`) bias them.
+    A lone sample on the rail is likely a bright voxel; a pile-up is saturation.
+    """
+    ceiling = float(np.max(data))
+    bits = _saturation_bits((ceiling - inter) / slope)
+    if bits is None:
+        return SaturationResult(ceiling=None, bits=None, n_clipped_pre=0,
+                                n_clipped_kept=0, worst_volume=None, worst_count=0)
+    per_volume = (data == ceiling).reshape(-1, data.shape[-1]).sum(axis=0)
+    worst = int(np.argmax(per_volume))
+    return SaturationResult(
+        ceiling=ceiling,
+        bits=bits,
+        n_clipped_pre=int(per_volume[:trim].sum()),
+        n_clipped_kept=int(per_volume[trim:].sum()),
+        worst_volume=worst,
+        worst_count=int(per_volume[worst]),
+    )
+
+
+# --------------------------------------------------------------------------- #
 # Preprocessing & orchestration
 # --------------------------------------------------------------------------- #
 
@@ -798,6 +912,13 @@ def run_qa(
     image-center ROI, Glover) or "phantom" (largest slice + detected center).
     `roi_size` is the fixed summary/Weisskoff ROI side (default 21, fBIRN).
     """
+    # Saturation is checked on the full untrimmed series: clipping is worst in
+    # the high-signal warm-up volumes that preprocessing drops. The count is
+    # split at the same trim boundary so clips outside the analyzed data (which
+    # don't bias the metrics) are reported apart from clips that do.
+    saturation = detect_saturation(scan.data, scan.slope, scan.inter,
+                                   trim=trim_count(scan.tr, trim_sec))
+
     images = preprocess(scan, trim_sec=trim_sec, detrend=detrend, center=center)
     geom = detect_phantom(images)
 
@@ -835,6 +956,7 @@ def run_qa(
         drift_pct=drift_percent(images, roi),
         percent_fluctuation=percent_fluctuation(images, roi),
         weisskoff=wk,
+        saturation=saturation,
     )
     return QAResult(images=images, geom=geom, roi=roi, metrics=metrics,
                     meta=scan.meta)

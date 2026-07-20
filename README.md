@@ -20,6 +20,7 @@ fBIRN size) on a single slice.
 | **fluctuation %** | SD of the ROI-mean residual, as % of mean signal |
 | **ghost %** | fBIRN percent ghost: `100 × mean ghost region / mean signal region` |
 | **ACRg %** | ACR/AAPM percent-signal-ghosting: `100 × \|ghost_pe − ghost_freq\| / signal`, over the N/2-shifted phantom masks |
+| **clip** / **clipPre** | ADC-saturation counts: voxel·time samples pinned at the inferred `2ⁿ−1` rail, in the analyzed data (`clip`) vs. the dropped warm-up volumes (`clipPre`); `0` when none |
 
 Drift is removed before the noise metrics are measured, using either a Legendre
 polynomial (`--detrend poly`, default) or a least-squares B-spline
@@ -40,6 +41,22 @@ The `--center` mode controls both slice and ROI placement:
 The phase-encode axis (used to place the ghost) is read from the NIfTI header
 `dim_info`; if that is missing it falls back to estimating the axis from where
 the Nyquist ghost lands. Override with `--pe-axis`.
+
+## Saturation
+
+The clip ceiling of the reconstruction is sequence-dependent and not recorded,
+so it is inferred. A clipped magnitude image piles up on a hardware `2ⁿ−1` rail
+(a 12-bit ADC gives 4095), so if the series maximum sits exactly on such a rail
+the run may be saturated; a maximum that is *not* a `2ⁿ−1` value means no
+clipping. The pile-up on that rail is then counted — but split at the trim
+boundary: `clip` counts samples in the analyzed volumes (which bias the
+metrics; a trailing `!` flags any), while `clipPre` counts samples confined to
+the dropped warm-up volumes. The full, untrimmed series is checked because
+clipping is worst in those high-signal warm-up volumes — but clipping there
+doesn't reach the statistics, and is expected for sequences (e.g. ABCD) that
+deliberately acquire through the approach to steady state. A lone sample on the
+rail is likely just a bright voxel; a pile-up across a volume is real
+saturation.
 
 ## Install
 
@@ -65,10 +82,10 @@ uv run fmri-qa [options] scan.nii.gz [more.nii.gz ...]
 
 ```
 # detrend=poly  trim_sec=5.0  center=image  roi_size=21
-scan                                      PE       SNR      SFNR      RDC   drift%   ghost%    ACRg%
-----------------------------------------------------------------------------------------------------
-FBIRN_QA_fMRI_flip77_13.nii.gz             j     467.3     452.0   10.953    0.303    4.153    0.606
-ABCD_QA_fMRI_16.nii.gz                     j      76.7      75.3   13.355    0.682    5.126    2.378
+scan                                      PE       SNR      SFNR      RDC   drift%   ghost%      RO%    ACRg%   clip  clipPre
+-----------------------------------------------------------------------------------------------------------------------------
+FBIRN_QA_fMRI_flip77_13.nii.gz           col     467.3     452.0   10.953    0.303    4.092    4.059    0.033      0        0
+ABCD_QA_fMRI_16.nii.gz                   col      76.7      75.3   13.355    0.682    5.074    3.192    1.882      0       68
 ```
 
 Options:

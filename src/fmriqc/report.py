@@ -346,6 +346,16 @@ def _acquisition_line(result):
         unit = "deg" if images.detrend_method == "poly" else "knots"
         detrend += f" ({unit} {images.detrend_order})"
     parts.append(detrend)
+    sat = m.saturation
+    if sat.clipped_kept:  # clipping in the analyzed data -- biases the metrics
+        txt = f"CLIP {sat.n_clipped_kept} in analyzed data"
+        if sat.n_clipped_pre:
+            txt += f" (+{sat.n_clipped_pre} pre-SS)"
+        parts.append(f"{txt} @ {sat.ceiling:.0f} ({sat.bits}-bit)")
+    elif sat.clipped:  # confined to dropped warm-up volumes -- doesn't reach stats
+        parts.append(
+            f"clip {sat.n_clipped_pre} pre-SS only @ {sat.ceiling:.0f} ({sat.bits}-bit)"
+        )
     return "   ·   ".join(parts)
 
 

@@ -51,7 +51,7 @@ def main(argv=None):
     header = (
         f"{'scan':40s} {'PE':>3s} "
         f"{'SNR':>9s} {'SFNR':>9s} {'RDC':>8s} {'drift%':>8s} "
-        f"{'ghost%':>8s} {'RO%':>8s} {'ACRg%':>8s}"
+        f"{'ghost%':>8s} {'RO%':>8s} {'ACRg%':>8s} {'clip':>6s} {'clipPre':>8s}"
     )
     print(header)
     print("-" * len(header))
@@ -77,11 +77,16 @@ def main(argv=None):
         else:
             axis = args.pe_axis if args.pe_axis is not None else scan.pe_axis
             pe = _PE_LABEL.get(axis, "?")
+        # clip: samples clipped in the analyzed data (they bias the metrics); a
+        # trailing "!" flags any. clipPre: samples clipped only in the dropped
+        # warm-up volumes -- reported apart because they don't reach the stats.
+        sat = m.saturation
+        clip = f"{sat.n_clipped_kept}{'!' if sat.clipped_kept else ''}"
         print(
             f"{name:40s} {pe:>3s} "
             f"{m.snr:>9.1f} {m.sfnr:>9.1f} {m.rdc:>8.3f} "
             f"{m.drift_pct:>8.3f} {m.ghost_pct:>8.3f} {m.ro_ghost_pct:>8.3f} "
-            f"{m.acr_ghost_pct:>8.3f}"
+            f"{m.acr_ghost_pct:>8.3f} {clip:>6s} {sat.n_clipped_pre:>8d}"
         )
         reports.append((name, result))
 

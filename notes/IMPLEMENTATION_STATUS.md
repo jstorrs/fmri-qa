@@ -34,6 +34,15 @@ Last reviewed: 2026-07-20.
 | **Detrend method** | `3dDetrend` = Legendre, `x∈[−1,1]`, LS projection | `poly_residuals()` = `legvander` on `linspace(-1,1,nt)` | exact |
 | **ROI / slice** | 21×21 centered, middle slice | `FBIRN_ROI_SIZE=21`, `center="image"` | |
 
+Beyond the guide, the pipeline also computes an **ADC-saturation check**
+(`detect_saturation` → `QAMetrics.saturation`, `clip`/`clipPre` columns): the
+AFNI `4095_warn` idea (`AFNI_qa_ideas.md`) generalized to an unknown ceiling by
+inferring the hardware `2**n - 1` rail from the series maximum and counting the
+pile-up on it, over the full untrimmed series. The count is split at the trim
+boundary — clips in the analyzed volumes (bias the metrics) vs. clips confined
+to the dropped warm-up volumes (don't reach the stats, and are expected for
+transition-acquiring sequences like ABCD).
+
 Two deliberate **refinements** over the literal spec (both documented in-code):
 
 - **RDC uses a pooled single-voxel CV** (`cv1_pooled / cv[-1]`) rather than the
@@ -93,24 +102,29 @@ Ranked by value for phantom QA.
    confounded by smoothness; an FWHM (Classic first-difference
    `FWHM = 2.35482·σ`, or the ACF mixed model) would complement RDC. Spec in
    `3dFWHMx_algorithms.md`.
-5. **Saturation / 4095 clipping check.** Recommended in both AFNI-ideas notes,
-   trivial (`any(data == 4095)` per volume), absent.
-6. **Ghost "top-10% voxels" statistic.** Our ghost uses the region *mean*; the
+5. **Ghost "top-10% voxels" statistic.** Our ghost uses the region *mean*; the
    Greve / `fmriqa_ghostiness.c` method also reports the top-10% ghost voxels
    (catches localized ghosts a mean dilutes).
 
 **Lower / larger scope**
 
-7. **Level C — longitudinal QA.** Guide's target is "B+C". We cover A+B (single
+6. **Level C — longitudinal QA.** Guide's target is "B+C". We cover A+B (single
    scan + batch table); no logging DB, trend plots, or ±k·SD control-limit
    flagging.
-8. **Background/air QA** (cran `max_bg_perc`), **`@radial_correlate`**
+7. **Background/air QA** (cran `max_bg_perc`), **`@radial_correlate`**
    structured-artifact detection, **hi/lo flip thermal-vs-instability split**
    (`bxh-fmriqa-hilo.md`, needs 2 scans) — genuinely out of the current
    single-scan scope; future directions.
-9. **FFT spectrum normalization.** `report.py._plot_spectrum` plots raw
+8. **FFT spectrum normalization.** `report.py._plot_spectrum` plots raw
    magnitude; `bxh` normalizes to percent-of-mean (`·100/m`) for cross-scan
    comparability. Cosmetic.
+
+**Done since first review**
+
+- **Saturation / clipping check** (was a gap): `detect_saturation` infers the
+  `2**n - 1` rail and counts the pile-up over the full untrimmed series, split
+  into analyzed (`clip`) vs. dropped warm-up (`clipPre`) volumes; surfaced as
+  two CLI columns and a PDF annotation.
 
 ---
 
