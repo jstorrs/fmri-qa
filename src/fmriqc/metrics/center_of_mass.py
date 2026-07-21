@@ -11,7 +11,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from ..prep.imaging import edge_valid_mask
+from ..prep.imaging import edge_valid_mask, normalize_voxel_mm
 from ..types import BoolArray, FloatArray
 
 
@@ -154,5 +154,5 @@ def estimate_center_of_mass(
         ang = np.arctan2(np.sin(theta) @ W, np.cos(theta) @ W)
         com[good, axis] = (ang[good] % (2.0 * np.pi)) * shape[axis] / (2.0 * np.pi)
 
-    vm = (float(voxel_mm[0]), float(voxel_mm[1])) if voxel_mm is not None else None
+    vm = normalize_voxel_mm(voxel_mm)
     return CenterOfMassResult(com=com, shape=shape, voxel_mm=vm)

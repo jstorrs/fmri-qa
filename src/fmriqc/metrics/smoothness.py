@@ -11,7 +11,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from ..prep.imaging import _geomean
+from ..prep.imaging import _geomean, normalize_voxel_mm
 from ..types import BoolArray, FloatArray, IntArray
 
 # Gaussian FWHM per standard deviation: sqrt(8 ln 2) (AFNI 3dFWHMx uses 2.35482).
@@ -247,7 +247,7 @@ def estimate_smoothness(
     lags = np.arange(lag + 1)
     acf = _directional_acf(scaled, work_mask, lag)
 
-    vm = (float(voxel_mm[0]), float(voxel_mm[1])) if voxel_mm is not None else None
+    vm = normalize_voxel_mm(voxel_mm)
     return SmoothnessResult(
         fwhm_vox=fwhm_vox, lags=lags, acf=acf, voxel_mm=vm, pe_axis=pe_axis
     )

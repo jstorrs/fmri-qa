@@ -11,6 +11,7 @@ from dataclasses import dataclass
 import numpy as np
 from scipy import ndimage
 
+from ..prep.imaging import normalize_voxel_mm
 from ..types import BoolArray, FloatArray
 
 # Per-volume registration budget (in-plane phantom motion). Phantom drift is
@@ -168,5 +169,4 @@ def estimate_motion(
         params[t] = _register_norotate(
             center_slice[..., t], reference, rr, cc, center, mask, max_iter, tol
         )
-    vm = (float(voxel_mm[0]), float(voxel_mm[1])) if voxel_mm is not None else None
-    return MotionResult(params=params, voxel_mm=vm)
+    return MotionResult(params=params, voxel_mm=normalize_voxel_mm(voxel_mm))

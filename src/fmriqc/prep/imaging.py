@@ -121,3 +121,17 @@ def _geomean(x: FloatArray) -> float:
     x = np.asarray(x, dtype=float)
     x = x[np.isfinite(x) & (x > 0)]
     return float(np.exp(np.mean(np.log(x)))) if x.size else float("nan")
+
+
+def normalize_voxel_mm(
+    voxel_mm: tuple[float, float] | None,
+) -> tuple[float, float] | None:
+    """In-plane (mm/voxel) pair coerced to a plain-float 2-tuple, or None.
+
+    The motion/centroid/smoothness estimators accept the header's in-plane voxel
+    size (often numpy scalars) and store it on their result objects; this pins it
+    to a clean `(float, float)` so the stored value is typed and JSON-plain.
+    """
+    if voxel_mm is None:
+        return None
+    return (float(voxel_mm[0]), float(voxel_mm[1]))
