@@ -157,7 +157,14 @@ def test_write_report_honours_a_custom_theme(tmp_path) -> None:
 
     scan = q.QAScan.from_nifti(_write_scan(tmp_path))
     result = q.run_qa(scan, roi_size=9)
-    theme = report.Theme(page_size=A4, margin=24.0, font_body="Times-Roman")
+    theme = report.Theme(
+        page_size=A4,
+        margin=24.0,
+        font_body="Times-Roman",
+        panel_cmap="magma",
+        panel_accent="#8e44ad",
+        panel_font_family="serif",
+    )
     pdf = tmp_path / "themed.pdf"
     pages = report.write_report([("scan", result)], pdf, theme=theme)
     assert pages == 1

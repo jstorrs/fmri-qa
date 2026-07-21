@@ -91,7 +91,8 @@ def _panel_fig(
     data = np.log(np.clip(img, 1e-9, None)) if log else img
     finite = data[np.isfinite(data)]
     vmin, vmax = np.percentile(finite, [2, 98]) if finite.size else (0, 1)
-    ax.imshow(data, cmap="gray", vmin=vmin, vmax=vmax, interpolation="nearest")
+    # cmap falls to rcParams["image.cmap"], which the report Theme sets.
+    ax.imshow(data, vmin=vmin, vmax=vmax, interpolation="nearest")
     ax.set_xticks([])
     ax.set_yticks([])
     # Fix the axes box before drawing the ROI: its pad is derived from the axes
@@ -136,7 +137,6 @@ def _ghost_panel_fig(
     ax = fig.add_subplot(111)
     ax.imshow(
         mean_image,
-        cmap="gray",
         vmin=0,
         vmax=np.percentile(mean_image, 99),
         interpolation="nearest",

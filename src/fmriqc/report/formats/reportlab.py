@@ -12,8 +12,9 @@ reuses `report.panels` and `report.summary` and only re-implements composition.
 import io
 from collections.abc import Iterable
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
+import matplotlib
 from matplotlib.figure import Figure
 from reportlab.graphics.shapes import Group, Image
 from reportlab.pdfgen import canvas
@@ -422,17 +423,23 @@ def add_report_pages(
     `layout="summary"` renders a single condensed page; `layout="detailed"`
     renders a summary page and a separate stability page. Each page is finalized
     with `showPage()`. Returns the number of pages drawn.
+
+    The panels are built under the theme's `rc_context`, so the phantom colormap
+    and the primary-series colour follow the theme along with the furniture.
     """
-    if layout == "summary":
-        _condensed_page(c, result, title, theme)
-        c.showPage()
-        return 1
-    if layout == "detailed":
-        _summary_page(c, result, title, theme)
-        c.showPage()
-        _analysis_page(c, result, title, theme)
-        c.showPage()
-        return 2
+    # cast: rc_context's stub keys are a Literal union, not str; the values are
+    # valid rc keys built by the theme.
+    with matplotlib.rc_context(cast("Any", theme.rc_params())):
+        if layout == "summary":
+            _condensed_page(c, result, title, theme)
+            c.showPage()
+            return 1
+        if layout == "detailed":
+            _summary_page(c, result, title, theme)
+            c.showPage()
+            _analysis_page(c, result, title, theme)
+            c.showPage()
+            return 2
     raise ValueError(f"unknown layout {layout!r}; choose from {REPORT_LAYOUTS}")
 
 
