@@ -220,7 +220,7 @@ Options:
 | `--roi-size` | `21` | summary/Weisskoff ROI side, in voxels |
 | `--json` | — | emit the metrics as JSON on stdout instead of the text table |
 | `--pdf` | — | write a PDF report to this file |
-| `--pdf-layout` | `one` | `one` condensed page or `two` pages per scan |
+| `--pdf-layout` | `summary` | `summary` (condensed) or `detailed` (adds a stability page) per scan |
 
 `--version` prints the version and exits.
 
@@ -248,8 +248,8 @@ SFNR, fluctuation noise, static spatial noise) with the phantom mask and ROI
 overlaid, the Weisskoff plot, the ROI signal with its fitted trend, and the
 residual time course, spectrum, per-frame outlier fraction, per-frame in-plane
 motion (translation and scale/shear strain), and the directional PSF curves (PE
-and RO). `--pdf-layout two` splits these across a summary page and a stability
-page.
+and RO). `--pdf-layout detailed` splits these across a summary page and a
+stability page.
 
 ## Library
 

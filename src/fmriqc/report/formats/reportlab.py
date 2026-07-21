@@ -178,7 +178,7 @@ def _panel_grid(
     return top - rows * ph - (rows - 1) * gap
 
 
-def _one_page(c: canvas.Canvas, result: q.QAResult, title: str) -> None:
+def _condensed_page(c: canvas.Canvas, result: q.QAResult, title: str) -> None:
     wk = result.metrics.weisskoff
     y = _header(c, result, title)
 
@@ -399,42 +399,46 @@ def _analysis_page(c: canvas.Canvas, result: q.QAResult, title: str) -> None:
     )
 
 
-REPORT_LAYOUTS = ("one", "two")
+REPORT_LAYOUTS = ("summary", "detailed")
 
 
 def add_report_pages(
-    c: canvas.Canvas, result: "q.QAResult", title: str = "", layout: str = "one"
-) -> None:
+    c: canvas.Canvas, result: "q.QAResult", title: str = "", layout: str = "summary"
+) -> int:
     """Draw a scan's report page(s) onto an open ReportLab `Canvas`.
 
-    `layout="one"` renders a single condensed page; `layout="two"` renders a
-    summary page and a separate stability page. Each page is finalized with
-    `showPage()`.
+    `layout="summary"` renders a single condensed page; `layout="detailed"`
+    renders a summary page and a separate stability page. Each page is finalized
+    with `showPage()`. Returns the number of pages drawn.
     """
-    if layout == "one":
-        _one_page(c, result, title)
+    if layout == "summary":
+        _condensed_page(c, result, title)
         c.showPage()
-    elif layout == "two":
+        return 1
+    if layout == "detailed":
         _summary_page(c, result, title)
         c.showPage()
         _analysis_page(c, result, title)
         c.showPage()
-    else:
-        raise ValueError(f"unknown layout {layout!r}; choose from {REPORT_LAYOUTS}")
+        return 2
+    raise ValueError(f"unknown layout {layout!r}; choose from {REPORT_LAYOUTS}")
 
 
 def write_report(
     items: Iterable[tuple[str, q.QAResult]] | q.QAResult,
     pdf_path: str | Path,
-    layout: str = "one",
-) -> None:
+    layout: str = "summary",
+) -> int:
     """Write a combined PDF, one scan after another.
 
     `items` is an iterable of `(title, QAResult)`, or a single `QAResult`.
+    Returns the total number of pages written.
     """
     if isinstance(items, q.QAResult):
         items = [("", items)]
     c = canvas.Canvas(str(pdf_path), pagesize=letter)
+    pages = 0
     for title, result in items:
-        add_report_pages(c, result, title, layout)
+        pages += add_report_pages(c, result, title, layout)
     c.save()
+    return pages

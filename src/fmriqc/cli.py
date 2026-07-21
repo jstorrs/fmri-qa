@@ -109,10 +109,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     parser.add_argument(
         "--pdf-layout",
-        choices=("one", "two"),
-        default="one",
-        help="Report layout: 'one' condensed page or 'two' pages per scan "
-        "(default: one).",
+        choices=("summary", "detailed"),
+        default="summary",
+        help="Report form per scan: 'summary' (condensed) or 'detailed' (adds a "
+        "stability page) (default: summary).",
     )
     args = parser.parse_args(argv)
 
@@ -170,8 +170,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.pdf and reports:
         from . import report as report_mod
 
-        report_mod.write_report(reports, args.pdf, layout=args.pdf_layout)
-        pages = len(reports) * (1 if args.pdf_layout == "one" else 2)
+        pages = report_mod.write_report(reports, args.pdf, layout=args.pdf_layout)
         print(f"# wrote {args.pdf} ({len(reports)} scan(s), {pages} pages)", file=info)
 
     if args.json:

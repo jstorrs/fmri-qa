@@ -64,7 +64,7 @@ def test_main_writes_a_nonempty_pdf(tmp_path) -> None:
     assert pdf.read_bytes().startswith(b"%PDF")
 
 
-def test_main_two_page_layout_renders(tmp_path) -> None:
+def test_main_detailed_layout_renders(tmp_path) -> None:
     pdf = tmp_path / "qa2.pdf"
     rc = cli.main(
         [
@@ -74,7 +74,7 @@ def test_main_two_page_layout_renders(tmp_path) -> None:
             "--pdf",
             str(pdf),
             "--pdf-layout",
-            "two",
+            "detailed",
         ]
     )
     assert rc == 0
