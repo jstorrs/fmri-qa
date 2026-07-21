@@ -52,6 +52,7 @@ def main(argv=None):
         f"{'scan':40s} {'PE':>3s} "
         f"{'SNR':>9s} {'SFNR':>9s} {'RDC':>8s} {'drift%':>8s} "
         f"{'ghost%':>8s} {'RO%':>8s} {'ACRg%':>8s} {'outl%':>7s} "
+        f"{'tcOut':>7s} {'spcOut':>7s} "
         f"{'clip':>6s} {'clipPre':>8s} {'motn':>7s} {'scl%':>7s} {'shr%':>7s} "
         f"{'com':>6s} {'fwPE':>6s} {'fwRO':>6s}"
     )
@@ -91,6 +92,11 @@ def main(argv=None):
         # mean (3dvolreg-style, rotation dropped) -- translation (voxels), and the
         # gradient-heating scale/shear strain (percent).
         mo = m.motion
+        # tcOut/spcOut: cran MAD-normalized spike scores of the ROI-mean residual
+        # -- peak / robust spread in the time domain (a transient volume) and on
+        # its DC-dropped FFT magnitude (a dominant periodic artifact). Unitless; a
+        # clean phantom sits low (a few), a spike stands well above.
+        sp = m.spikes
         # com: peak per-volume shift of the whole-slice intensity centroid from
         # its temporal mean (circular COM, bxh volmeasures), in voxels -- the
         # circular mean cancels uniform background and the N/2 ghost, so no phantom
@@ -107,7 +113,9 @@ def main(argv=None):
             f"{name:40s} {pe:>3s} "
             f"{m.snr:>9.1f} {m.sfnr:>9.1f} {m.rdc:>8.3f} "
             f"{m.drift_pct:>8.3f} {m.ghost_pct:>8.3f} {m.ro_ghost_pct:>8.3f} "
-            f"{m.acr_ghost_pct:>8.3f} {outl:>7.3f} {clip:>6s} {sat.n_clipped_pre:>8d} "
+            f"{m.acr_ghost_pct:>8.3f} {outl:>7.3f} "
+            f"{sp.tc_outlier:>7.2f} {sp.spec_outlier:>7.2f} "
+            f"{clip:>6s} {sat.n_clipped_pre:>8d} "
             f"{mo.max_translation:>7.3f} {mo.max_scale_pct:>7.3f} {mo.max_shear_pct:>7.3f} "
             f"{com:>6.3f} {fw_pe:>6.2f} {fw_ro:>6.2f}"
         )

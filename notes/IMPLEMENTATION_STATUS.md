@@ -9,9 +9,9 @@ against).
 Levels A + B)** — every scalar metric matches the guide, and detrending matches
 AFNI `3dDetrend` exactly. Much of the AFNI robustness/temporal-QA layer is now
 also in place (`3dToutcount` outlier fraction, saturation, 3dvolreg-style motion,
-`3dFWHMx` Classic-FWHM smoothness, bxh-volmeasures center-of-mass); the remaining
-gaps are `3dDespike`, the ACF-model half of `3dFWHMx`, and Level C (longitudinal
-trending).
+`3dFWHMx` Classic-FWHM smoothness, bxh-volmeasures center-of-mass, cran
+MAD-normalized spike scores); the remaining gaps are `3dDespike`, the ACF-model
+half of `3dFWHMx`, and Level C (longitudinal trending).
 
 **Design principle:** FBIRN is a specific, rigid protocol and its QA is adapted
 to it. On FBIRN-protocol data the pipeline must reproduce FBIRN results — that
@@ -92,24 +92,21 @@ Ranked by value for phantom QA.
    single spike inflates fluctuation / SFNR / RDC. Full algorithm (basis
    `2·corder+3`, `fsig = sqrt(π/2)·median|e|`, tanh smash c1=2.5 / c2=4.0) in
    `AFNI_detrend_despike.md`. Could be an optional pre-step.
-2. **Scalar spike scores.** Match `cran-fmriqa`: `tc_outlier = max|detrended ROI
-   series| / MAD` and `spec_outlier = max(FFT mag) / MAD`. ~2 lines each; the
-   residual series and its spectrum already exist in `report.py`.
 
 **Medium**
 
-3. **Ghost "top-10% voxels" statistic.** Our ghost uses the region *mean*; the
+2. **Ghost "top-10% voxels" statistic.** Our ghost uses the region *mean*; the
    Greve / `fmriqa_ghostiness.c` method also reports the top-10% ghost voxels
    (catches localized ghosts a mean dilutes).
 
 **Lower / larger scope**
 
-4. **Level C — longitudinal QA.** Guide's target is "B+C". We cover A+B (single
+3. **Level C — longitudinal QA.** Guide's target is "B+C". We cover A+B (single
    scan + batch table); no logging DB, trend plots, or ±k·SD control-limit
    flagging.
-5. **Background/air QA** (cran `max_bg_perc`) and **`@radial_correlate`**
+4. **Background/air QA** (cran `max_bg_perc`) and **`@radial_correlate`**
    structured-artifact detection — future directions.
-6. **FFT spectrum normalization.** `report.py._plot_spectrum` plots raw
+5. **FFT spectrum normalization.** `report.py._plot_spectrum` plots raw
    magnitude; `bxh` normalizes to percent-of-mean (`·100/m`) for cross-scan
    comparability. Cosmetic.
 
@@ -197,6 +194,22 @@ Ranked by value for phantom QA.
   vox; on real data (all three scans carry a genuine Siemens nulled edge, pedestal
   11–13) FBIRN sits at ≈ 0.007 vox (steady) and ABCD at ≈ 0.094 vox (its thermal
   drift).
+- **cran MAD-normalized spike scores** (was High gap #2): `cran-fmriqa`'s
+  `tc_outlier` / `spec_outlier`. `spike_scores` takes the detrended ROI-mean
+  residual — the ROI mean of the pipeline's per-voxel fluctuations, i.e. the same
+  series the report already plots (detrending commutes with the spatial mean) —
+  and reports two unitless peak-over-spread ratios (`_spike_ratio`): `tc_outlier
+  = max|residual| / MAD` in the time domain (a transient volume the SD-based
+  summaries average away) and `spec_outlier = max(FFT magnitude) / MAD` on the
+  DC-dropped residual spectrum (a dominant periodic artifact). The denominator is
+  R's `mad()` (`1.4826·median|x − median x|`, matched to `scipy` `scale='normal'`
+  to 1e-6), so a clean phantom sits at a few and a spike stands well above.
+  Surfaced as the `tcOut`/`spcOut` CLI columns, two PDF tiles, and inline in the
+  existing residual/spectrum plot titles (same series). Diagnostic only.
+  Validated: matches a manual recompute exactly; an injected one-frame spike
+  drives `tcOut` 2.5 → 19.3 and an injected sinusoid drives `spec` 5.2 → 37.5;
+  empty/constant series return NaN. On clean real data FBIRN sits at
+  tcOut 2.5 / spec 5.2, ABCD at 3.3 / 5.9.
 
 ---
 
@@ -205,7 +218,7 @@ Ranked by value for phantom QA.
 Highest leverage, fits the existing linear-chain architecture (operates on
 `QAImages.center_slice` / `fluctuations`):
 
-1. The two cheap `cran` spike scores (`tc_outlier`, `spec_outlier`).
-2. Optional despike pre-step.
+1. Optional despike pre-step (`3dDespike`) — the last High-value gap.
 
-(Done: `3dToutcount`-style per-TR outlier fraction; saturation/clipping check.)
+(Done: `3dToutcount`-style per-TR outlier fraction; saturation/clipping check;
+cran `tc_outlier`/`spec_outlier` spike scores.)

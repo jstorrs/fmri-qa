@@ -264,12 +264,21 @@ def _plot_signal(ax, t, signal, trend, fs=9):
     ax.legend(fontsize=fs - 2)
 
 
-def _plot_residual(ax, t, resid, fs=9):
+def _plot_residual(ax, t, resid, fs=9, tc_outlier=None):
+    """ROI-mean detrended residual; the title carries the cran `tc_outlier` score.
+
+    `tc_outlier` (max|residual| / MAD) is the peak-to-spread ratio of exactly this
+    series, so a lone volume standing far off the baseline is both visible here and
+    quantified in the title.
+    """
     ax.plot(t, resid, lw=0.5)
     ax.axhline(0, color="gray", lw=0.5)
     ax.set_xlabel("time (s)")
     ax.set_ylabel("residual")
-    ax.set_title("ROI mean residual", fontsize=fs)
+    title = "ROI mean residual"
+    if tc_outlier is not None:
+        title += f" (tcOut {tc_outlier:.1f})"
+    ax.set_title(title, fontsize=fs)
 
 
 def _plot_outliers(ax, t, outl, fs=9):
@@ -329,12 +338,21 @@ def _plot_com(ax, t, com, fs=9):
     ax.legend(fontsize=fs - 2, ncol=2, loc="upper left")
 
 
-def _plot_spectrum(ax, resid, tr, fs=9):
+def _plot_spectrum(ax, resid, tr, fs=9, spec_outlier=None):
+    """Residual FFT magnitude (DC dropped); title carries cran `spec_outlier`.
+
+    `spec_outlier` (max magnitude / MAD) is the peak-to-spread ratio of exactly
+    this DC-dropped spectrum, so a dominant periodic artifact shows as a spike here
+    and as a large number in the title.
+    """
     freqs = np.fft.rfftfreq(resid.size, d=tr)
     ax.plot(freqs[1:], np.abs(np.fft.rfft(resid))[1:], lw=0.7)  # skip DC
     ax.set_xlabel("frequency (Hz)")
     ax.set_ylabel("magnitude")
-    ax.set_title("residual spectrum", fontsize=fs)
+    title = "residual spectrum"
+    if spec_outlier is not None:
+        title += f" (spec {spec_outlier:.1f})"
+    ax.set_title(title, fontsize=fs)
 
 
 def _plot_psf(ax, s, fs=9):
@@ -391,6 +409,8 @@ def _metric_tiles(m):
         ("drift", f"{m.drift_pct:.3f}%"),
         ("fluct", f"{m.percent_fluctuation:.3f}%"),
         ("outl", f"{100.0 * m.outliers.max_fraction:.2f}%"),
+        ("tcOut", f"{m.spikes.tc_outlier:.1f}"),
+        ("spec", f"{m.spikes.spec_outlier:.1f}"),
         ("motn", f"{m.motion.max_translation:.2f}"),
         ("com", f"{m.center_of_mass.max_displacement:.2f}"),
         ("fwhm", _fwhm_label(m.smoothness)),
@@ -578,15 +598,19 @@ def _one_page(c, result, title):
                 _MARGIN + half + gap, y, half, row_h)
     y -= row_h + 6
 
+    spikes = result.metrics.spikes
     _draw_fig(c, _plot_fig(lambda ax: _plot_signal(ax, t, signal, trend),
                              (3.6, 2.5)), _MARGIN, y, half, row_h)
-    _draw_fig(c, _plot_fig(lambda ax: _plot_residual(ax, t, resid), (3.6, 2.5)),
-                _MARGIN + half + gap, y, half, row_h)
+    _draw_fig(c, _plot_fig(
+        lambda ax: _plot_residual(ax, t, resid, tc_outlier=spikes.tc_outlier),
+        (3.6, 2.5)), _MARGIN + half + gap, y, half, row_h)
     y -= row_h + 6
 
     fifth = (_CONTENT_W - 4 * gap) / 5
-    _draw_fig(c, _plot_fig(lambda ax: _plot_spectrum(ax, resid, result.images.tr),
-                             (3.0, 2.0)), _MARGIN, y, fifth, 120.0)
+    _draw_fig(c, _plot_fig(
+        lambda ax: _plot_spectrum(ax, resid, result.images.tr,
+                                  spec_outlier=spikes.spec_outlier),
+        (3.0, 2.0)), _MARGIN, y, fifth, 120.0)
     _draw_fig(c, _plot_fig(
         lambda ax: _plot_outliers(ax, t, result.metrics.outliers), (3.0, 2.0)),
               _MARGIN + fifth + gap, y, fifth, 120.0)
@@ -624,15 +648,20 @@ def _analysis_page(c, result, title):
                 _MARGIN + half + gap, y, half, row_h)
     y -= row_h + 12
 
+    spikes = result.metrics.spikes
     _draw_fig(c, _plot_fig(lambda ax: _plot_signal(ax, t, signal, trend, fs=10),
                              (3.6, 3.0)), _MARGIN, y, half, row_h)
-    _draw_fig(c, _plot_fig(lambda ax: _plot_residual(ax, t, resid, fs=10),
-                             (3.6, 3.0)), _MARGIN + half + gap, y, half, row_h)
+    _draw_fig(c, _plot_fig(
+        lambda ax: _plot_residual(ax, t, resid, fs=10,
+                                  tc_outlier=spikes.tc_outlier),
+        (3.6, 3.0)), _MARGIN + half + gap, y, half, row_h)
     y -= row_h + 12
 
     fifth = (_CONTENT_W - 4 * gap) / 5
-    _draw_fig(c, _plot_fig(lambda ax: _plot_spectrum(ax, resid, result.images.tr, fs=10),
-                             (3.0, 2.2)), _MARGIN, y, fifth, 150.0)
+    _draw_fig(c, _plot_fig(
+        lambda ax: _plot_spectrum(ax, resid, result.images.tr, fs=10,
+                                  spec_outlier=spikes.spec_outlier),
+        (3.0, 2.2)), _MARGIN, y, fifth, 150.0)
     _draw_fig(c, _plot_fig(
         lambda ax: _plot_outliers(ax, t, result.metrics.outliers, fs=10),
         (3.0, 2.2)), _MARGIN + fifth + gap, y, fifth, 150.0)
