@@ -53,7 +53,7 @@ def main(argv=None):
         f"{'SNR':>9s} {'SFNR':>9s} {'RDC':>8s} {'drift%':>8s} "
         f"{'ghost%':>8s} {'RO%':>8s} {'ACRg%':>8s} {'outl%':>7s} "
         f"{'clip':>6s} {'clipPre':>8s} {'motn':>7s} {'scl%':>7s} {'shr%':>7s} "
-        f"{'fwPE':>6s} {'fwRO':>6s}"
+        f"{'com':>6s} {'fwPE':>6s} {'fwRO':>6s}"
     )
     print(header)
     print("-" * len(header))
@@ -91,6 +91,12 @@ def main(argv=None):
         # mean (3dvolreg-style, rotation dropped) -- translation (voxels), and the
         # gradient-heating scale/shear strain (percent).
         mo = m.motion
+        # com: peak per-volume shift of the whole-slice intensity centroid from
+        # its temporal mean (circular COM, bxh volmeasures), in voxels -- the
+        # circular mean cancels uniform background and the N/2 ghost, so no phantom
+        # mask is used (only a Siemens zeroed edge is healed); a cheap first-moment
+        # jump/drift trace complementing motn.
+        com = m.center_of_mass.max_displacement
         # fwPE/fwRO: spatial smoothness of the noise field along the phase-encode
         # and readout axes (AFNI 3dFWHMx), in mm when the voxel size is known --
         # the RDC smoothness confound; PE/RO asymmetry is anisotropic smoothing.
@@ -103,7 +109,7 @@ def main(argv=None):
             f"{m.drift_pct:>8.3f} {m.ghost_pct:>8.3f} {m.ro_ghost_pct:>8.3f} "
             f"{m.acr_ghost_pct:>8.3f} {outl:>7.3f} {clip:>6s} {sat.n_clipped_pre:>8d} "
             f"{mo.max_translation:>7.3f} {mo.max_scale_pct:>7.3f} {mo.max_shear_pct:>7.3f} "
-            f"{fw_pe:>6.2f} {fw_ro:>6.2f}"
+            f"{com:>6.3f} {fw_pe:>6.2f} {fw_ro:>6.2f}"
         )
         reports.append((name, result))
 

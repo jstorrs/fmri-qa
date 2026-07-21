@@ -310,6 +310,25 @@ def _plot_motion(ax, t, motion, fs=9):
     ax.legend(h1 + h2, l1 + l2, fontsize=fs - 4, ncol=2, loc="upper left")
 
 
+def _plot_com(ax, t, com, fs=9):
+    """Per-volume phantom center-of-mass shift from the temporal mean (voxels).
+
+    Circular intensity centroid (bxh volmeasures) along each in-plane axis,
+    plotted as its signed deviation from the run's mean centroid. A rigid, stable
+    phantom stays flat near zero; a slow ramp is drift and a spike is a transient
+    jump -- gross first-moment instability the ROI summaries miss. Complements the
+    registration-based in-plane motion plot.
+    """
+    dev = com.deviation
+    ax.axhline(0, color="gray", lw=0.5)
+    ax.plot(t, dev[:, 0], lw=0.7, color="tab:blue", label="com0")
+    ax.plot(t, dev[:, 1], lw=0.7, color="tab:cyan", label="com1")
+    ax.set_xlabel("time (s)")
+    ax.set_ylabel("COM shift (vox)")
+    ax.set_title("center of mass", fontsize=fs)
+    ax.legend(fontsize=fs - 2, ncol=2, loc="upper left")
+
+
 def _plot_spectrum(ax, resid, tr, fs=9):
     freqs = np.fft.rfftfreq(resid.size, d=tr)
     ax.plot(freqs[1:], np.abs(np.fft.rfft(resid))[1:], lw=0.7)  # skip DC
@@ -373,6 +392,7 @@ def _metric_tiles(m):
         ("fluct", f"{m.percent_fluctuation:.3f}%"),
         ("outl", f"{100.0 * m.outliers.max_fraction:.2f}%"),
         ("motn", f"{m.motion.max_translation:.2f}"),
+        ("com", f"{m.center_of_mass.max_displacement:.2f}"),
         ("fwhm", _fwhm_label(m.smoothness)),
     ]
 
@@ -564,18 +584,21 @@ def _one_page(c, result, title):
                 _MARGIN + half + gap, y, half, row_h)
     y -= row_h + 6
 
-    quarter = (_CONTENT_W - 3 * gap) / 4
+    fifth = (_CONTENT_W - 4 * gap) / 5
     _draw_fig(c, _plot_fig(lambda ax: _plot_spectrum(ax, resid, result.images.tr),
-                             (3.0, 2.0)), _MARGIN, y, quarter, 120.0)
+                             (3.0, 2.0)), _MARGIN, y, fifth, 120.0)
     _draw_fig(c, _plot_fig(
         lambda ax: _plot_outliers(ax, t, result.metrics.outliers), (3.0, 2.0)),
-              _MARGIN + quarter + gap, y, quarter, 120.0)
+              _MARGIN + fifth + gap, y, fifth, 120.0)
     _draw_fig(c, _plot_fig(
         lambda ax: _plot_motion(ax, t, result.metrics.motion), (3.0, 2.0)),
-              _MARGIN + 2 * (quarter + gap), y, quarter, 120.0)
+              _MARGIN + 2 * (fifth + gap), y, fifth, 120.0)
+    _draw_fig(c, _plot_fig(
+        lambda ax: _plot_com(ax, t, result.metrics.center_of_mass), (3.0, 2.0)),
+              _MARGIN + 3 * (fifth + gap), y, fifth, 120.0)
     _draw_fig(c, _plot_fig(
         lambda ax: _plot_psf(ax, result.metrics.smoothness), (3.0, 2.0)),
-              _MARGIN + 3 * (quarter + gap), y, quarter, 120.0)
+              _MARGIN + 4 * (fifth + gap), y, fifth, 120.0)
 
 
 def _summary_page(c, result, title):
@@ -607,18 +630,21 @@ def _analysis_page(c, result, title):
                              (3.6, 3.0)), _MARGIN + half + gap, y, half, row_h)
     y -= row_h + 12
 
-    quarter = (_CONTENT_W - 3 * gap) / 4
+    fifth = (_CONTENT_W - 4 * gap) / 5
     _draw_fig(c, _plot_fig(lambda ax: _plot_spectrum(ax, resid, result.images.tr, fs=10),
-                             (3.0, 2.2)), _MARGIN, y, quarter, 150.0)
+                             (3.0, 2.2)), _MARGIN, y, fifth, 150.0)
     _draw_fig(c, _plot_fig(
         lambda ax: _plot_outliers(ax, t, result.metrics.outliers, fs=10),
-        (3.0, 2.2)), _MARGIN + quarter + gap, y, quarter, 150.0)
+        (3.0, 2.2)), _MARGIN + fifth + gap, y, fifth, 150.0)
     _draw_fig(c, _plot_fig(
         lambda ax: _plot_motion(ax, t, result.metrics.motion, fs=10),
-        (3.0, 2.2)), _MARGIN + 2 * (quarter + gap), y, quarter, 150.0)
+        (3.0, 2.2)), _MARGIN + 2 * (fifth + gap), y, fifth, 150.0)
+    _draw_fig(c, _plot_fig(
+        lambda ax: _plot_com(ax, t, result.metrics.center_of_mass, fs=10),
+        (3.0, 2.2)), _MARGIN + 3 * (fifth + gap), y, fifth, 150.0)
     _draw_fig(c, _plot_fig(
         lambda ax: _plot_psf(ax, result.metrics.smoothness, fs=10),
-        (3.0, 2.2)), _MARGIN + 3 * (quarter + gap), y, quarter, 150.0)
+        (3.0, 2.2)), _MARGIN + 4 * (fifth + gap), y, fifth, 150.0)
 
 
 REPORT_LAYOUTS = ("one", "two")

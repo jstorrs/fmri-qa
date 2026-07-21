@@ -9,8 +9,9 @@ against).
 Levels A + B)** — every scalar metric matches the guide, and detrending matches
 AFNI `3dDetrend` exactly. Much of the AFNI robustness/temporal-QA layer is now
 also in place (`3dToutcount` outlier fraction, saturation, 3dvolreg-style motion,
-`3dFWHMx` Classic-FWHM smoothness); the remaining gaps are `3dDespike`, the
-ACF-model half of `3dFWHMx`, and Level C (longitudinal trending).
+`3dFWHMx` Classic-FWHM smoothness, bxh-volmeasures center-of-mass); the remaining
+gaps are `3dDespike`, the ACF-model half of `3dFWHMx`, and Level C (longitudinal
+trending).
 
 **Design principle:** FBIRN is a specific, rigid protocol and its QA is adapted
 to it. On FBIRN-protocol data the pipeline must reproduce FBIRN results — that
@@ -19,7 +20,7 @@ is the correctness bar, not a deviation to be flagged. Parameter defaults that
 lands on the FBIRN-correct value; the scaling only takes over for non-FBIRN
 data, where reasonable innovation is fine.
 
-Last reviewed: 2026-07-20.
+Last reviewed: 2026-07-21.
 
 ---
 
@@ -168,6 +169,34 @@ Ranked by value for phantom QA.
   hi/lo variances correctly report a stable scanner (instability ≈ 4% of the
   high-flip variance). The single-scan pipeline (and the FBIRN correctness bar)
   is untouched — the data was always present; only the pair architecture was new.
+- **Per-volume center of mass (bxh `fmriqa_volmeasures`)**: the volmeasures
+  center-of-mass trace, as a cheap first-moment motion/instability diagnostic
+  alongside the registration-based `estimate_motion`. `estimate_center_of_mass`
+  takes each frame's intensity centroid along both in-plane axes with a
+  **circular mean** (map each coordinate to `2π·x/N`, average the
+  intensity-weighted unit vectors, map the angle back to `[0, N)`), consistent
+  with MRI periodicity. The circular mean buys three things that remove the need
+  to segment the phantom (which would in fact *harm* it, by breaking the
+  full-period symmetry): a phantom straddling a wrapped edge gives the true
+  centroid, not a mid-FOV alias; a **uniform background contributes zero net
+  vector** (`Σ_x exp(i2πx/N)=0`), where a linear COM would be dragged to image
+  center and forced to mask; and the **Nyquist ghost**, at exactly half-FOV =
+  180°, is anti-parallel to its source along PE (cancels) and co-located along RO
+  (reinforces), so it cannot shift the centroid. The one thing that *does* break
+  the background cancellation — **missing data**, e.g. a Siemens-nulled edge
+  row/col — is *healed* rather than masked: the background pedestal (lowest valid
+  magnitude) is subtracted so the floor sits at ~0 and the invalid voxels
+  (`edge_valid_mask`) are then zeroed, so the gap matches the now-zero background
+  instead of punching a hole in the periodic ring (pedestal subtraction also kills
+  the background DC term outright). Deviations are reported relative to the
+  temporal-mean centroid with the same circular wrapping, so a boundary crossing
+  is a small shift, not a full-FOV jump. Surfaced as the `com` CLI column, a PDF
+  tile, and a per-frame center-of-mass trace. Diagnostic only — the analyzed
+  series is untouched. Validated: a synthetic zeroed row biases the raw centroid
+  0.38 vox and the healing restores it exactly; an 8% N/2 ghost moves it 0.00
+  vox; on real data (all three scans carry a genuine Siemens nulled edge, pedestal
+  11–13) FBIRN sits at ≈ 0.007 vox (steady) and ABCD at ≈ 0.094 vox (its thermal
+  drift).
 
 ---
 
