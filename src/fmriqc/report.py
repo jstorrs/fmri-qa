@@ -25,6 +25,7 @@ from svglib import svglib as _svglib
 from svglib.svglib import svg2rlg
 
 import fmriqc as q
+from fmriqc.ghost import _ghost_masks  # internal: region-matched ghost/signal masks
 
 _PE_ROWCOL = {0: "row", 1: "col"}  # DICOM row/col fallback when meta is absent
 
@@ -202,8 +203,8 @@ def _ghost_panel_fig(mean_image, phantom_mask, pe_axis, *, aspect=1.15):
     handles = []
     if pe_axis in (0, 1):
         ro_axis = 1 - pe_axis
-        ro_signal, ro_ghost = q._ghost_masks(phantom_mask, ro_axis, 3, valid_mask)
-        signal_mask, ghost_mask = q._ghost_masks(phantom_mask, pe_axis, 3, valid_mask)
+        ro_signal, ro_ghost = _ghost_masks(phantom_mask, ro_axis, 3, valid_mask)
+        signal_mask, ghost_mask = _ghost_masks(phantom_mask, pe_axis, 3, valid_mask)
         _overlay(ax, ro_signal, _RO_SRC_RGB)
         _overlay(ax, ro_ghost, _RO_GHOST_RGB)
         _overlay(ax, signal_mask, _GHOST_SRC_RGB)
