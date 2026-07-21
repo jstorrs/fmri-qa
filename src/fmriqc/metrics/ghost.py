@@ -20,9 +20,17 @@ from ..types import BoolArray, FloatArray
 # bright ghost that the region-mean ghost ratio dilutes.
 GHOST_TOP_FRACTION = 0.10
 
+# Erosion/dilation radius (voxels) that sets the ghost/signal band width. The
+# single source of truth for every ghost statistic's default and for the report
+# overlay, so the drawn masks always match the masks the numbers were sampled on.
+GHOST_RADIUS = 3
 
-def _ghost_masks(
-    phantom_mask: BoolArray, pe_axis: int, radius: int, valid_mask: BoolArray
+
+def ghost_masks(
+    phantom_mask: BoolArray,
+    pe_axis: int,
+    radius: int = GHOST_RADIUS,
+    valid_mask: BoolArray | None = None,
 ) -> tuple[BoolArray, BoolArray]:
     """Region-matched (signal, ghost) masks for a candidate PE axis.
 
@@ -33,8 +41,11 @@ def _ghost_masks(
     each ghost patch against the exact tissue that produced it. The phantom/PE-
     ghost overlap zone -- where signal and ghost are superimposed and cannot be
     separated -- is thereby excluded from both masks. `valid_mask` (see
-    `edge_valid_mask`) drops the ghost pixels that wrap onto a zeroed edge.
+    `edge_valid_mask`) drops the ghost pixels that wrap onto a zeroed edge; it
+    defaults to keeping every pixel.
     """
+    if valid_mask is None:
+        valid_mask = np.ones(phantom_mask.shape, dtype=bool)
     shift = phantom_mask.shape[pe_axis] // 2
     ghost = np.roll(phantom_mask, shift, axis=pe_axis)
 
@@ -51,7 +62,7 @@ def ghost_ratio(
     mean_image: FloatArray,
     phantom_mask: BoolArray,
     pe_axis: int = 0,
-    radius: int = 3,
+    radius: int = GHOST_RADIUS,
     valid_mask: BoolArray | None = None,
 ) -> float:
     """fBIRN Nyquist ghost-to-signal ratio (mean ghost / mean signal).
@@ -64,7 +75,7 @@ def ghost_ratio(
     """
     if valid_mask is None:
         valid_mask = edge_valid_mask(mean_image)
-    signal_mask, ghost_mask = _ghost_masks(phantom_mask, pe_axis, radius, valid_mask)
+    signal_mask, ghost_mask = ghost_masks(phantom_mask, pe_axis, radius, valid_mask)
     if not ghost_mask.any() or not signal_mask.any():
         return float("nan")  # no clear ghost/signal region (matches ghost_top_ratio)
     return float(mean_image[ghost_mask].mean() / mean_image[signal_mask].mean())
@@ -74,7 +85,7 @@ def ghost_top_ratio(
     mean_image: FloatArray,
     phantom_mask: BoolArray,
     pe_axis: int = 0,
-    radius: int = 3,
+    radius: int = GHOST_RADIUS,
     valid_mask: BoolArray | None = None,
     top: float = GHOST_TOP_FRACTION,
 ) -> float:
@@ -90,7 +101,7 @@ def ghost_top_ratio(
     """
     if valid_mask is None:
         valid_mask = edge_valid_mask(mean_image)
-    signal_mask, ghost_mask = _ghost_masks(phantom_mask, pe_axis, radius, valid_mask)
+    signal_mask, ghost_mask = ghost_masks(phantom_mask, pe_axis, radius, valid_mask)
     g = mean_image[ghost_mask]
     if g.size == 0:
         return float("nan")
@@ -103,7 +114,7 @@ def acr_ghosting_ratio(
     mean_image: FloatArray,
     phantom_mask: BoolArray,
     pe_axis: int = 0,
-    radius: int = 3,
+    radius: int = GHOST_RADIUS,
     valid_mask: BoolArray | None = None,
 ) -> float:
     """ACR/AAPM-equivalent ghosting ratio from region-matched percent ghosts.
@@ -113,7 +124,7 @@ def acr_ghosting_ratio(
     normalized by the central signal: |ghost_pe - ghost_freq| / signal. This builds
     the same contrast in fBIRN region-matched space: `ghost_ratio` is evaluated
     independently along the PE and frequency axes -- each ghost patch normalized by
-    the exact tissue that produced it (`_ghost_masks`), with the phantom/ghost
+    the exact tissue that produced it (`ghost_masks`), with the phantom/ghost
     overlap zone excluded from both -- and the ACR-equivalent is the absolute
     difference of the two ratios.
 
@@ -133,7 +144,7 @@ def acr_ghosting_ratio(
     return abs(pe - ro)
 
 
-def phase_encode_axis(data: FloatArray, radius: int = 3) -> int:
+def phase_encode_axis(data: FloatArray, radius: int = GHOST_RADIUS) -> int:
     """Estimate the PE axis from a MIP over time and all slices.
 
     Collapsing time and slices concentrates the ghost, giving a stronger signal
@@ -164,7 +175,7 @@ def estimate_pe_axis(
 def estimate_pe_axis(
     mean_image: FloatArray,
     phantom_mask: BoolArray,
-    radius: int = 3,
+    radius: int = GHOST_RADIUS,
     return_ratios: bool = False,
     valid_mask: BoolArray | None = None,
 ) -> int | tuple[int, dict[int, float]]:

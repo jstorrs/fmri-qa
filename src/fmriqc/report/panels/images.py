@@ -12,7 +12,6 @@ from matplotlib.patches import Patch, Rectangle
 from scipy.spatial import ConvexHull
 
 import fmriqc as q
-from fmriqc.metrics.ghost import _ghost_masks  # region-matched ghost/signal masks
 from fmriqc.types import BoolArray, FloatArray
 
 _GHOST_SRC_RGB = (0.20, 0.85, 1.0)  # PE signal source region (cyan)
@@ -146,8 +145,12 @@ def _ghost_panel_fig(
     handles = []
     if pe_axis in (0, 1):
         ro_axis = 1 - pe_axis
-        ro_signal, ro_ghost = _ghost_masks(phantom_mask, ro_axis, 3, valid_mask)
-        signal_mask, ghost_mask = _ghost_masks(phantom_mask, pe_axis, 3, valid_mask)
+        ro_signal, ro_ghost = q.ghost_masks(
+            phantom_mask, ro_axis, q.GHOST_RADIUS, valid_mask
+        )
+        signal_mask, ghost_mask = q.ghost_masks(
+            phantom_mask, pe_axis, q.GHOST_RADIUS, valid_mask
+        )
         _overlay(ax, ro_signal, _RO_SRC_RGB)
         _overlay(ax, ro_ghost, _RO_GHOST_RGB)
         _overlay(ax, signal_mask, _GHOST_SRC_RGB)

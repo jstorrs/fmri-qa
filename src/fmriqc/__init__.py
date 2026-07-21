@@ -52,9 +52,11 @@ from .metrics.fbirn import (
     weisskoff,
 )
 from .metrics.ghost import (
+    GHOST_RADIUS,
     GHOST_TOP_FRACTION,
     acr_ghosting_ratio,
     estimate_pe_axis,
+    ghost_masks,
     ghost_ratio,
     ghost_top_ratio,
     phase_encode_axis,
@@ -104,6 +106,7 @@ logging.getLogger(__name__).addHandler(logging.NullHandler())
 __all__ = [
     "DETREND_METHODS",
     "FBIRN_ROI_SIZE",
+    "GHOST_RADIUS",
     "GHOST_TOP_FRACTION",
     "HILO_ERODE",
     "ROI",
@@ -141,6 +144,7 @@ __all__ = [
     "extract_center_slice",
     "find_phantom_center",
     "fluctuation_noise",
+    "ghost_masks",
     "ghost_ratio",
     "ghost_top_ratio",
     "image_center",
