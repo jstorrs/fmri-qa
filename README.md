@@ -19,11 +19,15 @@ fBIRN size) on a single slice.
 | **drift %** | peak-to-peak of the ROI-mean fitted trend, as % of mean signal |
 | **fluctuation %** | SD of the ROI-mean residual, as % of mean signal |
 | **ghost %** | fBIRN percent ghost: `100 × mean ghost region / mean signal region` |
-| **ACRg %** | ACR/AAPM percent-signal-ghosting: `100 × \|ghost_pe − ghost_freq\| / signal`, over the N/2-shifted phantom masks |
+| **ghT %** | PE percent ghost of the brightest 10% of ghost voxels (Greve / bxh ghostiness): a localized companion to `ghost %` on the same scale, so a bright ghost the region mean dilutes still shows (always `≥ ghost %`) |
+| **RO %** | the same region-matched percent ghost measured along the readout axis — the background-relative baseline the ACR difference is taken against |
+| **ACRg %** | ACR/AAPM percent-signal-ghosting: `100 × \|ghost_pe − ghost_freq\| / signal`, over the N/2-shifted phantom masks (i.e. `\|ghost % − RO %\|`) |
 | **outl %** | worst-frame outlier-voxel fraction (AFNI 3dToutcount): `100 × max_t (outlier voxels / phantom voxels)`; a clean run sits near the 0.1% chance level |
+| **tcOut** / **spcOut** | MAD-normalized spike scores of the ROI-mean residual — peak / robust-spread in the time domain (a transient volume) and on its DC-dropped FFT magnitude (a dominant periodic artifact); unitless, a clean phantom sits low (a few) and a spike stands well above |
 | **clip** / **clipPre** | ADC-saturation counts: voxel·time samples pinned at the inferred `2ⁿ−1` rail, in the analyzed data (`clip`) vs. the dropped warm-up volumes (`clipPre`); `0` when none |
 | **motn** | peak per-volume in-plane translation of the phantom vs. its temporal mean (voxels), from a 3dvolreg-style registration |
 | **scl %** / **shr %** | peak per-volume scaling and shear strain of the phantom (percent) — the gradient-heating deformation the rotation-free motion model isolates |
+| **com** | peak per-volume shift of the whole-slice intensity centroid from its temporal mean (circular COM, bxh volmeasures), in voxels — a cheap first-moment jump/drift trace complementing `motn` |
 | **fwPE** / **fwRO** | spatial smoothness of the noise field (AFNI 3dFWHMx): Gaussian FWHM of the detrended fluctuations over the phantom along the phase-encode and readout axes, in mm (voxels if the voxel size is unknown) |
 
 Drift is removed before the noise metrics are measured, using either a Legendre
@@ -199,10 +203,10 @@ uv run fmri-qa [options] scan.nii.gz [more.nii.gz ...]
 
 ```
 # detrend=poly  trim_sec=5.0  center=image  roi_size=21
-scan                                      PE       SNR      SFNR      RDC   drift%   ghost%      RO%    ACRg%   outl%   clip  clipPre    motn    scl%    shr%   fwPE   fwRO
----------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-FBIRN_QA_fMRI_flip77_13.nii.gz           col     467.3     452.0   10.953    0.303    4.092    4.059    0.033   0.211      0        0   0.017   0.198   0.015   2.19   2.72
-ABCD_QA_fMRI_16.nii.gz                   col      76.7      75.3   13.355    0.682    5.074    3.192    1.882   0.077      0       68   0.025   0.268   0.034   1.53   2.17
+scan                                      PE       SNR      SFNR      RDC   drift%   ghost%     ghT%      RO%    ACRg%   outl%   tcOut  spcOut   clip  clipPre    motn    scl%    shr%    com   fwPE   fwRO
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+FBIRN_QA_fMRI_flip77_13.nii.gz           col     467.3     452.0   10.953    0.303    4.092    6.643    4.059    0.033   0.211    2.48    5.19      0        0   0.017   0.198   0.015  0.007   2.19   2.72
+ABCD_QA_fMRI_16.nii.gz                   col      76.7      75.3   13.355    0.682    5.074   10.084    3.192    1.882   0.077    3.30    5.86      0       68   0.025   0.268   0.034  0.094   1.53   2.17
 ```
 
 Options:
@@ -257,4 +261,6 @@ QAScan → preprocess → QAImages → detect_phantom → resolve_roi
 returns a `QAImages` holding the center slice plus its fluctuations; the summary
 images (mean, MIP, static noise, fluctuation noise, trend) are derived
 properties. The full multi-slice volume can be discarded once `QAImages` exists.
-PDF rendering lives in `fmriqc/report.py` (imported only when `--pdf` is used).
+PDF rendering lives in the `fmriqc/report/` subpackage (format-agnostic
+`summary` text and `panels` figures, composed by a `formats` driver; imported
+only when `--pdf` is used).
