@@ -11,6 +11,8 @@ wheels/
 
 # Jupyter
 .ipynb_checkpoints/
+# Exploratory scratch notebooks (see pyproject.toml ruff extend-exclude)
+notebooks/
 
 # Data / DICOM / BIDS (large binary inputs, not versioned)
 data/
