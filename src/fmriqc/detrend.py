@@ -13,6 +13,7 @@ from numpy.typing import NDArray
 from scipy.interpolate import make_lsq_spline
 
 from .constants import POLY_CUTOFF_S, SPLINE_CUTOFF_S
+from .exceptions import InvalidChoiceError
 
 DETREND_METHODS = ("poly", "spline")
 
@@ -86,6 +87,9 @@ def detrend_fn(
     Complexity (poly degree / spline nodes) is derived once from the timeseries
     length and `tr`, then applied to the full slice and each ROI timeseries. The
     returned order is that complexity, surfaced for the report.
+
+    Raises:
+        InvalidChoiceError: If `method` is not one of `DETREND_METHODS`.
     """
     if method == "poly":
         degree = poly_degree(center_slice, tr)
@@ -93,6 +97,4 @@ def detrend_fn(
     if method == "spline":
         n_nodes = spline_nodes(center_slice, tr)
         return (lambda y: spline_residuals(y, n_nodes)), n_nodes
-    raise ValueError(
-        f"unknown detrend method {method!r}; choose from {DETREND_METHODS}"
-    )
+    raise InvalidChoiceError("detrend method", method, DETREND_METHODS)

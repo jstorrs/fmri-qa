@@ -34,6 +34,12 @@ from .detrend import (
     spline_nodes,
     spline_residuals,
 )
+from .exceptions import (
+    FmriqcError,
+    IncompatibleScansError,
+    InvalidChoiceError,
+    MissingSidecarError,
+)
 from .geometry import detect_phantom, resolve_roi, roi_fits
 from .ghost import (
     acr_ghosting_ratio,
@@ -101,7 +107,11 @@ __all__ = [
     "ROI",
     "ROI_CENTER_MODES",
     "CenterOfMassResult",
+    "FmriqcError",
     "HiLoResult",
+    "IncompatibleScansError",
+    "InvalidChoiceError",
+    "MissingSidecarError",
     "MotionResult",
     "OutlierResult",
     "PhantomGeometry",

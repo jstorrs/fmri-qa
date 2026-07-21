@@ -9,6 +9,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from .constants import FBIRN_ROI_SIZE, ROI_CENTER_MODES
+from .exceptions import InvalidChoiceError
 from .imaging import _clamp_center, find_phantom_center, image_center, segment_phantom
 from .types import ROI, PhantomGeometry, QAImages
 
@@ -34,6 +35,9 @@ def resolve_roi(
     The side is the fixed `roi_size` clamped to the image bounds, and the center
     is shifted if needed to keep the ROI on-image; whether it also fits inside the
     phantom is a separate check (see `roi_fits`).
+
+    Raises:
+        InvalidChoiceError: If `center` is not one of `ROI_CENTER_MODES`.
     """
     shape = images.center_slice.shape[:2]
     n = min(roi_size, *shape)
@@ -42,9 +46,7 @@ def resolve_roi(
     elif center == "phantom":
         c = geom.roi_center
     else:
-        raise ValueError(
-            f"unknown ROI center {center!r}; choose from {ROI_CENTER_MODES}"
-        )
+        raise InvalidChoiceError("ROI center", center, ROI_CENTER_MODES)
     return ROI(center=_clamp_center(c, n, shape), size=n)
 
 

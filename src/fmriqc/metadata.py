@@ -10,6 +10,7 @@ import json
 from pathlib import Path
 
 from .constants import _PE_ROWCOL
+from .exceptions import MissingSidecarError
 from .types import ScanMeta
 
 
@@ -18,7 +19,10 @@ def _load_sidecar(path: str | Path) -> dict:
 
     dcm2niix writes this alongside every NIfTI it converts, so a missing sidecar
     means the input did not go through the expected conversion; we refuse it
-    rather than silently dropping metadata. Raises `FileNotFoundError` if absent.
+    rather than silently dropping metadata.
+
+    Raises:
+        MissingSidecarError: If no `.json` sidecar is found beside `path`.
     """
     p = Path(path)
     name = p.name
@@ -28,11 +32,7 @@ def _load_sidecar(path: str | Path) -> dict:
             break
     sidecar = p.with_name(name + ".json")
     if not sidecar.is_file():
-        raise FileNotFoundError(
-            f"required BIDS JSON sidecar not found: {sidecar} "
-            f"(convert the DICOM with dcm2niix so a .json is written alongside "
-            f"the NIfTI)"
-        )
+        raise MissingSidecarError(sidecar)
     with sidecar.open() as f:
         return json.load(f)
 

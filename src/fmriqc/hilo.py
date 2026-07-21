@@ -16,6 +16,7 @@ from scipy import ndimage
 
 from .constants import HILO_ERODE
 from .detrend import detrend_fn
+from .exceptions import IncompatibleScansError
 from .imaging import fluctuation_noise, segment_phantom, trim_initial
 from .scan import QAScan
 
@@ -186,6 +187,10 @@ def run_hilo(
     and `mean_low` are averaged over identical voxels. `separate_noise` then does
     the flip-angle algebra. Raises if the two geometries differ or their cores do
     not overlap.
+
+    Raises:
+        IncompatibleScansError: If the two scans differ in geometry, or their
+            phantom cores do not overlap.
     """
     fh = high.meta.flip_angle if high.meta else None
     fl = low.meta.flip_angle if low.meta else None
@@ -199,7 +204,7 @@ def run_hilo(
     mean_h, sd_h, core_h = _hilo_stats(high, trim_sec, detrend, erode)
     mean_l, sd_l, core_l = _hilo_stats(low, trim_sec, detrend, erode)
     if mean_h.shape != mean_l.shape:
-        raise ValueError(
+        raise IncompatibleScansError(
             f"high/low scans have different geometry {mean_h.shape} vs "
             f"{mean_l.shape}; they must be the same acquisition except flip angle."
         )
@@ -207,7 +212,7 @@ def run_hilo(
     core = core_h & core_l
     n = int(core.sum())
     if n == 0:
-        raise ValueError(
+        raise IncompatibleScansError(
             "high/low phantom cores do not overlap; cannot pool statistics "
             "(check that both scans image the same phantom, or lower --erode)."
         )

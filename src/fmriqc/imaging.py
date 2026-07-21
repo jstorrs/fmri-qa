@@ -13,6 +13,7 @@ from scipy import ndimage
 from skimage import filters, segmentation
 
 from .constants import ROI_CENTER_MODES
+from .exceptions import InvalidChoiceError
 
 
 def trim_count(tr: float, trim_sec: float) -> int:
@@ -39,6 +40,9 @@ def extract_center_slice(data: NDArray, center: str = "image") -> NDArray:
 
     "image": the geometric middle slice (Glover/fBIRN convention).
     "phantom": the slice with the largest phantom cross-section (detected).
+
+    Raises:
+        InvalidChoiceError: If `center` is not one of `ROI_CENTER_MODES`.
     """
     if center == "image":
         z = data.shape[2] // 2
@@ -46,7 +50,7 @@ def extract_center_slice(data: NDArray, center: str = "image") -> NDArray:
         mip = data.max(axis=-1)
         z = int(np.argmax([segment_phantom(s).sum() for s in np.moveaxis(mip, -1, 0)]))
     else:
-        raise ValueError(f"unknown center {center!r}; choose from {ROI_CENTER_MODES}")
+        raise InvalidChoiceError("center", center, ROI_CENTER_MODES)
     return data[:, :, z, :]
 
 

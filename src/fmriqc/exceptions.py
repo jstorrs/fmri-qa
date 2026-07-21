@@ -1,0 +1,55 @@
+"""Exception hierarchy for fmriqc.
+
+One base class (`FmriqcError`) is the error contract: catch it to catch anything
+the package raises, and new subclasses can be added without breaking that catch.
+Each subclass also inherits the natural stdlib type (`ValueError`,
+`FileNotFoundError`) so code that already catches those keeps working — the dual
+base resolves the tension between "one base exception per package" and "use the
+standard exception when appropriate" (see style/exceptions.md).
+"""
+
+from collections.abc import Sequence
+from pathlib import Path
+
+
+class FmriqcError(Exception):
+    """Base exception for fmriqc; catch this to catch any error the package raises."""
+
+
+class MissingSidecarError(FmriqcError, FileNotFoundError):
+    """The required BIDS JSON sidecar was not found beside a NIfTI.
+
+    Also a `FileNotFoundError`, since the underlying condition is a missing file.
+    `sidecar` is the path that was looked for.
+    """
+
+    def __init__(self, sidecar: Path) -> None:
+        super().__init__(
+            f"required BIDS JSON sidecar not found: {sidecar} "
+            f"(convert the DICOM with dcm2niix so a .json is written alongside "
+            f"the NIfTI)"
+        )
+        self.sidecar = sidecar
+
+
+class InvalidChoiceError(FmriqcError, ValueError):
+    """A parameter was given a value outside its permitted set.
+
+    Also a `ValueError`, the natural stdlib type for a bad argument value.
+    Carries the offending `name`/`value` and the permitted `choices` so a caller
+    can react programmatically, not only print.
+    """
+
+    def __init__(self, name: str, value: object, choices: Sequence[object]) -> None:
+        super().__init__(f"unknown {name} {value!r}; choose from {tuple(choices)}")
+        self.name = name
+        self.value = value
+        self.choices = tuple(choices)
+
+
+class IncompatibleScansError(FmriqcError, ValueError):
+    """A high/low flip-angle scan pair cannot be combined.
+
+    Raised when the two scans differ in geometry, or when their phantom cores do
+    not overlap so no shared statistics can be pooled. Also a `ValueError`.
+    """
