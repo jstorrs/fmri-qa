@@ -7,7 +7,8 @@ from pathlib import Path
 
 import fmriqc as q
 
-_PE_LABEL = {0: "row", 1: "col", 2: "k", None: "?"}  # DICOM row/col (i->row, j->col)
+# Shared row/col (i->row, j->col), extended with the through-plane axis label.
+_PE_LABEL: dict[int, str] = {**q.PE_ROWCOL, 2: "k"}
 
 
 def _version() -> str:
@@ -159,7 +160,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             pe = result.meta.pe_dir
         else:
             axis = args.pe_axis if args.pe_axis is not None else scan.pe_axis
-            pe = _PE_LABEL.get(axis, "?")
+            pe = "?" if axis is None else _PE_LABEL.get(axis, "?")
         reports.append((name, result))
         if args.json:
             records.append(_metric_record(name, pe, result))

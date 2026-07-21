@@ -12,11 +12,7 @@ from pathlib import Path
 from typing import Any
 
 from ..exceptions import MissingSidecarError
-
-# DICOM in-plane phase-encode axis -> row/col: NIfTI i (axis 0) is the DICOM
-# row direction, j (axis 1) the column direction (verified against dcm2niix
-# InPlanePhaseEncodingDirectionDICOM on a Siemens acquisition).
-_PE_ROWCOL = {0: "row", 1: "col"}
+from .pe_axis import PE_ROWCOL
 
 
 @dataclass(frozen=True)
@@ -89,8 +85,8 @@ def _pe_direction(pe_axis: int | None, sidecar: dict[str, Any]) -> str | None:
     if dicom := sidecar.get("InPlanePhaseEncodingDirectionDICOM"):
         return str(dicom).lower()
     if ped := sidecar.get("PhaseEncodingDirection"):
-        return _PE_ROWCOL.get({"i": 0, "j": 1}.get(str(ped)[0], -1))
-    return _PE_ROWCOL.get(pe_axis) if pe_axis is not None else None
+        return PE_ROWCOL.get({"i": 0, "j": 1}.get(str(ped)[0], -1))
+    return PE_ROWCOL.get(pe_axis) if pe_axis is not None else None
 
 
 def _scan_meta(img: Any, sidecar: dict[str, Any], pe_axis: int | None) -> ScanMeta:

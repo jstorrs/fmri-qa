@@ -9,6 +9,12 @@ and only then falls back to `metrics.ghost.phase_encode_axis`.
 
 from typing import Any
 
+# DICOM in-plane phase-encode axis -> row/col: NIfTI i (axis 0) is the DICOM
+# row direction, j (axis 1) the column direction (verified against dcm2niix
+# InPlanePhaseEncodingDirectionDICOM on a Siemens acquisition). The single source
+# of truth for the row/col label the metadata, report, and CLI all show.
+PE_ROWCOL: dict[int, str] = {0: "row", 1: "col"}
+
 
 def _pe_axis_from_sidecar(sidecar: dict[str, Any]) -> int | None:
     """PE axis (0/1/2) from the sidecar, or None if it carries no PE field.

@@ -35,6 +35,7 @@ from .hilo import (
     separate_noise,
 )
 from .load.metadata import ScanMeta
+from .load.pe_axis import PE_ROWCOL
 from .load.scan import QAScan
 from .metrics.artifacts import (
     OutlierResult,
@@ -109,6 +110,7 @@ __all__ = [
     "GHOST_RADIUS",
     "GHOST_TOP_FRACTION",
     "HILO_ERODE",
+    "PE_ROWCOL",
     "ROI",
     "ROI_CENTER_MODES",
     "CenterOfMassResult",

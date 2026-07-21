@@ -8,8 +8,6 @@ A format driver (see `formats`) decides how to lay them out.
 
 import fmriqc as q
 
-_PE_ROWCOL = {0: "row", 1: "col"}  # DICOM row/col fallback when meta is absent
-
 
 def _fwhm_label(s: q.SmoothnessResult) -> str:
     """Combined FWHM tile text: mm when the voxel size is known, else voxels."""
@@ -56,7 +54,7 @@ def _acquisition_line(result: q.QAResult) -> str:
     if meta and meta.pe_dir:
         pe = meta.pe_dir
     elif m.pe_axis is not None:
-        pe = _PE_ROWCOL.get(m.pe_axis, "?")
+        pe = q.PE_ROWCOL.get(m.pe_axis, "?")
     else:
         pe = "?"
     parts.append(f"PE {pe}")
