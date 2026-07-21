@@ -46,6 +46,11 @@ SMOOTHNESS_MAX_LAG = 10
 # 3dAutomask -erode 5) -- excludes edge / partial-volume / ghost-contaminated voxels.
 HILO_ERODE = 5
 
+# Fraction of the brightest ghost-region voxels averaged for the localized-ghost
+# statistic (Greve / bxh fmriqa_ghostiness "top-10%"): catches a concentrated
+# bright ghost that the region-mean ghost ratio dilutes.
+GHOST_TOP_FRACTION = 0.10
+
 # Fixed summary-ROI side (voxels). Glover/fBIRN uses 21; user-configurable.
 FBIRN_ROI_SIZE = 21
 # ROI localization mode. "image": middle slice + image-center ROI (Glover).
@@ -670,6 +675,7 @@ class QAMetrics:
     sfnr: float
     rdc: float
     ghost_pct: float  # fBIRN percent ghost along PE: 100 * (mean ghost / mean signal)
+    ghost_top_pct: float  # PE percent ghost of the brightest 10% of ghost voxels (localized)
     ro_ghost_pct: float  # same along the readout axis: background-relative baseline
     acr_ghost_pct: float  # ACR/AAPM-equivalent percent-signal-ghosting: |PE% - RO%|
     pe_axis: int | None  # phase-encode axis actually used for the ghost masks
@@ -1102,6 +1108,34 @@ def ghost_ratio(
         valid_mask = edge_valid_mask(mean_image)
     signal_mask, ghost_mask = _ghost_masks(phantom_mask, pe_axis, radius, valid_mask)
     return float(mean_image[ghost_mask].mean() / mean_image[signal_mask].mean())
+
+def ghost_top_ratio(
+    mean_image: NDArray,
+    phantom_mask: NDArray,
+    pe_axis: int = 0,
+    radius: int = 3,
+    valid_mask: NDArray | None = None,
+    top: float = GHOST_TOP_FRACTION,
+) -> float:
+    """Localized (top-fraction) Nyquist ghost ratio (Greve / bxh fmriqa_ghostiness).
+
+    Identical to `ghost_ratio` but the numerator is the mean of the brightest
+    `top` fraction of ghost-region voxels rather than the whole-region mean, so a
+    concentrated bright ghost (a localized reconstruction artifact) shows up where
+    the region mean would dilute it. The signal denominator is the same
+    region-matched source patch as `ghost_ratio`, so this ratio shares that scale
+    and is always >= the mean ghost ratio; 100x it is the "top-10% percent ghost".
+    At least one voxel is always averaged; NaN if the ghost region is empty.
+    """
+    if valid_mask is None:
+        valid_mask = edge_valid_mask(mean_image)
+    signal_mask, ghost_mask = _ghost_masks(phantom_mask, pe_axis, radius, valid_mask)
+    g = mean_image[ghost_mask]
+    if g.size == 0:
+        return float("nan")
+    k = max(1, int(round(top * g.size)))
+    bright = np.partition(g, -k)[-k:]  # the k largest ghost-voxel intensities
+    return float(bright.mean() / mean_image[signal_mask].mean())
 
 def acr_ghosting_ratio(
     mean_image: NDArray,
@@ -1619,6 +1653,10 @@ def run_qa(
                            valid_mask=valid_mask)
     ro_ratio = ghost_ratio(mean_image, geom.phantom_mask, pe_axis=1 - pe_axis,
                            valid_mask=valid_mask)
+    # Localized-ghost companion to the PE mean ratio: the brightest 10% of ghost
+    # voxels (Greve / bxh fmriqa_ghostiness), on the same region-matched scale.
+    pe_top_ratio = ghost_top_ratio(mean_image, geom.phantom_mask, pe_axis=pe_axis,
+                                   valid_mask=valid_mask)
 
     # Directional spatial smoothness (AFNI 3dFWHMx): the Gaussian FWHM of the
     # detrended noise field along PE and RO, plus the point-spread curves -- the
@@ -1632,6 +1670,7 @@ def run_qa(
         sfnr=sfnr(images, roi),
         rdc=wk.rdc,
         ghost_pct=100.0 * pe_ratio,
+        ghost_top_pct=100.0 * pe_top_ratio,
         ro_ghost_pct=100.0 * ro_ratio,
         acr_ghost_pct=100.0 * abs(pe_ratio - ro_ratio),
         pe_axis=pe_axis,

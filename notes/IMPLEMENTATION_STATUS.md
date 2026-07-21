@@ -10,8 +10,9 @@ Levels A + B)** — every scalar metric matches the guide, and detrending matche
 AFNI `3dDetrend` exactly. Much of the AFNI robustness/temporal-QA layer is now
 also in place (`3dToutcount` outlier fraction, saturation, 3dvolreg-style motion,
 `3dFWHMx` Classic-FWHM smoothness, bxh-volmeasures center-of-mass, cran
-MAD-normalized spike scores); the remaining gaps are the ACF-model half of
-`3dFWHMx` and Level C (longitudinal trending). `3dDespike` and a robust
+MAD-normalized spike scores, Greve/bxh top-10% localized ghost); the remaining
+gaps are the ACF-model half of `3dFWHMx` and Level C (longitudinal trending).
+`3dDespike` and a robust
 fluctuation SD were considered and deliberately declined for a QA tool (see
 "Deliberate non-goals").
 
@@ -88,20 +89,14 @@ off-protocol acquisitions, by design.
 
 Ranked by value for phantom QA.
 
-**Medium**
-
-1. **Ghost "top-10% voxels" statistic.** Our ghost uses the region *mean*; the
-   Greve / `fmriqa_ghostiness.c` method also reports the top-10% ghost voxels
-   (catches localized ghosts a mean dilutes).
-
 **Lower / larger scope**
 
-2. **Level C — longitudinal QA.** Guide's target is "B+C". We cover A+B (single
+1. **Level C — longitudinal QA.** Guide's target is "B+C". We cover A+B (single
    scan + batch table); no logging DB, trend plots, or ±k·SD control-limit
    flagging.
-3. **Background/air QA** (cran `max_bg_perc`) and **`@radial_correlate`**
+2. **Background/air QA** (cran `max_bg_perc`) and **`@radial_correlate`**
    structured-artifact detection — future directions.
-4. **FFT spectrum normalization.** `report.py._plot_spectrum` plots raw
+3. **FFT spectrum normalization.** `report.py._plot_spectrum` plots raw
    magnitude; `bxh` normalizes to percent-of-mean (`·100/m`) for cross-scan
    comparability. Cosmetic.
 
@@ -231,6 +226,16 @@ Ranked by value for phantom QA.
   drives `tcOut` 2.5 → 19.3 and an injected sinusoid drives `spec` 5.2 → 37.5;
   empty/constant series return NaN. On clean real data FBIRN sits at
   tcOut 2.5 / spec 5.2, ABCD at 3.3 / 5.9.
+- **Top-10% localized ghost (Greve / bxh `fmriqa_ghostiness`)** (was Medium
+  gap #1): a companion to the PE mean ghost that averages only the brightest 10%
+  of ghost-region voxels (`ghost_top_ratio`, `GHOST_TOP_FRACTION = 0.10`), on the
+  **same** region-matched signal denominator as `ghost_ratio` — so it shares the
+  scale, is always ≥ the mean ghost, and a concentrated bright ghost the region
+  mean dilutes still shows. Surfaced as the `ghT%` CLI column and a `ghostT` PDF
+  tile. Validated: matches an explicit top-k sort exactly and never drops below
+  the mean ghost; a localized ghost injected into a few ghost voxels moves `ghT%`
+  ~10× more than `ghost%` (FBIRN 4.1→6.6, ABCD 5.1→10.1 at rest); an empty ghost
+  region returns NaN.
 
 ---
 
@@ -239,9 +244,11 @@ Ranked by value for phantom QA.
 Highest leverage, fits the existing linear-chain architecture (operates on
 `QAImages.center_slice` / `fluctuations`):
 
-1. Ghost top-10% voxel statistic (Medium gap #1) — the next diagnostic that adds
-   real coverage; catches localized ghosts the region mean dilutes.
+1. Level C — longitudinal trending (logging DB + control-limit flags), the last
+   substantive item toward the guide's "B+C" target; the single-scan metric set
+   is now broad.
 
 (Done: `3dToutcount`-style per-TR outlier fraction; saturation/clipping check;
-cran `tc_outlier`/`spec_outlier` spike scores. Declined for QA: `3dDespike`
-data-editing and a robust fluctuation SD — see "Deliberate non-goals".)
+cran `tc_outlier`/`spec_outlier` spike scores; Greve/bxh top-10% localized ghost.
+Declined for QA: `3dDespike` data-editing and a robust fluctuation SD — see
+"Deliberate non-goals".)

@@ -404,6 +404,7 @@ def _metric_tiles(m):
         ("SFNR", f"{m.sfnr:.1f}"),
         ("RDC", f"{m.rdc:.2f}"),
         ("ghost", f"{m.ghost_pct:.2f}%"),
+        ("ghostT", f"{m.ghost_top_pct:.2f}%"),
         ("RO", f"{m.ro_ghost_pct:.2f}%"),
         ("ACRg", f"{m.acr_ghost_pct:.2f}%"),
         ("drift", f"{m.drift_pct:.3f}%"),
