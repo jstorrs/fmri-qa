@@ -1,7 +1,14 @@
 # Hand-off: svglib embedded-image misalignment
 
-**Status (2026-07-20):** upstream issue filed, awaiting maintainer reply.
+**Status (2026-07-21):** maintainer (owner `deeplook`) confirmed the casts have
+no good reason and requested a small PR — filed as #492, now open and awaiting
+review/merge. CI so far: `pre-commit.ci` and the greeting workflow pass; the
+pytest matrix (`test.yml`) has **not run yet** — as a first-time contributor it
+needs a maintainer to approve the workflow run. No review or comments yet.
 **Upstream issue:** https://github.com/deeplook/svglib/issues/490
+**Upstream PR:** https://github.com/deeplook/svglib/pull/492 (removes the four
+`int()` casts + adds a regression test; verified locally, `tests/test_basic.py`
+→ 89 passed, 1 skipped)
 
 ## The problem
 
@@ -64,18 +71,22 @@ on any upgrade.
    go to 0.000. This is issue #490. The real cure; removes the need for any
    local patch once released.
 
-## Next steps — after maintainers reply on #490
+## Next steps — after PR #492 merges + releases
 
-- **If they confirm it's a bug / removable:** offer the PR (fork, remove the
-  `int()` casts in `src/svglib/svglib.py`, add a regression test from the repro).
-  Once released, bump svglib in `pyproject.toml`/`uv.lock` and **delete**
-  `_patch_svglib_image_alignment` + its call in `report.py`.
-- **If they say the rounding is intentional** (e.g. `renderPM` pixel-snapping):
-  keep a local patch, but switch it to **option 1 (narrower wrapper)** to remove
-  the upgrade risk above, or adopt **option 2** and delete the patch entirely.
+Maintainer confirmed it's a bug (option 3, the real cure). PR #492 is filed.
+
+- **When #492 is released:** bump svglib in `pyproject.toml`/`uv.lock` to the
+  release that contains it, then **delete** `_patch_svglib_image_alignment` +
+  its call in `report.py`. Confirm with the repro that deltas stay 0.000 on the
+  new stock svglib (no patch).
+- **Until then:** stay pinned to svglib 2.0.2 with the local monkeypatch. Note
+  the patch is the verbatim-2.0.2-body override, which silently drops the
+  intrinsic-size fallback that `main` has since gained (see "Known risk" above)
+  — but we don't need to switch to the narrower wrapper (option 1) since the
+  upstream fix is on the way; just don't bump svglib until #492 ships.
 - **Either way:** keep `examples/svglib_alignment_repro.py` as the regression
   guard, and re-sync the patch against the new `convertImage` body if svglib is
-  bumped.
+  bumped before #492 is released.
 
 ## Reference facts
 
