@@ -23,6 +23,7 @@ from svglib.svglib import svg2rlg
 
 import fmriqc as q
 
+from ..content import METRIC_DOCS, characterization_rows, metric_tiles
 from ..document import (
     Appendix,
     Block,
@@ -50,7 +51,6 @@ from ..panels.timeseries import (
 from ..summary import (
     _acquisition_line,
     _device_line,
-    _metric_tiles,
     _provenance_line,
 )
 from ..theme import DEFAULT_THEME, Theme
@@ -160,7 +160,7 @@ def _header(c: canvas.Canvas, result: q.QAResult, title: str, theme: Theme) -> f
         c.drawString(theme.margin, y, prov)
     c.setFillGray(theme.text_primary_gray)
 
-    bottom = _draw_tiles(c, _metric_tiles(result.metrics), y - 12, theme)
+    bottom = _draw_tiles(c, metric_tiles(result.metrics), y - 12, theme)
     return bottom - 10
 
 
@@ -394,10 +394,66 @@ def _analysis_page(
     )
 
 
+def _page_title(c: canvas.Canvas, title: str, heading: str, theme: Theme) -> float:
+    """Draw a physics page heading ("<title> — <heading>"); return the y below."""
+    y = theme.page_size[1] - 34
+    c.setFont(theme.font_title, 13)
+    label = f"{title} — {heading}" if title else heading
+    c.drawString(theme.margin, y, label)
+    c.setFillGray(theme.text_primary_gray)
+    return y - 22
+
+
+def _characterization_page(
+    c: canvas.Canvas, result: q.QAResult, title: str, theme: Theme
+) -> None:
+    """Physics: a per-metric table of value, definition, and acceptance window.
+
+    The acceptance column is a placeholder ("--") until the deferred threshold
+    subsystem lands; see `notes/report_redesign.md`.
+    """
+    y = _page_title(c, title, "characterization", theme)
+    value_x = theme.margin + 90
+    accept_x = theme.page_size[0] - theme.margin
+    for doc, value in characterization_rows(result.metrics):
+        c.setFont(theme.font_title, 9)
+        c.setFillGray(theme.text_primary_gray)
+        c.drawString(theme.margin, y, doc.label)
+        c.setFont(theme.font_numeric, 9)
+        c.drawString(value_x, y, value)
+        c.setFont(theme.font_body, 7)
+        c.setFillGray(theme.text_muted_gray)
+        c.drawRightString(accept_x, y, "accept --")
+        y -= 11
+        c.setFont(theme.font_body, 8)
+        c.drawString(theme.margin + 8, y, doc.definition)
+        c.setFillGray(theme.text_primary_gray)
+        y -= 17
+
+
+def _methods_page(
+    c: canvas.Canvas, result: q.QAResult, title: str, theme: Theme
+) -> None:
+    """Physics: the per-metric methods/provenance narrative."""
+    y = _page_title(c, title, "methods", theme)
+    for doc in METRIC_DOCS:
+        c.setFont(theme.font_title, 9)
+        c.setFillGray(theme.text_primary_gray)
+        c.drawString(theme.margin, y, doc.label)
+        y -= 11
+        c.setFont(theme.font_body, 8)
+        c.setFillGray(theme.text_muted_gray)
+        c.drawString(theme.margin + 8, y, doc.method)
+        c.setFillGray(theme.text_primary_gray)
+        y -= 17
+
+
 # One renderer per page `Part` (see `report.document`). Each draws its content
 # for a scan; `add_report_pages` finalizes each with `showPage()`.
 _PART_RENDERERS: dict[Part, PageRenderer] = {
     "overview": _condensed_page,
+    "characterization": _characterization_page,
+    "methods": _methods_page,
     "stability": _analysis_page,
 }
 

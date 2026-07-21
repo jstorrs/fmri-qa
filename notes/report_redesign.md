@@ -1,6 +1,7 @@
 # Report redesign: tiers, themes, and packets
 
-Status: design accepted, implementation in progress (see [Phasing](#phasing)).
+Status: implemented (all five phases; see [Phasing](#phasing)). Remaining
+follow-up: the deferred acceptance-threshold subsystem.
 
 This document describes the target structure for the `fmriqc.report` subpackage.
 It supersedes the ad-hoc `--pdf-layout summary|detailed` split with a design
@@ -45,10 +46,11 @@ themes, instead of one hard-coded page function per combination.
 
 - **`dashboard`** — status, the KPI metric tiles, the phantom-image row, and the
   core stability curves. Plain-language labels. One page per scan.
-- **`physics`** — the dashboard content *verbatim*, followed by a per-metric
-  **characterization** table (definition, units, measured value, and — once
-  thresholds land — the acceptance window and its provenance) and a **methods**
-  appendix drawn from the algorithm prose already in `notes/`.
+- **`physics`** — the dashboard `overview` page *verbatim*, then a full-size
+  `stability` page, a per-metric **characterization** table (definition, measured
+  value, and — once thresholds land — the acceptance window and its provenance),
+  and a **methods** page of the algorithm/provenance prose. Parts:
+  `("overview", "stability", "characterization", "methods")`.
 
 **`dashboard` is a strict prefix of `physics`.** This settles the open question
 recorded in the `project_pdf_report_tiers` memory: `physics` is `dashboard`'s
@@ -185,8 +187,13 @@ early phases are pure refactors: with the default `Theme`, output is unchanged.
    is proven by tests (a themed logo/footer/cover packet) rather than a shipped
    named theme, which would be arbitrary library content. Delivers the packet
    capability. Note: the appendix assumes it fits one page (no mid-page break yet).
-5. **`content.py` + characterization/methods.** Port the per-metric prose from
-   `notes/`; render the `physics` characterization table and methods appendix.
+5. **[done] `content.py` + characterization/methods.** Add `content.py`: a
+   `MetricDoc` catalog (`METRIC_DOCS`) that single-sources each metric's label,
+   value formatter, definition, and method prose. The header tiles now read it
+   (`metric_tiles`, moved out of `summary.py`), and the `physics` tier gains a
+   `characterization` page (value + definition, acceptance column stubbed "--"
+   pending thresholds) and a `methods` page. Tiles and the characterization table
+   are proven to share labels and values by test.
 
 Phases 1–3 are foundational and change no user-visible output under the default
 theme; 4–5 deliver the new dashboard/physics/packet capabilities.

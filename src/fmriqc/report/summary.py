@@ -1,9 +1,11 @@
-"""Format-agnostic report content: the metric tiles and the metadata text lines.
+"""Format-agnostic scan-level text: the acquisition/provenance metadata lines.
 
-The numbers and strings a report header shows, derived from a `QAResult` with no
-dependency on any output format — `_metric_tiles` returns (label, value) pairs
-and the `_*_line` helpers return the acquisition / provenance / device strings.
-A format driver (see `formats`) decides how to lay them out.
+The strings a report shows about a scan, derived from a `QAResult` with no
+dependency on any output format: the `_*_line` helpers return the acquisition /
+provenance / device strings, `_appendix_rows` the packet provenance table, and
+`package_version` the running version. The per-metric vocabulary (tile labels
+and value formatting) lives in `content`. A format driver (see `formats`)
+decides how to lay these out.
 """
 
 from collections.abc import Iterable
@@ -34,33 +36,6 @@ def _appendix_rows(
         detail = "   ·   ".join(p for p in parts if p) or "no sidecar metadata"
         rows.append((title, detail))
     return rows
-
-
-def _fwhm_label(s: q.SmoothnessResult) -> str:
-    """Combined FWHM tile text: mm when the voxel size is known, else voxels."""
-    unit = "mm" if s.voxel_mm is not None else "vox"
-    return f"{s.fwhm:.2f}{unit}"
-
-
-def _metric_tiles(m: q.QAMetrics) -> list[tuple[str, str]]:
-    """(label, value) pairs for the header metric tiles, in display order."""
-    return [
-        ("SNR", f"{m.snr:.1f}"),
-        ("SFNR", f"{m.sfnr:.1f}"),
-        ("RDC", f"{m.rdc:.2f}"),
-        ("ghost", f"{m.ghost_pct:.2f}%"),
-        ("ghostT", f"{m.ghost_top_pct:.2f}%"),
-        ("RO", f"{m.ro_ghost_pct:.2f}%"),
-        ("ACRg", f"{m.acr_ghost_pct:.2f}%"),
-        ("drift", f"{m.drift_pct:.3f}%"),
-        ("fluct", f"{m.percent_fluctuation:.3f}%"),
-        ("outl", f"{100.0 * m.outliers.max_fraction:.2f}%"),
-        ("tcOut", f"{m.spikes.tc_outlier:.1f}"),
-        ("spec", f"{m.spikes.spec_outlier:.1f}"),
-        ("motn", f"{m.motion.max_translation:.2f}"),
-        ("com", f"{m.center_of_mass.max_displacement:.2f}"),
-        ("fwhm", _fwhm_label(m.smoothness)),
-    ]
 
 
 def _acquisition_line(result: q.QAResult) -> str:

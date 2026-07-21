@@ -23,13 +23,13 @@ Tier = Literal["dashboard", "physics"]
 TIERS: tuple[Tier, ...] = get_args(Tier)
 
 # A renderable page unit; each maps to one renderer in a format driver.
-Part = Literal["overview", "stability"]
+Part = Literal["overview", "stability", "characterization", "methods"]
 
 # Parts per tier. `physics` starts with `dashboard`'s parts, so the shallower
 # tier is a strict prefix of the deeper one.
 _TIER_PARTS: dict[Tier, tuple[Part, ...]] = {
     "dashboard": ("overview",),
-    "physics": ("overview", "stability"),
+    "physics": ("overview", "stability", "characterization", "methods"),
 }
 
 
