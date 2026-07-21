@@ -12,5 +12,6 @@ import matplotlib
 matplotlib.use("Agg")  # headless; no display needed
 
 from .formats.reportlab import add_report_pages, write_report
+from .theme import DEFAULT_THEME, Theme
 
-__all__ = ["add_report_pages", "write_report"]
+__all__ = ["DEFAULT_THEME", "Theme", "add_report_pages", "write_report"]

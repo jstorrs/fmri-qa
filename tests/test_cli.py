@@ -147,3 +147,18 @@ def test_hilo_main_reports_bad_file(tmp_path, capsys) -> None:
     rc = cli.hilo_main([str(tmp_path / "nope.nii.gz"), str(tmp_path / "nah.nii.gz")])
     assert rc == 1
     assert "ERROR" in capsys.readouterr().err
+
+
+def test_write_report_honours_a_custom_theme(tmp_path) -> None:
+    from reportlab.lib.pagesizes import A4
+
+    import fmriqc as q
+    from fmriqc import report
+
+    scan = q.QAScan.from_nifti(_write_scan(tmp_path))
+    result = q.run_qa(scan, roi_size=9)
+    theme = report.Theme(page_size=A4, margin=24.0, font_body="Times-Roman")
+    pdf = tmp_path / "themed.pdf"
+    pages = report.write_report([("scan", result)], pdf, theme=theme)
+    assert pages == 1
+    assert pdf.read_bytes().startswith(b"%PDF")

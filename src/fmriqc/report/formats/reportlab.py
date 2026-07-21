@@ -16,7 +16,6 @@ from typing import Any
 
 from matplotlib.figure import Figure
 from reportlab.graphics.shapes import Group, Image
-from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
 from svglib import svglib as _svglib
 from svglib.svglib import svg2rlg
@@ -43,12 +42,7 @@ from ..summary import (
     _metric_tiles,
     _provenance_line,
 )
-
-_PAGE_W: float
-_PAGE_H: float
-_PAGE_W, _PAGE_H = letter  # 612 x 792 pt
-_MARGIN = 40.0
-_CONTENT_W = _PAGE_W - 2 * _MARGIN
+from ..theme import DEFAULT_THEME, Theme
 
 _TILE_H = 34.0  # metric-tile height (pt)
 _TILE_GAP = 6.0
@@ -104,95 +98,106 @@ def _draw_fig(
     drawing.drawOn(c, x + (w - dw) / 2, top - dh)
 
 
-def _draw_tiles(c: canvas.Canvas, tiles: list[tuple[str, str]], top: float) -> float:
+def _draw_tiles(
+    c: canvas.Canvas, tiles: list[tuple[str, str]], top: float, theme: Theme
+) -> float:
     """Draw the metric tiles as an even strip across the content width."""
     n = len(tiles)
-    tw = (_CONTENT_W - (n - 1) * _TILE_GAP) / n
+    tw = (theme.content_width - (n - 1) * _TILE_GAP) / n
     bottom = top - _TILE_H
     for i, (label, value) in enumerate(tiles):
-        x = _MARGIN + i * (tw + _TILE_GAP)
+        x = theme.margin + i * (tw + _TILE_GAP)
         cx = x + tw / 2
-        c.setFillGray(0.96)
-        c.setStrokeGray(0.80)
+        c.setFillGray(theme.tile_fill_gray)
+        c.setStrokeGray(theme.tile_stroke_gray)
         c.setLineWidth(0.5)
         c.rect(x, bottom, tw, _TILE_H, stroke=1, fill=1)
-        c.setFillGray(0.10)
-        c.setFont("Helvetica-Bold", 12)
+        c.setFillGray(theme.tile_value_gray)
+        c.setFont(theme.font_numeric, 12)
         c.drawCentredString(cx, bottom + 18, value)
-        c.setFillGray(0.45)
-        c.setFont("Helvetica", 6.5)
+        c.setFillGray(theme.tile_label_gray)
+        c.setFont(theme.font_body, 6.5)
         c.drawCentredString(cx, bottom + 6, label)
-    c.setFillGray(0.0)
+    c.setFillGray(theme.text_primary_gray)
     return bottom
 
 
-def _header(c: canvas.Canvas, result: q.QAResult, title: str) -> float:
+def _header(c: canvas.Canvas, result: q.QAResult, title: str, theme: Theme) -> float:
     """Draw the scan name, metadata lines, and metric tiles; return the y below."""
-    y = _PAGE_H - 32
+    page_w, page_h = theme.page_size
+    y = page_h - 32
     if title:
-        c.setFont("Helvetica-Bold", 14)
-        c.drawString(_MARGIN, y, title)
+        c.setFont(theme.font_title, 14)
+        c.drawString(theme.margin, y, title)
     device = _device_line(result.meta)
     if device:
-        c.setFont("Helvetica", 9)
-        c.setFillGray(0.40)
-        c.drawRightString(_PAGE_W - _MARGIN, y, device)
+        c.setFont(theme.font_body, 9)
+        c.setFillGray(theme.text_muted_gray)
+        c.drawRightString(page_w - theme.margin, y, device)
     if title or device:
         y -= 14
 
-    c.setFont("Helvetica", 8.3)
-    c.setFillGray(0.40)
-    c.drawString(_MARGIN, y, _acquisition_line(result))
+    c.setFont(theme.font_body, 8.3)
+    c.setFillGray(theme.text_muted_gray)
+    c.drawString(theme.margin, y, _acquisition_line(result))
     prov = _provenance_line(result.meta)
     if prov:
         y -= 11
-        c.drawString(_MARGIN, y, prov)
-    c.setFillGray(0.0)
+        c.drawString(theme.margin, y, prov)
+    c.setFillGray(theme.text_primary_gray)
 
-    bottom = _draw_tiles(c, _metric_tiles(result.metrics), y - 12)
+    bottom = _draw_tiles(c, _metric_tiles(result.metrics), y - 12, theme)
     return bottom - 10
 
 
 def _panel_row(
-    c: canvas.Canvas, figs: list[Figure], top: float, *, gap: float = 8.0
+    c: canvas.Canvas, figs: list[Figure], top: float, theme: Theme, *, gap: float = 8.0
 ) -> float:
     """Draw the panels in one row across the content width; return the y below."""
     n = len(figs)
-    pw = (_CONTENT_W - (n - 1) * gap) / n
+    pw = (theme.content_width - (n - 1) * gap) / n
     ph = pw * 1.15
     for i, fig in enumerate(figs):
-        _draw_fig(c, fig, _MARGIN + i * (pw + gap), top, pw, ph)
+        _draw_fig(c, fig, theme.margin + i * (pw + gap), top, pw, ph)
     return top - ph
 
 
 def _panel_grid(
-    c: canvas.Canvas, figs: list[Figure], top: float, *, ncol: int, gap: float = 14.0
+    c: canvas.Canvas,
+    figs: list[Figure],
+    top: float,
+    theme: Theme,
+    *,
+    ncol: int,
+    gap: float = 14.0,
 ) -> float:
     """Draw the panels in a grid of `ncol` columns; return the y below the grid."""
-    pw = (_CONTENT_W - (ncol - 1) * gap) / ncol
+    pw = (theme.content_width - (ncol - 1) * gap) / ncol
     ph = pw * 1.15
     for i, fig in enumerate(figs):
         r, col = divmod(i, ncol)
-        _draw_fig(c, fig, _MARGIN + col * (pw + gap), top - r * (ph + gap), pw, ph)
+        _draw_fig(c, fig, theme.margin + col * (pw + gap), top - r * (ph + gap), pw, ph)
     rows = -(-len(figs) // ncol)  # ceil
     return top - rows * ph - (rows - 1) * gap
 
 
-def _condensed_page(c: canvas.Canvas, result: q.QAResult, title: str) -> None:
+def _condensed_page(
+    c: canvas.Canvas, result: q.QAResult, title: str, theme: Theme
+) -> None:
     wk = result.metrics.weisskoff
-    y = _header(c, result, title)
+    y = _header(c, result, title, theme)
 
-    y = _panel_row(c, _panel_figs(result), y - 6)
+    y = _panel_row(c, _panel_figs(result), y - 6, theme)
 
     t, signal, trend, resid = _timeseries(result)
     gap, row_h = 16.0, 150.0
-    half = (_CONTENT_W - gap) / 2
+    half = (theme.content_width - gap) / 2
 
     y -= 10
     _draw_fig(
         c,
         _plot_fig(lambda ax: _plot_weisskoff(ax, wk), (3.6, 2.5)),
-        _MARGIN,
+        theme.margin,
         y,
         half,
         row_h,
@@ -200,7 +205,7 @@ def _condensed_page(c: canvas.Canvas, result: q.QAResult, title: str) -> None:
     _draw_fig(
         c,
         _plot_fig(lambda ax: _plot_rdc(ax, wk), (3.6, 2.5)),
-        _MARGIN + half + gap,
+        theme.margin + half + gap,
         y,
         half,
         row_h,
@@ -211,7 +216,7 @@ def _condensed_page(c: canvas.Canvas, result: q.QAResult, title: str) -> None:
     _draw_fig(
         c,
         _plot_fig(lambda ax: _plot_signal(ax, t, signal, trend), (3.6, 2.5)),
-        _MARGIN,
+        theme.margin,
         y,
         half,
         row_h,
@@ -222,14 +227,14 @@ def _condensed_page(c: canvas.Canvas, result: q.QAResult, title: str) -> None:
             lambda ax: _plot_residual(ax, t, resid, tc_outlier=spikes.tc_outlier),
             (3.6, 2.5),
         ),
-        _MARGIN + half + gap,
+        theme.margin + half + gap,
         y,
         half,
         row_h,
     )
     y -= row_h + 6
 
-    fifth = (_CONTENT_W - 4 * gap) / 5
+    fifth = (theme.content_width - 4 * gap) / 5
     _draw_fig(
         c,
         _plot_fig(
@@ -238,7 +243,7 @@ def _condensed_page(c: canvas.Canvas, result: q.QAResult, title: str) -> None:
             ),
             (3.0, 2.0),
         ),
-        _MARGIN,
+        theme.margin,
         y,
         fifth,
         120.0,
@@ -248,7 +253,7 @@ def _condensed_page(c: canvas.Canvas, result: q.QAResult, title: str) -> None:
         _plot_fig(
             lambda ax: _plot_outliers(ax, t, result.metrics.outliers), (3.0, 2.0)
         ),
-        _MARGIN + fifth + gap,
+        theme.margin + fifth + gap,
         y,
         fifth,
         120.0,
@@ -256,7 +261,7 @@ def _condensed_page(c: canvas.Canvas, result: q.QAResult, title: str) -> None:
     _draw_fig(
         c,
         _plot_fig(lambda ax: _plot_motion(ax, t, result.metrics.motion), (3.0, 2.0)),
-        _MARGIN + 2 * (fifth + gap),
+        theme.margin + 2 * (fifth + gap),
         y,
         fifth,
         120.0,
@@ -266,7 +271,7 @@ def _condensed_page(c: canvas.Canvas, result: q.QAResult, title: str) -> None:
         _plot_fig(
             lambda ax: _plot_com(ax, t, result.metrics.center_of_mass), (3.0, 2.0)
         ),
-        _MARGIN + 3 * (fifth + gap),
+        theme.margin + 3 * (fifth + gap),
         y,
         fifth,
         120.0,
@@ -274,36 +279,39 @@ def _condensed_page(c: canvas.Canvas, result: q.QAResult, title: str) -> None:
     _draw_fig(
         c,
         _plot_fig(lambda ax: _plot_psf(ax, result.metrics.smoothness), (3.0, 2.0)),
-        _MARGIN + 4 * (fifth + gap),
+        theme.margin + 4 * (fifth + gap),
         y,
         fifth,
         120.0,
     )
 
 
-def _summary_page(c: canvas.Canvas, result: q.QAResult, title: str) -> None:
-    y = _header(c, result, title)
+def _summary_page(
+    c: canvas.Canvas, result: q.QAResult, title: str, theme: Theme
+) -> None:
+    y = _header(c, result, title, theme)
     # Five image panels (signal, SFNR, fluct/static noise, N/2 ghost) in a grid.
-    _panel_grid(c, _panel_figs(result), y - 8, ncol=3)
+    _panel_grid(c, _panel_figs(result), y - 8, theme, ncol=3)
 
 
-def _analysis_page(c: canvas.Canvas, result: q.QAResult, title: str) -> None:
+def _analysis_page(
+    c: canvas.Canvas, result: q.QAResult, title: str, theme: Theme
+) -> None:
     wk = result.metrics.weisskoff
     t, signal, trend, resid = _timeseries(result)
 
-    y = _PAGE_H - 34
-    c.setFont("Helvetica-Bold", 13)
-    c.drawCentredString(
-        _PAGE_W / 2, y, f"{title} — stability" if title else "stability"
-    )
+    page_w, page_h = theme.page_size
+    y = page_h - 34
+    c.setFont(theme.font_title, 13)
+    c.drawCentredString(page_w / 2, y, f"{title} — stability" if title else "stability")
     y -= 24
 
     gap, row_h = 16.0, 200.0
-    half = (_CONTENT_W - gap) / 2
+    half = (theme.content_width - gap) / 2
     _draw_fig(
         c,
         _plot_fig(lambda ax: _plot_weisskoff(ax, wk, fs=10), (3.6, 3.0)),
-        _MARGIN,
+        theme.margin,
         y,
         half,
         row_h,
@@ -311,7 +319,7 @@ def _analysis_page(c: canvas.Canvas, result: q.QAResult, title: str) -> None:
     _draw_fig(
         c,
         _plot_fig(lambda ax: _plot_rdc(ax, wk, fs=10), (3.6, 3.0)),
-        _MARGIN + half + gap,
+        theme.margin + half + gap,
         y,
         half,
         row_h,
@@ -322,7 +330,7 @@ def _analysis_page(c: canvas.Canvas, result: q.QAResult, title: str) -> None:
     _draw_fig(
         c,
         _plot_fig(lambda ax: _plot_signal(ax, t, signal, trend, fs=10), (3.6, 3.0)),
-        _MARGIN,
+        theme.margin,
         y,
         half,
         row_h,
@@ -335,14 +343,14 @@ def _analysis_page(c: canvas.Canvas, result: q.QAResult, title: str) -> None:
             ),
             (3.6, 3.0),
         ),
-        _MARGIN + half + gap,
+        theme.margin + half + gap,
         y,
         half,
         row_h,
     )
     y -= row_h + 12
 
-    fifth = (_CONTENT_W - 4 * gap) / 5
+    fifth = (theme.content_width - 4 * gap) / 5
     _draw_fig(
         c,
         _plot_fig(
@@ -351,7 +359,7 @@ def _analysis_page(c: canvas.Canvas, result: q.QAResult, title: str) -> None:
             ),
             (3.0, 2.2),
         ),
-        _MARGIN,
+        theme.margin,
         y,
         fifth,
         150.0,
@@ -361,7 +369,7 @@ def _analysis_page(c: canvas.Canvas, result: q.QAResult, title: str) -> None:
         _plot_fig(
             lambda ax: _plot_outliers(ax, t, result.metrics.outliers, fs=10), (3.0, 2.2)
         ),
-        _MARGIN + fifth + gap,
+        theme.margin + fifth + gap,
         y,
         fifth,
         150.0,
@@ -371,7 +379,7 @@ def _analysis_page(c: canvas.Canvas, result: q.QAResult, title: str) -> None:
         _plot_fig(
             lambda ax: _plot_motion(ax, t, result.metrics.motion, fs=10), (3.0, 2.2)
         ),
-        _MARGIN + 2 * (fifth + gap),
+        theme.margin + 2 * (fifth + gap),
         y,
         fifth,
         150.0,
@@ -382,7 +390,7 @@ def _analysis_page(c: canvas.Canvas, result: q.QAResult, title: str) -> None:
             lambda ax: _plot_com(ax, t, result.metrics.center_of_mass, fs=10),
             (3.0, 2.2),
         ),
-        _MARGIN + 3 * (fifth + gap),
+        theme.margin + 3 * (fifth + gap),
         y,
         fifth,
         150.0,
@@ -392,7 +400,7 @@ def _analysis_page(c: canvas.Canvas, result: q.QAResult, title: str) -> None:
         _plot_fig(
             lambda ax: _plot_psf(ax, result.metrics.smoothness, fs=10), (3.0, 2.2)
         ),
-        _MARGIN + 4 * (fifth + gap),
+        theme.margin + 4 * (fifth + gap),
         y,
         fifth,
         150.0,
@@ -403,7 +411,11 @@ REPORT_LAYOUTS = ("summary", "detailed")
 
 
 def add_report_pages(
-    c: canvas.Canvas, result: "q.QAResult", title: str = "", layout: str = "summary"
+    c: canvas.Canvas,
+    result: "q.QAResult",
+    title: str = "",
+    layout: str = "summary",
+    theme: Theme = DEFAULT_THEME,
 ) -> int:
     """Draw a scan's report page(s) onto an open ReportLab `Canvas`.
 
@@ -412,13 +424,13 @@ def add_report_pages(
     with `showPage()`. Returns the number of pages drawn.
     """
     if layout == "summary":
-        _condensed_page(c, result, title)
+        _condensed_page(c, result, title, theme)
         c.showPage()
         return 1
     if layout == "detailed":
-        _summary_page(c, result, title)
+        _summary_page(c, result, title, theme)
         c.showPage()
-        _analysis_page(c, result, title)
+        _analysis_page(c, result, title, theme)
         c.showPage()
         return 2
     raise ValueError(f"unknown layout {layout!r}; choose from {REPORT_LAYOUTS}")
@@ -428,6 +440,7 @@ def write_report(
     items: Iterable[tuple[str, q.QAResult]] | q.QAResult,
     pdf_path: str | Path,
     layout: str = "summary",
+    theme: Theme = DEFAULT_THEME,
 ) -> int:
     """Write a combined PDF, one scan after another.
 
@@ -436,9 +449,9 @@ def write_report(
     """
     if isinstance(items, q.QAResult):
         items = [("", items)]
-    c = canvas.Canvas(str(pdf_path), pagesize=letter)
+    c = canvas.Canvas(str(pdf_path), pagesize=theme.page_size)
     pages = 0
     for title, result in items:
-        pages += add_report_pages(c, result, title, layout)
+        pages += add_report_pages(c, result, title, layout, theme)
     c.save()
     return pages
