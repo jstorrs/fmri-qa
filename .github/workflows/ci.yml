@@ -1,0 +1,36 @@
+# Runs the same gate as `make check` (see style/tooling.md) on every push and PR:
+# ruff format --check, ruff lint, mypy, pyright, pytest -- against the locked env.
+name: CI
+
+on:
+  push:
+  pull_request:
+
+# Cancel superseded runs on the same ref (e.g. a force-push mid-run).
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.9.8"
+          enable-cache: true
+
+      # Provision the pinned interpreter (.python-version) so the lock resolves.
+      - name: Install Python
+        run: uv python install
+
+      # --locked fails if uv.lock is out of date with pyproject.toml, so a stale
+      # lockfile is caught here rather than drifting silently.
+      - name: Sync the locked environment
+        run: uv sync --all-extras --locked
+
+      - name: Run the gate
+        run: make check
