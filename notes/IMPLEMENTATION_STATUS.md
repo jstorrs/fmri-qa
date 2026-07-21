@@ -10,8 +10,10 @@ Levels A + B)** — every scalar metric matches the guide, and detrending matche
 AFNI `3dDetrend` exactly. Much of the AFNI robustness/temporal-QA layer is now
 also in place (`3dToutcount` outlier fraction, saturation, 3dvolreg-style motion,
 `3dFWHMx` Classic-FWHM smoothness, bxh-volmeasures center-of-mass, cran
-MAD-normalized spike scores); the remaining gaps are `3dDespike`, the ACF-model
-half of `3dFWHMx`, and Level C (longitudinal trending).
+MAD-normalized spike scores); the remaining gaps are the ACF-model half of
+`3dFWHMx` and Level C (longitudinal trending). `3dDespike` and a robust
+fluctuation SD were considered and deliberately declined for a QA tool (see
+"Deliberate non-goals").
 
 **Design principle:** FBIRN is a specific, rigid protocol and its QA is adapted
 to it. On FBIRN-protocol data the pipeline must reproduce FBIRN results — that
@@ -86,29 +88,48 @@ off-protocol acquisitions, by design.
 
 Ranked by value for phantom QA.
 
-**High**
-
-1. **Despiking (`3dDespike`).** No spike handling before the noise metrics — a
-   single spike inflates fluctuation / SFNR / RDC. Full algorithm (basis
-   `2·corder+3`, `fsig = sqrt(π/2)·median|e|`, tanh smash c1=2.5 / c2=4.0) in
-   `AFNI_detrend_despike.md`. Could be an optional pre-step.
-
 **Medium**
 
-2. **Ghost "top-10% voxels" statistic.** Our ghost uses the region *mean*; the
+1. **Ghost "top-10% voxels" statistic.** Our ghost uses the region *mean*; the
    Greve / `fmriqa_ghostiness.c` method also reports the top-10% ghost voxels
    (catches localized ghosts a mean dilutes).
 
 **Lower / larger scope**
 
-3. **Level C — longitudinal QA.** Guide's target is "B+C". We cover A+B (single
+2. **Level C — longitudinal QA.** Guide's target is "B+C". We cover A+B (single
    scan + batch table); no logging DB, trend plots, or ±k·SD control-limit
    flagging.
-4. **Background/air QA** (cran `max_bg_perc`) and **`@radial_correlate`**
+3. **Background/air QA** (cran `max_bg_perc`) and **`@radial_correlate`**
    structured-artifact detection — future directions.
-5. **FFT spectrum normalization.** `report.py._plot_spectrum` plots raw
+4. **FFT spectrum normalization.** `report.py._plot_spectrum` plots raw
    magnitude; `bxh` normalizes to percent-of-mean (`·100/m`) for cross-scan
    comparability. Cosmetic.
+
+---
+
+## Deliberate non-goals (considered, decided against)
+
+- **`3dDespike` data-editing pre-step — not implemented, by design.** 3dDespike
+  edits the series (robust baseline + tanh spike-shrink) so spikes don't corrupt a
+  *downstream GLM* — a preprocessing goal. For QA the goal is the opposite: detect
+  and characterize a spike, not conceal it. Editing the data would make SFNR look
+  good while hiding the fault. Spikes are instead surfaced in dedicated channels
+  (`tcOut`/`spcOut` spike scores, `3dToutcount` outlier fraction) and left in the
+  data, so the FBIRN metrics still degrade honestly on a bad run.
+- **Robust fluctuation SD — not adopted; classic (FBIRN) SD kept.** SFNR /
+  %fluctuation / RDC stay on the ordinary SD of the detrended residual, so they
+  reproduce FBIRN reference numbers (the correctness bar). A spike inflating them
+  is treated as real instability and read against the spike channels (high %fluct +
+  high `tcOut` = spike-driven; high %fluct + low `tcOut` = broadly noisy). Measured:
+  the trend choice does *not* affect this — the spike lands in the residual and the
+  SD swallows it regardless; only a robust SD estimator would change it, and that
+  would break the FBIRN bar.
+- **Robust detrend (Huber-IRLS / L1 on the Legendre basis) — deferred.** Verified a
+  no-op on clean FBIRN data (≡ OLS to 4 sig figs), and for our low-order *global*
+  Legendre fit the OLS trend-drag from even a 20σ spike is ~0.03σ, so there is
+  little to gain. Its payoff grows only with detrend order / run length
+  (off-protocol). Revisit if a long-run or high-leverage case shows trend-drag
+  mattering; it would slot in as an opt-in `detrend="poly-robust"` method.
 
 **Done since first review**
 
@@ -218,7 +239,9 @@ Ranked by value for phantom QA.
 Highest leverage, fits the existing linear-chain architecture (operates on
 `QAImages.center_slice` / `fluctuations`):
 
-1. Optional despike pre-step (`3dDespike`) — the last High-value gap.
+1. Ghost top-10% voxel statistic (Medium gap #1) — the next diagnostic that adds
+   real coverage; catches localized ghosts the region mean dilutes.
 
 (Done: `3dToutcount`-style per-TR outlier fraction; saturation/clipping check;
-cran `tc_outlier`/`spec_outlier` spike scores.)
+cran `tc_outlier`/`spec_outlier` spike scores. Declined for QA: `3dDespike`
+data-editing and a robust fluctuation SD — see "Deliberate non-goals".)
