@@ -1,18 +1,51 @@
 """Parse the BIDS JSON sidecar into `ScanMeta`.
 
 dcm2niix writes a `.json` sidecar beside every NIfTI it converts; these helpers
-read the acquisition metadata and phase-encode direction out of it. The sidecar
-is authoritative for the PE axis (see the project notes); the header fields are
-fallbacks handled in `scan`.
+read the acquisition metadata out of it. Phase-encode *axis* resolution lives in
+`pe_axis`; the DICOM row/col *direction* string for the report header is derived
+here (`_pe_direction`) from the same sidecar.
 """
 
 import json
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from .constants import _PE_ROWCOL
-from .exceptions import MissingSidecarError
-from .types import ScanMeta
+from ..exceptions import MissingSidecarError
+
+# DICOM in-plane phase-encode axis -> row/col: NIfTI i (axis 0) is the DICOM
+# row direction, j (axis 1) the column direction (verified against dcm2niix
+# InPlanePhaseEncodingDirectionDICOM on a Siemens acquisition).
+_PE_ROWCOL = {0: "row", 1: "col"}
+
+
+@dataclass(frozen=True)
+class ScanMeta:
+    """Human-readable acquisition metadata for the report header.
+
+    Geometry (`voxel_mm`, `matrix`, `tr`) comes from the NIfTI header and is
+    always present. The rest comes from the BIDS JSON sidecar written alongside
+    the NIfTI (dcm2niix) and is `None` when no sidecar is found. `voxel_mm` is
+    (row, col, slice-spacing) from the header zooms; `slice_thickness` is the
+    excited slab from the sidecar (the zoom is spacing, which includes any gap).
+    `pe_dir` is the DICOM row/col direction.
+    """
+
+    voxel_mm: tuple[float, float, float]
+    matrix: tuple[int, int]
+    tr: float
+    te: float | None = None  # s
+    flip_angle: float | None = None  # degrees
+    slice_thickness: float | None = None  # mm
+    pe_dir: str | None = None  # "row" / "col"
+    coil: str | None = None
+    manufacturer: str | None = None
+    model: str | None = None
+    serial: str | None = None
+    field_strength: float | None = None  # tesla
+    software: str | None = None
+    datetime: str | None = None  # acquisition date and/or time
+    series: str | None = None
 
 
 def _load_sidecar(path: str | Path) -> dict[str, Any]:
@@ -49,20 +82,6 @@ def _acq_datetime(sidecar: dict[str, Any]) -> str | None:
     date, time = sidecar.get("AcquisitionDate"), sidecar.get("AcquisitionTime")
     time = str(time).split(".")[0] if time else None
     return " ".join(x for x in (date, time) if x) or None
-
-
-def _pe_axis_from_sidecar(sidecar: dict[str, Any]) -> int | None:
-    """PE axis (0/1/2) from the sidecar, or None if it carries no PE field.
-
-    `PhaseEncodingDirection` (BIDS i/j/k, with an optional polarity we drop) maps
-    straight to the array axis; `InPlanePhaseEncodingDirectionDICOM` (ROW/COL) is
-    the DICOM fallback (row = i = axis 0, col = j = axis 1).
-    """
-    if ped := sidecar.get("PhaseEncodingDirection"):
-        return {"i": 0, "j": 1, "k": 2}.get(str(ped)[0])
-    if dicom := sidecar.get("InPlanePhaseEncodingDirectionDICOM"):
-        return {"ROW": 0, "COL": 1}.get(str(dicom).upper())
-    return None
 
 
 def _pe_direction(pe_axis: int | None, sidecar: dict[str, Any]) -> str | None:

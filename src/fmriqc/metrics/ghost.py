@@ -3,16 +3,22 @@
 The ghost is located by rolling the phantom half the FOV along the phase-encode
 axis; every statistic here is a region-matched ghost-to-signal ratio built on
 that idea. When no sidecar/header PE axis is available, the same machinery picks
-the axis where the ghost actually lands.
+the axis where the ghost actually lands (`estimate_pe_axis`), which the loader
+uses as its last-resort fallback (see `load.pe_axis`).
 """
 
-from typing import Any, Literal, overload
+from typing import Literal, overload
 
 import numpy as np
 from skimage.morphology import isotropic_dilation, isotropic_erosion
 
-from .constants import GHOST_TOP_FRACTION, BoolArray, FloatArray
-from .imaging import edge_valid_mask, segment_phantom
+from ..prep.imaging import edge_valid_mask, segment_phantom
+from ..types import BoolArray, FloatArray
+
+# Fraction of the brightest ghost-region voxels averaged for the localized-ghost
+# statistic (Greve / bxh fmriqa_ghostiness "top-10%"): catches a concentrated
+# bright ghost that the region-mean ghost ratio dilutes.
+GHOST_TOP_FRACTION = 0.10
 
 
 def _ghost_masks(
@@ -123,15 +129,6 @@ def acr_ghosting_ratio(
     pe = ghost_ratio(mean_image, phantom_mask, pe_axis, radius, valid_mask)
     ro = ghost_ratio(mean_image, phantom_mask, freq_axis, radius, valid_mask)
     return abs(pe - ro)
-
-
-def _pe_axis_from_header(header: Any) -> int | None:
-    """PE axis from the NIfTI `dim_info` phase field, or None if unset/invalid.
-
-    `dim_info` carries no polarity, which we don't need for ghost placement.
-    """
-    phase = header.get_dim_info()[1]
-    return int(phase) if phase in (0, 1, 2) else None
 
 
 def phase_encode_axis(data: FloatArray, radius: int = 3) -> int:

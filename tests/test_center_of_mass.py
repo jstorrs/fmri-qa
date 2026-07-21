@@ -2,8 +2,7 @@
 
 import numpy as np
 
-from fmriqc.center_of_mass import estimate_center_of_mass
-from fmriqc.types import CenterOfMassResult
+from fmriqc.metrics.center_of_mass import CenterOfMassResult, estimate_center_of_mass
 
 
 def _block_slice(center: tuple[int, int], n: int = 16, t: int = 6) -> np.ndarray:

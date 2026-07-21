@@ -4,15 +4,15 @@ import numpy as np
 import pytest
 
 import fmriqc as q
-from fmriqc.detrend import detrend_fn
 from fmriqc.exceptions import (
     FmriqcError,
     IncompatibleScansError,
     InvalidChoiceError,
     MissingSidecarError,
 )
-from fmriqc.geometry import resolve_roi
-from fmriqc.imaging import extract_center_slice
+from fmriqc.prep.detrend import detrend_fn
+from fmriqc.prep.geometry import resolve_roi
+from fmriqc.prep.imaging import extract_center_slice
 
 
 def test_detrend_fn_rejects_unknown_method() -> None:

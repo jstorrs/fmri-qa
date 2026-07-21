@@ -91,7 +91,7 @@ ignore = [
 "**/cli.py" = ["T201"]
 "**/__main__.py" = ["T201"]
 # The report renders human-facing text with intentional typography (× ° —).
-"src/fmriqc/report.py" = ["RUF001"]
+"src/fmriqc/report/**" = ["RUF001"]
 # Stubs mirror external library signatures verbatim (e.g. scipy's `input` param).
 "stubs/**" = ["A002"]
 

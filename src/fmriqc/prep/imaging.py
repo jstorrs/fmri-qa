@@ -11,8 +11,8 @@ import numpy as np
 from scipy import ndimage
 from skimage import filters, segmentation
 
-from .constants import ROI_CENTER_MODES, BoolArray, FloatArray, IntArray, RoiCenter
-from .exceptions import InvalidChoiceError
+from ..exceptions import InvalidChoiceError
+from ..types import ROI_CENTER_MODES, BoolArray, FloatArray, IntArray, RoiCenter
 
 
 def trim_count(tr: float, trim_sec: float) -> int:

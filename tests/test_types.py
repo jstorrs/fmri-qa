@@ -2,8 +2,8 @@
 
 import numpy as np
 
-from fmriqc.imaging import roi_indexes
-from fmriqc.types import ROI, MotionResult, QAImages, SaturationResult
+from fmriqc import ROI, MotionResult, QAImages, SaturationResult
+from fmriqc.prep.imaging import roi_indexes
 
 
 def test_roi_index_matches_roi_indexes() -> None:

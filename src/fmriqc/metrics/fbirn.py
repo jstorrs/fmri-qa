@@ -1,4 +1,4 @@
-"""ROI-based FBIRN noise metrics: SNR, SFNR, drift, Weisskoff/RDC, spikes, outliers.
+"""Core FBIRN ROI stability metrics: SNR, SFNR, drift, fluctuation, Weisskoff/RDC.
 
 Every statistic here reads from the preprocessed `QAImages` over a resolved
 `ROI`. ROI-averaging the per-voxel fluctuations equals detrending the ROI-mean
@@ -6,70 +6,35 @@ time course (detrending commutes with the spatial mean), which is what lets the
 Weisskoff and drift measures reuse the pipeline's per-voxel residual.
 """
 
+from dataclasses import dataclass
+
 import numpy as np
-from scipy.special import erfcinv
 
-from .constants import MAD_SCALE, OUTLIER_QTHR, BoolArray, FloatArray, IntArray
-from .imaging import roi_indexes
-from .types import ROI, OutlierResult, QAImages, SpikeResult, WeisskoffResult
+from ..prep.geometry import ROI
+from ..prep.images import QAImages
+from ..prep.imaging import roi_indexes
+from ..types import FloatArray, IntArray
 
 
-def outlier_fraction(
-    fluctuations: FloatArray, mask: BoolArray, qthr: float = OUTLIER_QTHR
-) -> OutlierResult:
-    """Per-TR outlier-voxel fraction over `mask`, following AFNI 3dToutcount.
+@dataclass(frozen=True, eq=False)
+class WeisskoffResult:
+    """Weisskoff/RDC analysis over a range of ROI sizes.
 
-    For each masked voxel the robust spread of its detrended residual is
-    `sigma = sqrt(pi/2) * MAD` (MAD = median |residual|); a frame is an outlier
-    for that voxel when `|residual| > alpha * sigma`, with
-    `alpha = Q^-1(qthr / n_t)` the normal upper-tail quantile that makes a clean
-    voxel flag a frame with probability `qthr`. `fraction[t]` is the share of
-    masked voxels flagged at frame `t`. Constant voxels (`MAD = 0`) never flag.
-
-    `fluctuations` is the per-voxel *detrended* residual (3dToutcount detrends
-    first); passing `QAImages.fluctuations` reuses the pipeline's Legendre
-    detrend, as afni_proc.py recommends before outlier classification (its trend
-    fit is L1 vs. our L2 -- a minor difference for a stable phantom).
+    `cv` is the ROI-averaged CV and `cv1` the single-voxel CV pooled within each
+    ROI size; `rdc_curve = cv1 / cv` is the effective decorrelation factor at
+    each size (ideal = ROI width). `rdc` is the scalar value at the full ROI.
     """
-    resid = fluctuations[mask]  # (n_vox, n_t)
-    n_vox, n_t = resid.shape
-    mad = np.median(np.abs(resid), axis=1)  # (n_vox,)
-    alpha = float(np.sqrt(2.0) * erfcinv(2.0 * qthr / n_t))  # Q^-1(qthr / n_t)
-    thr = alpha * np.sqrt(np.pi / 2.0) * mad  # per-voxel outlier threshold
-    is_out = (np.abs(resid) > thr[:, None]) & (mad > 0)[:, None]
-    return OutlierResult(
-        fraction=is_out.sum(axis=0) / n_vox,
-        n_voxels=int(n_vox),
-        qthr=qthr,
-    )
 
+    roi_sizes: IntArray
+    cv: FloatArray
+    cv1: FloatArray
+    cv1_pooled: float
+    rdc: float
 
-def _spike_ratio(x: FloatArray) -> float:
-    """Peak-over-spread ratio `max|x| / mad(x)`, R's `mad` (see `MAD_SCALE`).
-
-    The kernel of both cran-fmriqa spike scores: the largest absolute value
-    against the robust spread of the whole series. NaN if `x` is empty or has zero
-    spread (a constant series, where the ratio is undefined).
-    """
-    if x.size == 0:
-        return float("nan")
-    mad = MAD_SCALE * float(np.median(np.abs(x - np.median(x))))
-    return float(np.max(np.abs(x)) / mad) if mad > 0 else float("nan")
-
-
-def spike_scores(images: QAImages, roi: ROI) -> SpikeResult:
-    """cran-fmriqa MAD-normalized temporal/spectral spike scores over the ROI.
-
-    Both are `_spike_ratio` (peak / robust spread) of the detrended ROI-mean
-    residual series -- `tc_outlier` in the time domain, `spec_outlier` on its FFT
-    magnitude with the DC bin dropped (matching cran, and the report's residual
-    spectrum). The residual is the ROI mean of the pipeline's per-voxel
-    fluctuations, i.e. the detrended ROI-mean time course (detrending commutes
-    with the spatial mean).
-    """
-    resid = images.fluctuations[*roi.index].mean(axis=(0, 1))
-    spec = np.abs(np.fft.rfft(resid))[1:]  # magnitude, DC bin dropped (as cran does)
-    return SpikeResult(tc_outlier=_spike_ratio(resid), spec_outlier=_spike_ratio(spec))
+    @property
+    def rdc_curve(self) -> FloatArray:
+        """RDC at each ROI size: pooled single-voxel CV / ROI-averaged CV."""
+        return self.cv1 / self.cv
 
 
 def _roi_cv(

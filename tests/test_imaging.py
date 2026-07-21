@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from fmriqc.imaging import (
+from fmriqc.prep.imaging import (
     _clamp_center,
     edge_valid_mask,
     fluctuation_noise,

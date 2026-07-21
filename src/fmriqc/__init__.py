@@ -1,62 +1,85 @@
 """Phantom fMRI quality-assurance metrics (SNR, SFNR, RDC, ghost, and more).
 
 The public surface is re-exported here; the implementation lives in topical
-modules (`ls` the package to find a concern):
+subpackages (`ls` the package to find a concern):
 
-* `scan` / `metadata`   -- load a NIfTI + BIDS sidecar into a `QAScan`
-* `pipeline`            -- `preprocess` and the full `run_qa` orchestration
-* `imaging`             -- low-level raw-array image operations
-* `geometry`           -- phantom detection and ROI resolution
-* `detrend`            -- polynomial / spline temporal detrending
-* `noise`              -- FBIRN ROI metrics (SNR, SFNR, Weisskoff, spikes, ...)
-* `ghost`              -- Nyquist ghost ratios and PE-axis estimation
-* `saturation` / `motion` / `center_of_mass` / `smoothness` -- per-scan diagnostics
-* `hilo`               -- high/low flip-angle thermal/instability separation
-* `types`              -- the frozen dataclass value objects
+* `load`      -- NIfTI + BIDS-sidecar I/O: `scan` (`QAScan`), `metadata`
+                 (`ScanMeta`), `pe_axis` (phase-encode resolution)
+* `prep`      -- preprocessing infrastructure: `imaging` (raw-array ops),
+                 `detrend`, `geometry` (phantom/ROI), `images` (`QAImages`)
+* `metrics`   -- the physics tests, one module per family: `fbirn`
+                 (SNR/SFNR/RDC/drift), `artifacts` (spikes/outliers), `ghost`,
+                 `saturation`, `motion`, `center_of_mass`, `smoothness`
+* `pipeline`  -- `preprocess`, the full `run_qa` orchestration, and the
+                 aggregate `QAMetrics`/`QAResult`
+* `hilo`      -- high/low flip-angle thermal/instability separation (its own pipeline)
+* `report`    -- multi-page reports (format-agnostic panels + a ReportLab driver)
+* `types`     -- the shared array dtypes and option Literals
 
 Everything named in `__all__` below is importable straight from `fmriqc`.
 """
 
 import logging
 
-from .center_of_mass import estimate_center_of_mass
-from .constants import (
-    DETREND_METHODS,
-    FBIRN_ROI_SIZE,
-    GHOST_TOP_FRACTION,
-    HILO_ERODE,
-    ROI_CENTER_MODES,
-    DetrendMethod,
-    RoiCenter,
-)
-from .detrend import (
-    detrend_fn,
-    poly_degree,
-    poly_residuals,
-    spline_nodes,
-    spline_residuals,
-)
 from .exceptions import (
     FmriqcError,
     IncompatibleScansError,
     InvalidChoiceError,
     MissingSidecarError,
 )
-from .geometry import detect_phantom, resolve_roi, roi_fits
-from .ghost import (
+from .hilo import (
+    HILO_ERODE,
+    HiLoResult,
+    phantom_core_mask,
+    run_hilo,
+    separate_noise,
+)
+from .load.metadata import ScanMeta
+from .load.scan import QAScan
+from .metrics.artifacts import (
+    OutlierResult,
+    SpikeResult,
+    outlier_fraction,
+    spike_scores,
+)
+from .metrics.center_of_mass import CenterOfMassResult, estimate_center_of_mass
+from .metrics.fbirn import (
+    WeisskoffResult,
+    drift_percent,
+    percent_fluctuation,
+    sfnr,
+    snr,
+    weisskoff,
+)
+from .metrics.ghost import (
+    GHOST_TOP_FRACTION,
     acr_ghosting_ratio,
     estimate_pe_axis,
     ghost_ratio,
     ghost_top_ratio,
     phase_encode_axis,
 )
-from .hilo import (
-    HiLoResult,
-    phantom_core_mask,
-    run_hilo,
-    separate_noise,
+from .metrics.motion import MotionResult, estimate_motion
+from .metrics.saturation import SaturationResult, detect_saturation
+from .metrics.smoothness import SmoothnessResult, estimate_smoothness
+from .pipeline import QAMetrics, QAResult, preprocess, run_qa
+from .prep.detrend import (
+    detrend_fn,
+    poly_degree,
+    poly_residuals,
+    spline_nodes,
+    spline_residuals,
 )
-from .imaging import (
+from .prep.geometry import (
+    FBIRN_ROI_SIZE,
+    ROI,
+    PhantomGeometry,
+    detect_phantom,
+    resolve_roi,
+    roi_fits,
+)
+from .prep.images import QAImages
+from .prep.imaging import (
     edge_valid_mask,
     extract_center_slice,
     find_phantom_center,
@@ -68,34 +91,11 @@ from .imaging import (
     trim_count,
     trim_initial,
 )
-from .motion import estimate_motion
-from .noise import (
-    drift_percent,
-    outlier_fraction,
-    percent_fluctuation,
-    sfnr,
-    snr,
-    spike_scores,
-    weisskoff,
-)
-from .pipeline import preprocess, run_qa
-from .saturation import detect_saturation
-from .scan import QAScan
-from .smoothness import estimate_smoothness
 from .types import (
-    ROI,
-    CenterOfMassResult,
-    MotionResult,
-    OutlierResult,
-    PhantomGeometry,
-    QAImages,
-    QAMetrics,
-    QAResult,
-    SaturationResult,
-    ScanMeta,
-    SmoothnessResult,
-    SpikeResult,
-    WeisskoffResult,
+    DETREND_METHODS,
+    ROI_CENTER_MODES,
+    DetrendMethod,
+    RoiCenter,
 )
 
 # A library configures no handlers of its own (see style/logging.md).

@@ -13,11 +13,15 @@ from dataclasses import dataclass
 import numpy as np
 from scipy import ndimage
 
-from .constants import HILO_ERODE, BoolArray, DetrendMethod, FloatArray
-from .detrend import detrend_fn
 from .exceptions import IncompatibleScansError
-from .imaging import fluctuation_noise, segment_phantom, trim_initial
-from .scan import QAScan
+from .load.scan import QAScan
+from .prep.detrend import detrend_fn
+from .prep.imaging import fluctuation_noise, segment_phantom, trim_initial
+from .types import BoolArray, DetrendMethod, FloatArray
+
+# Voxel layers peeled off the phantom to form the hi/lo core mask (AFNI
+# 3dAutomask -erode 5) -- excludes edge / partial-volume / ghost-contaminated voxels.
+HILO_ERODE = 5
 
 
 @dataclass(frozen=True)

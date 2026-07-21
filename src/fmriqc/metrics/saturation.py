@@ -6,10 +6,58 @@ and the pile-up is counted — split at the trim boundary so clips in the droppe
 warm-up volumes are reported apart from clips that bias the analyzed metrics.
 """
 
+from dataclasses import dataclass
+
 import numpy as np
 
-from .constants import SATURATION_BITS, FloatArray
-from .types import SaturationResult
+from ..types import FloatArray
+
+# Plausible ADC saturation rails. A clipped magnitude image piles up at a
+# hardware 2**n - 1 ceiling; only these n are realistic for MR (12-bit -> 4095).
+SATURATION_BITS = range(8, 17)  # 255 .. 65535
+
+
+@dataclass(frozen=True)
+class SaturationResult:
+    """ADC-saturation (signal-clipping) check for one scan.
+
+    The clip ceiling is sequence-dependent and not recorded, so it is inferred:
+    a clipped magnitude image piles up on a hardware `2**n - 1` rail. `ceiling`
+    is that rail (in image units) when the series maximum sits on one, else
+    `None` -- a maximum that is not a `2**n - 1` value means no clipping.
+    """
+
+    ceiling: float | None  # clip level (image units); None if max is not a 2**n-1 rail
+    bits: int | None  # n such that the stored ceiling is 2**n - 1
+    n_clipped_pre: int  # clipped samples in the dropped warm-up volumes
+    n_clipped_kept: int  # clipped samples in the analyzed volumes (bias the metrics)
+    worst_volume: int | None  # volume index (full series) with the most clipped samples
+    worst_count: int  # clipped samples in that worst volume
+
+    @property
+    def n_clipped(self) -> int:
+        """Total voxel*time samples pinned at the ceiling, across the full series."""
+        return self.n_clipped_pre + self.n_clipped_kept
+
+    @property
+    def suspected(self) -> bool:
+        """True if the series maximum sits exactly on a 2**n-1 hardware rail."""
+        return self.ceiling is not None
+
+    @property
+    def clipped(self) -> bool:
+        """True if any sample reaches that rail, anywhere in the series."""
+        return self.n_clipped > 0
+
+    @property
+    def clipped_kept(self) -> bool:
+        """True if clipping falls in the analyzed data, where it biases the metrics.
+
+        Clips confined to the dropped warm-up volumes (`clipped and not
+        clipped_kept`) don't affect the statistics — and are expected for
+        sequences that deliberately acquire through the approach to steady state.
+        """
+        return self.n_clipped_kept > 0
 
 
 def _saturation_bits(stored_max: float) -> int | None:

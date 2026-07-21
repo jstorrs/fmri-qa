@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from fmriqc.saturation import _saturation_bits, detect_saturation
+from fmriqc.metrics.saturation import _saturation_bits, detect_saturation
 
 
 def test_saturation_bits_recognizes_hardware_rails() -> None:

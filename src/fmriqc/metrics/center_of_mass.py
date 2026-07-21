@@ -6,11 +6,77 @@ the whole grid, which needs no phantom mask because a uniform background and the
 data (a vendor-nulled edge) is healed first. A cheap complement to `motion`.
 """
 
+import warnings
+from dataclasses import dataclass
+
 import numpy as np
 
-from .constants import BoolArray, FloatArray
-from .imaging import edge_valid_mask
-from .types import CenterOfMassResult
+from ..prep.imaging import edge_valid_mask
+from ..types import BoolArray, FloatArray
+
+
+@dataclass(frozen=True)
+class CenterOfMassResult:
+    """Per-volume intensity-weighted center of mass of the phantom (bxh volmeasures).
+
+    `com` is (n_t, 2): each frame's intensity centroid along in-plane axes 0/1, in
+    voxels within `[0, N)`, computed with a *circular* mean so a phantom sitting
+    against a wrapped image edge yields the true centroid instead of aliasing to
+    mid-FOV (MRI images are periodic under FFT reconstruction). The circular mean
+    also makes a uniform background and the 180-degree Nyquist ghost self-cancel,
+    so the centroid needs no phantom mask -- only missing data (a Siemens zeroed
+    edge) is healed first (see `estimate_center_of_mass`). A rigid, stable phantom
+    holds a fixed centroid; a slow ramp or a sudden jump in the trace flags drift,
+    a spike, or gross instability the ROI-only GSQAP summaries miss. A cheap
+    first-moment complement to `MotionResult` (registration-based deformation).
+
+    `shape` is the in-plane array size `(N0, N1)` — the wrap periods, so
+    displacements respect the periodic boundary; `voxel_mm` lets lengths be
+    reported in mm.
+    """
+
+    com: FloatArray  # (n_t, 2) per-frame circular COM (voxels, [0, N))
+    shape: tuple[int, int]  # in-plane (N0, N1): the axis wrap periods
+    voxel_mm: tuple[float, float] | None = None
+
+    @property
+    def reference(self) -> FloatArray:
+        """(2,) temporal-mean centroid: the circular mean of the per-frame COM."""
+        n = np.asarray(self.shape, dtype=float)
+        theta = self.com * (2.0 * np.pi / n)
+        with warnings.catch_warnings():  # all-NaN axis -> NaN, not a warning
+            warnings.simplefilter("ignore", RuntimeWarning)
+            mean_theta = np.arctan2(
+                np.nanmean(np.sin(theta), axis=0), np.nanmean(np.cos(theta), axis=0)
+            )
+        return np.asarray(
+            (mean_theta % (2.0 * np.pi)) * n / (2.0 * np.pi), dtype=np.float64
+        )
+
+    @property
+    def deviation(self) -> FloatArray:
+        """(n_t, 2) signed per-frame displacement from the reference (voxels).
+
+        Wrapped into `(-N/2, N/2]` per axis, so a centroid that crosses the
+        periodic boundary yields a small displacement, not a full-FOV jump.
+        """
+        n = np.asarray(self.shape, dtype=float)
+        d = self.com - self.reference
+        return np.asarray((d + n / 2.0) % n - n / 2.0, dtype=np.float64)
+
+    @property
+    def displacement(self) -> FloatArray:
+        """(n_t,) centroid displacement per volume (mm if known, else voxels)."""
+        d = self.deviation
+        if self.voxel_mm is not None:
+            d = d * np.asarray(self.voxel_mm)
+        return np.hypot(d[:, 0], d[:, 1])
+
+    @property
+    def max_displacement(self) -> float:
+        """Peak per-volume centroid displacement (voxels); NaN if never resolved."""
+        d = np.hypot(self.deviation[:, 0], self.deviation[:, 1])
+        return float(np.nanmax(d)) if np.isfinite(d).any() else float("nan")
 
 
 def estimate_center_of_mass(

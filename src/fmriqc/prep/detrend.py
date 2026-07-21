@@ -11,14 +11,14 @@ from collections.abc import Callable
 import numpy as np
 from scipy.interpolate import make_lsq_spline
 
-from .constants import (
-    DETREND_METHODS,
-    POLY_CUTOFF_S,
-    SPLINE_CUTOFF_S,
-    DetrendMethod,
-    FloatArray,
-)
-from .exceptions import InvalidChoiceError
+from ..exceptions import InvalidChoiceError
+from ..types import DETREND_METHODS, DetrendMethod, FloatArray
+
+# Detrend cutoff period (s). Drift slower than this is removed before noise is
+# measured. `poly` and `spline` historically used 200 vs 256; kept distinct
+# because only `poly` feeds the settled pipeline.
+POLY_CUTOFF_S = 200.0
+SPLINE_CUTOFF_S = 256.0
 
 
 def spline_nodes(y: FloatArray, tr: float, cutoff_s: float = SPLINE_CUTOFF_S) -> int:

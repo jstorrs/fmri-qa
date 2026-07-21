@@ -6,11 +6,83 @@ phantom cannot rotate while gradient heating translates, scales, and shears the
 image. The analyzed series is not resampled from this fit; it is a diagnostic.
 """
 
+from dataclasses import dataclass
+
 import numpy as np
 from scipy import ndimage
 
-from .constants import MOTION_MAX_ITER, MOTION_TOL, BoolArray, FloatArray
-from .types import MotionResult
+from ..types import BoolArray, FloatArray
+
+# Per-volume registration budget (in-plane phantom motion). Phantom drift is
+# sub-voxel, so a few Gauss-Newton steps converge; TOL is on the largest
+# per-step parameter update (voxels for translation, fraction for strain).
+MOTION_MAX_ITER = 12
+MOTION_TOL = 1e-4
+
+
+@dataclass(frozen=True)
+class MotionResult:
+    """Per-volume in-plane deformation of the phantom (thermal-drift model).
+
+    A phantom is rigid and stationary, so between volumes it cannot rotate; what
+    gradient heating *does* produce is a slow translation plus a scaling/shear of
+    the image as the gradient calibration drifts. This is 3dvolreg's per-volume
+    registration with the rotation degrees of freedom removed: each frame is
+    aligned to the temporal-mean image under a 2-D affine restricted to
+    translation + symmetric strain (anisotropic scale + shear) -- 5 parameters,
+    no rotation.
+
+    `params` is (n_t, 5); each row is that frame's fit relative to the reference
+    (an all-zero row = perfectly aligned):
+
+      0 dr, 1 dc  -- translation along array axes 0/1 (voxels)
+      2 sr, 3 sc  -- fractional scaling along axes 0/1 (image grows where > 0)
+      4 shear     -- symmetric off-diagonal strain (dimensionless)
+    """
+
+    params: FloatArray  # (n_t, 5): dr, dc, sr, sc, shear
+    voxel_mm: tuple[float, float] | None = None  # in-plane (axis0, axis1) mm/voxel
+
+    @property
+    def translation(self) -> FloatArray:
+        """(n_t, 2) per-volume translation along the two in-plane axes (voxels)."""
+        return self.params[:, 0:2]
+
+    @property
+    def scale_pct(self) -> FloatArray:
+        """(n_t, 2) per-volume fractional scaling along each axis, as percent."""
+        return 100.0 * self.params[:, 2:4]
+
+    @property
+    def shear_pct(self) -> FloatArray:
+        """(n_t,) per-volume symmetric shear, as percent."""
+        return 100.0 * self.params[:, 4]
+
+    @property
+    def displacement(self) -> FloatArray:
+        """(n_t,) translation magnitude per volume, in mm if `voxel_mm` is known.
+
+        Falls back to voxels when the in-plane voxel size is unavailable.
+        """
+        d = self.params[:, 0:2]
+        if self.voxel_mm is not None:
+            d = d * np.asarray(self.voxel_mm)
+        return np.hypot(d[:, 0], d[:, 1])
+
+    @property
+    def max_translation(self) -> float:
+        """Peak per-volume translation magnitude (voxels)."""
+        return float(np.max(np.hypot(self.params[:, 0], self.params[:, 1])))
+
+    @property
+    def max_scale_pct(self) -> float:
+        """Peak absolute scaling across both axes (percent)."""
+        return float(np.max(np.abs(self.scale_pct)))
+
+    @property
+    def max_shear_pct(self) -> float:
+        """Peak absolute shear (percent)."""
+        return float(np.max(np.abs(self.shear_pct)))
 
 
 def _register_norotate(

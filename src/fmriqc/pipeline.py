@@ -1,33 +1,88 @@
-"""Preprocessing and the full single-scan QA pipeline.
+"""Preprocessing and the full single-scan QA pipeline, plus its result objects.
 
 `preprocess` turns a raw `QAScan` into the `QAImages` every metric reads from;
 `run_qa` orchestrates the whole analysis — saturation, phantom detection,
 motion/centroid, the FBIRN ROI metrics, ghost ratios, and smoothness — into one
-`QAResult`. The heavy lifting lives in the operation modules; this is the glue.
+`QAResult`. The heavy lifting lives in the operation modules; this is the glue,
+so it is also the natural home for the aggregate `QAMetrics`/`QAResult` value
+objects that gather every metric's output.
 """
 
 import warnings
+from dataclasses import dataclass
 
-from .center_of_mass import estimate_center_of_mass
-from .constants import FBIRN_ROI_SIZE, DetrendMethod, RoiCenter
-from .detrend import detrend_fn
-from .geometry import detect_phantom, resolve_roi, roi_fits
-from .ghost import estimate_pe_axis, ghost_ratio, ghost_top_ratio
-from .imaging import extract_center_slice, trim_count, trim_initial
-from .motion import estimate_motion
-from .noise import (
-    drift_percent,
+from .load.metadata import ScanMeta
+from .load.scan import QAScan
+from .metrics.artifacts import (
+    OutlierResult,
+    SpikeResult,
     outlier_fraction,
+    spike_scores,
+)
+from .metrics.center_of_mass import CenterOfMassResult, estimate_center_of_mass
+from .metrics.fbirn import (
+    WeisskoffResult,
+    drift_percent,
     percent_fluctuation,
     sfnr,
     snr,
-    spike_scores,
     weisskoff,
 )
-from .saturation import detect_saturation
-from .scan import QAScan
-from .smoothness import estimate_smoothness
-from .types import QAImages, QAMetrics, QAResult
+from .metrics.ghost import estimate_pe_axis, ghost_ratio, ghost_top_ratio
+from .metrics.motion import MotionResult, estimate_motion
+from .metrics.saturation import SaturationResult, detect_saturation
+from .metrics.smoothness import SmoothnessResult, estimate_smoothness
+from .prep.detrend import detrend_fn
+from .prep.geometry import (
+    FBIRN_ROI_SIZE,
+    ROI,
+    PhantomGeometry,
+    detect_phantom,
+    resolve_roi,
+    roi_fits,
+)
+from .prep.images import QAImages
+from .prep.imaging import extract_center_slice, trim_count, trim_initial
+from .types import DetrendMethod, RoiCenter
+
+
+@dataclass(frozen=True)
+class QAMetrics:
+    """Settled scalar QA metrics for one scan."""
+
+    snr: float
+    sfnr: float
+    rdc: float
+    ghost_pct: float  # fBIRN percent ghost along PE: 100 * (mean ghost / mean signal)
+    ghost_top_pct: float  # PE percent ghost of the brightest 10% of ghost voxels
+    ro_ghost_pct: float  # same along the readout axis: background-relative baseline
+    acr_ghost_pct: float  # ACR/AAPM-equivalent percent-signal-ghosting: |PE% - RO%|
+    pe_axis: int | None  # phase-encode axis actually used for the ghost masks
+    drift_pct: float
+    percent_fluctuation: float
+    weisskoff: WeisskoffResult
+    saturation: SaturationResult
+    outliers: OutlierResult
+    spikes: SpikeResult
+    motion: MotionResult
+    center_of_mass: CenterOfMassResult
+    smoothness: SmoothnessResult
+
+
+@dataclass(frozen=True, eq=False)
+class QAResult:
+    """Full QA output: the intermediate objects plus the scalar metrics.
+
+    Returned by `run_qa`. `metrics` holds the scalars; `images`/`geom`/`roi` are
+    retained so a report can render the images, curves, and time series; `meta`
+    carries the acquisition metadata (from the scan) for the report header.
+    """
+
+    images: QAImages
+    geom: PhantomGeometry
+    roi: ROI
+    metrics: QAMetrics
+    meta: ScanMeta | None = None
 
 
 def preprocess(

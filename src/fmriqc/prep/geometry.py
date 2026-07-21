@@ -1,16 +1,52 @@
-"""Phantom localization: detect the phantom and resolve the summary ROI.
+"""Phantom localization: the phantom/ROI value objects and how they're resolved.
 
 Operates on the preprocessed `QAImages`, turning the raw-array primitives in
 `imaging` into the value objects the metrics consume — the phantom mask and
 detected center (`PhantomGeometry`), and the fixed-size, on-image summary `ROI`.
 """
 
+from dataclasses import dataclass
+
 import numpy as np
 
-from .constants import FBIRN_ROI_SIZE, ROI_CENTER_MODES, BoolArray, RoiCenter
-from .exceptions import InvalidChoiceError
-from .imaging import _clamp_center, find_phantom_center, image_center, segment_phantom
-from .types import ROI, PhantomGeometry, QAImages
+from ..exceptions import InvalidChoiceError
+from ..types import ROI_CENTER_MODES, BoolArray, IntArray, RoiCenter
+from .images import QAImages
+from .imaging import (
+    _clamp_center,
+    find_phantom_center,
+    image_center,
+    roi_indexes,
+    segment_phantom,
+)
+
+# Fixed summary-ROI side (voxels). Glover/fBIRN uses 21; user-configurable.
+FBIRN_ROI_SIZE = 21
+
+
+@dataclass(frozen=True, eq=False)
+class PhantomGeometry:
+    """Phantom location, computed by `detect_phantom` from `QAImages`."""
+
+    phantom_mask: BoolArray  # (X, Y) bool
+    roi_center: IntArray  # (row, col) in array-index order — detected phantom center
+
+
+@dataclass(frozen=True, eq=False)
+class ROI:
+    """A resolved square ROI: center (row, col, array order) and side length.
+
+    Produced once by `resolve_roi` and threaded into the ROI-based statistics so
+    the localization is computed a single time.
+    """
+
+    center: IntArray
+    size: int
+
+    @property
+    def index(self) -> tuple[slice, slice]:
+        """The (rows, cols) slice pair for indexing an image."""
+        return roi_indexes(self.center, self.size)
 
 
 def detect_phantom(images: QAImages) -> PhantomGeometry:

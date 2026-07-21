@@ -4,8 +4,8 @@ import numpy as np
 from hypothesis import given
 from hypothesis import strategies as st
 
-from fmriqc.detrend import detrend_fn, poly_residuals, spline_residuals
-from fmriqc.imaging import trim_count
+from fmriqc.prep.detrend import detrend_fn, poly_residuals, spline_residuals
+from fmriqc.prep.imaging import trim_count
 
 
 def test_poly_residuals_removes_constant() -> None:

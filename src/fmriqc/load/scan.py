@@ -12,10 +12,10 @@ from pathlib import Path
 
 import nibabel as nib
 
-from .constants import FloatArray
-from .ghost import _pe_axis_from_header, phase_encode_axis
-from .metadata import _load_sidecar, _pe_axis_from_sidecar, _scan_meta
-from .types import ScanMeta
+from ..metrics.ghost import phase_encode_axis
+from ..types import FloatArray
+from .metadata import ScanMeta, _load_sidecar, _scan_meta
+from .pe_axis import _pe_axis_from_header, _pe_axis_from_sidecar
 
 
 @dataclass(frozen=True, eq=False)
