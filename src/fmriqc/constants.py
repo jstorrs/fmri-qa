@@ -8,6 +8,16 @@ and why is it set there?" without opening the operation modules.
 from typing import Literal, get_args
 
 import numpy as np
+from numpy.typing import NDArray
+
+# Array aliases. numpy's generic `NDArray` needs a dtype parameter under strict
+# typing; naming the three element kinds the pipeline actually uses keeps the
+# annotations honest (signal is float64 end to end -- nibabel `get_fdata`
+# returns float64 -- masks are bool, index/size arrays are int) and lets dtype
+# flow through arithmetic instead of decaying to Any.
+FloatArray = NDArray[np.float64]
+BoolArray = NDArray[np.bool_]
+IntArray = NDArray[np.intp]
 
 # Closed sets of option strings, modeled as Literal so a bad value is a type
 # error at the call site (see style/architecture.md). The runtime tuple each CLI

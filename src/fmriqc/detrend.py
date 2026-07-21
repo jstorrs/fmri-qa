@@ -9,28 +9,33 @@ the run length and TR; `detrend_fn` packages a chosen method as a reusable
 from collections.abc import Callable
 
 import numpy as np
-from numpy.typing import NDArray
 from scipy.interpolate import make_lsq_spline
 
-from .constants import DETREND_METHODS, POLY_CUTOFF_S, SPLINE_CUTOFF_S, DetrendMethod
+from .constants import (
+    DETREND_METHODS,
+    POLY_CUTOFF_S,
+    SPLINE_CUTOFF_S,
+    DetrendMethod,
+    FloatArray,
+)
 from .exceptions import InvalidChoiceError
 
 
-def spline_nodes(y: NDArray, tr: float, cutoff_s: float = SPLINE_CUTOFF_S) -> int:
+def spline_nodes(y: FloatArray, tr: float, cutoff_s: float = SPLINE_CUTOFF_S) -> int:
     """Recommended number of interior knots: one spline segment per `cutoff_s`.
 
     The spline analogue of `poly_degree` — the fit-complexity knob for
     `spline_residuals`, separated so it can be computed once from the header.
     """
     nt = y.shape[-1]
-    return max(round(nt * tr / cutoff_s) - 1, 0)
+    return int(max(round(nt * tr / cutoff_s) - 1, 0))
 
 
 def spline_residuals(
-    y: NDArray[np.float64],
+    y: FloatArray,
     n_nodes: int,
     degree: int = 2,
-) -> NDArray[np.float64]:
+) -> FloatArray:
     """Detrend along the last axis with a least-squares B-spline (handles N-D).
 
     A drop-in alternative to `poly_residuals`; `n_nodes` (interior knots, from
@@ -51,15 +56,15 @@ def spline_residuals(
     # Treat all leading-index combinations as separate signals: (nt, n_signals).
     signals = y.reshape(-1, nt).T
     fitted = make_lsq_spline(x, signals, t, k=degree)(x)
-    return (signals - fitted).T.reshape(y.shape)
+    return np.asarray((signals - fitted).T.reshape(y.shape), dtype=np.float64)
 
 
-def poly_degree(y: NDArray, tr: float, cutoff_s: float = POLY_CUTOFF_S) -> int:
+def poly_degree(y: FloatArray, tr: float, cutoff_s: float = POLY_CUTOFF_S) -> int:
     n = y.shape[-1]
     return int(np.round(n * tr / cutoff_s))
 
 
-def poly_residuals(y: NDArray, degree: int) -> NDArray:
+def poly_residuals(y: FloatArray, degree: int) -> FloatArray:
     """Detrend along the last axis with Legendre polynomials (handles N-D)."""
     nt = y.shape[-1]
     x = np.linspace(-1.0, 1.0, nt, dtype=float)
@@ -78,8 +83,8 @@ def poly_residuals(y: NDArray, degree: int) -> NDArray:
 
 
 def detrend_fn(
-    center_slice: NDArray, tr: float, method: DetrendMethod = "poly"
-) -> tuple[Callable[[NDArray], NDArray], int]:
+    center_slice: FloatArray, tr: float, method: DetrendMethod = "poly"
+) -> tuple[Callable[[FloatArray], FloatArray], int]:
     """Build a detrender `f(y) -> residuals` and its fit order for `method`.
 
     Complexity (poly degree / spline nodes) is derived once from the timeseries

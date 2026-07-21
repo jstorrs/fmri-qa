@@ -8,13 +8,14 @@ fallbacks handled in `scan`.
 
 import json
 from pathlib import Path
+from typing import Any
 
 from .constants import _PE_ROWCOL
 from .exceptions import MissingSidecarError
 from .types import ScanMeta
 
 
-def _load_sidecar(path: str | Path) -> dict:
+def _load_sidecar(path: str | Path) -> dict[str, Any]:
     """Parse the required BIDS JSON sidecar beside `path` (.nii/.nii.gz -> .json).
 
     dcm2niix writes this alongside every NIfTI it converts, so a missing sidecar
@@ -34,10 +35,11 @@ def _load_sidecar(path: str | Path) -> dict:
     if not sidecar.is_file():
         raise MissingSidecarError(sidecar)
     with sidecar.open() as f:
-        return json.load(f)
+        data: dict[str, Any] = json.load(f)
+    return data
 
 
-def _acq_datetime(sidecar: dict) -> str | None:
+def _acq_datetime(sidecar: dict[str, Any]) -> str | None:
     """Acquisition date/time from the sidecar, seconds-precision; None if absent.
 
     Siemens often anonymizes the date away, leaving only `AcquisitionTime`.
@@ -49,7 +51,7 @@ def _acq_datetime(sidecar: dict) -> str | None:
     return " ".join(x for x in (date, time) if x) or None
 
 
-def _pe_axis_from_sidecar(sidecar: dict) -> int | None:
+def _pe_axis_from_sidecar(sidecar: dict[str, Any]) -> int | None:
     """PE axis (0/1/2) from the sidecar, or None if it carries no PE field.
 
     `PhaseEncodingDirection` (BIDS i/j/k, with an optional polarity we drop) maps
@@ -63,7 +65,7 @@ def _pe_axis_from_sidecar(sidecar: dict) -> int | None:
     return None
 
 
-def _pe_direction(pe_axis: int | None, sidecar: dict) -> str | None:
+def _pe_direction(pe_axis: int | None, sidecar: dict[str, Any]) -> str | None:
     """DICOM row/col phase-encode direction, preferring the sidecar."""
     if dicom := sidecar.get("InPlanePhaseEncodingDirectionDICOM"):
         return str(dicom).lower()
@@ -72,7 +74,7 @@ def _pe_direction(pe_axis: int | None, sidecar: dict) -> str | None:
     return _PE_ROWCOL.get(pe_axis) if pe_axis is not None else None
 
 
-def _scan_meta(img, sidecar: dict, pe_axis: int | None) -> ScanMeta:
+def _scan_meta(img: Any, sidecar: dict[str, Any], pe_axis: int | None) -> ScanMeta:
     """Assemble `ScanMeta` from the NIfTI header and (optional) BIDS sidecar."""
     zooms = img.header.get_zooms()
     return ScanMeta(

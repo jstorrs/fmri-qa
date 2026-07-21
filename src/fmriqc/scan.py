@@ -11,8 +11,8 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import nibabel as nib
-from numpy.typing import NDArray
 
+from .constants import FloatArray
 from .ghost import _pe_axis_from_header, phase_encode_axis
 from .metadata import _load_sidecar, _pe_axis_from_sidecar, _scan_meta
 from .types import ScanMeta
@@ -31,9 +31,9 @@ class QAScan:
     sidecar, which `from_nifti` requires.
     """
 
-    data: NDArray  # (X, Y, Z, T)
+    data: FloatArray  # (X, Y, Z, T)
     tr: float
-    affine: NDArray | None = None
+    affine: FloatArray | None = None
     pe_axis: int | None = None
     meta: ScanMeta | None = None
     # NIfTI scl_slope/scl_inter, so saturation can recover stored integers from

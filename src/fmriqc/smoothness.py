@@ -9,14 +9,13 @@ correlation-length confound the Weisskoff RDC is measured against.
 import warnings
 
 import numpy as np
-from numpy.typing import NDArray
 
-from .constants import SIGMA_TO_FWHM, SMOOTHNESS_MAX_LAG
+from .constants import SIGMA_TO_FWHM, SMOOTHNESS_MAX_LAG, BoolArray, FloatArray
 from .imaging import _geomean
 from .types import SmoothnessResult
 
 
-def _fwhm_1dif(image: NDArray, mask: NDArray) -> NDArray:
+def _fwhm_1dif(image: FloatArray, mask: BoolArray) -> FloatArray:
     """Classic first-difference Gaussian FWHM (voxels) along each in-plane axis.
 
     AFNI `mri_estimate_FWHM_1dif`: for each axis, the sample variance of forward
@@ -47,7 +46,7 @@ def _fwhm_1dif(image: NDArray, mask: NDArray) -> NDArray:
     return out
 
 
-def _acf_1d(image: NDArray, mask: NDArray, axis: int, max_lag: int) -> NDArray:
+def _acf_1d(image: FloatArray, mask: BoolArray, axis: int, max_lag: int) -> FloatArray:
     """Normalized spatial autocorrelation of `image` along `axis`, lags 0..max_lag.
 
     Follows AFNI `mri_estimate_ACF`: center by the in-mask mean and normalize by
@@ -76,7 +75,7 @@ def _acf_1d(image: NDArray, mask: NDArray, axis: int, max_lag: int) -> NDArray:
     return rho
 
 
-def _directional_acf(scaled: NDArray, mask: NDArray, max_lag: int) -> NDArray:
+def _directional_acf(scaled: FloatArray, mask: BoolArray, max_lag: int) -> FloatArray:
     """Per-axis empirical noise autocorrelation, averaged over frames (AFNI ACF).
 
     `_acf_1d` per frame and axis, then the per-lag mean across frames (AFNI
@@ -95,8 +94,8 @@ def _directional_acf(scaled: NDArray, mask: NDArray, max_lag: int) -> NDArray:
 
 
 def estimate_smoothness(
-    fluctuations: NDArray,
-    mask: NDArray,
+    fluctuations: FloatArray,
+    mask: BoolArray,
     voxel_mm: tuple[float, float] | None = None,
     pe_axis: int | None = None,
     max_lag: int = SMOOTHNESS_MAX_LAG,

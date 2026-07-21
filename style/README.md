@@ -17,7 +17,7 @@ expressions of those principles; read them when you need the specifics.
 | [documentation.md](documentation.md) | Naming, docstrings (contract, not implementation), comments that explain *why*, the coherence test between code and docs. |
 | [exceptions.md](exceptions.md) | Per-package exception hierarchies, wrapping foreign errors, structured payloads, when to use stdlib exceptions, when to raise vs. silence. |
 | [logging.md](logging.md) | Libraries stay silent and return values; binaries talk. stdout-vs-stderr discipline, keeping `print` out of libraries, and the `logging` module conventions. |
-| [tooling.md](tooling.md) | `uv`, `ruff` format/lint, the `mypy`/`pyright`/`pyrefly` type checkers, `pytest`, security scanners, pre-commit, and the standard `make` loop. |
+| [tooling.md](tooling.md) | `uv`, `ruff` format/lint, the `mypy`/`pyright`/`pyrefly` type checkers, local stubs for third-party types, `pytest`, security scanners, pre-commit, and the standard `make` loop. |
 | [stability.md](stability.md) | Code is cheap, data is precious: refactor internal APIs freely; treat on-disk formats, CLI flags, and output as interfaces. |
 | [testing.md](testing.md) | Test the pure core with values and the shell with I/O; assert behavior not implementation; round-trips, property tests, and error cases; deterministic tests. |
 

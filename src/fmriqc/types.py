@@ -11,9 +11,14 @@ import warnings
 from dataclasses import dataclass
 
 import numpy as np
-from numpy.typing import NDArray
 
-from .constants import SIGMA_TO_FWHM, DetrendMethod
+from .constants import (
+    SIGMA_TO_FWHM,
+    BoolArray,
+    DetrendMethod,
+    FloatArray,
+    IntArray,
+)
 from .imaging import (
     _geomean,
     edge_valid_mask,
@@ -66,30 +71,30 @@ class QAImages:
     are derived properties so there is no redundant state to keep in sync.
     """
 
-    center_slice: NDArray  # (X, Y, T) trimmed center slice (raw signal)
-    fluctuations: NDArray  # (X, Y, T) detrended residuals
+    center_slice: FloatArray  # (X, Y, T) trimmed center slice (raw signal)
+    fluctuations: FloatArray  # (X, Y, T) detrended residuals
     tr: float
     pe_axis: int | None = None
     detrend_method: DetrendMethod = "poly"
     detrend_order: int | None = None  # poly degree / spline interior-knot count
 
     @property
-    def trend(self) -> NDArray:
+    def trend(self) -> FloatArray:
         """(X, Y, T) fitted low-frequency trend: signal minus fluctuations."""
         return self.center_slice - self.fluctuations
 
     @property
-    def mean_image(self) -> NDArray:
+    def mean_image(self) -> FloatArray:
         """(X, Y) temporal mean (FBIRN signal image)."""
         return self.center_slice.mean(axis=-1)
 
     @property
-    def mip(self) -> NDArray:
+    def mip(self) -> FloatArray:
         """(X, Y) max over time — phantom-segmentation target."""
         return self.center_slice.max(axis=-1)
 
     @property
-    def valid_mask(self) -> NDArray:
+    def valid_mask(self) -> BoolArray:
         """(X, Y) real-data mask: True except on entirely-zeroed image edges.
 
         Detected from the time-MIP so a voxel that is ever nonzero counts as
@@ -98,12 +103,12 @@ class QAImages:
         return edge_valid_mask(self.mip)
 
     @property
-    def static_noise(self) -> NDArray:
+    def static_noise(self) -> FloatArray:
         """(X, Y) odd/even difference (FBIRN static spatial noise)."""
         return odd_even_difference(self.center_slice)
 
     @property
-    def fluctuation_noise(self) -> NDArray:
+    def fluctuation_noise(self) -> FloatArray:
         """(X, Y) temporal RMS of the fluctuations."""
         return fluctuation_noise(self.fluctuations)
 
@@ -112,8 +117,8 @@ class QAImages:
 class PhantomGeometry:
     """Phantom location, computed by `detect_phantom` from `QAImages`."""
 
-    phantom_mask: NDArray  # (X, Y) bool
-    roi_center: NDArray  # (row, col) in array-index order — detected phantom center
+    phantom_mask: BoolArray  # (X, Y) bool
+    roi_center: IntArray  # (row, col) in array-index order — detected phantom center
 
 
 @dataclass(frozen=True, eq=False)
@@ -124,7 +129,7 @@ class ROI:
     the localization is computed a single time.
     """
 
-    center: NDArray
+    center: IntArray
     size: int
 
     @property
@@ -142,14 +147,14 @@ class WeisskoffResult:
     each size (ideal = ROI width). `rdc` is the scalar value at the full ROI.
     """
 
-    roi_sizes: NDArray
-    cv: NDArray
-    cv1: NDArray
+    roi_sizes: IntArray
+    cv: FloatArray
+    cv1: FloatArray
     cv1_pooled: float
     rdc: float
 
     @property
-    def rdc_curve(self) -> NDArray:
+    def rdc_curve(self) -> FloatArray:
         """RDC at each ROI size: pooled single-voxel CV / ROI-averaged CV."""
         return self.cv1 / self.cv
 
@@ -207,7 +212,7 @@ class OutlierResult:
     near `qthr` and a spike stands well above it.
     """
 
-    fraction: NDArray  # (n_t,) outlier-voxel fraction per frame
+    fraction: FloatArray  # (n_t,) outlier-voxel fraction per frame
     n_voxels: int  # masked voxels (the fraction denominator)
     qthr: float  # per-voxel tail probability (expected chance fraction)
 
@@ -272,26 +277,26 @@ class MotionResult:
       4 shear     -- symmetric off-diagonal strain (dimensionless)
     """
 
-    params: NDArray  # (n_t, 5): dr, dc, sr, sc, shear
+    params: FloatArray  # (n_t, 5): dr, dc, sr, sc, shear
     voxel_mm: tuple[float, float] | None = None  # in-plane (axis0, axis1) mm/voxel
 
     @property
-    def translation(self) -> NDArray:
+    def translation(self) -> FloatArray:
         """(n_t, 2) per-volume translation along the two in-plane axes (voxels)."""
         return self.params[:, 0:2]
 
     @property
-    def scale_pct(self) -> NDArray:
+    def scale_pct(self) -> FloatArray:
         """(n_t, 2) per-volume fractional scaling along each axis, as percent."""
         return 100.0 * self.params[:, 2:4]
 
     @property
-    def shear_pct(self) -> NDArray:
+    def shear_pct(self) -> FloatArray:
         """(n_t,) per-volume symmetric shear, as percent."""
         return 100.0 * self.params[:, 4]
 
     @property
-    def displacement(self) -> NDArray:
+    def displacement(self) -> FloatArray:
         """(n_t,) translation magnitude per volume, in mm if `voxel_mm` is known.
 
         Falls back to voxels when the in-plane voxel size is unavailable.
@@ -337,12 +342,12 @@ class CenterOfMassResult:
     reported in mm.
     """
 
-    com: NDArray  # (n_t, 2) per-frame circular COM (voxels, [0, N))
+    com: FloatArray  # (n_t, 2) per-frame circular COM (voxels, [0, N))
     shape: tuple[int, int]  # in-plane (N0, N1): the axis wrap periods
     voxel_mm: tuple[float, float] | None = None
 
     @property
-    def reference(self) -> NDArray:
+    def reference(self) -> FloatArray:
         """(2,) temporal-mean centroid: the circular mean of the per-frame COM."""
         n = np.asarray(self.shape, dtype=float)
         theta = self.com * (2.0 * np.pi / n)
@@ -351,10 +356,12 @@ class CenterOfMassResult:
             mean_theta = np.arctan2(
                 np.nanmean(np.sin(theta), axis=0), np.nanmean(np.cos(theta), axis=0)
             )
-        return (mean_theta % (2.0 * np.pi)) * n / (2.0 * np.pi)
+        return np.asarray(
+            (mean_theta % (2.0 * np.pi)) * n / (2.0 * np.pi), dtype=np.float64
+        )
 
     @property
-    def deviation(self) -> NDArray:
+    def deviation(self) -> FloatArray:
         """(n_t, 2) signed per-frame displacement from the reference (voxels).
 
         Wrapped into `(-N/2, N/2]` per axis, so a centroid that crosses the
@@ -362,10 +369,10 @@ class CenterOfMassResult:
         """
         n = np.asarray(self.shape, dtype=float)
         d = self.com - self.reference
-        return (d + n / 2.0) % n - n / 2.0
+        return np.asarray((d + n / 2.0) % n - n / 2.0, dtype=np.float64)
 
     @property
-    def displacement(self) -> NDArray:
+    def displacement(self) -> FloatArray:
         """(n_t,) centroid displacement per volume (mm if known, else voxels)."""
         d = self.deviation
         if self.voxel_mm is not None:
@@ -409,8 +416,8 @@ class SmoothnessResult:
     """
 
     fwhm_vox: tuple[float, float]
-    lags: NDArray  # (n_lag,) integer voxel lags 0..L
-    acf: NDArray  # (2, n_lag): per-axis autocorrelation
+    lags: IntArray  # (n_lag,) integer voxel lags 0..L
+    acf: FloatArray  # (2, n_lag): per-axis autocorrelation
     voxel_mm: tuple[float, float] | None = None
     pe_axis: int | None = None  # array axis of the phase-encode direction
 
@@ -423,11 +430,11 @@ class SmoothnessResult:
         """FWHM along an array `axis`, in mm if the voxel size is known, else voxels."""
         return self.fwhm_vox[axis] * self._mm_per(axis)
 
-    def displacement(self, axis: int) -> NDArray:
+    def displacement(self, axis: int) -> FloatArray:
         """Lag axis for `axis` as a length (mm if voxel size is known, else voxels)."""
-        return self.lags * self._mm_per(axis)
+        return np.asarray(self.lags * self._mm_per(axis), dtype=np.float64)
 
-    def psf_empirical(self, axis: int) -> NDArray:
+    def psf_empirical(self, axis: int) -> FloatArray:
         """Empirical PSF profile along `axis`: the squared noise autocorrelation.
 
         For white noise convolved with a PSF, the normalized spatial
@@ -435,9 +442,9 @@ class SmoothnessResult:
         equals `PSF**2`, so squaring the measured `acf` recovers the point-spread
         profile implied by the data at each sampled lag.
         """
-        return self.acf[axis] ** 2
+        return np.asarray(self.acf[axis] ** 2, dtype=np.float64)
 
-    def psf_model(self, x: NDArray, axis: int) -> NDArray:
+    def psf_model(self, x: FloatArray, axis: int) -> FloatArray:
         """Gaussian PSF profile along `axis` at displacement `x` (same units as `x`).
 
         The Gaussian whose FWHM is `fwhm_axis(axis)`; pass `x` from `displacement`

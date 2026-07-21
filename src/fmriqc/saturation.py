@@ -7,9 +7,8 @@ warm-up volumes are reported apart from clips that bias the analyzed metrics.
 """
 
 import numpy as np
-from numpy.typing import NDArray
 
-from .constants import SATURATION_BITS
+from .constants import SATURATION_BITS, FloatArray
 from .types import SaturationResult
 
 
@@ -30,7 +29,7 @@ def _saturation_bits(stored_max: float) -> int | None:
 
 
 def detect_saturation(
-    data: NDArray, slope: float = 1.0, inter: float = 0.0, trim: int = 0
+    data: FloatArray, slope: float = 1.0, inter: float = 0.0, trim: int = 0
 ) -> SaturationResult:
     """Detect ADC saturation (signal clipped at a `2**n - 1` rail) in a 4-D series.
 

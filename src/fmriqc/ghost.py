@@ -6,19 +6,18 @@ that idea. When no sidecar/header PE axis is available, the same machinery picks
 the axis where the ghost actually lands.
 """
 
-from typing import Literal, overload
+from typing import Any, Literal, overload
 
 import numpy as np
-from numpy.typing import NDArray
-from skimage import morphology
+from skimage.morphology import isotropic_dilation, isotropic_erosion
 
-from .constants import GHOST_TOP_FRACTION
+from .constants import GHOST_TOP_FRACTION, BoolArray, FloatArray
 from .imaging import edge_valid_mask, segment_phantom
 
 
 def _ghost_masks(
-    phantom_mask: NDArray, pe_axis: int, radius: int, valid_mask: NDArray
-) -> tuple[NDArray, NDArray]:
+    phantom_mask: BoolArray, pe_axis: int, radius: int, valid_mask: BoolArray
+) -> tuple[BoolArray, BoolArray]:
     """Region-matched (signal, ghost) masks for a candidate PE axis.
 
     The ghost is the phantom rolled half the FOV along `pe_axis`; the ghost mask
@@ -34,8 +33,8 @@ def _ghost_masks(
     ghost = np.roll(phantom_mask, shift, axis=pe_axis)
 
     ghost_mask = (
-        morphology.isotropic_erosion(ghost, radius)
-        & ~morphology.isotropic_dilation(phantom_mask, radius)
+        isotropic_erosion(ghost, radius)
+        & ~isotropic_dilation(phantom_mask, radius)
         & valid_mask
     )
     signal_mask = np.roll(ghost_mask, -shift, axis=pe_axis)
@@ -43,11 +42,11 @@ def _ghost_masks(
 
 
 def ghost_ratio(
-    mean_image: NDArray,
-    phantom_mask: NDArray,
+    mean_image: FloatArray,
+    phantom_mask: BoolArray,
     pe_axis: int = 0,
     radius: int = 3,
-    valid_mask: NDArray | None = None,
+    valid_mask: BoolArray | None = None,
 ) -> float:
     """fBIRN Nyquist ghost-to-signal ratio (mean ghost / mean signal).
 
@@ -64,11 +63,11 @@ def ghost_ratio(
 
 
 def ghost_top_ratio(
-    mean_image: NDArray,
-    phantom_mask: NDArray,
+    mean_image: FloatArray,
+    phantom_mask: BoolArray,
     pe_axis: int = 0,
     radius: int = 3,
-    valid_mask: NDArray | None = None,
+    valid_mask: BoolArray | None = None,
     top: float = GHOST_TOP_FRACTION,
 ) -> float:
     """Localized (top-fraction) Nyquist ghost ratio (Greve / bxh fmriqa_ghostiness).
@@ -93,11 +92,11 @@ def ghost_top_ratio(
 
 
 def acr_ghosting_ratio(
-    mean_image: NDArray,
-    phantom_mask: NDArray,
+    mean_image: FloatArray,
+    phantom_mask: BoolArray,
     pe_axis: int = 0,
     radius: int = 3,
-    valid_mask: NDArray | None = None,
+    valid_mask: BoolArray | None = None,
 ) -> float:
     """ACR/AAPM-equivalent ghosting ratio from region-matched percent ghosts.
 
@@ -126,7 +125,7 @@ def acr_ghosting_ratio(
     return abs(pe - ro)
 
 
-def _pe_axis_from_header(header) -> int | None:
+def _pe_axis_from_header(header: Any) -> int | None:
     """PE axis from the NIfTI `dim_info` phase field, or None if unset/invalid.
 
     `dim_info` carries no polarity, which we don't need for ghost placement.
@@ -135,7 +134,7 @@ def _pe_axis_from_header(header) -> int | None:
     return int(phase) if phase in (0, 1, 2) else None
 
 
-def phase_encode_axis(data: NDArray, radius: int = 3) -> int:
+def phase_encode_axis(data: FloatArray, radius: int = 3) -> int:
     """Estimate the PE axis from a MIP over time and all slices.
 
     Collapsing time and slices concentrates the ghost, giving a stronger signal
@@ -147,28 +146,28 @@ def phase_encode_axis(data: NDArray, radius: int = 3) -> int:
 
 @overload
 def estimate_pe_axis(
-    mean_image: NDArray,
-    phantom_mask: NDArray,
+    mean_image: FloatArray,
+    phantom_mask: BoolArray,
     radius: int = ...,
     return_ratios: Literal[False] = ...,
     *,
-    valid_mask: NDArray | None = ...,
+    valid_mask: BoolArray | None = ...,
 ) -> int: ...
 @overload
 def estimate_pe_axis(
-    mean_image: NDArray,
-    phantom_mask: NDArray,
+    mean_image: FloatArray,
+    phantom_mask: BoolArray,
     radius: int = ...,
     *,
     return_ratios: Literal[True],
-    valid_mask: NDArray | None = ...,
+    valid_mask: BoolArray | None = ...,
 ) -> tuple[int, dict[int, float]]: ...
 def estimate_pe_axis(
-    mean_image: NDArray,
-    phantom_mask: NDArray,
+    mean_image: FloatArray,
+    phantom_mask: BoolArray,
     radius: int = 3,
     return_ratios: bool = False,
-    valid_mask: NDArray | None = None,
+    valid_mask: BoolArray | None = None,
 ) -> int | tuple[int, dict[int, float]]:
     """Guess the phase-encode axis from where the Nyquist ghost actually lands.
 

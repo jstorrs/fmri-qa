@@ -52,6 +52,9 @@ packages = ["src/fmriqc"]
 line-length = 88
 target-version = "py313"
 src = ["src"]
+# Reference notebooks and standalone repro scripts are exploratory scratch, not
+# maintained code — skip them.
+extend-exclude = ["notebooks", "examples"]
 
 [tool.ruff.format]
 quote-style = "double"
@@ -89,6 +92,8 @@ ignore = [
 "**/__main__.py" = ["T201"]
 # The report renders human-facing text with intentional typography (× ° —).
 "src/fmriqc/report.py" = ["RUF001"]
+# Stubs mirror external library signatures verbatim (e.g. scipy's `input` param).
+"stubs/**" = ["A002"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["fmriqc"]
@@ -99,21 +104,27 @@ strict = true
 warn_unused_ignores = true
 warn_return_any = true
 files = ["src"]
+# Local partial stubs (see stubs/) fix the return types nibabel and scipy ship
+# imprecisely; both type checkers read them first (pyright via tool.pyright.stubPath).
+mypy_path = "stubs"
 
-# Scientific stack ships without (complete) type information.
+# Scientific stack whose shipped types we treat as untyped. `follow_imports =
+# skip` renders these installed-but-untyped packages as `Any` instead of
+# analyzing their internals, so calling their functions is not flagged as an
+# untyped call. nibabel and scipy are handled by the local stubs instead.
 [[tool.mypy.overrides]]
 module = [
-    "nibabel.*",
-    "scipy.*",
     "skimage.*",
     "svglib.*",
     "matplotlib.*",
     "reportlab.*",
 ]
 ignore_missing_imports = true
+follow_imports = "skip"
 
 [tool.pyright]
 include = ["src"]
+stubPath = "stubs"
 pythonVersion = "3.13"
 typeCheckingMode = "standard"
 

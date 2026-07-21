@@ -5,7 +5,7 @@
 
 .PHONY: all format lint typecheck pyright test check sync
 
-all: lint typecheck test
+all: lint typecheck pyright test
 
 sync:
 	uv sync --all-extras
@@ -25,9 +25,11 @@ pyright:
 test:
 	uv run pytest
 
-# CI-style gate: fail on any formatting drift or lint hit, then typecheck + test.
+# CI-style gate: fail on any formatting drift or lint hit, then both type
+# checkers + test.
 check:
 	uv run ruff format --check .
 	uv run ruff check .
 	uv run mypy
+	uv run pyright
 	uv run pytest

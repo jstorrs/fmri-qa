@@ -11,10 +11,9 @@ import warnings
 from dataclasses import dataclass
 
 import numpy as np
-from numpy.typing import NDArray
 from scipy import ndimage
 
-from .constants import HILO_ERODE, DetrendMethod
+from .constants import HILO_ERODE, BoolArray, DetrendMethod, FloatArray
 from .detrend import detrend_fn
 from .exceptions import IncompatibleScansError
 from .imaging import fluctuation_noise, segment_phantom, trim_initial
@@ -71,7 +70,7 @@ class HiLoResult:
         result that means the model did not fit -- e.g. near-equal flip signals).
         """
         return (
-            self.mean_high / np.sqrt(self.thermal_var)
+            float(self.mean_high / np.sqrt(self.thermal_var))
             if self.thermal_var > 0
             else float("nan")
         )
@@ -84,7 +83,7 @@ class HiLoResult:
         detected (`instability_var == 0`), NaN if it is negative.
         """
         if self.instability_var > 0:
-            return self.mean_high / np.sqrt(self.instability_var)
+            return float(self.mean_high / np.sqrt(self.instability_var))
         return float("inf") if self.instability_var == 0 else float("nan")
 
     @property
@@ -131,7 +130,7 @@ def separate_noise(
     )
 
 
-def phantom_core_mask(volume: NDArray, erode: int = HILO_ERODE) -> NDArray:
+def phantom_core_mask(volume: FloatArray, erode: int = HILO_ERODE) -> BoolArray:
     """Eroded phantom-core mask of a 3-D image (AFNI `3dAutomask -q -erode` analogue).
 
     Segments the phantom from the temporal-mean `volume` with the same watershed
@@ -149,12 +148,12 @@ def phantom_core_mask(volume: NDArray, erode: int = HILO_ERODE) -> NDArray:
         mask = labels == int(np.argmax(sizes))
     if erode > 0:
         mask = ndimage.binary_erosion(mask, iterations=erode)
-    return mask
+    return np.asarray(mask, dtype=bool)
 
 
 def _hilo_stats(
     scan: QAScan, trim_sec: float, detrend: DetrendMethod, erode: int
-) -> tuple[NDArray, NDArray, NDArray]:
+) -> tuple[FloatArray, FloatArray, BoolArray]:
     """(temporal-mean map, temporal-SD-of-residual map, eroded core mask) for a scan.
 
     The whole 3-D volume is used (not a single slice): thermal/instability

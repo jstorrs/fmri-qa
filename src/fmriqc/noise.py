@@ -7,16 +7,15 @@ Weisskoff and drift measures reuse the pipeline's per-voxel residual.
 """
 
 import numpy as np
-from numpy.typing import NDArray
 from scipy.special import erfcinv
 
-from .constants import MAD_SCALE, OUTLIER_QTHR
+from .constants import MAD_SCALE, OUTLIER_QTHR, BoolArray, FloatArray, IntArray
 from .imaging import roi_indexes
 from .types import ROI, OutlierResult, QAImages, SpikeResult, WeisskoffResult
 
 
 def outlier_fraction(
-    fluctuations: NDArray, mask: NDArray, qthr: float = OUTLIER_QTHR
+    fluctuations: FloatArray, mask: BoolArray, qthr: float = OUTLIER_QTHR
 ) -> OutlierResult:
     """Per-TR outlier-voxel fraction over `mask`, following AFNI 3dToutcount.
 
@@ -45,7 +44,7 @@ def outlier_fraction(
     )
 
 
-def _spike_ratio(x: NDArray) -> float:
+def _spike_ratio(x: FloatArray) -> float:
     """Peak-over-spread ratio `max|x| / mad(x)`, R's `mad` (see `MAD_SCALE`).
 
     The kernel of both cran-fmriqa spike scores: the largest absolute value
@@ -74,7 +73,7 @@ def spike_scores(images: QAImages, roi: ROI) -> SpikeResult:
 
 
 def _roi_cv(
-    fluctuations: NDArray, mean_image: NDArray, roi_center: NDArray, k: int
+    fluctuations: FloatArray, mean_image: FloatArray, roi_center: IntArray, k: int
 ) -> float:
     """CV over a k x k ROI: RMS of the ROI-mean fluctuation / ROI-mean signal.
 
@@ -88,7 +87,7 @@ def _roi_cv(
 
 
 def _roi_cv1(
-    fluctuation_noise: NDArray, mean_image: NDArray, roi_center: NDArray, k: int
+    fluctuation_noise: FloatArray, mean_image: FloatArray, roi_center: IntArray, k: int
 ) -> float:
     """Single-voxel CV pooled over a k x k ROI: RMS(noise) / ROI mean signal."""
     roi = roi_indexes(roi_center, k)

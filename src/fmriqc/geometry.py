@@ -6,9 +6,8 @@ detected center (`PhantomGeometry`), and the fixed-size, on-image summary `ROI`.
 """
 
 import numpy as np
-from numpy.typing import NDArray
 
-from .constants import FBIRN_ROI_SIZE, ROI_CENTER_MODES, RoiCenter
+from .constants import FBIRN_ROI_SIZE, ROI_CENTER_MODES, BoolArray, RoiCenter
 from .exceptions import InvalidChoiceError
 from .imaging import _clamp_center, find_phantom_center, image_center, segment_phantom
 from .types import ROI, PhantomGeometry, QAImages
@@ -50,7 +49,7 @@ def resolve_roi(
     return ROI(center=_clamp_center(c, n, shape), size=n)
 
 
-def roi_fits(phantom_mask: NDArray, roi: tuple[slice, slice]) -> bool:
+def roi_fits(phantom_mask: BoolArray, roi: tuple[slice, slice]) -> bool:
     """True if `roi` is on-image and every voxel of it lies inside the phantom.
 
     An out-of-bounds ROI (negative/overflowing slice) counts as not fitting —

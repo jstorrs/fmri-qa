@@ -9,12 +9,16 @@ svglib defect this has to work around.
 """
 
 import io
+from collections.abc import Callable, Iterable
+from pathlib import Path
+from typing import Any
 
 import matplotlib
 
 matplotlib.use("Agg")  # headless; no display needed
 
 import numpy as np
+from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 from matplotlib.patches import Patch, Rectangle
 from reportlab.graphics.shapes import Group, Image
@@ -25,10 +29,13 @@ from svglib import svglib as _svglib
 from svglib.svglib import svg2rlg
 
 import fmriqc as q
+from fmriqc.constants import BoolArray, FloatArray
 from fmriqc.ghost import _ghost_masks  # internal: region-matched ghost/signal masks
 
 _PE_ROWCOL = {0: "row", 1: "col"}  # DICOM row/col fallback when meta is absent
 
+_PAGE_W: float
+_PAGE_H: float
 _PAGE_W, _PAGE_H = letter  # 612 x 792 pt
 _MARGIN = 40.0
 _CONTENT_W = _PAGE_W - 2 * _MARGIN
@@ -39,7 +46,7 @@ _CONTENT_W = _PAGE_W - 2 * _MARGIN
 # --------------------------------------------------------------------------- #
 
 
-def _patch_svglib_image_alignment():
+def _patch_svglib_image_alignment() -> None:
     """Fix svglib truncating embedded-image geometry to whole points.
 
     svglib's `convertImage` builds the ReportLab `Image` from `int(x)`,
@@ -51,7 +58,7 @@ def _patch_svglib_image_alignment():
     svglib in `uv.lock`; revisit on upgrade.
     """
 
-    def convertImage(self, node):
+    def convertImage(self: Any, node: Any) -> Any:
         x, y, width, height = self.convert_length_attrs(
             node, "x", "y", "width", "height"
         )
@@ -68,7 +75,9 @@ def _patch_svglib_image_alignment():
 _patch_svglib_image_alignment()
 
 
-def _draw_fig(c, fig, x, top, w, h):
+def _draw_fig(
+    c: canvas.Canvas, fig: Figure, x: float, top: float, w: float, h: float
+) -> None:
     """Embed a matplotlib `Figure` as vector SVG in a box, top-aligned/centered.
 
     The figure is scaled uniformly to fit `w` x `h` (preserving aspect) with its
@@ -78,6 +87,8 @@ def _draw_fig(c, fig, x, top, w, h):
     fig.savefig(buf, format="svg")
     buf.seek(0)
     drawing = svg2rlg(buf)
+    if drawing is None:  # svg2rlg returns None only on a parse failure
+        raise RuntimeError("svg2rlg failed to render the figure SVG")
     scale = min(w / drawing.width, h / drawing.height)
     dw, dh = drawing.width * scale, drawing.height * scale
     drawing.scale(scale, scale)
@@ -85,12 +96,12 @@ def _draw_fig(c, fig, x, top, w, h):
     drawing.drawOn(c, x + (w - dw) / 2, top - dh)
 
 
-def _roi_series(arr, roi):
+def _roi_series(arr: FloatArray, roi: q.ROI) -> FloatArray:
     """ROI-mean time series of a 3-D (X, Y, T) array."""
-    return arr[roi.index].mean(axis=(0, 1))
+    return np.asarray(arr[roi.index].mean(axis=(0, 1)), dtype=np.float64)
 
 
-def _data_per_point(ax):
+def _data_per_point(ax: Axes) -> float:
     """Length of one typographic point (1/72 in) in axes data units.
 
     `imshow` uses equal aspect, so x and y share a scale; `apply_aspect` finalizes
@@ -100,10 +111,10 @@ def _data_per_point(ax):
     """
     ax.apply_aspect()
     (x0, x1) = ax.transData.transform([(0, 0), (1, 0)])[:, 0]
-    return (ax.figure.dpi / 72.0) / abs(x1 - x0)
+    return float((ax.figure.dpi / 72.0) / abs(x1 - x0))
 
 
-def _draw_roi(ax, roi, *, lw=1.3):
+def _draw_roi(ax: Axes, roi: q.ROI, *, lw: float = 1.3) -> None:
     """Outline the ROI just outside its pixels so the stroke doesn't cover them.
 
     The ROI's outer boundary in imshow coordinates runs from `start - 0.5` to
@@ -127,7 +138,9 @@ def _draw_roi(ax, roi, *, lw=1.3):
     )
 
 
-def _draw_hull(ax, mask, *, color="tab:cyan", lw=1.0):
+def _draw_hull(
+    ax: Axes, mask: BoolArray, *, color: str = "tab:cyan", lw: float = 1.0
+) -> None:
     """Outline the convex hull of a boolean mask as a closed polygon.
 
     The hull smooths the ragged phantom-mask boundary into a clean convex
@@ -143,7 +156,15 @@ def _draw_hull(ax, mask, *, color="tab:cyan", lw=1.0):
     ax.plot(pts[loop, 0], pts[loop, 1], color=color, lw=lw)
 
 
-def _panel_fig(img, title, *, mask=None, roi=None, log=False, aspect=1.15):
+def _panel_fig(
+    img: FloatArray,
+    title: str,
+    *,
+    mask: BoolArray | None = None,
+    roi: q.ROI | None = None,
+    log: bool = False,
+    aspect: float = 1.15,
+) -> Figure:
     """A single labelled image panel as a square-ish figure."""
     fig = Figure(figsize=(2.0, 2.0 * aspect))
     ax = fig.add_subplot(111)
@@ -171,14 +192,22 @@ _RO_GHOST_RGB = (1.0, 0.72, 0.15)  # RO ghost region (amber)
 _INVALID_RGB = (1.0, 0.15, 0.90)  # zeroed image edge, excluded from stats (magenta)
 
 
-def _overlay(ax, mask, rgb, alpha=0.45):
+def _overlay(
+    ax: Axes, mask: BoolArray, rgb: tuple[float, float, float], alpha: float = 0.45
+) -> None:
     """Tint the True pixels of `mask` with a translucent color over the image."""
     rgba = np.zeros((*mask.shape, 4))
     rgba[mask] = (*rgb, alpha)
     ax.imshow(rgba, interpolation="nearest")
 
 
-def _ghost_panel_fig(mean_image, phantom_mask, pe_axis, *, aspect=1.15):
+def _ghost_panel_fig(
+    mean_image: FloatArray,
+    phantom_mask: BoolArray,
+    pe_axis: int | None,
+    *,
+    aspect: float = 1.15,
+) -> Figure:
     """Mean image with the region-matched ghost/signal masks for both axes.
 
     Draws the exact masks the ghost metrics average: for each in-plane axis, the
@@ -236,14 +265,14 @@ def _ghost_panel_fig(mean_image, phantom_mask, pe_axis, *, aspect=1.15):
     return fig
 
 
-def _plot_fig(draw, figsize):
+def _plot_fig(draw: Callable[[Axes], object], figsize: tuple[float, float]) -> Figure:
     """Run an ax-drawing callback on a fresh constrained-layout figure."""
     fig = Figure(figsize=figsize, layout="constrained")
     draw(fig.add_subplot(111))
     return fig
 
 
-def _plot_weisskoff(ax, wk, fs=9):
+def _plot_weisskoff(ax: Axes, wk: q.WeisskoffResult, fs: int = 9) -> None:
     """Measured CV vs the ideal slope=-1 line, anchored at the pooled cv1.
 
     Anchoring the ideal line at `cv1_pooled` (the single-voxel CV pooled over the
@@ -267,7 +296,7 @@ def _plot_weisskoff(ax, wk, fs=9):
     ax.legend(fontsize=fs - 2)
 
 
-def _plot_rdc(ax, wk, fs=9):
+def _plot_rdc(ax: Axes, wk: q.WeisskoffResult, fs: int = 9) -> None:
     """RDC vs ROI size: pooled single-voxel CV / ROI-averaged CV, vs identity."""
     r, rdc = wk.roi_sizes, wk.rdc_curve
     # Match the Weisskoff plot: measured is C0/"o-" on top and first in the
@@ -282,7 +311,9 @@ def _plot_rdc(ax, wk, fs=9):
     ax.legend(fontsize=fs - 2, loc="upper left")
 
 
-def _plot_signal(ax, t, signal, trend, fs=9):
+def _plot_signal(
+    ax: Axes, t: FloatArray, signal: FloatArray, trend: FloatArray, fs: int = 9
+) -> None:
     ax.plot(t, signal, lw=0.5, label="ROI signal")
     ax.plot(t, trend, "r", lw=1.2, label="trend")
     ax.set_xlabel("time (s)")
@@ -291,7 +322,13 @@ def _plot_signal(ax, t, signal, trend, fs=9):
     ax.legend(fontsize=fs - 2)
 
 
-def _plot_residual(ax, t, resid, fs=9, tc_outlier=None):
+def _plot_residual(
+    ax: Axes,
+    t: FloatArray,
+    resid: FloatArray,
+    fs: int = 9,
+    tc_outlier: float | None = None,
+) -> None:
     """ROI-mean detrended residual; the title carries the cran `tc_outlier` score.
 
     `tc_outlier` (max|residual| / MAD) is the peak-to-spread ratio of exactly this
@@ -308,7 +345,7 @@ def _plot_residual(ax, t, resid, fs=9, tc_outlier=None):
     ax.set_title(title, fontsize=fs)
 
 
-def _plot_outliers(ax, t, outl, fs=9):
+def _plot_outliers(ax: Axes, t: FloatArray, outl: q.OutlierResult, fs: int = 9) -> None:
     """Per-TR outlier-voxel fraction (3dToutcount) with the chance-level line.
 
     A clean run hovers near `qthr` (the per-voxel chance fraction, dashed); a
@@ -322,7 +359,7 @@ def _plot_outliers(ax, t, outl, fs=9):
     ax.legend(fontsize=fs - 2)
 
 
-def _plot_motion(ax, t, motion, fs=9):
+def _plot_motion(ax: Axes, t: FloatArray, motion: q.MotionResult, fs: int = 9) -> None:
     """Per-volume in-plane phantom motion: translation (voxels) + strain (%).
 
     3dvolreg-style registration to the temporal mean with the rotation dropped
@@ -346,7 +383,7 @@ def _plot_motion(ax, t, motion, fs=9):
     ax.legend(h1 + h2, l1 + l2, fontsize=fs - 4, ncol=2, loc="upper left")
 
 
-def _plot_com(ax, t, com, fs=9):
+def _plot_com(ax: Axes, t: FloatArray, com: q.CenterOfMassResult, fs: int = 9) -> None:
     """Per-volume phantom center-of-mass shift from the temporal mean (voxels).
 
     Circular intensity centroid (bxh volmeasures) along each in-plane axis,
@@ -365,7 +402,13 @@ def _plot_com(ax, t, com, fs=9):
     ax.legend(fontsize=fs - 2, ncol=2, loc="upper left")
 
 
-def _plot_spectrum(ax, resid, tr, fs=9, spec_outlier=None):
+def _plot_spectrum(
+    ax: Axes,
+    resid: FloatArray,
+    tr: float,
+    fs: int = 9,
+    spec_outlier: float | None = None,
+) -> None:
     """Residual FFT magnitude (DC dropped); title carries cran `spec_outlier`.
 
     `spec_outlier` (max magnitude / MAD) is the peak-to-spread ratio of exactly
@@ -382,7 +425,7 @@ def _plot_spectrum(ax, resid, tr, fs=9, spec_outlier=None):
     ax.set_title(title, fontsize=fs)
 
 
-def _plot_psf(ax, s, fs=9):
+def _plot_psf(ax: Axes, s: q.SmoothnessResult, fs: int = 9) -> None:
     """Directional point-spread profiles (PE, RO) of the noise field (3dFWHMx).
 
     Markers are the empirical PSF (the squared spatial autocorrelation of the
@@ -394,7 +437,8 @@ def _plot_psf(ax, s, fs=9):
     """
     unit = "mm" if s.voxel_mm is not None else "vox"
     if s.pe_axis is not None:
-        dirs = [("PE", s.pe_axis, "tab:blue"), ("RO", s.ro_axis, "tab:orange")]
+        # ro_axis == 1 - pe_axis; spell it out so both entries are concrete ints.
+        dirs = [("PE", s.pe_axis, "tab:blue"), ("RO", 1 - s.pe_axis, "tab:orange")]
     else:  # no PE axis resolved -- fall back to raw array axes
         dirs = [("axis0", 0, "tab:blue"), ("axis1", 1, "tab:orange")]
     # Zoom to a few FWHM (but at least 3 voxels), so a narrow PSF isn't squashed
@@ -430,7 +474,7 @@ _TILE_H = 34.0  # metric-tile height (pt)
 _TILE_GAP = 6.0
 
 
-def _metric_tiles(m):
+def _metric_tiles(m: q.QAMetrics) -> list[tuple[str, str]]:
     """(label, value) pairs for the header metric tiles, in display order."""
     return [
         ("SNR", f"{m.snr:.1f}"),
@@ -451,13 +495,13 @@ def _metric_tiles(m):
     ]
 
 
-def _fwhm_label(s):
+def _fwhm_label(s: q.SmoothnessResult) -> str:
     """Combined FWHM tile text: mm when the voxel size is known, else voxels."""
     unit = "mm" if s.voxel_mm is not None else "vox"
     return f"{s.fwhm:.2f}{unit}"
 
 
-def _draw_tiles(c, tiles, top):
+def _draw_tiles(c: canvas.Canvas, tiles: list[tuple[str, str]], top: float) -> float:
     """Draw the metric tiles as an even strip across the content width."""
     n = len(tiles)
     tw = (_CONTENT_W - (n - 1) * _TILE_GAP) / n
@@ -479,7 +523,7 @@ def _draw_tiles(c, tiles, top):
     return bottom
 
 
-def _acquisition_line(result):
+def _acquisition_line(result: q.QAResult) -> str:
     """The sequence/geometry metadata string. Sidecar-only fields are omitted."""
     images, m, meta = result.images, result.metrics, result.meta
     parts = [f"TR {images.tr:.3g}s"]
@@ -494,7 +538,12 @@ def _acquisition_line(result):
         parts.append(f"{thk:g}mm slice")
         parts.append(f"{meta.matrix[0]}×{meta.matrix[1]} px")
     parts.append(f"{images.center_slice.shape[-1]} frames")
-    pe = meta.pe_dir if meta and meta.pe_dir else _PE_ROWCOL.get(m.pe_axis, "?")
+    if meta and meta.pe_dir:
+        pe = meta.pe_dir
+    elif m.pe_axis is not None:
+        pe = _PE_ROWCOL.get(m.pe_axis, "?")
+    else:
+        pe = "?"
     parts.append(f"PE {pe}")
     detrend = f"detrend {images.detrend_method}"
     if images.detrend_order is not None:
@@ -514,7 +563,7 @@ def _acquisition_line(result):
     return "   ·   ".join(parts)
 
 
-def _provenance_line(meta):
+def _provenance_line(meta: q.ScanMeta | None) -> str:
     """The scanner/coil/software/time string; empty without a sidecar."""
     if meta is None:
         return ""
@@ -530,7 +579,7 @@ def _provenance_line(meta):
     return "   ·   ".join(parts)
 
 
-def _device_line(meta):
+def _device_line(meta: q.ScanMeta | None) -> str:
     """Manufacturer/model/field-strength for the title row; empty if unknown."""
     if meta is None:
         return ""
@@ -540,7 +589,7 @@ def _device_line(meta):
     return dev
 
 
-def _header(c, result, title):
+def _header(c: canvas.Canvas, result: q.QAResult, title: str) -> float:
     """Draw the scan name, metadata lines, and metric tiles; return the y below."""
     y = _PAGE_H - 32
     if title:
@@ -567,7 +616,7 @@ def _header(c, result, title):
     return bottom - 10
 
 
-def _panel_figs(result):
+def _panel_figs(result: q.QAResult) -> list[Figure]:
     """The summary image panels, in row order (last is the N/2 ghost overlay)."""
     images, geom, roi, m = result.images, result.geom, result.roi, result.metrics
     sfnr_img = np.where(
@@ -590,7 +639,9 @@ def _panel_figs(result):
     ]
 
 
-def _panel_row(c, figs, top, *, gap=8.0):
+def _panel_row(
+    c: canvas.Canvas, figs: list[Figure], top: float, *, gap: float = 8.0
+) -> float:
     """Draw the panels in one row across the content width; return the y below."""
     n = len(figs)
     pw = (_CONTENT_W - (n - 1) * gap) / n
@@ -600,7 +651,9 @@ def _panel_row(c, figs, top, *, gap=8.0):
     return top - ph
 
 
-def _panel_grid(c, figs, top, *, ncol, gap=14.0):
+def _panel_grid(
+    c: canvas.Canvas, figs: list[Figure], top: float, *, ncol: int, gap: float = 14.0
+) -> float:
     """Draw the panels in a grid of `ncol` columns; return the y below the grid."""
     pw = (_CONTENT_W - (ncol - 1) * gap) / ncol
     ph = pw * 1.15
@@ -611,10 +664,12 @@ def _panel_grid(c, figs, top, *, ncol, gap=14.0):
     return top - rows * ph - (rows - 1) * gap
 
 
-def _timeseries(result):
+def _timeseries(
+    result: q.QAResult,
+) -> tuple[FloatArray, FloatArray, FloatArray, FloatArray]:
     images, roi = result.images, result.roi
     n = images.center_slice.shape[-1]
-    t = np.arange(n) * images.tr
+    t = np.asarray(np.arange(n) * images.tr, dtype=np.float64)
     return (
         t,
         _roi_series(images.center_slice, roi),
@@ -623,7 +678,7 @@ def _timeseries(result):
     )
 
 
-def _one_page(c, result, title):
+def _one_page(c: canvas.Canvas, result: q.QAResult, title: str) -> None:
     wk = result.metrics.weisskoff
     y = _header(c, result, title)
 
@@ -726,13 +781,13 @@ def _one_page(c, result, title):
     )
 
 
-def _summary_page(c, result, title):
+def _summary_page(c: canvas.Canvas, result: q.QAResult, title: str) -> None:
     y = _header(c, result, title)
     # Five image panels (signal, SFNR, fluct/static noise, N/2 ghost) in a grid.
     _panel_grid(c, _panel_figs(result), y - 8, ncol=3)
 
 
-def _analysis_page(c, result, title):
+def _analysis_page(c: canvas.Canvas, result: q.QAResult, title: str) -> None:
     wk = result.metrics.weisskoff
     t, signal, trend, resid = _timeseries(result)
 
@@ -868,7 +923,11 @@ def add_report_pages(
         raise ValueError(f"unknown layout {layout!r}; choose from {REPORT_LAYOUTS}")
 
 
-def write_report(items, pdf_path, layout: str = "one") -> None:
+def write_report(
+    items: Iterable[tuple[str, q.QAResult]] | q.QAResult,
+    pdf_path: str | Path,
+    layout: str = "one",
+) -> None:
     """Write a combined PDF, one scan after another.
 
     `items` is an iterable of `(title, QAResult)`, or a single `QAResult`.

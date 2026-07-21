@@ -1,12 +1,13 @@
 import argparse
 import sys
+from collections.abc import Sequence
 
 import fmriqc as q
 
 _PE_LABEL = {0: "row", 1: "col", 2: "k", None: "?"}  # DICOM row/col (i->row, j->col)
 
 
-def main(argv=None):
+def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="fmri-qa",
         description="Phantom fMRI QA: SNR, SFNR, RDC (Weisskoff), Nyquist ghost.",
@@ -156,7 +157,7 @@ def main(argv=None):
     return 1 if failed else 0
 
 
-def hilo_main(argv=None):
+def hilo_main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="fmri-qa-hilo",
         description="High/low flip-angle phantom QA: separate thermal from "

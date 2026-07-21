@@ -7,15 +7,15 @@ data (a vendor-nulled edge) is healed first. A cheap complement to `motion`.
 """
 
 import numpy as np
-from numpy.typing import NDArray
 
+from .constants import BoolArray, FloatArray
 from .imaging import edge_valid_mask
 from .types import CenterOfMassResult
 
 
 def estimate_center_of_mass(
-    center_slice: NDArray,
-    valid_mask: NDArray | None = None,
+    center_slice: FloatArray,
+    valid_mask: BoolArray | None = None,
     voxel_mm: tuple[float, float] | None = None,
 ) -> CenterOfMassResult:
     """Per-volume intensity-weighted center of mass of the phantom (circular).

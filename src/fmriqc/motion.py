@@ -7,23 +7,22 @@ image. The analyzed series is not resampled from this fit; it is a diagnostic.
 """
 
 import numpy as np
-from numpy.typing import NDArray
 from scipy import ndimage
 
-from .constants import MOTION_MAX_ITER, MOTION_TOL
+from .constants import MOTION_MAX_ITER, MOTION_TOL, BoolArray, FloatArray
 from .types import MotionResult
 
 
 def _register_norotate(
-    moving: NDArray,
-    reference: NDArray,
-    rr: NDArray,
-    cc: NDArray,
-    center: NDArray,
-    mask: NDArray,
+    moving: FloatArray,
+    reference: FloatArray,
+    rr: FloatArray,
+    cc: FloatArray,
+    center: FloatArray,
+    mask: BoolArray,
     max_iter: int,
     tol: float,
-) -> NDArray:
+) -> FloatArray:
     """Register one frame to `reference` under translation + symmetric strain.
 
     Forward-additive Lucas-Kanade for the 5-parameter warp
@@ -63,8 +62,8 @@ def _register_norotate(
 
 
 def estimate_motion(
-    center_slice: NDArray,
-    mask: NDArray,
+    center_slice: FloatArray,
+    mask: BoolArray,
     voxel_mm: tuple[float, float] | None = None,
     max_iter: int = MOTION_MAX_ITER,
     tol: float = MOTION_TOL,

@@ -100,6 +100,53 @@ runtime and reviewers; a well-typed one makes the checker reject mistakes for fr
 - `warn_unused_ignores` deletes the suppression for you once it stops being necessary, so
   ignores don't rot in place.
 
+### Local stubs for third-party types
+
+The scientific stack (`nibabel`, `scipy`, `scikit-image`, `reportlab`, `svglib`) types its
+public API unevenly — some packages ship nothing, some ship stubs that are wrong or too
+broad for the way we call them. That is the checkers' blind spot, not ours to absorb into
+the code. Work down this ladder — the *first* option that fits is the right one, and most of
+them are not "write a stub":
+
+1. **The library ships good types → use them.** Nothing to do. `numpy` and `matplotlib`
+   are here.
+2. **A genuine `Optional` or error return is not a stub gap → handle it.** If a call really
+   can return `None` (e.g. `svg2rlg` on a parse failure), guard it and `raise` — don't stub
+   the `None` away and pretend the failure can't happen. This is the *errors never pass
+   silently* rule from [exceptions.md](exceptions.md), and the guard is real safety, not a
+   type-checker appeasement.
+3. **A one-off narrowing of a correct-but-broad type → a scoped `cast`.** When a shipped
+   signature is accurate but wider than the single form you use at *one* site, a
+   `typing.cast(Target, expr)` with a one-line reason is lighter than a stub. Reach for a
+   stub once the same narrowing recurs across call sites.
+4. **Shipped types wrong or absent for a small, well-defined surface → a local partial
+   stub** in `stubs/`. This is the case `nibabel` and `scipy.ndimage` hit: `nib.load` is
+   typed to a base class without the NIfTI accessors we call, and `ndimage`'s transforms are
+   overloaded so their returns come back as broad unions. A few lines of `.pyi` pin the
+   forms we actually use, and — unlike a `cast` — every call site gets checked against them.
+5. **Untyped across a large or awkward surface, or you monkeypatch its internals → treat it
+   as `Any`.** In the mypy override, `follow_imports = "skip"` (plus `ignore_missing_imports`)
+   renders the package as `Any` so calling it isn't flagged as an untyped call. This is the
+   fallback for `scikit-image`, `reportlab`, and `svglib` — stubbing their full surface, or
+   the `Svg2RlgShapeConverter` monkeypatch, would cost more than it's worth.
+
+Writing a local stub:
+
+- **Both checkers read `stubs/`** — `mypy_path = "stubs"` and pyright `stubPath = "stubs"`.
+  When you stub a package, drop it from the `follow_imports = "skip"` list so its calls go
+  back to being *checked* against your stub rather than waved through as `Any`.
+- **Stub only the surface you call, faithfully.** List the handful of functions/attributes
+  the code touches, with real parameter names even when they shadow a builtin (scipy's
+  `input`) — a caller may pass them by keyword, so the names are part of the contract. That
+  faithfulness is why `stubs/**` carries a narrow `A002` per-file-ignore.
+- **Open each stub with a docstring saying *why* the shipped types were inadequate.** A stub
+  is a claim about someone else's library; the next reader needs the reason to trust it, and
+  to know when an upstream fix makes it deletable.
+- **Prefer a narrow local stub over a broad stub dependency.** Published packages exist
+  (`types-*`, `scipy-stubs`) and are the right call when the surface is large — but don't add
+  a whole dependency to fix two return types. Delete the local stub if the library ships good
+  types upstream later.
+
 ## Security and Supply Chain
 
 Python code pulls in dependencies and touches the filesystem, so security scanning is part
