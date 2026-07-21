@@ -108,11 +108,21 @@ def main(argv: Sequence[str] | None = None) -> int:
         help="Write a PDF report to FILE.",
     )
     parser.add_argument(
-        "--pdf-layout",
-        choices=("summary", "detailed"),
-        default="summary",
-        help="Report form per scan: 'summary' (condensed) or 'detailed' (adds a "
-        "stability page) (default: summary).",
+        "--pdf-tier",
+        choices=("dashboard", "physics"),
+        default="dashboard",
+        help="Report depth per scan: 'dashboard' (condensed overview) or 'physics' "
+        "(adds a full-size stability page) (default: dashboard).",
+    )
+    parser.add_argument(
+        "--pdf-cover",
+        action="store_true",
+        help="Prepend a cover page listing the scans in the PDF packet.",
+    )
+    parser.add_argument(
+        "--pdf-appendix",
+        action="store_true",
+        help="Append a provenance page (per-scan metadata + version) to the PDF.",
     )
     args = parser.parse_args(argv)
 
@@ -170,7 +180,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.pdf and reports:
         from . import report as report_mod
 
-        pages = report_mod.write_report(reports, args.pdf, layout=args.pdf_layout)
+        pages = report_mod.write_report(
+            reports,
+            args.pdf,
+            tier=args.pdf_tier,
+            cover=args.pdf_cover,
+            appendix=args.pdf_appendix,
+        )
         print(f"# wrote {args.pdf} ({len(reports)} scan(s), {pages} pages)", file=info)
 
     if args.json:

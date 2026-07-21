@@ -220,7 +220,9 @@ Options:
 | `--roi-size` | `21` | summary/Weisskoff ROI side, in voxels |
 | `--json` | — | emit the metrics as JSON on stdout instead of the text table |
 | `--pdf` | — | write a PDF report to this file |
-| `--pdf-layout` | `summary` | `summary` (condensed) or `detailed` (adds a stability page) per scan |
+| `--pdf-tier` | `dashboard` | `dashboard` (condensed overview) or `physics` (adds a stability page) per scan |
+| `--pdf-cover` | — | prepend a cover page listing the scans in the packet |
+| `--pdf-appendix` | — | append a provenance page (per-scan metadata + version) |
 
 `--version` prints the version and exits.
 
@@ -248,8 +250,15 @@ SFNR, fluctuation noise, static spatial noise) with the phantom mask and ROI
 overlaid, the Weisskoff plot, the ROI signal with its fitted trend, and the
 residual time course, spectrum, per-frame outlier fraction, per-frame in-plane
 motion (translation and scale/shear strain), and the directional PSF curves (PE
-and RO). `--pdf-layout detailed` splits these across a summary page and a
-stability page.
+and RO). `--pdf-tier physics` follows that dashboard overview with a full-size
+stability page, a per-metric characterization table (value + definition), and a
+methods page describing how each metric is computed.
+
+Several scans combine into one branded packet: `--pdf-cover` prepends a cover
+with the scan inventory and `--pdf-appendix` appends a provenance page, and a
+running footer carries page numbers once the packet spans pages. The cover
+title, logo, footer text, fonts, and colours all come from a `report.Theme`, so
+a group brands every packet it issues from one object (see the library section).
 
 ## Library
 
@@ -273,6 +282,27 @@ QAScan → preprocess → QAImages → detect_phantom → resolve_roi
 returns a `QAImages` holding the center slice plus its fluctuations; the summary
 images (mean, MIP, static noise, fluctuation noise, trend) are derived
 properties. The full multi-slice volume can be discarded once `QAImages` exists.
-PDF rendering lives in the `fmriqc/report/` subpackage (format-agnostic
-`summary` text and `panels` figures, composed by a `formats` driver; imported
-only when `--pdf` is used).
+PDF rendering lives in the `fmriqc/report/` subpackage: format-agnostic content
+(`summary` metadata text, `content` per-metric catalog, `panels` figures) and a
+`theme` (one `Theme` object driving both the page furniture and the matplotlib
+panels), composed by a `formats` driver that walks the `document` block model
+(cover, tiered scan sections, appendix). Imported only when `--pdf` is used. A
+group brands its packets by passing a custom `report.Theme` to
+`report.write_report`:
+
+```python
+from pathlib import Path
+from fmriqc import report
+
+theme = report.Theme(
+    font_title="Times-Bold",
+    panel_accent="#1a4d7a",
+    logo=Path("group-logo.png"),
+    footer="Acme MR Physics · confidential",
+    cover_title="Acme Phantom QA",
+)
+report.write_report(
+    [("run-1", result)], "packet.pdf",
+    tier="physics", theme=theme, cover=True, appendix=True,
+)
+```

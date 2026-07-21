@@ -64,7 +64,7 @@ def test_main_writes_a_nonempty_pdf(tmp_path) -> None:
     assert pdf.read_bytes().startswith(b"%PDF")
 
 
-def test_main_detailed_layout_renders(tmp_path) -> None:
+def test_main_physics_tier_renders(tmp_path) -> None:
     pdf = tmp_path / "qa2.pdf"
     rc = cli.main(
         [
@@ -73,8 +73,8 @@ def test_main_detailed_layout_renders(tmp_path) -> None:
             "9",
             "--pdf",
             str(pdf),
-            "--pdf-layout",
-            "detailed",
+            "--pdf-tier",
+            "physics",
         ]
     )
     assert rc == 0
@@ -147,3 +147,77 @@ def test_hilo_main_reports_bad_file(tmp_path, capsys) -> None:
     rc = cli.hilo_main([str(tmp_path / "nope.nii.gz"), str(tmp_path / "nah.nii.gz")])
     assert rc == 1
     assert "ERROR" in capsys.readouterr().err
+
+
+def test_write_report_honours_a_custom_theme(tmp_path) -> None:
+    from reportlab.lib.pagesizes import A4
+
+    import fmriqc as q
+    from fmriqc import report
+
+    scan = q.QAScan.from_nifti(_write_scan(tmp_path))
+    result = q.run_qa(scan, roi_size=9)
+    theme = report.Theme(
+        page_size=A4,
+        margin=24.0,
+        font_body="Times-Roman",
+        panel_cmap="magma",
+        panel_accent="#8e44ad",
+        panel_font_family="serif",
+    )
+    pdf = tmp_path / "themed.pdf"
+    pages = report.write_report([("scan", result)], pdf, theme=theme)
+    assert pages == 1
+    assert pdf.read_bytes().startswith(b"%PDF")
+
+
+def test_write_report_builds_a_cover_and_appendix_packet(tmp_path) -> None:
+    import fmriqc as q
+    from fmriqc import report
+
+    scan = q.QAScan.from_nifti(_write_scan(tmp_path))
+    result = q.run_qa(scan, roi_size=9)
+    items = [("run-1", result), ("run-2", result)]
+    theme = report.Theme(footer="Test MR Physics")
+    pdf = tmp_path / "packet.pdf"
+    # cover + two dashboard pages + appendix.
+    pages = report.write_report(
+        items, pdf, tier="dashboard", theme=theme, cover=True, appendix=True
+    )
+    assert pages == 4
+    assert pdf.read_bytes().startswith(b"%PDF")
+
+
+def test_cover_renders_a_theme_logo(tmp_path) -> None:
+    from PIL import Image
+
+    import fmriqc as q
+    from fmriqc import report
+
+    logo = tmp_path / "logo.png"
+    Image.new("RGB", (8, 4), color=(10, 77, 122)).save(logo)
+
+    scan = q.QAScan.from_nifti(_write_scan(tmp_path))
+    result = q.run_qa(scan, roi_size=9)
+    theme = report.Theme(logo=logo, cover_title="Site QA", footer="Physics")
+    pdf = tmp_path / "logo_packet.pdf"
+    pages = report.write_report([("scan", result)], pdf, theme=theme, cover=True)
+    assert pages == 2  # cover + one dashboard page
+    assert pdf.read_bytes().startswith(b"%PDF")
+
+
+def test_main_cover_and_appendix_flags_render(tmp_path) -> None:
+    pdf = tmp_path / "qa3.pdf"
+    rc = cli.main(
+        [
+            _write_scan(tmp_path),
+            "--roi-size",
+            "9",
+            "--pdf",
+            str(pdf),
+            "--pdf-cover",
+            "--pdf-appendix",
+        ]
+    )
+    assert rc == 0
+    assert pdf.read_bytes().startswith(b"%PDF")
