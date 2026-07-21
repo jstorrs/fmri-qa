@@ -32,9 +32,93 @@ notebooks = [
 fmri-qa = "fmriqc.cli:main"
 fmri-qa-hilo = "fmriqc.cli:hilo_main"
 
+[dependency-groups]
+dev = [
+    "hypothesis>=6.100",
+    "mypy>=1.18",
+    "pyright>=1.1.390",
+    "pytest>=8.0",
+    "ruff>=0.13",
+]
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/fmriqc"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py313"
+src = ["src"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+[tool.ruff.lint]
+# See style/tooling.md for the rationale behind each group. TC (type-only
+# imports under TYPE_CHECKING) and D (docstrings) are deliberately left out for
+# now — the ruleset is a living part of the style, tightened as needs recur.
+select = [
+    "E", "W", "F",   # pycodestyle + Pyflakes
+    "I",             # import sorting (isort)
+    "B",             # bugbear
+    "UP",            # pyupgrade
+    "SIM", "RET", "PIE", "FURB", "C4",  # simplifications
+    "S",             # flake8-bandit security
+    "BLE",           # blind-except (justified batch catches carry a scoped noqa)
+    "PERF",          # performance anti-patterns
+    "PLE", "PLC", "PLW",  # pylint errors / conventions / warnings
+    "PTH",           # prefer pathlib over os.path
+    "G",             # logging-format correctness
+    "A",             # shadowing builtins
+    "T20",           # flake8-print (keeps print out of libraries)
+    "RUF",           # ruff-specific rules
+]
+ignore = [
+    "PLC0415",  # allow function-local imports (the CLI lazily imports report)
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Tests: assert is the assertion, magic values and unused fixture args are fine.
+"**/tests/**" = ["S101", "PLR2004", "ARG"]
+# Output belongs to the binary (see style/logging.md).
+"**/cli.py" = ["T201"]
+"**/__main__.py" = ["T201"]
+# The report renders human-facing text with intentional typography (× ° —).
+"src/fmriqc/report.py" = ["RUF001"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["fmriqc"]
+
+[tool.mypy]
+python_version = "3.13"
+strict = true
+warn_unused_ignores = true
+warn_return_any = true
+files = ["src"]
+
+# Scientific stack ships without (complete) type information.
+[[tool.mypy.overrides]]
+module = [
+    "nibabel.*",
+    "scipy.*",
+    "skimage.*",
+    "svglib.*",
+    "matplotlib.*",
+    "reportlab.*",
+]
+ignore_missing_imports = true
+
+[tool.pyright]
+include = ["src"]
+pythonVersion = "3.13"
+typeCheckingMode = "standard"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short"

@@ -37,6 +37,7 @@ _CONTENT_W = _PAGE_W - 2 * _MARGIN
 # matplotlib panels/plots -> embeddable vector drawings
 # --------------------------------------------------------------------------- #
 
+
 def _patch_svglib_image_alignment():
     """Fix svglib truncating embedded-image geometry to whole points.
 
@@ -48,9 +49,11 @@ def _patch_svglib_image_alignment():
     This reinstates the method verbatim without the `int()` casts. Pinned to the
     svglib in `uv.lock`; revisit on upgrade.
     """
+
     def convertImage(self, node):
         x, y, width, height = self.convert_length_attrs(
-            node, "x", "y", "width", "height")
+            node, "x", "y", "width", "height"
+        )
         image = node._resolved_target
         image = Image(x, y + height, width, height, image)
         group = Group(image)
@@ -111,11 +114,16 @@ def _draw_roi(ax, roi, *, lw=1.3):
     """
     (r, c) = roi.index
     pad = 0.5 * lw * _data_per_point(ax)
-    ax.add_patch(Rectangle(
-        (c.start - 0.5 - pad, r.start - 0.5 - pad),
-        (c.stop - c.start) + 2 * pad, (r.stop - r.start) + 2 * pad,
-        edgecolor="red", facecolor="none", lw=lw,
-    ))
+    ax.add_patch(
+        Rectangle(
+            (c.start - 0.5 - pad, r.start - 0.5 - pad),
+            (c.stop - c.start) + 2 * pad,
+            (r.stop - r.start) + 2 * pad,
+            edgecolor="red",
+            facecolor="none",
+            lw=lw,
+        )
+    )
 
 
 def _draw_hull(ax, mask, *, color="tab:cyan", lw=1.0):
@@ -140,7 +148,7 @@ def _panel_fig(img, title, *, mask=None, roi=None, log=False, aspect=1.15):
     ax = fig.add_subplot(111)
     data = np.log(np.clip(img, 1e-9, None)) if log else img
     finite = data[np.isfinite(data)]
-    vmin, vmax = (np.percentile(finite, [2, 98]) if finite.size else (0, 1))
+    vmin, vmax = np.percentile(finite, [2, 98]) if finite.size else (0, 1)
     ax.imshow(data, cmap="gray", vmin=vmin, vmax=vmax, interpolation="nearest")
     ax.set_xticks([])
     ax.set_yticks([])
@@ -183,8 +191,13 @@ def _ghost_panel_fig(mean_image, phantom_mask, pe_axis, *, aspect=1.15):
     """
     fig = Figure(figsize=(2.0, 2.0 * aspect))
     ax = fig.add_subplot(111)
-    ax.imshow(mean_image, cmap="gray", vmin=0, vmax=np.percentile(mean_image, 99),
-              interpolation="nearest")
+    ax.imshow(
+        mean_image,
+        cmap="gray",
+        vmin=0,
+        vmax=np.percentile(mean_image, 99),
+        interpolation="nearest",
+    )
     valid_mask = q.edge_valid_mask(mean_image)
     handles = []
     if pe_axis in (0, 1):
@@ -195,18 +208,25 @@ def _ghost_panel_fig(mean_image, phantom_mask, pe_axis, *, aspect=1.15):
         _overlay(ax, ro_ghost, _RO_GHOST_RGB)
         _overlay(ax, signal_mask, _GHOST_SRC_RGB)
         _overlay(ax, ghost_mask, _GHOST_RGB)
-        handles += [Patch(color=_GHOST_SRC_RGB, label="PE signal"),
-                    Patch(color=_GHOST_RGB, label="PE ghost"),
-                    Patch(color=_RO_SRC_RGB, label="RO signal"),
-                    Patch(color=_RO_GHOST_RGB, label="RO ghost")]
+        handles += [
+            Patch(color=_GHOST_SRC_RGB, label="PE signal"),
+            Patch(color=_GHOST_RGB, label="PE ghost"),
+            Patch(color=_RO_SRC_RGB, label="RO signal"),
+            Patch(color=_RO_GHOST_RGB, label="RO ghost"),
+        ]
     invalid = ~valid_mask
     if invalid.any():
         _overlay(ax, invalid, _INVALID_RGB, alpha=0.9)
         handles.append(Patch(color=_INVALID_RGB, label="invalid edge"))
     if handles:
         ax.legend(
-            handles=handles, fontsize=5, loc="lower right", framealpha=0.6,
-            handlelength=1.0, borderpad=0.3, labelspacing=0.2,
+            handles=handles,
+            fontsize=5,
+            loc="lower right",
+            framealpha=0.6,
+            handlelength=1.0,
+            borderpad=0.3,
+            labelspacing=0.2,
         )
     ax.set_title("N/2 ghost", fontsize=9)
     ax.set_xticks([])
@@ -232,8 +252,14 @@ def _plot_weisskoff(ax, wk, fs=9):
     """
     # Measured data on top (zorder), but first in the legend (call order).
     ax.loglog(wk.roi_sizes, wk.cv, "o-", ms=3, label="measured", zorder=3)
-    ax.loglog(wk.roi_sizes, wk.cv1_pooled / wk.roi_sizes,
-              "--", color="gray", label="ideal (pooled cv1)", zorder=2)
+    ax.loglog(
+        wk.roi_sizes,
+        wk.cv1_pooled / wk.roi_sizes,
+        "--",
+        color="gray",
+        label="ideal (pooled cv1)",
+        zorder=2,
+    )
     ax.set_xlabel("ROI width (voxels)")
     ax.set_ylabel("CV")
     ax.set_title(f"Weisskoff (RDC {wk.rdc:.1f})", fontsize=fs)
@@ -377,8 +403,14 @@ def _plot_psf(ax, s, fs=9):
         x = s.displacement(axis)
         fw = s.fwhm_axis(axis)
         xs = np.linspace(0.0, xmax, 100)
-        ax.plot(xs, s.psf_model(xs, axis), "-", color=color, lw=1.1,
-                label=f"{name} {fw:.2f}{unit}")
+        ax.plot(
+            xs,
+            s.psf_model(xs, axis),
+            "-",
+            color=color,
+            lw=1.1,
+            label=f"{name} {fw:.2f}{unit}",
+        )
         vis = x <= xmax
         ax.plot(x[vis], s.psf_empirical(axis)[vis], "o", ms=3, color=color)
     ax.set_xlim(0, xmax)
@@ -537,16 +569,22 @@ def _header(c, result, title):
 def _panel_figs(result):
     """The summary image panels, in row order (last is the N/2 ghost overlay)."""
     images, geom, roi, m = result.images, result.geom, result.roi, result.metrics
-    sfnr_img = np.where(geom.phantom_mask,
-                        images.mean_image / (images.fluctuation_noise + 1e-9), 0.0)
+    sfnr_img = np.where(
+        geom.phantom_mask, images.mean_image / (images.fluctuation_noise + 1e-9), 0.0
+    )
     return [
-        _panel_fig(images.mean_image, "signal",
-                   mask=geom.phantom_mask, roi=roi),
+        _panel_fig(images.mean_image, "signal", mask=geom.phantom_mask, roi=roi),
         _panel_fig(sfnr_img, "SFNR", roi=roi),
-        _panel_fig(images.fluctuation_noise, "fluct noise (log)",
-                   mask=geom.phantom_mask, roi=roi, log=True),
-        _panel_fig(images.static_noise, "static noise",
-                   mask=geom.phantom_mask, roi=roi),
+        _panel_fig(
+            images.fluctuation_noise,
+            "fluct noise (log)",
+            mask=geom.phantom_mask,
+            roi=roi,
+            log=True,
+        ),
+        _panel_fig(
+            images.static_noise, "static noise", mask=geom.phantom_mask, roi=roi
+        ),
         _ghost_panel_fig(images.mean_image, geom.phantom_mask, m.pe_axis),
     ]
 
@@ -576,10 +614,12 @@ def _timeseries(result):
     images, roi = result.images, result.roi
     n = images.center_slice.shape[-1]
     t = np.arange(n) * images.tr
-    return (t,
-            _roi_series(images.center_slice, roi),
-            _roi_series(images.trend, roi),
-            _roi_series(images.fluctuations, roi))
+    return (
+        t,
+        _roi_series(images.center_slice, roi),
+        _roi_series(images.trend, roi),
+        _roi_series(images.fluctuations, roi),
+    )
 
 
 def _one_page(c, result, title):
@@ -593,37 +633,96 @@ def _one_page(c, result, title):
     half = (_CONTENT_W - gap) / 2
 
     y -= 10
-    _draw_fig(c, _plot_fig(lambda ax: _plot_weisskoff(ax, wk), (3.6, 2.5)),
-                _MARGIN, y, half, row_h)
-    _draw_fig(c, _plot_fig(lambda ax: _plot_rdc(ax, wk), (3.6, 2.5)),
-                _MARGIN + half + gap, y, half, row_h)
+    _draw_fig(
+        c,
+        _plot_fig(lambda ax: _plot_weisskoff(ax, wk), (3.6, 2.5)),
+        _MARGIN,
+        y,
+        half,
+        row_h,
+    )
+    _draw_fig(
+        c,
+        _plot_fig(lambda ax: _plot_rdc(ax, wk), (3.6, 2.5)),
+        _MARGIN + half + gap,
+        y,
+        half,
+        row_h,
+    )
     y -= row_h + 6
 
     spikes = result.metrics.spikes
-    _draw_fig(c, _plot_fig(lambda ax: _plot_signal(ax, t, signal, trend),
-                             (3.6, 2.5)), _MARGIN, y, half, row_h)
-    _draw_fig(c, _plot_fig(
-        lambda ax: _plot_residual(ax, t, resid, tc_outlier=spikes.tc_outlier),
-        (3.6, 2.5)), _MARGIN + half + gap, y, half, row_h)
+    _draw_fig(
+        c,
+        _plot_fig(lambda ax: _plot_signal(ax, t, signal, trend), (3.6, 2.5)),
+        _MARGIN,
+        y,
+        half,
+        row_h,
+    )
+    _draw_fig(
+        c,
+        _plot_fig(
+            lambda ax: _plot_residual(ax, t, resid, tc_outlier=spikes.tc_outlier),
+            (3.6, 2.5),
+        ),
+        _MARGIN + half + gap,
+        y,
+        half,
+        row_h,
+    )
     y -= row_h + 6
 
     fifth = (_CONTENT_W - 4 * gap) / 5
-    _draw_fig(c, _plot_fig(
-        lambda ax: _plot_spectrum(ax, resid, result.images.tr,
-                                  spec_outlier=spikes.spec_outlier),
-        (3.0, 2.0)), _MARGIN, y, fifth, 120.0)
-    _draw_fig(c, _plot_fig(
-        lambda ax: _plot_outliers(ax, t, result.metrics.outliers), (3.0, 2.0)),
-              _MARGIN + fifth + gap, y, fifth, 120.0)
-    _draw_fig(c, _plot_fig(
-        lambda ax: _plot_motion(ax, t, result.metrics.motion), (3.0, 2.0)),
-              _MARGIN + 2 * (fifth + gap), y, fifth, 120.0)
-    _draw_fig(c, _plot_fig(
-        lambda ax: _plot_com(ax, t, result.metrics.center_of_mass), (3.0, 2.0)),
-              _MARGIN + 3 * (fifth + gap), y, fifth, 120.0)
-    _draw_fig(c, _plot_fig(
-        lambda ax: _plot_psf(ax, result.metrics.smoothness), (3.0, 2.0)),
-              _MARGIN + 4 * (fifth + gap), y, fifth, 120.0)
+    _draw_fig(
+        c,
+        _plot_fig(
+            lambda ax: _plot_spectrum(
+                ax, resid, result.images.tr, spec_outlier=spikes.spec_outlier
+            ),
+            (3.0, 2.0),
+        ),
+        _MARGIN,
+        y,
+        fifth,
+        120.0,
+    )
+    _draw_fig(
+        c,
+        _plot_fig(
+            lambda ax: _plot_outliers(ax, t, result.metrics.outliers), (3.0, 2.0)
+        ),
+        _MARGIN + fifth + gap,
+        y,
+        fifth,
+        120.0,
+    )
+    _draw_fig(
+        c,
+        _plot_fig(lambda ax: _plot_motion(ax, t, result.metrics.motion), (3.0, 2.0)),
+        _MARGIN + 2 * (fifth + gap),
+        y,
+        fifth,
+        120.0,
+    )
+    _draw_fig(
+        c,
+        _plot_fig(
+            lambda ax: _plot_com(ax, t, result.metrics.center_of_mass), (3.0, 2.0)
+        ),
+        _MARGIN + 3 * (fifth + gap),
+        y,
+        fifth,
+        120.0,
+    )
+    _draw_fig(
+        c,
+        _plot_fig(lambda ax: _plot_psf(ax, result.metrics.smoothness), (3.0, 2.0)),
+        _MARGIN + 4 * (fifth + gap),
+        y,
+        fifth,
+        120.0,
+    )
 
 
 def _summary_page(c, result, title):
@@ -638,50 +737,118 @@ def _analysis_page(c, result, title):
 
     y = _PAGE_H - 34
     c.setFont("Helvetica-Bold", 13)
-    c.drawCentredString(_PAGE_W / 2, y, f"{title} — stability" if title else "stability")
+    c.drawCentredString(
+        _PAGE_W / 2, y, f"{title} — stability" if title else "stability"
+    )
     y -= 24
 
     gap, row_h = 16.0, 200.0
     half = (_CONTENT_W - gap) / 2
-    _draw_fig(c, _plot_fig(lambda ax: _plot_weisskoff(ax, wk, fs=10), (3.6, 3.0)),
-                _MARGIN, y, half, row_h)
-    _draw_fig(c, _plot_fig(lambda ax: _plot_rdc(ax, wk, fs=10), (3.6, 3.0)),
-                _MARGIN + half + gap, y, half, row_h)
+    _draw_fig(
+        c,
+        _plot_fig(lambda ax: _plot_weisskoff(ax, wk, fs=10), (3.6, 3.0)),
+        _MARGIN,
+        y,
+        half,
+        row_h,
+    )
+    _draw_fig(
+        c,
+        _plot_fig(lambda ax: _plot_rdc(ax, wk, fs=10), (3.6, 3.0)),
+        _MARGIN + half + gap,
+        y,
+        half,
+        row_h,
+    )
     y -= row_h + 12
 
     spikes = result.metrics.spikes
-    _draw_fig(c, _plot_fig(lambda ax: _plot_signal(ax, t, signal, trend, fs=10),
-                             (3.6, 3.0)), _MARGIN, y, half, row_h)
-    _draw_fig(c, _plot_fig(
-        lambda ax: _plot_residual(ax, t, resid, fs=10,
-                                  tc_outlier=spikes.tc_outlier),
-        (3.6, 3.0)), _MARGIN + half + gap, y, half, row_h)
+    _draw_fig(
+        c,
+        _plot_fig(lambda ax: _plot_signal(ax, t, signal, trend, fs=10), (3.6, 3.0)),
+        _MARGIN,
+        y,
+        half,
+        row_h,
+    )
+    _draw_fig(
+        c,
+        _plot_fig(
+            lambda ax: _plot_residual(
+                ax, t, resid, fs=10, tc_outlier=spikes.tc_outlier
+            ),
+            (3.6, 3.0),
+        ),
+        _MARGIN + half + gap,
+        y,
+        half,
+        row_h,
+    )
     y -= row_h + 12
 
     fifth = (_CONTENT_W - 4 * gap) / 5
-    _draw_fig(c, _plot_fig(
-        lambda ax: _plot_spectrum(ax, resid, result.images.tr, fs=10,
-                                  spec_outlier=spikes.spec_outlier),
-        (3.0, 2.2)), _MARGIN, y, fifth, 150.0)
-    _draw_fig(c, _plot_fig(
-        lambda ax: _plot_outliers(ax, t, result.metrics.outliers, fs=10),
-        (3.0, 2.2)), _MARGIN + fifth + gap, y, fifth, 150.0)
-    _draw_fig(c, _plot_fig(
-        lambda ax: _plot_motion(ax, t, result.metrics.motion, fs=10),
-        (3.0, 2.2)), _MARGIN + 2 * (fifth + gap), y, fifth, 150.0)
-    _draw_fig(c, _plot_fig(
-        lambda ax: _plot_com(ax, t, result.metrics.center_of_mass, fs=10),
-        (3.0, 2.2)), _MARGIN + 3 * (fifth + gap), y, fifth, 150.0)
-    _draw_fig(c, _plot_fig(
-        lambda ax: _plot_psf(ax, result.metrics.smoothness, fs=10),
-        (3.0, 2.2)), _MARGIN + 4 * (fifth + gap), y, fifth, 150.0)
+    _draw_fig(
+        c,
+        _plot_fig(
+            lambda ax: _plot_spectrum(
+                ax, resid, result.images.tr, fs=10, spec_outlier=spikes.spec_outlier
+            ),
+            (3.0, 2.2),
+        ),
+        _MARGIN,
+        y,
+        fifth,
+        150.0,
+    )
+    _draw_fig(
+        c,
+        _plot_fig(
+            lambda ax: _plot_outliers(ax, t, result.metrics.outliers, fs=10), (3.0, 2.2)
+        ),
+        _MARGIN + fifth + gap,
+        y,
+        fifth,
+        150.0,
+    )
+    _draw_fig(
+        c,
+        _plot_fig(
+            lambda ax: _plot_motion(ax, t, result.metrics.motion, fs=10), (3.0, 2.2)
+        ),
+        _MARGIN + 2 * (fifth + gap),
+        y,
+        fifth,
+        150.0,
+    )
+    _draw_fig(
+        c,
+        _plot_fig(
+            lambda ax: _plot_com(ax, t, result.metrics.center_of_mass, fs=10),
+            (3.0, 2.2),
+        ),
+        _MARGIN + 3 * (fifth + gap),
+        y,
+        fifth,
+        150.0,
+    )
+    _draw_fig(
+        c,
+        _plot_fig(
+            lambda ax: _plot_psf(ax, result.metrics.smoothness, fs=10), (3.0, 2.2)
+        ),
+        _MARGIN + 4 * (fifth + gap),
+        y,
+        fifth,
+        150.0,
+    )
 
 
 REPORT_LAYOUTS = ("one", "two")
 
 
-def add_report_pages(c: canvas.Canvas, result: "q.QAResult", title: str = "",
-                     layout: str = "one") -> None:
+def add_report_pages(
+    c: canvas.Canvas, result: "q.QAResult", title: str = "", layout: str = "one"
+) -> None:
     """Draw a scan's report page(s) onto an open ReportLab `Canvas`.
 
     `layout="one"` renders a single condensed page; `layout="two"` renders a

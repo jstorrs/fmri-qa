@@ -8,8 +8,8 @@ from typing import Literal, overload
 import nibabel as nib
 import numpy as np
 from numpy.typing import NDArray
-from scipy.interpolate import make_lsq_spline
 from scipy import ndimage
+from scipy.interpolate import make_lsq_spline
 from scipy.special import erfcinv
 from skimage import filters, morphology, segmentation
 
@@ -83,17 +83,17 @@ class ScanMeta:
     voxel_mm: tuple[float, float, float]
     matrix: tuple[int, int]
     tr: float
-    te: float | None = None            # s
-    flip_angle: float | None = None    # degrees
+    te: float | None = None  # s
+    flip_angle: float | None = None  # degrees
     slice_thickness: float | None = None  # mm
-    pe_dir: str | None = None          # "row" / "col"
+    pe_dir: str | None = None  # "row" / "col"
     coil: str | None = None
     manufacturer: str | None = None
     model: str | None = None
     serial: str | None = None
     field_strength: float | None = None  # tesla
     software: str | None = None
-    datetime: str | None = None        # acquisition date and/or time
+    datetime: str | None = None  # acquisition date and/or time
     series: str | None = None
 
 
@@ -117,7 +117,7 @@ def _load_sidecar(path: str | Path) -> dict:
             f"(convert the DICOM with dcm2niix so a .json is written alongside "
             f"the NIfTI)"
         )
-    with open(sidecar) as f:
+    with sidecar.open() as f:
         return json.load(f)
 
 
@@ -342,12 +342,12 @@ class SaturationResult:
     `None` -- a maximum that is not a `2**n - 1` value means no clipping.
     """
 
-    ceiling: float | None      # clip level (image units); None if max is not a 2**n-1 rail
-    bits: int | None           # n such that the stored ceiling is 2**n - 1
-    n_clipped_pre: int         # clipped samples in the dropped warm-up volumes
-    n_clipped_kept: int        # clipped samples in the analyzed volumes (bias the metrics)
-    worst_volume: int | None   # volume index (full series) with the most clipped samples
-    worst_count: int           # clipped samples in that worst volume
+    ceiling: float | None  # clip level (image units); None if max is not a 2**n-1 rail
+    bits: int | None  # n such that the stored ceiling is 2**n - 1
+    n_clipped_pre: int  # clipped samples in the dropped warm-up volumes
+    n_clipped_kept: int  # clipped samples in the analyzed volumes (bias the metrics)
+    worst_volume: int | None  # volume index (full series) with the most clipped samples
+    worst_count: int  # clipped samples in that worst volume
 
     @property
     def n_clipped(self) -> int:
@@ -386,8 +386,8 @@ class OutlierResult:
     """
 
     fraction: NDArray  # (n_t,) outlier-voxel fraction per frame
-    n_voxels: int      # masked voxels (the fraction denominator)
-    qthr: float        # per-voxel tail probability (expected chance fraction)
+    n_voxels: int  # masked voxels (the fraction denominator)
+    qthr: float  # per-voxel tail probability (expected chance fraction)
 
     @property
     def max_fraction(self) -> float:
@@ -426,7 +426,7 @@ class SpikeResult:
     plots (`spike_scores`). NaN if the series is empty or has no spread.
     """
 
-    tc_outlier: float    # max|detrended ROI-mean residual| / MAD
+    tc_outlier: float  # max|detrended ROI-mean residual| / MAD
     spec_outlier: float  # max(residual-spectrum magnitude) / MAD
 
 
@@ -515,8 +515,8 @@ class CenterOfMassResult:
     reported in mm.
     """
 
-    com: NDArray                 # (n_t, 2) per-frame circular COM (voxels, [0, N))
-    shape: tuple[int, int]       # in-plane (N0, N1): the axis wrap periods
+    com: NDArray  # (n_t, 2) per-frame circular COM (voxels, [0, N))
+    shape: tuple[int, int]  # in-plane (N0, N1): the axis wrap periods
     voxel_mm: tuple[float, float] | None = None
 
     @property
@@ -526,8 +526,9 @@ class CenterOfMassResult:
         theta = self.com * (2.0 * np.pi / n)
         with warnings.catch_warnings():  # all-NaN axis -> NaN, not a warning
             warnings.simplefilter("ignore", RuntimeWarning)
-            mean_theta = np.arctan2(np.nanmean(np.sin(theta), axis=0),
-                                    np.nanmean(np.cos(theta), axis=0))
+            mean_theta = np.arctan2(
+                np.nanmean(np.sin(theta), axis=0), np.nanmean(np.cos(theta), axis=0)
+            )
         return (mean_theta % (2.0 * np.pi)) * n / (2.0 * np.pi)
 
     @property
@@ -543,7 +544,7 @@ class CenterOfMassResult:
 
     @property
     def displacement(self) -> NDArray:
-        """(n_t,) centroid displacement magnitude per volume (mm if known, else voxels)."""
+        """(n_t,) centroid displacement per volume (mm if known, else voxels)."""
         d = self.deviation
         if self.voxel_mm is not None:
             d = d * np.asarray(self.voxel_mm)
@@ -586,10 +587,10 @@ class SmoothnessResult:
     """
 
     fwhm_vox: tuple[float, float]
-    lags: NDArray                                # (n_lag,) integer voxel lags 0..L
-    acf: NDArray                                 # (2, n_lag): per-axis autocorrelation
+    lags: NDArray  # (n_lag,) integer voxel lags 0..L
+    acf: NDArray  # (2, n_lag): per-axis autocorrelation
     voxel_mm: tuple[float, float] | None = None
-    pe_axis: int | None = None                   # array axis of the phase-encode direction
+    pe_axis: int | None = None  # array axis of the phase-encode direction
 
     # -- per-axis helpers ---------------------------------------------------- #
     def _mm_per(self, axis: int) -> float:
@@ -601,7 +602,7 @@ class SmoothnessResult:
         return self.fwhm_vox[axis] * self._mm_per(axis)
 
     def displacement(self, axis: int) -> NDArray:
-        """Lag axis for `axis` as a length (mm if the voxel size is known, else voxels)."""
+        """Lag axis for `axis` as a length (mm if voxel size is known, else voxels)."""
         return self.lags * self._mm_per(axis)
 
     def psf_empirical(self, axis: int) -> NDArray:
@@ -646,8 +647,10 @@ class SmoothnessResult:
         """(axis 0, axis 1) FWHM in mm, or None if voxel sizes are unknown."""
         if self.voxel_mm is None:
             return None
-        return (self.fwhm_vox[0] * self.voxel_mm[0],
-                self.fwhm_vox[1] * self.voxel_mm[1])
+        return (
+            self.fwhm_vox[0] * self.voxel_mm[0],
+            self.fwhm_vox[1] * self.voxel_mm[1],
+        )
 
     @property
     def fwhm_combined_vox(self) -> float:
@@ -675,7 +678,9 @@ class QAMetrics:
     sfnr: float
     rdc: float
     ghost_pct: float  # fBIRN percent ghost along PE: 100 * (mean ghost / mean signal)
-    ghost_top_pct: float  # PE percent ghost of the brightest 10% of ghost voxels (localized)
+    ghost_top_pct: (
+        float  # PE percent ghost of the brightest 10% of ghost voxels (localized)
+    )
     ro_ghost_pct: float  # same along the readout axis: background-relative baseline
     acr_ghost_pct: float  # ACR/AAPM-equivalent percent-signal-ghosting: |PE% - RO%|
     pe_axis: int | None  # phase-encode axis actually used for the ghost masks
@@ -710,12 +715,15 @@ class QAResult:
 # Preprocessing & phantom geometry
 # --------------------------------------------------------------------------- #
 
+
 def trim_count(tr: float, trim_sec: float) -> int:
     """Number of initial (non-steady-state) volumes dropped for `trim_sec`."""
-    return max(int(round(trim_sec / tr)), 0)
+    return max(round(trim_sec / tr), 0)
+
 
 def trim_initial(data: NDArray, tr: float, trim_sec: float) -> NDArray:
-    return data[..., trim_count(tr, trim_sec):]
+    return data[..., trim_count(tr, trim_sec) :]
+
 
 def segment_phantom(image: NDArray) -> NDArray:
     # mode="wrap": MRI images are periodic (FFT reconstruction), so the edge
@@ -725,6 +733,7 @@ def segment_phantom(image: NDArray) -> NDArray:
     labels[image < np.quantile(image, 0.1)] = 1
     labels[image > np.quantile(image, 0.9)] = 2
     return segmentation.watershed(edges, labels) == 2
+
 
 def extract_center_slice(data: NDArray, center: str = "image") -> NDArray:
     """Select the QA slice from a volume.
@@ -741,10 +750,12 @@ def extract_center_slice(data: NDArray, center: str = "image") -> NDArray:
         raise ValueError(f"unknown center {center!r}; choose from {ROI_CENTER_MODES}")
     return data[:, :, z, :]
 
+
 def find_phantom_center(phantom_mask: NDArray) -> NDArray:
     dist = ndimage.distance_transform_edt(phantom_mask)
     roi_center = np.unravel_index(np.argmax(dist), dist.shape)
     return np.array(roi_center)
+
 
 def roi_indexes(roi_center: NDArray, n: int) -> tuple[slice, slice]:
     # roi_center is (row, col) in array-index order; return (rows, cols) so
@@ -753,6 +764,7 @@ def roi_indexes(roi_center: NDArray, n: int) -> tuple[slice, slice]:
     p1 = roi_center - (n - 1) // 2
     p2 = p1 + n
     return slice(p1[0], p2[0]), slice(p1[1], p2[1])
+
 
 def detect_phantom(images: "QAImages") -> PhantomGeometry:
     """Locate the phantom from the preprocessed images: mask and detected center."""
@@ -767,6 +779,7 @@ def detect_phantom(images: "QAImages") -> PhantomGeometry:
 # Detrending
 # --------------------------------------------------------------------------- #
 
+
 def spline_nodes(y: NDArray, tr: float, cutoff_s: float = SPLINE_CUTOFF_S) -> int:
     """Recommended number of interior knots: one spline segment per `cutoff_s`.
 
@@ -774,7 +787,8 @@ def spline_nodes(y: NDArray, tr: float, cutoff_s: float = SPLINE_CUTOFF_S) -> in
     `spline_residuals`, separated so it can be computed once from the header.
     """
     nt = y.shape[-1]
-    return max(int(round(nt * tr / cutoff_s)) - 1, 0)
+    return max(round(nt * tr / cutoff_s) - 1, 0)
+
 
 def spline_residuals(
     y: NDArray[np.float64],
@@ -790,20 +804,24 @@ def spline_residuals(
     x = np.arange(nt, dtype=np.float64)
 
     # interior knots spread evenly over the fitted (steady-state) span
-    t = np.concatenate((
-        np.full(degree + 1, 0.0),
-        np.linspace(0, nt, n_nodes + 2)[1:-1],
-        np.full(degree + 1, nt),
-    ))
+    t = np.concatenate(
+        (
+            np.full(degree + 1, 0.0),
+            np.linspace(0, nt, n_nodes + 2)[1:-1],
+            np.full(degree + 1, nt),
+        )
+    )
 
     # Treat all leading-index combinations as separate signals: (nt, n_signals).
     signals = y.reshape(-1, nt).T
     fitted = make_lsq_spline(x, signals, t, k=degree)(x)
     return (signals - fitted).T.reshape(y.shape)
 
+
 def poly_degree(y: NDArray, tr: float, cutoff_s: float = POLY_CUTOFF_S) -> int:
     n = y.shape[-1]
     return int(np.round(n * tr / cutoff_s))
+
 
 def poly_residuals(y: NDArray, degree: int) -> NDArray:
     """Detrend along the last axis with Legendre polynomials (handles N-D)."""
@@ -822,10 +840,13 @@ def poly_residuals(y: NDArray, degree: int) -> NDArray:
     fitted = (design @ coefficients).T
     return y - fitted.reshape(y.shape)
 
+
 DETREND_METHODS = ("poly", "spline")
 
-def detrend_fn(center_slice: NDArray, tr: float,
-               method: str = "poly") -> tuple[Callable[[NDArray], NDArray], int]:
+
+def detrend_fn(
+    center_slice: NDArray, tr: float, method: str = "poly"
+) -> tuple[Callable[[NDArray], NDArray], int]:
     """Build a detrender `f(y) -> residuals` and its fit order for `method`.
 
     Complexity (poly degree / spline nodes) is derived once from the timeseries
@@ -838,19 +859,24 @@ def detrend_fn(center_slice: NDArray, tr: float,
     if method == "spline":
         n_nodes = spline_nodes(center_slice, tr)
         return (lambda y: spline_residuals(y, n_nodes)), n_nodes
-    raise ValueError(f"unknown detrend method {method!r}; choose from {DETREND_METHODS}")
+    raise ValueError(
+        f"unknown detrend method {method!r}; choose from {DETREND_METHODS}"
+    )
 
 
 # --------------------------------------------------------------------------- #
 # Noise metrics
 # --------------------------------------------------------------------------- #
 
+
 def fluctuation_noise(residuals: NDArray) -> NDArray:
     """Temporal RMS of detrended residuals (std about zero) over the last axis."""
     return np.std(residuals, axis=-1, mean=0)
 
-def outlier_fraction(fluctuations: NDArray, mask: NDArray,
-                     qthr: float = OUTLIER_QTHR) -> OutlierResult:
+
+def outlier_fraction(
+    fluctuations: NDArray, mask: NDArray, qthr: float = OUTLIER_QTHR
+) -> OutlierResult:
     """Per-TR outlier-voxel fraction over `mask`, following AFNI 3dToutcount.
 
     For each masked voxel the robust spread of its detrended residual is
@@ -865,17 +891,18 @@ def outlier_fraction(fluctuations: NDArray, mask: NDArray,
     detrend, as afni_proc.py recommends before outlier classification (its trend
     fit is L1 vs. our L2 -- a minor difference for a stable phantom).
     """
-    resid = fluctuations[mask]                       # (n_vox, n_t)
+    resid = fluctuations[mask]  # (n_vox, n_t)
     n_vox, n_t = resid.shape
-    mad = np.median(np.abs(resid), axis=1)            # (n_vox,)
+    mad = np.median(np.abs(resid), axis=1)  # (n_vox,)
     alpha = float(np.sqrt(2.0) * erfcinv(2.0 * qthr / n_t))  # Q^-1(qthr / n_t)
-    thr = alpha * np.sqrt(np.pi / 2.0) * mad          # per-voxel outlier threshold
+    thr = alpha * np.sqrt(np.pi / 2.0) * mad  # per-voxel outlier threshold
     is_out = (np.abs(resid) > thr[:, None]) & (mad > 0)[:, None]
     return OutlierResult(
         fraction=is_out.sum(axis=0) / n_vox,
         n_voxels=int(n_vox),
         qthr=qthr,
     )
+
 
 def _spike_ratio(x: NDArray) -> float:
     """Peak-over-spread ratio `max|x| / mad(x)`, R's `mad` (see `MAD_SCALE`).
@@ -888,6 +915,7 @@ def _spike_ratio(x: NDArray) -> float:
         return float("nan")
     mad = MAD_SCALE * float(np.median(np.abs(x - np.median(x))))
     return float(np.max(np.abs(x)) / mad) if mad > 0 else float("nan")
+
 
 def spike_scores(images: "QAImages", roi: ROI) -> SpikeResult:
     """cran-fmriqa MAD-normalized temporal/spectral spike scores over the ROI.
@@ -903,8 +931,10 @@ def spike_scores(images: "QAImages", roi: ROI) -> SpikeResult:
     spec = np.abs(np.fft.rfft(resid))[1:]  # magnitude, DC bin dropped (as cran does)
     return SpikeResult(tc_outlier=_spike_ratio(resid), spec_outlier=_spike_ratio(spec))
 
-def _roi_cv(fluctuations: NDArray, mean_image: NDArray,
-            roi_center: NDArray, k: int) -> float:
+
+def _roi_cv(
+    fluctuations: NDArray, mean_image: NDArray, roi_center: NDArray, k: int
+) -> float:
     """CV over a k x k ROI: RMS of the ROI-mean fluctuation / ROI-mean signal.
 
     ROI-averaging the per-voxel `fluctuations` equals detrending the ROI-mean
@@ -915,12 +945,15 @@ def _roi_cv(fluctuations: NDArray, mean_image: NDArray,
     roi_fluct = fluctuations[*roi].mean(axis=(0, 1))
     return float(np.std(roi_fluct, mean=0) / mean_image[*roi].mean())
 
-def _roi_cv1(fluctuation_noise: NDArray, mean_image: NDArray,
-             roi_center: NDArray, k: int) -> float:
+
+def _roi_cv1(
+    fluctuation_noise: NDArray, mean_image: NDArray, roi_center: NDArray, k: int
+) -> float:
     """Single-voxel CV pooled over a k x k ROI: RMS(noise) / ROI mean signal."""
     roi = roi_indexes(roi_center, k)
     s = fluctuation_noise[*roi]
     return float(np.sqrt(np.mean(s**2)) / mean_image[*roi].mean())
+
 
 def weisskoff(images: "QAImages", roi: ROI) -> WeisskoffResult:
     """Weisskoff plot + radius of decorrelation over a resolved ROI.
@@ -935,14 +968,10 @@ def weisskoff(images: "QAImages", roi: ROI) -> WeisskoffResult:
     # every integer width 1..roi.size, per the fBIRN/Glover Weisskoff protocol
     # (Friedman & Glover 2006); cv[-1] is at the full ROI the pooled cv1 spans
     roi_sizes = np.arange(1, roi.size + 1)
-    cv = np.array([
-        _roi_cv(fluctuations, mean_image, roi.center, int(k))
-        for k in roi_sizes
-    ])
-    cv1 = np.array([
-        _roi_cv1(noise, mean_image, roi.center, int(k))
-        for k in roi_sizes
-    ])
+    cv = np.array(
+        [_roi_cv(fluctuations, mean_image, roi.center, int(k)) for k in roi_sizes]
+    )
+    cv1 = np.array([_roi_cv1(noise, mean_image, roi.center, int(k)) for k in roi_sizes])
 
     idx = roi.index
     s = noise[*idx]
@@ -956,15 +985,18 @@ def weisskoff(images: "QAImages", roi: ROI) -> WeisskoffResult:
         rdc=cv1_pooled / cv[-1],
     )
 
+
 def odd_even_difference(center_slice: NDArray) -> NDArray:
     """|mean(even frames) - mean(odd frames)| — a temporal-stability image."""
     even = center_slice[..., 0::2].mean(axis=-1)
     odd = center_slice[..., 1::2].mean(axis=-1)
     return np.abs(even - odd)
 
+
 def image_center(shape: tuple[int, ...]) -> NDArray:
     """Geometric center (row, col) of an image, array-index order."""
     return np.array(shape[:2]) // 2
+
 
 def _clamp_center(center: NDArray, n: int, shape: tuple[int, ...]) -> NDArray:
     """Shift `center` so an n x n ROI (per `roi_indexes`) stays within `shape`."""
@@ -972,8 +1004,13 @@ def _clamp_center(center: NDArray, n: int, shape: tuple[int, ...]) -> NDArray:
     hi = n - lo
     return np.array([int(np.clip(center[i], lo, shape[i] - hi)) for i in (0, 1)])
 
-def resolve_roi(images: "QAImages", geom: PhantomGeometry,
-                roi_size: int = FBIRN_ROI_SIZE, center: str = "image") -> ROI:
+
+def resolve_roi(
+    images: "QAImages",
+    geom: PhantomGeometry,
+    roi_size: int = FBIRN_ROI_SIZE,
+    center: str = "image",
+) -> ROI:
     """Resolve the summary ROI once for a localization mode.
 
     "image": image-matrix center (Glover). "phantom": detected phantom center.
@@ -988,8 +1025,11 @@ def resolve_roi(images: "QAImages", geom: PhantomGeometry,
     elif center == "phantom":
         c = geom.roi_center
     else:
-        raise ValueError(f"unknown ROI center {center!r}; choose from {ROI_CENTER_MODES}")
+        raise ValueError(
+            f"unknown ROI center {center!r}; choose from {ROI_CENTER_MODES}"
+        )
     return ROI(center=_clamp_center(c, n, shape), size=n)
+
 
 def roi_fits(phantom_mask: NDArray, roi: tuple[slice, slice]) -> bool:
     """True if `roi` is on-image and every voxel of it lies inside the phantom.
@@ -1001,6 +1041,7 @@ def roi_fits(phantom_mask: NDArray, roi: tuple[slice, slice]) -> bool:
     if r.start < 0 or c.start < 0 or r.stop > h or c.stop > w:
         return False
     return bool(np.all(phantom_mask[roi]))
+
 
 def snr(images: "QAImages", roi: ROI) -> float:
     """fBIRN signal-to-noise ratio over a resolved ROI (Glover 2006).
@@ -1018,6 +1059,7 @@ def snr(images: "QAImages", roi: ROI) -> float:
     var_summary = diff[*idx].var()
     return float(signal / np.sqrt(var_summary / n_frames))
 
+
 def sfnr(images: "QAImages", roi: ROI) -> float:
     """fBIRN signal-to-fluctuation-noise ratio over a resolved ROI (Glover 2006).
 
@@ -1028,6 +1070,7 @@ def sfnr(images: "QAImages", roi: ROI) -> float:
     sfnr_image = images.mean_image[*idx] / images.fluctuation_noise[*idx]
     return float(sfnr_image.mean())
 
+
 def drift_percent(images: "QAImages", roi: ROI) -> float:
     """Peak-to-peak of the ROI-mean fitted trend, as % of the ROI mean signal."""
     idx = roi.index
@@ -1035,12 +1078,14 @@ def drift_percent(images: "QAImages", roi: ROI) -> float:
     signal = images.mean_image[*idx].mean()
     return float(100.0 * (trend_roi.max() - trend_roi.min()) / signal)
 
+
 def percent_fluctuation(images: "QAImages", roi: ROI) -> float:
     """SD of the ROI-mean residual, as % of the ROI mean signal (fBIRN)."""
     idx = roi.index
     resid_roi = images.fluctuations[*idx].mean(axis=(0, 1))
     signal = images.mean_image[*idx].mean()
     return float(100.0 * np.std(resid_roi, mean=0) / signal)
+
 
 def edge_valid_mask(image: NDArray) -> NDArray:
     """(X, Y) bool mask of real data, clearing only entirely-zeroed image edges.
@@ -1065,8 +1110,10 @@ def edge_valid_mask(image: NDArray) -> NDArray:
         valid[:, -1] = False
     return valid
 
-def _ghost_masks(phantom_mask: NDArray, pe_axis: int, radius: int,
-                 valid_mask: NDArray) -> tuple[NDArray, NDArray]:
+
+def _ghost_masks(
+    phantom_mask: NDArray, pe_axis: int, radius: int, valid_mask: NDArray
+) -> tuple[NDArray, NDArray]:
     """Region-matched (signal, ghost) masks for a candidate PE axis.
 
     The ghost is the phantom rolled half the FOV along `pe_axis`; the ghost mask
@@ -1089,6 +1136,7 @@ def _ghost_masks(phantom_mask: NDArray, pe_axis: int, radius: int,
     signal_mask = np.roll(ghost_mask, -shift, axis=pe_axis)
     return signal_mask, ghost_mask
 
+
 def ghost_ratio(
     mean_image: NDArray,
     phantom_mask: NDArray,
@@ -1108,6 +1156,7 @@ def ghost_ratio(
         valid_mask = edge_valid_mask(mean_image)
     signal_mask, ghost_mask = _ghost_masks(phantom_mask, pe_axis, radius, valid_mask)
     return float(mean_image[ghost_mask].mean() / mean_image[signal_mask].mean())
+
 
 def ghost_top_ratio(
     mean_image: NDArray,
@@ -1133,9 +1182,10 @@ def ghost_top_ratio(
     g = mean_image[ghost_mask]
     if g.size == 0:
         return float("nan")
-    k = max(1, int(round(top * g.size)))
+    k = max(1, round(top * g.size))
     bright = np.partition(g, -k)[-k:]  # the k largest ghost-voxel intensities
     return float(bright.mean() / mean_image[signal_mask].mean())
+
 
 def acr_ghosting_ratio(
     mean_image: NDArray,
@@ -1170,6 +1220,7 @@ def acr_ghosting_ratio(
     ro = ghost_ratio(mean_image, phantom_mask, freq_axis, radius, valid_mask)
     return abs(pe - ro)
 
+
 def _pe_axis_from_header(header) -> int | None:
     """PE axis from the NIfTI `dim_info` phase field, or None if unset/invalid.
 
@@ -1177,6 +1228,7 @@ def _pe_axis_from_header(header) -> int | None:
     """
     phase = header.get_dim_info()[1]
     return int(phase) if phase in (0, 1, 2) else None
+
 
 def phase_encode_axis(data: NDArray, radius: int = 3) -> int:
     """Estimate the PE axis from a MIP over time and all slices.
@@ -1187,15 +1239,24 @@ def phase_encode_axis(data: NDArray, radius: int = 3) -> int:
     mip = data.max(axis=(-2, -1))  # (X, Y): max over Z and T
     return estimate_pe_axis(mip, segment_phantom(mip), radius=radius)
 
+
 @overload
 def estimate_pe_axis(
-    mean_image: NDArray, phantom_mask: NDArray, radius: int = ...,
-    return_ratios: Literal[False] = ..., *, valid_mask: NDArray | None = ...,
+    mean_image: NDArray,
+    phantom_mask: NDArray,
+    radius: int = ...,
+    return_ratios: Literal[False] = ...,
+    *,
+    valid_mask: NDArray | None = ...,
 ) -> int: ...
 @overload
 def estimate_pe_axis(
-    mean_image: NDArray, phantom_mask: NDArray, radius: int = ...,
-    *, return_ratios: Literal[True], valid_mask: NDArray | None = ...,
+    mean_image: NDArray,
+    phantom_mask: NDArray,
+    radius: int = ...,
+    *,
+    return_ratios: Literal[True],
+    valid_mask: NDArray | None = ...,
 ) -> tuple[int, dict[int, float]]: ...
 def estimate_pe_axis(
     mean_image: NDArray,
@@ -1215,8 +1276,9 @@ def estimate_pe_axis(
     verify against the acquisition's known PE direction before trusting it.
     """
     ratios = {
-        axis: ghost_ratio(mean_image, phantom_mask, pe_axis=axis, radius=radius,
-                          valid_mask=valid_mask)
+        axis: ghost_ratio(
+            mean_image, phantom_mask, pe_axis=axis, radius=radius, valid_mask=valid_mask
+        )
         for axis in (0, 1)
     }
     best = max(ratios, key=ratios.__getitem__)
@@ -1226,6 +1288,7 @@ def estimate_pe_axis(
 # --------------------------------------------------------------------------- #
 # Saturation (ADC clipping)
 # --------------------------------------------------------------------------- #
+
 
 def _saturation_bits(stored_max: float) -> int | None:
     """Return n if `stored_max` is a `2**n - 1` rail for a plausible n, else None.
@@ -1243,8 +1306,9 @@ def _saturation_bits(stored_max: float) -> int | None:
     return n if n in SATURATION_BITS else None
 
 
-def detect_saturation(data: NDArray, slope: float = 1.0, inter: float = 0.0,
-                      trim: int = 0) -> SaturationResult:
+def detect_saturation(
+    data: NDArray, slope: float = 1.0, inter: float = 0.0, trim: int = 0
+) -> SaturationResult:
     """Detect ADC saturation (signal clipped at a `2**n - 1` rail) in a 4-D series.
 
     The clip ceiling is sequence-dependent and unrecorded, so it is inferred
@@ -1265,8 +1329,14 @@ def detect_saturation(data: NDArray, slope: float = 1.0, inter: float = 0.0,
     ceiling = float(np.max(data))
     bits = _saturation_bits((ceiling - inter) / slope)
     if bits is None:
-        return SaturationResult(ceiling=None, bits=None, n_clipped_pre=0,
-                                n_clipped_kept=0, worst_volume=None, worst_count=0)
+        return SaturationResult(
+            ceiling=None,
+            bits=None,
+            n_clipped_pre=0,
+            n_clipped_kept=0,
+            worst_volume=None,
+            worst_count=0,
+        )
     per_volume = (data == ceiling).reshape(-1, data.shape[-1]).sum(axis=0)
     worst = int(np.argmax(per_volume))
     return SaturationResult(
@@ -1283,9 +1353,17 @@ def detect_saturation(data: NDArray, slope: float = 1.0, inter: float = 0.0,
 # In-plane motion (phantom deformation)
 # --------------------------------------------------------------------------- #
 
-def _register_norotate(moving: NDArray, reference: NDArray, rr: NDArray,
-                       cc: NDArray, center: NDArray, mask: NDArray,
-                       max_iter: int, tol: float) -> NDArray:
+
+def _register_norotate(
+    moving: NDArray,
+    reference: NDArray,
+    rr: NDArray,
+    cc: NDArray,
+    center: NDArray,
+    mask: NDArray,
+    max_iter: int,
+    tol: float,
+) -> NDArray:
     """Register one frame to `reference` under translation + symmetric strain.
 
     Forward-additive Lucas-Kanade for the 5-parameter warp
@@ -1306,8 +1384,9 @@ def _register_norotate(moving: NDArray, reference: NDArray, rr: NDArray,
         offset = center - u @ center + p[:2]
         # affine_transform samples moving at u @ o + offset for output pixel o,
         # i.e. it pulls the frame back onto the reference grid under W.
-        warped = ndimage.affine_transform(moving, u, offset=offset, order=1,
-                                          mode="nearest")
+        warped = ndimage.affine_transform(
+            moving, u, offset=offset, order=1, mode="nearest"
+        )
         gr, gc = np.gradient(warped)  # d/axis0, d/axis1 of the warped frame
         gr, gc = gr.ravel()[m], gc.ravel()[m]
         # steepest-descent images = grad(W) . dW/dp for p = [dr, dc, sr, sc, h]
@@ -1323,10 +1402,13 @@ def _register_norotate(moving: NDArray, reference: NDArray, rr: NDArray,
     return p
 
 
-def estimate_motion(center_slice: NDArray, mask: NDArray,
-                    voxel_mm: tuple[float, float] | None = None,
-                    max_iter: int = MOTION_MAX_ITER,
-                    tol: float = MOTION_TOL) -> MotionResult:
+def estimate_motion(
+    center_slice: NDArray,
+    mask: NDArray,
+    voxel_mm: tuple[float, float] | None = None,
+    max_iter: int = MOTION_MAX_ITER,
+    tol: float = MOTION_TOL,
+) -> MotionResult:
     """Per-volume in-plane registration of the phantom to its temporal mean.
 
     3dvolreg-style motion estimation specialized for a rigid phantom: the model
@@ -1341,16 +1423,20 @@ def estimate_motion(center_slice: NDArray, mask: NDArray,
     """
     reference = center_slice.mean(axis=-1)
     r_idx, c_idx = np.nonzero(mask)
-    center = (np.array([r_idx.mean(), c_idx.mean()]) if r_idx.size
-              else np.array(reference.shape[:2], dtype=float) / 2.0)
+    center = (
+        np.array([r_idx.mean(), c_idx.mean()])
+        if r_idx.size
+        else np.array(reference.shape[:2], dtype=float) / 2.0
+    )
     rows, cols = np.indices(reference.shape[:2]).astype(float)
     rr, cc = rows - center[0], cols - center[1]
 
     nt = center_slice.shape[-1]
     params = np.zeros((nt, 5))
     for t in range(nt):
-        params[t] = _register_norotate(center_slice[..., t], reference, rr, cc,
-                                       center, mask, max_iter, tol)
+        params[t] = _register_norotate(
+            center_slice[..., t], reference, rr, cc, center, mask, max_iter, tol
+        )
     vm = (float(voxel_mm[0]), float(voxel_mm[1])) if voxel_mm is not None else None
     return MotionResult(params=params, voxel_mm=vm)
 
@@ -1359,10 +1445,12 @@ def estimate_motion(center_slice: NDArray, mask: NDArray,
 # Center of mass (per-volume intensity centroid, circular)
 # --------------------------------------------------------------------------- #
 
-def estimate_center_of_mass(center_slice: NDArray,
-                            valid_mask: NDArray | None = None,
-                            voxel_mm: tuple[float, float] | None = None
-                            ) -> CenterOfMassResult:
+
+def estimate_center_of_mass(
+    center_slice: NDArray,
+    valid_mask: NDArray | None = None,
+    voxel_mm: tuple[float, float] | None = None,
+) -> CenterOfMassResult:
     """Per-volume intensity-weighted center of mass of the phantom (circular).
 
     bxh `fmriqa_volmeasures`' center-of-mass trace, specialized to the QA center
@@ -1422,11 +1510,11 @@ def estimate_center_of_mass(center_slice: NDArray,
     pedestal = float(valid_vals.min()) if valid_vals.size else 0.0
     weights = np.clip(center_slice - pedestal, 0.0, None)
     weights[~valid_mask] = 0.0
-    W = weights.reshape(-1, nt)                       # (npix, n_t)
+    W = weights.reshape(-1, nt)  # (npix, n_t)
 
-    idx = np.indices(shape).reshape(2, -1)           # (2, npix): full periodic grid
-    total = W.sum(axis=0)                             # (n_t,)
-    good = total > 0                                  # blank frames -> NaN centroid
+    idx = np.indices(shape).reshape(2, -1)  # (2, npix): full periodic grid
+    total = W.sum(axis=0)  # (n_t,)
+    good = total > 0  # blank frames -> NaN centroid
     com = np.full((nt, 2), np.nan)
     for axis in (0, 1):
         theta = idx[axis] * (2.0 * np.pi / shape[axis])
@@ -1440,6 +1528,7 @@ def estimate_center_of_mass(center_slice: NDArray,
 # --------------------------------------------------------------------------- #
 # Spatial smoothness (FWHM)
 # --------------------------------------------------------------------------- #
+
 
 def _geomean(x: NDArray) -> float:
     """Geometric mean over the positive, finite entries; NaN if there are none."""
@@ -1517,18 +1606,22 @@ def _directional_acf(scaled: NDArray, mask: NDArray, max_lag: int) -> NDArray:
     nt = scaled.shape[-1]
     acf = np.full((2, max_lag + 1), np.nan)
     for axis in (0, 1):
-        per = np.array([_acf_1d(scaled[..., t], mask, axis, max_lag)
-                        for t in range(nt)])
+        per = np.array(
+            [_acf_1d(scaled[..., t], mask, axis, max_lag) for t in range(nt)]
+        )
         with warnings.catch_warnings():  # all-NaN lag columns -> NaN, not a warning
             warnings.simplefilter("ignore", RuntimeWarning)
             acf[axis] = np.nanmean(per, axis=0)
     return acf
 
 
-def estimate_smoothness(fluctuations: NDArray, mask: NDArray,
-                        voxel_mm: tuple[float, float] | None = None,
-                        pe_axis: int | None = None,
-                        max_lag: int = SMOOTHNESS_MAX_LAG) -> SmoothnessResult:
+def estimate_smoothness(
+    fluctuations: NDArray,
+    mask: NDArray,
+    voxel_mm: tuple[float, float] | None = None,
+    pe_axis: int | None = None,
+    max_lag: int = SMOOTHNESS_MAX_LAG,
+) -> SmoothnessResult:
     """Directional spatial smoothness of the detrended noise field (AFNI 3dFWHMx).
 
     Follows `3dFWHMx` run on detrended residuals: each voxel time series is first
@@ -1546,7 +1639,7 @@ def estimate_smoothness(fluctuations: NDArray, mask: NDArray,
     Legendre-detrended residual the noise metrics are measured on.
     """
     centered = fluctuations - np.median(fluctuations, axis=-1, keepdims=True)
-    mad = np.median(np.abs(centered), axis=-1)          # (X, Y)
+    mad = np.median(np.abs(centered), axis=-1)  # (X, Y)
     work_mask = mask & (mad > 0)
     scaled = centered / np.where(mad > 0, mad, 1.0)[..., None]
 
@@ -1559,16 +1652,19 @@ def estimate_smoothness(fluctuations: NDArray, mask: NDArray,
     acf = _directional_acf(scaled, work_mask, lag)
 
     vm = (float(voxel_mm[0]), float(voxel_mm[1])) if voxel_mm is not None else None
-    return SmoothnessResult(fwhm_vox=fwhm_vox, lags=lags, acf=acf, voxel_mm=vm,
-                            pe_axis=pe_axis)
+    return SmoothnessResult(
+        fwhm_vox=fwhm_vox, lags=lags, acf=acf, voxel_mm=vm, pe_axis=pe_axis
+    )
 
 
 # --------------------------------------------------------------------------- #
 # Preprocessing & orchestration
 # --------------------------------------------------------------------------- #
 
-def preprocess(scan: QAScan, trim_sec: float = 5.0, detrend: str = "poly",
-               center: str = "image") -> QAImages:
+
+def preprocess(
+    scan: QAScan, trim_sec: float = 5.0, detrend: str = "poly", center: str = "image"
+) -> QAImages:
     """Trim, select the QA slice, and compute the FBIRN summary images.
 
     Returns `QAImages` (center slice, detrended fluctuations, and derived summary
@@ -1588,6 +1684,7 @@ def preprocess(scan: QAScan, trim_sec: float = 5.0, detrend: str = "poly",
         detrend_method=detrend,
         detrend_order=detrend_order,
     )
+
 
 def run_qa(
     scan: QAScan,
@@ -1609,8 +1706,9 @@ def run_qa(
     # the high-signal warm-up volumes that preprocessing drops. The count is
     # split at the same trim boundary so clips outside the analyzed data (which
     # don't bias the metrics) are reported apart from clips that do.
-    saturation = detect_saturation(scan.data, scan.slope, scan.inter,
-                                   trim=trim_count(scan.tr, trim_sec))
+    saturation = detect_saturation(
+        scan.data, scan.slope, scan.inter, trim=trim_count(scan.tr, trim_sec)
+    )
 
     images = preprocess(scan, trim_sec=trim_sec, detrend=detrend, center=center)
     geom = detect_phantom(images)
@@ -1620,15 +1718,15 @@ def run_qa(
     # of gradient-heating deformation. The analyzed series is NOT resampled from
     # this fit, so the FBIRN metrics stay measured on the acquired data.
     voxel_mm = scan.meta.voxel_mm[:2] if scan.meta else None
-    motion = estimate_motion(images.center_slice, geom.phantom_mask,
-                             voxel_mm=voxel_mm)
+    motion = estimate_motion(images.center_slice, geom.phantom_mask, voxel_mm=voxel_mm)
     # Per-volume intensity centroid (bxh volmeasures), circular so a phantom
     # against a wrapped edge does not alias and -- crucially -- so a uniform
     # background and the 180-degree Nyquist ghost self-cancel; no phantom mask is
     # used (it would break that cancellation). The valid mask only heals missing
     # data (a Siemens zeroed edge). A cheap first-moment trace alongside `motion`.
-    com = estimate_center_of_mass(images.center_slice, images.valid_mask,
-                                  voxel_mm=voxel_mm)
+    com = estimate_center_of_mass(
+        images.center_slice, images.valid_mask, voxel_mm=voxel_mm
+    )
 
     roi = resolve_roi(images, geom, roi_size, center)
     if not roi_fits(geom.phantom_mask, roi.index):
@@ -1644,26 +1742,29 @@ def run_qa(
     if pe_axis is None:
         pe_axis = images.pe_axis
     if pe_axis is None:
-        pe_axis = estimate_pe_axis(mean_image, geom.phantom_mask,
-                                   valid_mask=valid_mask)
+        pe_axis = estimate_pe_axis(mean_image, geom.phantom_mask, valid_mask=valid_mask)
     # Region-matched percent ghost on each in-plane axis; the ACR-equivalent is
     # their difference (see `acr_ghosting_ratio`). Computing both here avoids
     # re-deriving the PE ratio inside `acr_ghosting_ratio`.
-    pe_ratio = ghost_ratio(mean_image, geom.phantom_mask, pe_axis=pe_axis,
-                           valid_mask=valid_mask)
-    ro_ratio = ghost_ratio(mean_image, geom.phantom_mask, pe_axis=1 - pe_axis,
-                           valid_mask=valid_mask)
+    pe_ratio = ghost_ratio(
+        mean_image, geom.phantom_mask, pe_axis=pe_axis, valid_mask=valid_mask
+    )
+    ro_ratio = ghost_ratio(
+        mean_image, geom.phantom_mask, pe_axis=1 - pe_axis, valid_mask=valid_mask
+    )
     # Localized-ghost companion to the PE mean ratio: the brightest 10% of ghost
     # voxels (Greve / bxh fmriqa_ghostiness), on the same region-matched scale.
-    pe_top_ratio = ghost_top_ratio(mean_image, geom.phantom_mask, pe_axis=pe_axis,
-                                   valid_mask=valid_mask)
+    pe_top_ratio = ghost_top_ratio(
+        mean_image, geom.phantom_mask, pe_axis=pe_axis, valid_mask=valid_mask
+    )
 
     # Directional spatial smoothness (AFNI 3dFWHMx): the Gaussian FWHM of the
     # detrended noise field along PE and RO, plus the point-spread curves -- the
     # correlation-length confound the guide warns the Weisskoff RDC is measured
     # against. Computed here so the resolved `pe_axis` labels the directions.
-    smoothness = estimate_smoothness(images.fluctuations, geom.phantom_mask,
-                                     voxel_mm=voxel_mm, pe_axis=pe_axis)
+    smoothness = estimate_smoothness(
+        images.fluctuations, geom.phantom_mask, voxel_mm=voxel_mm, pe_axis=pe_axis
+    )
 
     metrics = QAMetrics(
         snr=snr(images, roi),
@@ -1684,13 +1785,13 @@ def run_qa(
         center_of_mass=com,
         smoothness=smoothness,
     )
-    return QAResult(images=images, geom=geom, roi=roi, metrics=metrics,
-                    meta=scan.meta)
+    return QAResult(images=images, geom=geom, roi=roi, metrics=metrics, meta=scan.meta)
 
 
 # --------------------------------------------------------------------------- #
 # High/low flip-angle noise separation (thermal vs. instability)
 # --------------------------------------------------------------------------- #
+
 
 @dataclass(frozen=True)
 class HiLoResult:
@@ -1741,8 +1842,11 @@ class HiLoResult:
         NaN if the separated thermal variance is non-positive (an unphysical
         result that means the model did not fit -- e.g. near-equal flip signals).
         """
-        return (self.mean_high / np.sqrt(self.thermal_var)
-                if self.thermal_var > 0 else float("nan"))
+        return (
+            self.mean_high / np.sqrt(self.thermal_var)
+            if self.thermal_var > 0
+            else float("nan")
+        )
 
     @property
     def instability_fsnr(self) -> float:
@@ -1758,15 +1862,20 @@ class HiLoResult:
     @property
     def instability_fraction(self) -> float:
         """Share of the high-flip variance attributed to instability noise."""
-        return (self.instability_var / self.var_high
-                if self.var_high > 0 else float("nan"))
+        return (
+            self.instability_var / self.var_high if self.var_high > 0 else float("nan")
+        )
 
 
-def separate_noise(mean_high: float, mean_low: float,
-                   var_high: float, var_low: float,
-                   n_voxels: int = 0,
-                   flip_high: float | None = None,
-                   flip_low: float | None = None) -> HiLoResult:
+def separate_noise(
+    mean_high: float,
+    mean_low: float,
+    var_high: float,
+    var_low: float,
+    n_voxels: int = 0,
+    flip_high: float | None = None,
+    flip_low: float | None = None,
+) -> HiLoResult:
     """Thermal/instability variance split from pooled hi/lo statistics (pure algebra).
 
     The flip-angle noise-separation math of `HiLoResult`; `run_hilo` computes the
@@ -1781,11 +1890,16 @@ def separate_noise(mean_high: float, mean_low: float,
         thermal_var = var_low
         instability_var = var_high - var_low
     return HiLoResult(
-        mean_high=mean_high, mean_low=mean_low,
-        var_high=var_high, var_low=var_low,
-        thermal_var=thermal_var, instability_var=instability_var,
-        n_voxels=n_voxels, fell_back=fell_back,
-        flip_high=flip_high, flip_low=flip_low,
+        mean_high=mean_high,
+        mean_low=mean_low,
+        var_high=var_high,
+        var_low=var_low,
+        thermal_var=thermal_var,
+        instability_var=instability_var,
+        n_voxels=n_voxels,
+        fell_back=fell_back,
+        flip_high=flip_high,
+        flip_low=flip_low,
     )
 
 
@@ -1810,8 +1924,9 @@ def phantom_core_mask(volume: NDArray, erode: int = HILO_ERODE) -> NDArray:
     return mask
 
 
-def _hilo_stats(scan: QAScan, trim_sec: float, detrend: str,
-                erode: int) -> tuple[NDArray, NDArray, NDArray]:
+def _hilo_stats(
+    scan: QAScan, trim_sec: float, detrend: str, erode: int
+) -> tuple[NDArray, NDArray, NDArray]:
     """(temporal-mean map, temporal-SD-of-residual map, eroded core mask) for a scan.
 
     The whole 3-D volume is used (not a single slice): thermal/instability
@@ -1820,15 +1935,20 @@ def _hilo_stats(scan: QAScan, trim_sec: float, detrend: str,
     on the per-voxel detrended residual (poly degree scaled to this scan's own run
     length, as elsewhere). The core mask comes from the mean map.
     """
-    data = trim_initial(scan.data, scan.tr, trim_sec)   # (X, Y, Z, T)
+    data = trim_initial(scan.data, scan.tr, trim_sec)  # (X, Y, Z, T)
     mean_map = data.mean(axis=-1)
     detrend_op, _ = detrend_fn(data, scan.tr, detrend)
     sd_map = fluctuation_noise(detrend_op(data))
     return mean_map, sd_map, phantom_core_mask(mean_map, erode)
 
 
-def run_hilo(high: QAScan, low: QAScan, trim_sec: float = 5.0,
-             detrend: str = "poly", erode: int = HILO_ERODE) -> HiLoResult:
+def run_hilo(
+    high: QAScan,
+    low: QAScan,
+    trim_sec: float = 5.0,
+    detrend: str = "poly",
+    erode: int = HILO_ERODE,
+) -> HiLoResult:
     """Separate thermal from instability noise using a high/low flip-angle scan pair.
 
     Following `bxh-fmriqa-hilo.md`: `high` and `low` must be the same acquisition
@@ -1867,7 +1987,10 @@ def run_hilo(high: QAScan, low: QAScan, trim_sec: float = 5.0,
 
     mean_high = float(mean_h[core].mean())
     mean_low = float(mean_l[core].mean())
-    var_high = float(sd_h[core].mean()) ** 2   # (core-mean per-voxel SD)**2, per the note
+    var_high = (
+        float(sd_h[core].mean()) ** 2
+    )  # (core-mean per-voxel SD)**2, per the note
     var_low = float(sd_l[core].mean()) ** 2
-    return separate_noise(mean_high, mean_low, var_high, var_low,
-                          n_voxels=n, flip_high=fh, flip_low=fl)
+    return separate_noise(
+        mean_high, mean_low, var_high, var_low, n_voxels=n, flip_high=fh, flip_low=fl
+    )

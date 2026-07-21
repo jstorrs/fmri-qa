@@ -13,34 +13,51 @@ def main(argv=None):
     )
     parser.add_argument("paths", nargs="+", help="NIfTI (.nii/.nii.gz) QA scans")
     parser.add_argument(
-        "--trim-sec", type=float, default=5.0,
+        "--trim-sec",
+        type=float,
+        default=5.0,
         help="Seconds of initial (non-steady-state) volumes to drop (default: 5).",
     )
     parser.add_argument(
-        "--pe-axis", type=int, choices=(0, 1, 2), default=None,
+        "--pe-axis",
+        type=int,
+        choices=(0, 1, 2),
+        default=None,
         help="Override the phase-encode axis (default: read from the header).",
     )
     parser.add_argument(
-        "--detrend", choices=q.DETREND_METHODS, default="poly",
+        "--detrend",
+        choices=q.DETREND_METHODS,
+        default="poly",
         help="Detrending method (default: poly).",
     )
     parser.add_argument(
-        "--center", choices=q.ROI_CENTER_MODES, default="image",
+        "--center",
+        choices=q.ROI_CENTER_MODES,
+        default="image",
         help="Slice + ROI localization: 'image' (middle slice + image center, "
-             "Glover) or 'phantom' (largest slice + detected center). Default: image.",
+        "Glover) or 'phantom' (largest slice + detected center). Default: image.",
     )
     parser.add_argument(
-        "--roi-size", type=int, default=q.FBIRN_ROI_SIZE,
-        help=f"Fixed summary/Weisskoff ROI side in voxels (default: {q.FBIRN_ROI_SIZE}).",
+        "--roi-size",
+        type=int,
+        default=q.FBIRN_ROI_SIZE,
+        help=(
+            f"Fixed summary/Weisskoff ROI side in voxels (default: {q.FBIRN_ROI_SIZE})."
+        ),
     )
     parser.add_argument(
-        "--pdf", metavar="FILE", default=None,
+        "--pdf",
+        metavar="FILE",
+        default=None,
         help="Write a PDF report to FILE.",
     )
     parser.add_argument(
-        "--pdf-layout", choices=("one", "two"), default="one",
+        "--pdf-layout",
+        choices=("one", "two"),
+        default="one",
         help="Report layout: 'one' condensed page or 'two' pages per scan "
-             "(default: one).",
+        "(default: one).",
     )
     args = parser.parse_args(argv)
 
@@ -66,8 +83,12 @@ def main(argv=None):
         try:
             scan = q.QAScan.from_nifti(path)
             result = q.run_qa(
-                scan, trim_sec=args.trim_sec, pe_axis=args.pe_axis,
-                detrend=args.detrend, center=args.center, roi_size=args.roi_size,
+                scan,
+                trim_sec=args.trim_sec,
+                pe_axis=args.pe_axis,
+                detrend=args.detrend,
+                center=args.center,
+                roi_size=args.roi_size,
             )
         except Exception as exc:  # noqa: BLE001 - report and continue the batch
             failed = True
@@ -119,7 +140,8 @@ def main(argv=None):
             f"{m.ro_ghost_pct:>8.3f} {m.acr_ghost_pct:>8.3f} {outl:>7.3f} "
             f"{sp.tc_outlier:>7.2f} {sp.spec_outlier:>7.2f} "
             f"{clip:>6s} {sat.n_clipped_pre:>8d} "
-            f"{mo.max_translation:>7.3f} {mo.max_scale_pct:>7.3f} {mo.max_shear_pct:>7.3f} "
+            f"{mo.max_translation:>7.3f} "
+            f"{mo.max_scale_pct:>7.3f} {mo.max_shear_pct:>7.3f} "
             f"{com:>6.3f} {fw_pe:>6.2f} {fw_ro:>6.2f}"
         )
         reports.append((name, result))
@@ -138,30 +160,37 @@ def hilo_main(argv=None):
     parser = argparse.ArgumentParser(
         prog="fmri-qa-hilo",
         description="High/low flip-angle phantom QA: separate thermal from "
-                    "instability noise (Greve). Pass the HIGH-flip scan first.",
+        "instability noise (Greve). Pass the HIGH-flip scan first.",
     )
     parser.add_argument("high", help="High-flip-angle NIfTI (.nii/.nii.gz) QA scan")
     parser.add_argument("low", help="Low-flip-angle NIfTI (.nii/.nii.gz) QA scan")
     parser.add_argument(
-        "--trim-sec", type=float, default=5.0,
+        "--trim-sec",
+        type=float,
+        default=5.0,
         help="Seconds of initial (non-steady-state) volumes to drop (default: 5).",
     )
     parser.add_argument(
-        "--detrend", choices=q.DETREND_METHODS, default="poly",
+        "--detrend",
+        choices=q.DETREND_METHODS,
+        default="poly",
         help="Detrending method applied before the SD map (default: poly).",
     )
     parser.add_argument(
-        "--erode", type=int, default=q.HILO_ERODE,
+        "--erode",
+        type=int,
+        default=q.HILO_ERODE,
         help=f"Voxel layers peeled off the phantom for the core mask "
-             f"(default: {q.HILO_ERODE}).",
+        f"(default: {q.HILO_ERODE}).",
     )
     args = parser.parse_args(argv)
 
     try:
         high = q.QAScan.from_nifti(args.high)
         low = q.QAScan.from_nifti(args.low)
-        res = q.run_hilo(high, low, trim_sec=args.trim_sec,
-                         detrend=args.detrend, erode=args.erode)
+        res = q.run_hilo(
+            high, low, trim_sec=args.trim_sec, detrend=args.detrend, erode=args.erode
+        )
     except Exception as exc:  # noqa: BLE001 - report cleanly and exit non-zero
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
