@@ -28,7 +28,12 @@ from .metrics.fbirn import (
     snr,
     weisskoff,
 )
-from .metrics.ghost import estimate_pe_axis, ghost_ratio, ghost_top_ratio
+from .metrics.ghost import (
+    acr_ghosting_ratio,
+    estimate_pe_axis,
+    ghost_ratio,
+    ghost_top_ratio,
+)
 from .metrics.motion import MotionResult, estimate_motion
 from .metrics.saturation import SaturationResult, detect_saturation
 from .metrics.smoothness import SmoothnessResult, estimate_smoothness
@@ -169,9 +174,10 @@ def run_qa(
         pe_axis = images.pe_axis
     if pe_axis is None:
         pe_axis = estimate_pe_axis(mean_image, geom.phantom_mask, valid_mask=valid_mask)
-    # Region-matched percent ghost on each in-plane axis; the ACR-equivalent is
-    # their difference (see `acr_ghosting_ratio`). Computing both here avoids
-    # re-deriving the PE ratio inside `acr_ghosting_ratio`.
+    # Region-matched percent ghost on each in-plane axis: pe_ratio feeds ghost%,
+    # ro_ratio feeds RO% (the readout-axis background-relative baseline). The
+    # ACR-equivalent |PE - RO| comes from `acr_ghosting_ratio` below, which owns
+    # that metric's definition (matched signal/ghost ROIs per direction).
     pe_ratio = ghost_ratio(
         mean_image, geom.phantom_mask, pe_axis=pe_axis, valid_mask=valid_mask
     )
@@ -199,7 +205,10 @@ def run_qa(
         ghost_pct=100.0 * pe_ratio,
         ghost_top_pct=100.0 * pe_top_ratio,
         ro_ghost_pct=100.0 * ro_ratio,
-        acr_ghost_pct=100.0 * abs(pe_ratio - ro_ratio),
+        acr_ghost_pct=100.0
+        * acr_ghosting_ratio(
+            mean_image, geom.phantom_mask, pe_axis=pe_axis, valid_mask=valid_mask
+        ),
         pe_axis=pe_axis,
         drift_pct=drift_percent(images, roi),
         percent_fluctuation=percent_fluctuation(images, roi),
