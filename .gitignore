@@ -9,6 +9,13 @@ wheels/
 # Virtual environments
 .venv
 
+# Test / coverage / type-check caches
+.coverage
+.coverage.*
+.pytest_cache/
+.mypy_cache/
+.hypothesis/
+
 # Jupyter
 .ipynb_checkpoints/
 # Exploratory scratch notebooks (see pyproject.toml ruff extend-exclude)
