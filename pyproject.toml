@@ -38,6 +38,7 @@ dev = [
     "mypy>=1.18",
     "pyright>=1.1.390",
     "pytest>=8.0",
+    "pytest-cov>=6.0",
     "ruff>=0.13",
 ]
 
@@ -132,4 +133,19 @@ typeCheckingMode = "standard"
 testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_functions = ["test_*"]
+# Coverage is opt-in (the `check` gate passes --cov) so a bare `pytest` on one
+# file stays fast and doesn't trip the package-wide floor.
 addopts = "-v --tb=short"
+
+[tool.coverage.run]
+source = ["src/fmriqc"]
+branch = true
+
+[tool.coverage.report]
+# The numeric core carries the metrics; the untested lines that remain are
+# defensive branches and the `__main__`/`if __name__` shims.
+exclude_also = [
+    "if TYPE_CHECKING:",
+    "if __name__ == .__main__.:",
+    "raise NotImplementedError",
+]

@@ -26,10 +26,10 @@ test:
 	uv run pytest
 
 # CI-style gate: fail on any formatting drift or lint hit, then both type
-# checkers + test.
+# checkers + test with a coverage floor (guards the core from silent regression).
 check:
 	uv run ruff format --check .
 	uv run ruff check .
 	uv run mypy
 	uv run pyright
-	uv run pytest
+	uv run pytest --cov --cov-report=term-missing --cov-fail-under=90
