@@ -179,9 +179,12 @@ early phases are pure refactors: with the default `Theme`, output is unchanged.
    `--pdf-tier dashboard|physics`. The image-grid page (`_summary_page`) is
    retired — the overview already carries the compact image row; a large-image
    part can return in phase 5 alongside characterization.
-4. **Cover + Appendix + furniture.** Implement the `Cover` and `Appendix`
-   renderers and the running header/footer; add a second example `Theme` to prove
-   rebranding. Delivers the packet capability.
+4. **[done] Cover + Appendix + furniture.** Add the `Cover` and `Appendix`
+   blocks and their renderers, a running footer (brand text + page numbers, shown
+   once a packet spans pages), and `--pdf-cover`/`--pdf-appendix` flags. Rebranding
+   is proven by tests (a themed logo/footer/cover packet) rather than a shipped
+   named theme, which would be arbitrary library content. Delivers the packet
+   capability. Note: the appendix assumes it fits one page (no mid-page break yet).
 5. **`content.py` + characterization/methods.** Port the per-metric prose from
    `notes/`; render the `physics` characterization table and methods appendix.
 

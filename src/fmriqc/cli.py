@@ -114,6 +114,16 @@ def main(argv: Sequence[str] | None = None) -> int:
         help="Report depth per scan: 'dashboard' (condensed overview) or 'physics' "
         "(adds a full-size stability page) (default: dashboard).",
     )
+    parser.add_argument(
+        "--pdf-cover",
+        action="store_true",
+        help="Prepend a cover page listing the scans in the PDF packet.",
+    )
+    parser.add_argument(
+        "--pdf-appendix",
+        action="store_true",
+        help="Append a provenance page (per-scan metadata + version) to the PDF.",
+    )
     args = parser.parse_args(argv)
 
     # In --json mode stdout carries only the JSON document; the config banner,
@@ -170,7 +180,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.pdf and reports:
         from . import report as report_mod
 
-        pages = report_mod.write_report(reports, args.pdf, tier=args.pdf_tier)
+        pages = report_mod.write_report(
+            reports,
+            args.pdf,
+            tier=args.pdf_tier,
+            cover=args.pdf_cover,
+            appendix=args.pdf_appendix,
+        )
         print(f"# wrote {args.pdf} ({len(reports)} scan(s), {pages} pages)", file=info)
 
     if args.json:

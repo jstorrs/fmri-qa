@@ -23,7 +23,16 @@ from svglib.svglib import svg2rlg
 
 import fmriqc as q
 
-from ..document import Part, ScanSection, Tier, compose, parts_for
+from ..document import (
+    Appendix,
+    Block,
+    Cover,
+    Part,
+    ScanSection,
+    Tier,
+    compose,
+    parts_for,
+)
 from ..panels.images import _panel_figs
 from ..panels.timeseries import (
     _plot_com,
@@ -419,9 +428,122 @@ def add_report_pages(
 
     `tier="dashboard"` renders the single condensed overview page; `tier="physics"`
     renders that overview and then a full-size stability page. Each page is
-    finalized with `showPage()`. Returns the number of pages drawn.
+    finalized with `showPage()`. Returns the number of pages drawn. This is the
+    per-scan primitive with no packet furniture; `write_report` adds the cover,
+    appendix, and page footers.
     """
     return _render_section(c, ScanSection(title, result, parts_for(tier)), theme)
+
+
+def _draw_footer(c: canvas.Canvas, theme: Theme, page_no: int, total: int) -> None:
+    """Draw the running footer: brand text at the left, page number at the right.
+
+    Suppressed on a single-page report with no footer text, so a lone dashboard
+    page stays clean; the page number appears only once a packet spans pages.
+    """
+    if total <= 1 and not theme.footer:
+        return
+    y = theme.margin - 22
+    c.setFont(theme.font_body, 7.5)
+    c.setFillGray(theme.text_muted_gray)
+    if theme.footer:
+        c.drawString(theme.margin, y, theme.footer)
+    if total > 1:
+        c.drawRightString(theme.page_size[0] - theme.margin, y, f"{page_no} / {total}")
+    c.setFillGray(theme.text_primary_gray)
+
+
+def _cover_page(c: canvas.Canvas, cover: Cover, theme: Theme) -> None:
+    """Draw the branded cover: logo, title, optional subtitle, scan inventory."""
+    page_w, page_h = theme.page_size
+    cx = page_w / 2
+    y = page_h * 0.70
+    if theme.logo is not None and theme.logo.is_file():
+        c.drawImage(
+            str(theme.logo),
+            cx - 60,
+            y,
+            width=120,
+            height=54,
+            preserveAspectRatio=True,
+            mask="auto",
+        )
+        y -= 18
+    c.setFillGray(theme.text_primary_gray)
+    c.setFont(theme.font_title, 22)
+    c.drawCentredString(cx, y, theme.cover_title)
+    y -= 26
+    if cover.subtitle:
+        c.setFont(theme.font_body, 12)
+        c.setFillGray(theme.text_muted_gray)
+        c.drawCentredString(cx, y, cover.subtitle)
+    y -= 40
+
+    c.setFillGray(theme.text_primary_gray)
+    c.setFont(theme.font_title, 11)
+    c.drawString(theme.margin, y, f"Scans ({len(cover.scans)})")
+    y -= 16
+    c.setFont(theme.font_body, 10)
+    c.setFillGray(theme.text_muted_gray)
+    for name in cover.scans:
+        c.drawString(theme.margin + 10, y, f"·  {name}")
+        y -= 14
+    c.setFillGray(theme.text_primary_gray)
+
+
+def _appendix_page(c: canvas.Canvas, appendix: Appendix, theme: Theme) -> None:
+    """Draw the provenance appendix: the package version and per-scan rows."""
+    y = theme.page_size[1] - 34
+    c.setFont(theme.font_title, 14)
+    c.drawString(theme.margin, y, "Provenance")
+    y -= 20
+    if appendix.version:
+        c.setFont(theme.font_body, 9)
+        c.setFillGray(theme.text_muted_gray)
+        c.drawString(theme.margin, y, f"fmri-qa {appendix.version}")
+        c.setFillGray(theme.text_primary_gray)
+        y -= 20
+    for name, detail in appendix.rows:
+        c.setFont(theme.font_title, 10)
+        c.drawString(theme.margin, y, name)
+        y -= 13
+        c.setFont(theme.font_body, 8.5)
+        c.setFillGray(theme.text_muted_gray)
+        c.drawString(theme.margin + 10, y, detail)
+        c.setFillGray(theme.text_primary_gray)
+        y -= 20
+
+
+def _block_pages(block: Block) -> int:
+    """How many pages a block draws: its parts for a scan, else one."""
+    return len(block.parts) if isinstance(block, ScanSection) else 1
+
+
+def _render_block(
+    c: canvas.Canvas, block: Block, theme: Theme, page_no: int, total: int
+) -> int:
+    """Draw one block; return the running page number after it.
+
+    The cover carries no footer (it reads as a title page); every other page
+    gets the running footer.
+    """
+    if isinstance(block, Cover):
+        _cover_page(c, block, theme)
+        c.showPage()
+        return page_no + 1
+    if isinstance(block, Appendix):
+        page_no += 1
+        _appendix_page(c, block, theme)
+        _draw_footer(c, theme, page_no, total)
+        c.showPage()
+        return page_no
+    with matplotlib.rc_context(cast("Any", theme.rc_params())):
+        for part in block.parts:
+            page_no += 1
+            _PART_RENDERERS[part](c, block.result, block.title, theme)
+            _draw_footer(c, theme, page_no, total)
+            c.showPage()
+    return page_no
 
 
 def write_report(
@@ -429,15 +551,24 @@ def write_report(
     pdf_path: str | Path,
     tier: Tier = "dashboard",
     theme: Theme = DEFAULT_THEME,
+    *,
+    cover: bool = False,
+    appendix: bool = False,
 ) -> int:
-    """Write a combined PDF, one scan after another.
+    """Write a combined PDF packet: optional cover, the scans, optional appendix.
 
     `items` is an iterable of `(title, QAResult)`, or a single `QAResult`.
-    Returns the total number of pages written.
+    `cover` prepends a branded cover with the scan inventory; `appendix` appends
+    a provenance page. Multi-page packets carry a running footer with the theme's
+    brand text and page numbers. Returns the total number of pages written.
     """
     if isinstance(items, q.QAResult):
         items = [("", items)]
+    blocks = compose(items, tier, cover=cover, appendix=appendix)
+    total = sum(_block_pages(b) for b in blocks)
     c = canvas.Canvas(str(pdf_path), pagesize=theme.page_size)
-    pages = sum(_render_section(c, s, theme) for s in compose(items, tier))
+    page_no = 0
+    for block in blocks:
+        page_no = _render_block(c, block, theme, page_no, total)
     c.save()
-    return pages
+    return total

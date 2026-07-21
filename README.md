@@ -221,6 +221,8 @@ Options:
 | `--json` | — | emit the metrics as JSON on stdout instead of the text table |
 | `--pdf` | — | write a PDF report to this file |
 | `--pdf-tier` | `dashboard` | `dashboard` (condensed overview) or `physics` (adds a stability page) per scan |
+| `--pdf-cover` | — | prepend a cover page listing the scans in the packet |
+| `--pdf-appendix` | — | append a provenance page (per-scan metadata + version) |
 
 `--version` prints the version and exits.
 
@@ -250,6 +252,12 @@ residual time course, spectrum, per-frame outlier fraction, per-frame in-plane
 motion (translation and scale/shear strain), and the directional PSF curves (PE
 and RO). `--pdf-tier physics` follows that dashboard overview with a full-size
 stability page.
+
+Several scans combine into one branded packet: `--pdf-cover` prepends a cover
+with the scan inventory and `--pdf-appendix` appends a provenance page, and a
+running footer carries page numbers once the packet spans pages. The cover
+title, logo, footer text, fonts, and colours all come from a `report.Theme`, so
+a group brands every packet it issues from one object (see the library section).
 
 ## Library
 

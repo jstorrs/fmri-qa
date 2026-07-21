@@ -6,7 +6,34 @@ and the `_*_line` helpers return the acquisition / provenance / device strings.
 A format driver (see `formats`) decides how to lay them out.
 """
 
+from collections.abc import Iterable
+from importlib.metadata import PackageNotFoundError, version
+
 import fmriqc as q
+
+
+def package_version() -> str:
+    """The installed `fmri-qa` version, or "unknown" from a bare source tree."""
+    try:
+        return version("fmri-qa")
+    except PackageNotFoundError:
+        return "unknown"
+
+
+def _appendix_rows(
+    items: Iterable[tuple[str, q.QAResult]],
+) -> list[tuple[str, str]]:
+    """(scan title, provenance text) rows for the packet appendix.
+
+    Joins the device and scanner/coil/software/time lines; scans without a
+    sidecar contribute a placeholder so every scan is accounted for.
+    """
+    rows = []
+    for title, result in items:
+        parts = [_device_line(result.meta), _provenance_line(result.meta)]
+        detail = "   ·   ".join(p for p in parts if p) or "no sidecar metadata"
+        rows.append((title, detail))
+    return rows
 
 
 def _fwhm_label(s: q.SmoothnessResult) -> str:
