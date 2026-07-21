@@ -113,7 +113,24 @@ def separate_noise(
     pooled `mean_*`/`var_*` from a scan pair and calls this. Kept separate so the
     algebra can be exercised directly.
     """
-    m = (mean_high / mean_low) ** 2
+    m = (mean_high / mean_low) ** 2 if mean_low != 0.0 else float("inf")
+    if not np.isfinite(m) or m == 1.0:
+        # Signal unchanged across the two flip angles (m == 1, e.g. the same scan
+        # passed twice) or zero low-flip signal: the split divides by (m - 1) and
+        # is undefined. Report NaN variances rather than dividing by zero -- the
+        # FSNR properties already fold a non-positive variance to NaN.
+        return HiLoResult(
+            mean_high=mean_high,
+            mean_low=mean_low,
+            var_high=var_high,
+            var_low=var_low,
+            thermal_var=float("nan"),
+            instability_var=float("nan"),
+            n_voxels=n_voxels,
+            fell_back=False,
+            flip_high=flip_high,
+            flip_low=flip_low,
+        )
     thermal_var = (m * var_low - var_high) / (m - 1.0)
     instability_var = var_high - thermal_var
     fell_back = instability_var < 0.0

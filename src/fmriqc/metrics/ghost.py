@@ -65,6 +65,8 @@ def ghost_ratio(
     if valid_mask is None:
         valid_mask = edge_valid_mask(mean_image)
     signal_mask, ghost_mask = _ghost_masks(phantom_mask, pe_axis, radius, valid_mask)
+    if not ghost_mask.any() or not signal_mask.any():
+        return float("nan")  # no clear ghost/signal region (matches ghost_top_ratio)
     return float(mean_image[ghost_mask].mean() / mean_image[signal_mask].mean())
 
 

@@ -1,5 +1,7 @@
 """High/low flip-angle noise separation: the pure variance algebra."""
 
+import warnings
+
 import numpy as np
 
 from fmriqc.hilo import separate_noise
@@ -33,6 +35,22 @@ def test_hilo_fsnr_properties_handle_degenerate_variance() -> None:
     # a non-positive thermal variance yields NaN, not a crash
     degenerate = separate_noise(100.0, 100.001, var_high=1.0, var_low=1.0)
     assert np.isnan(degenerate.thermal_fsnr) or np.isfinite(degenerate.thermal_fsnr)
+
+
+def test_separate_noise_is_nan_when_signal_does_not_change_with_flip() -> None:
+    # Equal high/low signal (m == 1, e.g. the same scan twice) makes the split
+    # divide by m - 1 == 0; it must return NaN variances, not divide by zero.
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")  # no zero-division warning may escape
+        res = separate_noise(100.0, 100.0, var_high=20.0, var_low=10.0)
+    assert np.isnan(res.thermal_var)
+    assert np.isnan(res.instability_var)
+    assert not res.fell_back
+    # a zero low-flip signal is likewise undefined (m -> inf)
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        zero = separate_noise(100.0, 0.0, var_high=20.0, var_low=10.0)
+    assert np.isnan(zero.thermal_var)
 
 
 def test_instability_fraction_is_share_of_high_variance() -> None:

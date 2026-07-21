@@ -80,13 +80,14 @@ def test_acr_ghosting_ratio_is_the_pe_minus_ro_difference() -> None:
 
 
 def test_ghost_ratio_is_nan_when_the_ghost_region_is_empty() -> None:
-    # A phantom filling the FOV leaves no clear ghost region; ghost_ratio takes the
-    # mean of an empty selection (NaN), while ghost_top_ratio guards it explicitly.
+    # A phantom filling the FOV leaves no clear ghost region. Both ratios must
+    # return NaN via their explicit empty-region guards -- and without tripping a
+    # numpy empty-slice / invalid-divide warning (turned into an error here).
     img = np.full((8, 8), 100.0)
     mask = np.ones((8, 8), dtype=bool)
     valid = np.ones((8, 8), dtype=bool)
     with warnings.catch_warnings():
-        warnings.simplefilter("ignore")  # numpy's empty-slice / invalid-divide
+        warnings.simplefilter("error")
         ratio = ghost_ratio(img, mask, pe_axis=0, radius=0, valid_mask=valid)
         top = ghost_top_ratio(img, mask, pe_axis=0, radius=0, valid_mask=valid)
     assert np.isnan(ratio)

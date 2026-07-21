@@ -5,17 +5,12 @@ file I/O), so the whole functional core runs deterministically.
 """
 
 import numpy as np
-import pytest
 
 import fmriqc as q
 
 # The synthetic phantom fills half the FOV, so its N/2-rolled ghost region erodes
-# to empty and the ghost ratio is NaN — a correct edge outcome (no real ghost),
-# not a defect. Silence just those two numpy edge warnings from the pipeline run.
-pytestmark = [
-    pytest.mark.filterwarnings("ignore:Mean of empty slice"),
-    pytest.mark.filterwarnings("ignore:invalid value encountered in scalar divide"),
-]
+# to empty and the ghost ratio is NaN -- a correct edge outcome (no real ghost),
+# handled by the ghost_ratio/ghost_top_ratio empty-region guards without warnings.
 
 
 def synthetic_scan(seed: int = 0, n: int = 32, z: int = 3, t: int = 40) -> q.QAScan:
