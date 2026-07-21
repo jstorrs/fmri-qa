@@ -439,6 +439,67 @@ a `codec/write_u16.py` would not. Split along topic seams, not arbitrarily. *Rea
 single-purpose* is the target, not *smallest possible*. This is *namespaces are one honking
 great idea* from [zen.md](zen.md).
 
+### Layered Subpackages
+
+Once a package grows past a handful of operation modules, group them into subpackages by
+**domain layer**, not only by topic. A layer is a stage in the data's life — load it, prepare
+it, compute on it, aggregate, present it — and each stage becomes a subpackage. This is the
+one-topic rule applied a level up: `ls` on the package answers "which *stage* owns this?" the
+way `ls` on a subpackage answers "which *file* owns this?".
+
+The concrete shape this repo uses (`fmriqc`):
+
+```
+fmriqc/
+    types.py            # shared vocabulary: array dtypes + closed-set Literals
+    exceptions.py       # the package exception hierarchy
+    load/               # I/O boundary: file + sidecar -> value objects
+    prep/               # preprocessing: raw-array ops -> the analysis images
+    metrics/            # the domain operations, one family per module
+    pipeline.py         # aggregation: orchestrate the operations + the combined result
+    report/             # presentation
+```
+
+Three rules keep the layering honest:
+
+- **Dependencies point down the stack.** `load < prep < metrics < pipeline < report`. A lower
+  layer never imports a higher one, and a leaf module (e.g. pure raw-array transforms) imports
+  nothing but the shared vocabulary. If you reach for an upward import, the thing you want is
+  usually sitting in the wrong layer. Where a genuine domain dependency crosses layers (a
+  loader needing a compute-layer estimate as a last-resort fallback), make it a single,
+  documented edge — not a habit.
+- **Value objects live with the operation that produces them.** This is the domain-operation
+  rule from above, applied to types: each `metrics/` module owns its own result dataclass and
+  the constants that tune it; the aggregator owns the combined result. A single top-level
+  `types.py` grab-bag holding *every* dataclass is organized by language construct, exactly
+  what "organize by domain operation" warns against. Reserve `types.py` for the genuinely
+  shared *vocabulary* every layer speaks — array aliases, option `Literal`s — the definitions
+  that would otherwise force an arbitrary cross-module import.
+- **Keep tuning constants next to the code they tune.** A knob used by one operation lives in
+  that operation's module; only cross-cutting vocabulary stays central. `grep` finds a
+  scattered constant instantly; a central "ledger of every knob" is just a grab-bag sorted by
+  being-a-constant.
+
+### Separate Content from Format
+
+At the presentation layer, split what a report *says* from how a particular format *renders
+it*. The content — the numbers, strings, and figures derived from a result — carries no
+dependency on the output format; a per-format **driver** composes that content into a document.
+
+```
+report/
+    summary.py          # format-agnostic text/tiles from a result
+    panels/             # format-agnostic figures from a result
+    formats/
+        pdf.py          # one driver: composes summary + panels into a PDF
+        # html.py, ...  # a second format reuses summary + panels unchanged
+```
+
+Adding a format touches only `formats/`; the content modules never learn that a format exists.
+This is *simple public interfaces* and *one file, one topic* applied to output — the format is
+an implementation detail behind the content, not threaded through it. The payoff is concrete:
+a new output format is a new file in `formats/`, not an edit to every figure-building function.
+
 ## Example: Complete Pattern
 
 ```python
