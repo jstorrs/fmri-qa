@@ -10,7 +10,7 @@ reuses `report.panels` and `report.summary` and only re-implements composition.
 """
 
 import io
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from pathlib import Path
 from typing import Any, cast
 
@@ -23,6 +23,7 @@ from svglib.svglib import svg2rlg
 
 import fmriqc as q
 
+from ..document import Part, ScanSection, Tier, compose, parts_for
 from ..panels.images import _panel_figs
 from ..panels.timeseries import (
     _plot_com,
@@ -44,6 +45,9 @@ from ..summary import (
     _provenance_line,
 )
 from ..theme import DEFAULT_THEME, Theme
+
+# A page-part renderer: draw one scan's part onto the canvas (no showPage).
+PageRenderer = Callable[[canvas.Canvas, q.QAResult, str, Theme], None]
 
 _TILE_H = 34.0  # metric-tile height (pt)
 _TILE_GAP = 6.0
@@ -163,25 +167,6 @@ def _panel_row(
     return top - ph
 
 
-def _panel_grid(
-    c: canvas.Canvas,
-    figs: list[Figure],
-    top: float,
-    theme: Theme,
-    *,
-    ncol: int,
-    gap: float = 14.0,
-) -> float:
-    """Draw the panels in a grid of `ncol` columns; return the y below the grid."""
-    pw = (theme.content_width - (ncol - 1) * gap) / ncol
-    ph = pw * 1.15
-    for i, fig in enumerate(figs):
-        r, col = divmod(i, ncol)
-        _draw_fig(c, fig, theme.margin + col * (pw + gap), top - r * (ph + gap), pw, ph)
-    rows = -(-len(figs) // ncol)  # ceil
-    return top - rows * ph - (rows - 1) * gap
-
-
 def _condensed_page(
     c: canvas.Canvas, result: q.QAResult, title: str, theme: Theme
 ) -> None:
@@ -285,14 +270,6 @@ def _condensed_page(
         fifth,
         120.0,
     )
-
-
-def _summary_page(
-    c: canvas.Canvas, result: q.QAResult, title: str, theme: Theme
-) -> None:
-    y = _header(c, result, title, theme)
-    # Five image panels (signal, SFNR, fluct/static noise, N/2 ghost) in a grid.
-    _panel_grid(c, _panel_figs(result), y - 8, theme, ncol=3)
 
 
 def _analysis_page(
@@ -408,45 +385,49 @@ def _analysis_page(
     )
 
 
-REPORT_LAYOUTS = ("summary", "detailed")
+# One renderer per page `Part` (see `report.document`). Each draws its content
+# for a scan; `add_report_pages` finalizes each with `showPage()`.
+_PART_RENDERERS: dict[Part, PageRenderer] = {
+    "overview": _condensed_page,
+    "stability": _analysis_page,
+}
+
+
+def _render_section(c: canvas.Canvas, section: ScanSection, theme: Theme) -> int:
+    """Draw one scan's parts onto the canvas; return the number of pages drawn.
+
+    The parts are built under the theme's `rc_context`, so the phantom colormap
+    and the primary-series colour follow the theme along with the furniture.
+    """
+    # cast: rc_context's stub keys are a Literal union, not str; the values are
+    # valid rc keys built by the theme.
+    with matplotlib.rc_context(cast("Any", theme.rc_params())):
+        for part in section.parts:
+            _PART_RENDERERS[part](c, section.result, section.title, theme)
+            c.showPage()
+    return len(section.parts)
 
 
 def add_report_pages(
     c: canvas.Canvas,
     result: "q.QAResult",
     title: str = "",
-    layout: str = "summary",
+    tier: Tier = "dashboard",
     theme: Theme = DEFAULT_THEME,
 ) -> int:
     """Draw a scan's report page(s) onto an open ReportLab `Canvas`.
 
-    `layout="summary"` renders a single condensed page; `layout="detailed"`
-    renders a summary page and a separate stability page. Each page is finalized
-    with `showPage()`. Returns the number of pages drawn.
-
-    The panels are built under the theme's `rc_context`, so the phantom colormap
-    and the primary-series colour follow the theme along with the furniture.
+    `tier="dashboard"` renders the single condensed overview page; `tier="physics"`
+    renders that overview and then a full-size stability page. Each page is
+    finalized with `showPage()`. Returns the number of pages drawn.
     """
-    # cast: rc_context's stub keys are a Literal union, not str; the values are
-    # valid rc keys built by the theme.
-    with matplotlib.rc_context(cast("Any", theme.rc_params())):
-        if layout == "summary":
-            _condensed_page(c, result, title, theme)
-            c.showPage()
-            return 1
-        if layout == "detailed":
-            _summary_page(c, result, title, theme)
-            c.showPage()
-            _analysis_page(c, result, title, theme)
-            c.showPage()
-            return 2
-    raise ValueError(f"unknown layout {layout!r}; choose from {REPORT_LAYOUTS}")
+    return _render_section(c, ScanSection(title, result, parts_for(tier)), theme)
 
 
 def write_report(
     items: Iterable[tuple[str, q.QAResult]] | q.QAResult,
     pdf_path: str | Path,
-    layout: str = "summary",
+    tier: Tier = "dashboard",
     theme: Theme = DEFAULT_THEME,
 ) -> int:
     """Write a combined PDF, one scan after another.
@@ -457,8 +438,6 @@ def write_report(
     if isinstance(items, q.QAResult):
         items = [("", items)]
     c = canvas.Canvas(str(pdf_path), pagesize=theme.page_size)
-    pages = 0
-    for title, result in items:
-        pages += add_report_pages(c, result, title, layout, theme)
+    pages = sum(_render_section(c, s, theme) for s in compose(items, tier))
     c.save()
     return pages

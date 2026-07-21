@@ -11,7 +11,18 @@ import matplotlib
 
 matplotlib.use("Agg")  # headless; no display needed
 
+from .document import TIERS, ScanSection, Tier, compose, parts_for
 from .formats.reportlab import add_report_pages, write_report
 from .theme import DEFAULT_THEME, Theme
 
-__all__ = ["DEFAULT_THEME", "Theme", "add_report_pages", "write_report"]
+__all__ = [
+    "DEFAULT_THEME",
+    "TIERS",
+    "ScanSection",
+    "Theme",
+    "Tier",
+    "add_report_pages",
+    "compose",
+    "parts_for",
+    "write_report",
+]

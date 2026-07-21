@@ -64,7 +64,7 @@ def test_main_writes_a_nonempty_pdf(tmp_path) -> None:
     assert pdf.read_bytes().startswith(b"%PDF")
 
 
-def test_main_detailed_layout_renders(tmp_path) -> None:
+def test_main_physics_tier_renders(tmp_path) -> None:
     pdf = tmp_path / "qa2.pdf"
     rc = cli.main(
         [
@@ -73,8 +73,8 @@ def test_main_detailed_layout_renders(tmp_path) -> None:
             "9",
             "--pdf",
             str(pdf),
-            "--pdf-layout",
-            "detailed",
+            "--pdf-tier",
+            "physics",
         ]
     )
     assert rc == 0

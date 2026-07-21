@@ -167,15 +167,18 @@ actually drawn and is unaffected.
 Each phase is a self-contained, reviewable commit that keeps the gate green. The
 early phases are pure refactors: with the default `Theme`, output is unchanged.
 
-1. **`Theme` for the driver.** Add `theme.py`; thread a `Theme` through
+1. **[done] `Theme` for the driver.** Add `theme.py`; thread a `Theme` through
    `formats/reportlab.py` (page size, margin, fonts, tile/header colours),
    replacing the literals. Panels untouched. Default theme ⇒ identical output.
-2. **`Theme` for the panels.** Add `rc_params()` and the panel colour fields;
-   thread the `Theme` into `panels/`, wrapping figure builds in `rc_context`.
-   Now one object styles the whole report.
-3. **Block model + `compose` + CLI.** Add `document.py`; refactor the driver to
-   walk a block list; demote the page functions to `parts`-keyed renderers; make
-   `physics` = `dashboard` parts + extras. Rename the CLI flag.
+2. **[done] `Theme` for the panels.** Add `rc_params()` and the panel colour
+   fields; build the panels under `matplotlib.rc_context` in the driver so the
+   figures follow the theme. Now one object styles the whole report.
+3. **[done] Block model + `compose` + CLI.** Add `document.py`; the driver walks
+   a `ScanSection`'s `parts`, one renderer per part; `physics` = `dashboard`
+   parts + `stability`. `--pdf-layout summary|detailed` renamed to
+   `--pdf-tier dashboard|physics`. The image-grid page (`_summary_page`) is
+   retired — the overview already carries the compact image row; a large-image
+   part can return in phase 5 alongside characterization.
 4. **Cover + Appendix + furniture.** Implement the `Cover` and `Appendix`
    renderers and the running header/footer; add a second example `Theme` to prove
    rebranding. Delivers the packet capability.
