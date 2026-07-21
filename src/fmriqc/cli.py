@@ -1,6 +1,7 @@
 import argparse
 import sys
 from collections.abc import Sequence
+from pathlib import Path
 
 import fmriqc as q
 
@@ -80,7 +81,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     failed = False
     reports = []
     for path in args.paths:
-        name = path.rsplit("/", 1)[-1]
+        name = Path(path).name
         try:
             scan = q.QAScan.from_nifti(path)
             result = q.run_qa(
@@ -196,8 +197,8 @@ def hilo_main(argv: Sequence[str] | None = None) -> int:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
 
-    hi_name = args.high.rsplit("/", 1)[-1]
-    lo_name = args.low.rsplit("/", 1)[-1]
+    hi_name = Path(args.high).name
+    lo_name = Path(args.low).name
     hi_flip = f" (flip {res.flip_high:g})" if res.flip_high is not None else ""
     lo_flip = f" (flip {res.flip_low:g})" if res.flip_low is not None else ""
     print("# hi/lo flip-angle thermal/instability noise separation (Greve)")
