@@ -98,6 +98,9 @@ def outlier_fraction(
     """
     resid = fluctuations[mask]  # (n_vox, n_t)
     n_vox, n_t = resid.shape
+    # Empty mask: report NaN rather than divide by zero (as the sibling metrics do).
+    if n_vox == 0:
+        return OutlierResult(fraction=np.full(n_t, np.nan), n_voxels=0, qthr=qthr)
     mad = np.median(np.abs(resid), axis=1)  # (n_vox,)
     alpha = float(np.sqrt(2.0) * erfcinv(2.0 * qthr / n_t))  # Q^-1(qthr / n_t)
     thr = alpha * np.sqrt(np.pi / 2.0) * mad  # per-voxel outlier threshold
