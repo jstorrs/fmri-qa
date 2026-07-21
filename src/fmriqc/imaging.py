@@ -12,7 +12,7 @@ from numpy.typing import NDArray
 from scipy import ndimage
 from skimage import filters, segmentation
 
-from .constants import ROI_CENTER_MODES
+from .constants import ROI_CENTER_MODES, RoiCenter
 from .exceptions import InvalidChoiceError
 
 
@@ -35,7 +35,7 @@ def segment_phantom(image: NDArray) -> NDArray:
     return segmentation.watershed(edges, labels) == 2
 
 
-def extract_center_slice(data: NDArray, center: str = "image") -> NDArray:
+def extract_center_slice(data: NDArray, center: RoiCenter = "image") -> NDArray:
     """Select the QA slice from a volume.
 
     "image": the geometric middle slice (Glover/fBIRN convention).

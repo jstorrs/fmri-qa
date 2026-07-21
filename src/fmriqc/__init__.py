@@ -21,13 +21,15 @@ import logging
 
 from .center_of_mass import estimate_center_of_mass
 from .constants import (
+    DETREND_METHODS,
     FBIRN_ROI_SIZE,
     GHOST_TOP_FRACTION,
     HILO_ERODE,
     ROI_CENTER_MODES,
+    DetrendMethod,
+    RoiCenter,
 )
 from .detrend import (
-    DETREND_METHODS,
     detrend_fn,
     poly_degree,
     poly_residuals,
@@ -107,6 +109,7 @@ __all__ = [
     "ROI",
     "ROI_CENTER_MODES",
     "CenterOfMassResult",
+    "DetrendMethod",
     "FmriqcError",
     "HiLoResult",
     "IncompatibleScansError",
@@ -119,6 +122,7 @@ __all__ = [
     "QAMetrics",
     "QAResult",
     "QAScan",
+    "RoiCenter",
     "SaturationResult",
     "ScanMeta",
     "SmoothnessResult",

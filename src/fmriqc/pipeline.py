@@ -9,7 +9,7 @@ motion/centroid, the FBIRN ROI metrics, ghost ratios, and smoothness — into on
 import warnings
 
 from .center_of_mass import estimate_center_of_mass
-from .constants import FBIRN_ROI_SIZE
+from .constants import FBIRN_ROI_SIZE, DetrendMethod, RoiCenter
 from .detrend import detrend_fn
 from .geometry import detect_phantom, resolve_roi, roi_fits
 from .ghost import estimate_pe_axis, ghost_ratio, ghost_top_ratio
@@ -31,7 +31,10 @@ from .types import QAImages, QAMetrics, QAResult
 
 
 def preprocess(
-    scan: QAScan, trim_sec: float = 5.0, detrend: str = "poly", center: str = "image"
+    scan: QAScan,
+    trim_sec: float = 5.0,
+    detrend: DetrendMethod = "poly",
+    center: RoiCenter = "image",
 ) -> QAImages:
     """Trim, select the QA slice, and compute the FBIRN summary images.
 
@@ -58,8 +61,8 @@ def run_qa(
     scan: QAScan,
     trim_sec: float = 5.0,
     pe_axis: int | None = None,
-    detrend: str = "poly",
-    center: str = "image",
+    detrend: DetrendMethod = "poly",
+    center: RoiCenter = "image",
     roi_size: int = FBIRN_ROI_SIZE,
 ) -> QAResult:
     """Full pipeline: scan -> preprocess -> phantom -> Weisskoff/RDC + ghost ratio.

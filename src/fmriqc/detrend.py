@@ -12,10 +12,8 @@ import numpy as np
 from numpy.typing import NDArray
 from scipy.interpolate import make_lsq_spline
 
-from .constants import POLY_CUTOFF_S, SPLINE_CUTOFF_S
+from .constants import DETREND_METHODS, POLY_CUTOFF_S, SPLINE_CUTOFF_S, DetrendMethod
 from .exceptions import InvalidChoiceError
-
-DETREND_METHODS = ("poly", "spline")
 
 
 def spline_nodes(y: NDArray, tr: float, cutoff_s: float = SPLINE_CUTOFF_S) -> int:
@@ -80,7 +78,7 @@ def poly_residuals(y: NDArray, degree: int) -> NDArray:
 
 
 def detrend_fn(
-    center_slice: NDArray, tr: float, method: str = "poly"
+    center_slice: NDArray, tr: float, method: DetrendMethod = "poly"
 ) -> tuple[Callable[[NDArray], NDArray], int]:
     """Build a detrender `f(y) -> residuals` and its fit order for `method`.
 

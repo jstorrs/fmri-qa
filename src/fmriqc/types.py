@@ -13,7 +13,7 @@ from dataclasses import dataclass
 import numpy as np
 from numpy.typing import NDArray
 
-from .constants import SIGMA_TO_FWHM
+from .constants import SIGMA_TO_FWHM, DetrendMethod
 from .imaging import (
     _geomean,
     edge_valid_mask,
@@ -70,7 +70,7 @@ class QAImages:
     fluctuations: NDArray  # (X, Y, T) detrended residuals
     tr: float
     pe_axis: int | None = None
-    detrend_method: str = "poly"
+    detrend_method: DetrendMethod = "poly"
     detrend_order: int | None = None  # poly degree / spline interior-knot count
 
     @property

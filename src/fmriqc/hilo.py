@@ -14,7 +14,7 @@ import numpy as np
 from numpy.typing import NDArray
 from scipy import ndimage
 
-from .constants import HILO_ERODE
+from .constants import HILO_ERODE, DetrendMethod
 from .detrend import detrend_fn
 from .exceptions import IncompatibleScansError
 from .imaging import fluctuation_noise, segment_phantom, trim_initial
@@ -153,7 +153,7 @@ def phantom_core_mask(volume: NDArray, erode: int = HILO_ERODE) -> NDArray:
 
 
 def _hilo_stats(
-    scan: QAScan, trim_sec: float, detrend: str, erode: int
+    scan: QAScan, trim_sec: float, detrend: DetrendMethod, erode: int
 ) -> tuple[NDArray, NDArray, NDArray]:
     """(temporal-mean map, temporal-SD-of-residual map, eroded core mask) for a scan.
 
@@ -174,7 +174,7 @@ def run_hilo(
     high: QAScan,
     low: QAScan,
     trim_sec: float = 5.0,
-    detrend: str = "poly",
+    detrend: DetrendMethod = "poly",
     erode: int = HILO_ERODE,
 ) -> HiLoResult:
     """Separate thermal from instability noise using a high/low flip-angle scan pair.

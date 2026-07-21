@@ -8,7 +8,7 @@ detected center (`PhantomGeometry`), and the fixed-size, on-image summary `ROI`.
 import numpy as np
 from numpy.typing import NDArray
 
-from .constants import FBIRN_ROI_SIZE, ROI_CENTER_MODES
+from .constants import FBIRN_ROI_SIZE, ROI_CENTER_MODES, RoiCenter
 from .exceptions import InvalidChoiceError
 from .imaging import _clamp_center, find_phantom_center, image_center, segment_phantom
 from .types import ROI, PhantomGeometry, QAImages
@@ -27,7 +27,7 @@ def resolve_roi(
     images: QAImages,
     geom: PhantomGeometry,
     roi_size: int = FBIRN_ROI_SIZE,
-    center: str = "image",
+    center: RoiCenter = "image",
 ) -> ROI:
     """Resolve the summary ROI once for a localization mode.
 

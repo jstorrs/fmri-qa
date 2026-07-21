@@ -5,7 +5,20 @@ individual comments. Grouped here so a single file answers "what knob is this
 and why is it set there?" without opening the operation modules.
 """
 
+from typing import Literal, get_args
+
 import numpy as np
+
+# Closed sets of option strings, modeled as Literal so a bad value is a type
+# error at the call site (see style/architecture.md). The runtime tuple each CLI
+# and validator uses is derived from the Literal, so the set is defined once.
+DetrendMethod = Literal["poly", "spline"]
+DETREND_METHODS: tuple[DetrendMethod, ...] = get_args(DetrendMethod)
+
+# ROI localization mode. "image": middle slice + image-center ROI (Glover).
+# "phantom": largest-cross-section slice + detected phantom-center ROI.
+RoiCenter = Literal["image", "phantom"]
+ROI_CENTER_MODES: tuple[RoiCenter, ...] = get_args(RoiCenter)
 
 # Detrend cutoff period (s). Drift slower than this is removed before noise is
 # measured. `poly` and `spline` historically used 200 vs 256; kept distinct
@@ -47,9 +60,6 @@ GHOST_TOP_FRACTION = 0.10
 
 # Fixed summary-ROI side (voxels). Glover/fBIRN uses 21; user-configurable.
 FBIRN_ROI_SIZE = 21
-# ROI localization mode. "image": middle slice + image-center ROI (Glover).
-# "phantom": largest-cross-section slice + detected phantom-center ROI.
-ROI_CENTER_MODES = ("image", "phantom")
 
 # DICOM in-plane phase-encode axis -> row/col: NIfTI i (axis 0) is the DICOM
 # row direction, j (axis 1) the column direction (verified against dcm2niix
