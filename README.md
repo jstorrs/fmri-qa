@@ -218,12 +218,24 @@ Options:
 | `--detrend` | `poly` | detrending method (`poly` or `spline`) |
 | `--center` | `image` | localization mode (`image` or `phantom`) |
 | `--roi-size` | `21` | summary/Weisskoff ROI side, in voxels |
+| `--json` | — | emit the metrics as JSON on stdout instead of the text table |
 | `--pdf` | — | write a PDF report to this file |
 | `--pdf-layout` | `one` | `one` condensed page or `two` pages per scan |
+
+`--version` prints the version and exits.
 
 Multiple scans are summarized in one table and, with `--pdf`, combined into a
 single PDF (one page per scan by default). A bad file is reported to stderr and
 the batch continues; the process exits non-zero if any file failed.
+
+With `--json`, stdout carries a single JSON document — `{"config": {...},
+"scans": [...]}`, one record per scan with the same fields as the table columns
+as raw numbers — while the banner, any errors, and the PDF notice go to stderr,
+so `fmri-qa --json scan.nii.gz | jq` stays clean:
+
+```bash
+uv run fmri-qa --json data/*_fMRI_*.nii.gz > qa.json
+```
 
 ### PDF report
 

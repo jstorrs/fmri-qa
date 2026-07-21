@@ -11,6 +11,7 @@ from pathlib import Path
 
 import nibabel as nib
 import numpy as np
+import pytest
 
 from fmriqc import cli
 
@@ -88,6 +89,49 @@ def test_main_reports_bad_file_and_continues_batch(tmp_path, capsys) -> None:
     assert rc == 1  # a failure makes the batch exit non-zero
     assert "ERROR" in captured.err and "missing.nii.gz" in captured.err
     assert "good.nii.gz" in captured.out  # the good scan still ran
+
+
+def test_json_emits_a_parseable_document(tmp_path, capsys) -> None:
+    rc = cli.main([_write_scan(tmp_path), "--roi-size", "9", "--json"])
+    captured = capsys.readouterr()
+    assert rc == 0
+    doc = json.loads(captured.out)  # stdout is pure JSON, nothing else
+    assert doc["config"]["detrend"] == "poly"
+    assert "version" in doc["config"]
+    assert len(doc["scans"]) == 1
+    scan = doc["scans"][0]
+    assert scan["scan"] == "scan.nii.gz"
+    assert scan["snr"] > 0 and scan["pe_axis"] == 1
+    assert "# detrend" in captured.err  # the banner moved off stdout
+
+
+def test_json_stdout_stays_pure_with_pdf(tmp_path, capsys) -> None:
+    pdf = tmp_path / "qa.pdf"
+    rc = cli.main(
+        [_write_scan(tmp_path), "--roi-size", "9", "--json", "--pdf", str(pdf)]
+    )
+    captured = capsys.readouterr()
+    assert rc == 0
+    json.loads(captured.out)  # still parses -- the "wrote" notice is on stderr
+    assert "wrote" in captured.err
+    assert pdf.read_bytes().startswith(b"%PDF")
+
+
+def test_json_excludes_failed_scans(tmp_path, capsys) -> None:
+    good = _write_scan(tmp_path, name="good")
+    rc = cli.main([str(tmp_path / "missing.nii.gz"), good, "--roi-size", "9", "--json"])
+    captured = capsys.readouterr()
+    assert rc == 1
+    doc = json.loads(captured.out)
+    assert [s["scan"] for s in doc["scans"]] == ["good.nii.gz"]  # only the one that ran
+    assert "ERROR" in captured.err
+
+
+def test_version_flag_prints_and_exits(capsys) -> None:
+    with pytest.raises(SystemExit) as info:
+        cli.main(["--version"])
+    assert info.value.code == 0
+    assert "fmri-qa" in capsys.readouterr().out
 
 
 def test_hilo_main_succeeds_on_a_pair(tmp_path, capsys) -> None:
