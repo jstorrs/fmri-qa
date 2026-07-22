@@ -4,6 +4,8 @@ version = "0.1.0"
 description = "Phantom fMRI quality-assurance metrics (SNR, SFNR, RDC, ghost)"
 readme = "README.md"
 requires-python = ">=3.13"
+license = "MIT"
+license-files = ["LICENSE"]
 authors = [
     { name = "Judd Storrs", email = "jstorrs@gmail.com" },
 ]

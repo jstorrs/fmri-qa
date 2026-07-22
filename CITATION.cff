@@ -6,3 +6,4 @@ authors:
   - family-names: "Storrs"
     given-names: "Judd"
 version: 0.1.0
+license: MIT

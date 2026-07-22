@@ -12,6 +12,7 @@ versioning when the first stable public interface is released.
 - A versioned, standards-compliant JSON output contract.
 - Atomic PDF writes and pagination for packet cover and provenance sections.
 - Build-artifact smoke tests in CI.
+- MIT licensing and distributable package-license metadata.
 
 ### Changed
 
