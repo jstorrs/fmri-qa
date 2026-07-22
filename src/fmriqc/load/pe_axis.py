@@ -9,6 +9,8 @@ and only then falls back to `metrics.ghost.phase_encode_axis`.
 
 from typing import Any
 
+from ..exceptions import InvalidScanError
+
 # DICOM in-plane phase-encode axis -> row/col: NIfTI i (axis 0) is the DICOM
 # row direction, j (axis 1) the column direction (verified against dcm2niix
 # InPlanePhaseEncodingDirectionDICOM on a Siemens acquisition). The single source
@@ -24,9 +26,25 @@ def _pe_axis_from_sidecar(sidecar: dict[str, Any]) -> int | None:
     the DICOM fallback (row = i = axis 0, col = j = axis 1).
     """
     if ped := sidecar.get("PhaseEncodingDirection"):
-        return {"i": 0, "j": 1, "k": 2}.get(str(ped)[0])
+        value = str(ped)
+        try:
+            return {"i": 0, "i-": 0, "j": 1, "j-": 1, "k": 2, "k-": 2}[value]
+        except KeyError:
+            raise InvalidScanError(
+                "PhaseEncodingDirection",
+                ped,
+                "expected one of 'i', 'i-', 'j', 'j-', 'k', or 'k-'",
+            ) from None
     if dicom := sidecar.get("InPlanePhaseEncodingDirectionDICOM"):
-        return {"ROW": 0, "COL": 1}.get(str(dicom).upper())
+        value = str(dicom).upper()
+        try:
+            return {"ROW": 0, "COL": 1}[value]
+        except KeyError:
+            raise InvalidScanError(
+                "InPlanePhaseEncodingDirectionDICOM",
+                dicom,
+                "expected 'ROW' or 'COL'",
+            ) from None
     return None
 
 

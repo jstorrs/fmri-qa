@@ -50,6 +50,10 @@ The phase-encode axis (used to place the ghost) is read from the NIfTI header
 `dim_info`; if that is missing it falls back to estimating the axis from where
 the Nyquist ghost lands. Override with `--pe-axis`.
 
+The current metrics operate on one image slice, so phase encoding must be
+in-plane (NIfTI axis `0`/`i` or `1`/`j`). Through-plane (`2`/`k`) acquisitions
+are rejected with an input error rather than being analyzed on the wrong plane.
+
 ## Saturation
 
 The clip ceiling of the reconstruction is sequence-dependent and not recorded,
@@ -214,7 +218,7 @@ Options:
 | Flag | Default | Meaning |
 | --- | --- | --- |
 | `--trim-sec` | `5.0` | seconds of initial (non-steady-state) volumes to drop |
-| `--pe-axis` | header | override the phase-encode axis (`0`/`1`/`2`) |
+| `--pe-axis` | header | override the in-plane phase-encode axis (`0`/`1`) |
 | `--detrend` | `poly` | detrending method (`poly` or `spline`) |
 | `--center` | `image` | localization mode (`image` or `phantom`) |
 | `--roi-size` | `21` | summary/Weisskoff ROI side, in voxels |

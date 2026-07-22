@@ -85,7 +85,7 @@ def _pe_direction(pe_axis: int | None, sidecar: dict[str, Any]) -> str | None:
     if dicom := sidecar.get("InPlanePhaseEncodingDirectionDICOM"):
         return str(dicom).lower()
     if ped := sidecar.get("PhaseEncodingDirection"):
-        return PE_ROWCOL.get({"i": 0, "j": 1}.get(str(ped)[0], -1))
+        return PE_ROWCOL.get({"i": 0, "i-": 0, "j": 1, "j-": 1}.get(str(ped), -1))
     return PE_ROWCOL.get(pe_axis) if pe_axis is not None else None
 
 

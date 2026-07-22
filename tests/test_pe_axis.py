@@ -36,6 +36,19 @@ def test_pe_axis_from_sidecar(sidecar: dict, expected: int | None) -> None:
     assert _pe_axis_from_sidecar(sidecar) == expected
 
 
+@pytest.mark.parametrize(
+    "sidecar",
+    [
+        {"PhaseEncodingDirection": "junk"},
+        {"PhaseEncodingDirection": "j+"},
+        {"InPlanePhaseEncodingDirectionDICOM": "diagonal"},
+    ],
+)
+def test_pe_axis_from_sidecar_rejects_malformed_values(sidecar: dict) -> None:
+    with pytest.raises(q.InvalidScanError):
+        _pe_axis_from_sidecar(sidecar)
+
+
 def test_sidecar_bids_direction_wins_over_dicom() -> None:
     # PhaseEncodingDirection is checked before the DICOM row/col fallback.
     sidecar = {
@@ -85,7 +98,7 @@ def test_from_nifti_falls_back_to_ghost_estimate_with_warning(tmp_path) -> None:
     nifti = _write_scan(tmp_path, {"FlipAngle": 77}, phase=None)
     with pytest.warns(UserWarning, match="ghost estimate"):
         scan = q.QAScan.from_nifti(nifti)
-    assert scan.pe_axis in (0, 1, 2)
+    assert scan.pe_axis in (0, 1)
 
 
 def test_from_nifti_no_estimate_leaves_axis_none(tmp_path) -> None:

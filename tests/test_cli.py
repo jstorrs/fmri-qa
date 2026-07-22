@@ -134,6 +134,16 @@ def test_version_flag_prints_and_exits(capsys) -> None:
     assert "fmri-qa" in capsys.readouterr().out
 
 
+@pytest.mark.parametrize(
+    "args", [["--roi-size", "0"], ["--trim-sec", "-1"], ["--pe-axis", "2"]]
+)
+def test_main_rejects_invalid_numeric_options(args: list[str], capsys) -> None:
+    with pytest.raises(SystemExit) as info:
+        cli.main([*args, "scan.nii.gz"])
+    assert info.value.code == 2
+    assert "error:" in capsys.readouterr().err
+
+
 def test_hilo_main_succeeds_on_a_pair(tmp_path, capsys) -> None:
     high = _write_scan(tmp_path, name="high", seed=1, flip=77)
     low = _write_scan(tmp_path, name="low", seed=2, flip=10)

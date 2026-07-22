@@ -25,6 +25,7 @@ from .exceptions import (
     FmriqcError,
     IncompatibleScansError,
     InvalidChoiceError,
+    InvalidScanError,
     MissingSidecarError,
 )
 from .hilo import (
@@ -119,6 +120,7 @@ __all__ = [
     "HiLoResult",
     "IncompatibleScansError",
     "InvalidChoiceError",
+    "InvalidScanError",
     "MissingSidecarError",
     "MotionResult",
     "OutlierResult",

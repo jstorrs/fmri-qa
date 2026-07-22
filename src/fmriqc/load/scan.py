@@ -12,6 +12,7 @@ from pathlib import Path
 
 import nibabel as nib
 
+from ..exceptions import InvalidScanError
 from ..metrics.ghost import phase_encode_axis
 from ..types import FloatArray
 from .metadata import ScanMeta, _load_sidecar, _scan_meta
@@ -22,8 +23,10 @@ from .pe_axis import _pe_axis_from_header, _pe_axis_from_sidecar
 class QAScan:
     """A raw QA acquisition plus the header metadata the pipeline needs.
 
-    `pe_axis` is the phase-encode axis as a NIfTI voxel-array index (0/1/2). It
-    comes from the sidecar `PhaseEncodingDirection` (authoritative), falling back
+    `pe_axis` is the phase-encode axis as a NIfTI voxel-array index (0/1/2). The
+    single-slice QA pipeline supports the in-plane axes 0/1 and rejects axis 2.
+    The value comes from the sidecar `PhaseEncodingDirection` (authoritative),
+    falling back
     to the header `dim_info` phase field, then — only if both are absent — to the
     Nyquist-ghost estimate (with a warning; `None` if `estimate_pe=False`).
     Polarity is dropped (unneeded here). `meta` holds the human-readable
@@ -45,6 +48,10 @@ class QAScan:
     def from_nifti(cls, path: str | Path, estimate_pe: bool = True) -> "QAScan":
         sidecar = _load_sidecar(path)  # required; raises before the data load
         img = nib.load(str(path))
+        if len(img.shape) != 4:
+            raise InvalidScanError(
+                "data shape", img.shape, "expected a 4-D (X, Y, Z, T) NIfTI series"
+            )
         zooms = img.header.get_zooms()
         data = img.get_fdata()
         slope, inter = img.header.get_slope_inter()  # (None, None) when unscaled

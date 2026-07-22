@@ -1,0 +1,76 @@
+"""Validation at the boundary between loaded scans and numerical metrics."""
+
+from typing import TYPE_CHECKING
+
+import numpy as np
+
+from .exceptions import InvalidScanError
+
+if TYPE_CHECKING:
+    from .load.scan import QAScan
+
+
+MIN_ANALYSIS_FRAMES = 4
+SUPPORTED_PE_AXES = (0, 1)
+
+
+def validate_scan(scan: "QAScan", *, minimum_frames: int = 1) -> None:
+    """Validate the structure shared by the main and high/low pipelines."""
+    if scan.data.ndim != 4:
+        raise InvalidScanError(
+            "data shape", scan.data.shape, "expected a 4-D (X, Y, Z, T) series"
+        )
+    if any(size < 1 for size in scan.data.shape[:3]):
+        raise InvalidScanError(
+            "spatial shape", scan.data.shape[:3], "every spatial axis must be non-empty"
+        )
+    if scan.data.shape[-1] < minimum_frames:
+        raise InvalidScanError(
+            "frame count",
+            scan.data.shape[-1],
+            f"expected at least {minimum_frames} frame(s)",
+        )
+    if not np.isfinite(scan.tr) or scan.tr <= 0:
+        raise InvalidScanError(
+            "TR", scan.tr, "expected a finite value greater than zero"
+        )
+    if not np.isfinite(scan.data).all():
+        raise InvalidScanError(
+            "data", "non-finite", "NaN and infinite samples are unsupported"
+        )
+
+
+def validate_qa_run(
+    scan: "QAScan", *, trim_sec: float, roi_size: int, pe_axis: int | None
+) -> None:
+    """Validate parameters required by the single-slice QA pipeline."""
+    validate_scan(scan, minimum_frames=MIN_ANALYSIS_FRAMES)
+    if not np.isfinite(trim_sec) or trim_sec < 0:
+        raise InvalidScanError(
+            "trim_sec",
+            trim_sec,
+            "expected a finite value greater than or equal to zero",
+        )
+    if roi_size <= 0:
+        raise InvalidScanError("roi_size", roi_size, "expected a positive integer")
+
+    n_trim = round(trim_sec / scan.tr)
+    remaining = scan.data.shape[-1] - n_trim
+    if remaining < MIN_ANALYSIS_FRAMES:
+        reason = (
+            f"leaves {max(remaining, 0)} frames; "
+            f"at least {MIN_ANALYSIS_FRAMES} are required"
+        )
+        raise InvalidScanError(
+            "trim_sec",
+            trim_sec,
+            reason,
+        )
+
+    resolved_pe = scan.pe_axis if pe_axis is None else pe_axis
+    if resolved_pe is not None and resolved_pe not in SUPPORTED_PE_AXES:
+        raise InvalidScanError(
+            "phase-encode axis",
+            resolved_pe,
+            "the single-slice metrics support only in-plane axes 0 and 1",
+        )

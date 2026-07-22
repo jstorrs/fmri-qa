@@ -49,6 +49,7 @@ from .prep.geometry import (
 from .prep.images import QAImages
 from .prep.imaging import extract_center_slice, trim_count, trim_initial
 from .types import DetrendMethod, RoiCenter
+from .validation import validate_qa_run
 
 
 @dataclass(frozen=True)
@@ -133,6 +134,8 @@ def run_qa(
     image-center ROI, Glover) or "phantom" (largest slice + detected center).
     `roi_size` is the fixed summary/Weisskoff ROI side (default 21, fBIRN).
     """
+    validate_qa_run(scan, trim_sec=trim_sec, roi_size=roi_size, pe_axis=pe_axis)
+
     # Saturation is checked on the full untrimmed series: clipping is worst in
     # the high-signal warm-up volumes that preprocessing drops. The count is
     # split at the same trim boundary so clips outside the analyzed data (which

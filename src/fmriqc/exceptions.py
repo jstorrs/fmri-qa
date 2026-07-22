@@ -47,6 +47,20 @@ class InvalidChoiceError(FmriqcError, ValueError):
         self.choices = tuple(choices)
 
 
+class InvalidScanError(FmriqcError, ValueError):
+    """A scan or analysis parameter cannot produce valid QA metrics.
+
+    ``field`` identifies the invalid input, ``value`` preserves the value a
+    caller may want to inspect, and ``reason`` states the violated contract.
+    """
+
+    def __init__(self, field: str, value: object, reason: str) -> None:
+        super().__init__(f"invalid {field} {value!r}: {reason}")
+        self.field = field
+        self.value = value
+        self.reason = reason
+
+
 class IncompatibleScansError(FmriqcError, ValueError):
     """A high/low flip-angle scan pair cannot be combined.
 

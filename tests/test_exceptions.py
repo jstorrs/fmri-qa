@@ -68,6 +68,41 @@ def test_run_hilo_rejects_mismatched_geometry() -> None:
         q.run_hilo(high, low)
 
 
+@pytest.mark.parametrize(
+    ("shape", "kwargs", "field"),
+    [
+        ((16, 16, 3, 3), {}, "frame count"),
+        ((16, 16, 3, 20), {"roi_size": 0}, "roi_size"),
+        ((16, 16, 3, 20), {"trim_sec": 1_000.0}, "trim_sec"),
+        ((16, 16, 3, 20), {"pe_axis": 2}, "phase-encode axis"),
+    ],
+)
+def test_run_qa_rejects_invalid_inputs(
+    shape: tuple[int, int, int, int], kwargs: dict[str, object], field: str
+) -> None:
+    scan = _flat_scan(shape=shape)
+    with pytest.raises(q.InvalidScanError) as info:
+        q.run_qa(scan, **kwargs)  # type: ignore[arg-type]
+    assert info.value.field == field
+
+
+def test_run_qa_rejects_nonfinite_data_and_tr() -> None:
+    bad_data = _flat_scan()
+    bad_data.data[0, 0, 0, 0] = np.nan
+    with pytest.raises(q.InvalidScanError, match="non-finite"):
+        q.run_qa(bad_data)
+
+    bad_tr = q.QAScan(data=_flat_scan().data, tr=0.0, pe_axis=1)
+    with pytest.raises(q.InvalidScanError, match="TR"):
+        q.run_qa(bad_tr)
+
+
+def test_run_qa_rejects_through_plane_pe_from_scan() -> None:
+    scan = q.QAScan(data=_flat_scan().data, tr=2.0, pe_axis=2)
+    with pytest.raises(q.InvalidScanError, match="in-plane"):
+        q.run_qa(scan)
+
+
 def _flat_scan(shape: tuple[int, int, int, int] = (16, 16, 3, 20)) -> q.QAScan:
     """A minimal scan with a bright central block, built without file I/O."""
     x, y = shape[0], shape[1]

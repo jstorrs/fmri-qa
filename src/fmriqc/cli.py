@@ -1,5 +1,6 @@
 import argparse
 import json
+import math
 import sys
 from collections.abc import Sequence
 from importlib.metadata import PackageNotFoundError, version
@@ -7,8 +8,24 @@ from pathlib import Path
 
 import fmriqc as q
 
-# Shared row/col (i->row, j->col), extended with the through-plane axis label.
-_PE_LABEL: dict[int, str] = {**q.PE_ROWCOL, 2: "k"}
+# Shared in-plane row/col labels (i->row, j->col).
+_PE_LABEL = q.PE_ROWCOL
+
+
+def _nonnegative_float(value: str) -> float:
+    parsed = float(value)
+    if not math.isfinite(parsed) or parsed < 0:
+        raise argparse.ArgumentTypeError(
+            "expected a finite number greater than or equal to 0"
+        )
+    return parsed
+
+
+def _positive_int(value: str) -> int:
+    parsed = int(value)
+    if parsed <= 0:
+        raise argparse.ArgumentTypeError("expected a positive integer")
+    return parsed
 
 
 def _version() -> str:
@@ -63,16 +80,16 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("paths", nargs="+", help="NIfTI (.nii/.nii.gz) QA scans")
     parser.add_argument(
         "--trim-sec",
-        type=float,
+        type=_nonnegative_float,
         default=5.0,
         help="Seconds of initial (non-steady-state) volumes to drop (default: 5).",
     )
     parser.add_argument(
         "--pe-axis",
         type=int,
-        choices=(0, 1, 2),
+        choices=(0, 1),
         default=None,
-        help="Override the phase-encode axis (default: read from the header).",
+        help="Override the in-plane phase-encode axis (default: read from the header).",
     )
     parser.add_argument(
         "--detrend",
@@ -89,7 +106,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     parser.add_argument(
         "--roi-size",
-        type=int,
+        type=_positive_int,
         default=q.FBIRN_ROI_SIZE,
         help=(
             f"Fixed summary/Weisskoff ROI side in voxels (default: {q.FBIRN_ROI_SIZE})."
