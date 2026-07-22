@@ -234,10 +234,13 @@ Multiple scans are summarized in one table and, with `--pdf`, combined into a
 single PDF (one page per scan by default). A bad file is reported to stderr and
 the batch continues; the process exits non-zero if any file failed.
 
-With `--json`, stdout carries a single JSON document — `{"config": {...},
-"scans": [...]}`, one record per scan with the same fields as the table columns
-as raw numbers — while the banner, any errors, and the PDF notice go to stderr,
-so `fmri-qa --json scan.nii.gz | jq` stays clean:
+With `--json`, stdout carries a single versioned JSON document —
+`{"schema_version": 1, "config": {...}, "scans": [...]}`, one record per scan
+with the same fields as the table columns as raw numbers. A metric that cannot
+be computed for a scan is JSON `null` (for example, a ghost ratio with no clear
+ghost region), never a non-standard `NaN` or `Infinity` token. The banner, any
+errors, and the PDF notice go to stderr, so
+`fmri-qa --json scan.nii.gz | jq` stays clean:
 
 ```bash
 uv run fmri-qa --json data/*_fMRI_*.nii.gz > qa.json

@@ -96,6 +96,7 @@ def test_json_emits_a_parseable_document(tmp_path, capsys) -> None:
     captured = capsys.readouterr()
     assert rc == 0
     doc = json.loads(captured.out)  # stdout is pure JSON, nothing else
+    assert doc["schema_version"] == 1
     assert doc["config"]["detrend"] == "poly"
     assert "version" in doc["config"]
     assert len(doc["scans"]) == 1
@@ -103,6 +104,19 @@ def test_json_emits_a_parseable_document(tmp_path, capsys) -> None:
     assert scan["scan"] == "scan.nii.gz"
     assert scan["snr"] > 0 and scan["pe_axis"] == 1
     assert "# detrend" in captured.err  # the banner moved off stdout
+
+
+def test_json_uses_null_for_undefined_metrics(tmp_path, capsys) -> None:
+    rc = cli.main([_write_scan(tmp_path), "--roi-size", "9", "--json"])
+    captured = capsys.readouterr()
+    assert rc == 0
+    assert "NaN" not in captured.out and "Infinity" not in captured.out
+    doc = json.loads(captured.out, parse_constant=_reject_json_constant)
+    assert doc["scans"][0]["ghost_pct"] is None
+
+
+def _reject_json_constant(value: str) -> None:
+    raise ValueError(f"non-standard JSON constant: {value}")
 
 
 def test_json_stdout_stays_pure_with_pdf(tmp_path, capsys) -> None:

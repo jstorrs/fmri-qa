@@ -10,6 +10,7 @@ import fmriqc as q
 
 # Shared in-plane row/col labels (i->row, j->col).
 _PE_LABEL = q.PE_ROWCOL
+_JSON_SCHEMA_VERSION = 1
 
 
 def _nonnegative_float(value: str) -> float:
@@ -44,7 +45,7 @@ def _metric_record(name: str, pe: str, result: q.QAResult) -> dict[str, object]:
     m = result.metrics
     sat = m.saturation
     sm = m.smoothness
-    return {
+    record: dict[str, object] = {
         "scan": name,
         "pe": pe,
         "pe_axis": m.pe_axis,
@@ -68,6 +69,12 @@ def _metric_record(name: str, pe: str, result: q.QAResult) -> dict[str, object]:
         "com": m.center_of_mass.max_displacement,
         "fw_pe": sm.fwhm_pe if sm.fwhm_pe is not None else sm.fwhm,
         "fw_ro": sm.fwhm_ro if sm.fwhm_ro is not None else sm.fwhm,
+    }
+    # Undefined numerical metrics are JSON null, not Python's non-standard NaN
+    # or Infinity tokens. This keeps stdout consumable by strict JSON parsers.
+    return {
+        key: None if isinstance(value, float) and not math.isfinite(value) else value
+        for key, value in record.items()
     }
 
 
@@ -207,7 +214,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f"# wrote {args.pdf} ({len(reports)} scan(s), {pages} pages)", file=info)
 
     if args.json:
-        json.dump({"config": _config(args), "scans": records}, sys.stdout, indent=2)
+        document = {
+            "schema_version": _JSON_SCHEMA_VERSION,
+            "config": _config(args),
+            "scans": records,
+        }
+        json.dump(document, sys.stdout, indent=2, allow_nan=False)
         print()
 
     return 1 if failed else 0
