@@ -29,6 +29,15 @@ def _positive_int(value: str) -> int:
     return parsed
 
 
+def _nonnegative_int(value: str) -> int:
+    parsed = int(value)
+    if parsed < 0:
+        raise argparse.ArgumentTypeError(
+            "expected an integer greater than or equal to 0"
+        )
+    return parsed
+
+
 def _version() -> str:
     try:
         return version("fmri-qa")
@@ -295,7 +304,7 @@ def hilo_main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("low", help="Low-flip-angle NIfTI (.nii/.nii.gz) QA scan")
     parser.add_argument(
         "--trim-sec",
-        type=float,
+        type=_nonnegative_float,
         default=5.0,
         help="Seconds of initial (non-steady-state) volumes to drop (default: 5).",
     )
@@ -307,7 +316,7 @@ def hilo_main(argv: Sequence[str] | None = None) -> int:
     )
     parser.add_argument(
         "--erode",
-        type=int,
+        type=_nonnegative_int,
         default=q.HILO_ERODE,
         help=f"Voxel layers peeled off the phantom for the core mask "
         f"(default: {q.HILO_ERODE}).",

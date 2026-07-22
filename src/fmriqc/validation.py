@@ -74,3 +74,29 @@ def validate_qa_run(
             resolved_pe,
             "the single-slice metrics support only in-plane axes 0 and 1",
         )
+
+
+def validate_hilo_run(
+    high: "QAScan", low: "QAScan", *, trim_sec: float, erode: int
+) -> None:
+    """Validate parameters shared by both sides of a high/low analysis."""
+    validate_scan(high, minimum_frames=MIN_ANALYSIS_FRAMES)
+    validate_scan(low, minimum_frames=MIN_ANALYSIS_FRAMES)
+    if not np.isfinite(trim_sec) or trim_sec < 0:
+        raise InvalidScanError(
+            "trim_sec",
+            trim_sec,
+            "expected a finite value greater than or equal to zero",
+        )
+    if erode < 0:
+        raise InvalidScanError(
+            "erode", erode, "expected an integer greater than or equal to zero"
+        )
+    for label, scan in (("high", high), ("low", low)):
+        remaining = scan.data.shape[-1] - round(trim_sec / scan.tr)
+        if remaining < MIN_ANALYSIS_FRAMES:
+            reason = (
+                f"leaves {max(remaining, 0)} {label}-flip frames; "
+                f"at least {MIN_ANALYSIS_FRAMES} are required"
+            )
+            raise InvalidScanError("trim_sec", trim_sec, reason)

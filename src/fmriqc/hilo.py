@@ -18,10 +18,13 @@ from .load.scan import QAScan
 from .prep.detrend import detrend_fn
 from .prep.imaging import fluctuation_noise, segment_phantom, trim_initial
 from .types import BoolArray, DetrendMethod, FloatArray
+from .validation import validate_hilo_run
 
 # Voxel layers peeled off the phantom to form the hi/lo core mask (AFNI
 # 3dAutomask -erode 5) -- excludes edge / partial-volume / ghost-contaminated voxels.
 HILO_ERODE = 5
+_GEOMETRY_RTOL = 1e-5
+_GEOMETRY_ATOL = 1e-4
 
 
 @dataclass(frozen=True)
@@ -190,6 +193,56 @@ def _hilo_stats(
     return mean_map, sd_map, phantom_core_mask(mean_map, erode)
 
 
+def _require_compatible_scans(high: QAScan, low: QAScan) -> None:
+    """Require matching geometry and acquisition parameters before pooling."""
+    if high.data.shape != low.data.shape:
+        raise IncompatibleScansError(
+            "data geometry",
+            high.data.shape,
+            low.data.shape,
+            "the scans must differ only in flip angle",
+        )
+    if not np.isclose(high.tr, low.tr, rtol=_GEOMETRY_RTOL, atol=_GEOMETRY_ATOL):
+        raise IncompatibleScansError("TR", high.tr, low.tr)
+
+    if (high.affine is None) != (low.affine is None):
+        raise IncompatibleScansError("affine", high.affine, low.affine)
+    if (
+        high.affine is not None
+        and low.affine is not None
+        and not np.allclose(
+            high.affine,
+            low.affine,
+            rtol=_GEOMETRY_RTOL,
+            atol=_GEOMETRY_ATOL,
+        )
+    ):
+        raise IncompatibleScansError("affine", high.affine, low.affine)
+
+    if high.meta is None or low.meta is None:
+        return
+    if not np.allclose(
+        high.meta.voxel_mm,
+        low.meta.voxel_mm,
+        rtol=_GEOMETRY_RTOL,
+        atol=_GEOMETRY_ATOL,
+    ):
+        raise IncompatibleScansError(
+            "voxel size", high.meta.voxel_mm, low.meta.voxel_mm
+        )
+    if (
+        high.meta.te is not None
+        and low.meta.te is not None
+        and not np.isclose(
+            high.meta.te,
+            low.meta.te,
+            rtol=_GEOMETRY_RTOL,
+            atol=_GEOMETRY_ATOL,
+        )
+    ):
+        raise IncompatibleScansError("TE", high.meta.te, low.meta.te)
+
+
 def run_hilo(
     high: QAScan,
     low: QAScan,
@@ -212,6 +265,9 @@ def run_hilo(
         IncompatibleScansError: If the two scans differ in geometry, or their
             phantom cores do not overlap.
     """
+    validate_hilo_run(high, low, trim_sec=trim_sec, erode=erode)
+    _require_compatible_scans(high, low)
+
     fh = high.meta.flip_angle if high.meta else None
     fl = low.meta.flip_angle if low.meta else None
     if fh is not None and fl is not None and fh <= fl:
@@ -223,18 +279,15 @@ def run_hilo(
 
     mean_h, sd_h, core_h = _hilo_stats(high, trim_sec, detrend, erode)
     mean_l, sd_l, core_l = _hilo_stats(low, trim_sec, detrend, erode)
-    if mean_h.shape != mean_l.shape:
-        raise IncompatibleScansError(
-            f"high/low scans have different geometry {mean_h.shape} vs "
-            f"{mean_l.shape}; they must be the same acquisition except flip angle."
-        )
 
     core = core_h & core_l
     n = int(core.sum())
     if n == 0:
         raise IncompatibleScansError(
-            "high/low phantom cores do not overlap; cannot pool statistics "
-            "(check that both scans image the same phantom, or lower --erode)."
+            "phantom core overlap",
+            int(core_h.sum()),
+            int(core_l.sum()),
+            "no shared voxels; check positioning or lower --erode",
         )
 
     mean_high = float(mean_h[core].mean())

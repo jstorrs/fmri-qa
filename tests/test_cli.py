@@ -173,6 +173,14 @@ def test_hilo_main_reports_bad_file(tmp_path, capsys) -> None:
     assert "ERROR" in capsys.readouterr().err
 
 
+@pytest.mark.parametrize("args", [["--erode", "-1"], ["--trim-sec", "-1"]])
+def test_hilo_main_rejects_invalid_numeric_options(args: list[str], capsys) -> None:
+    with pytest.raises(SystemExit) as info:
+        cli.hilo_main([*args, "high.nii.gz", "low.nii.gz"])
+    assert info.value.code == 2
+    assert "error:" in capsys.readouterr().err
+
+
 def test_write_report_honours_a_custom_theme(tmp_path) -> None:
     from reportlab.lib.pagesizes import A4
 

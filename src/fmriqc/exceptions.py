@@ -64,6 +64,23 @@ class InvalidScanError(FmriqcError, ValueError):
 class IncompatibleScansError(FmriqcError, ValueError):
     """A high/low flip-angle scan pair cannot be combined.
 
-    Raised when the two scans differ in geometry, or when their phantom cores do
-    not overlap so no shared statistics can be pooled. Also a `ValueError`.
+    Raised when the two scans differ in geometry or acquisition settings, or
+    when their phantom cores do not overlap. Also a `ValueError`. The mismatched
+    ``field`` and the two values are retained for programmatic handling.
     """
+
+    def __init__(
+        self,
+        field: str,
+        high_value: object,
+        low_value: object,
+        reason: str | None = None,
+    ) -> None:
+        detail = f"incompatible {field}: high={high_value!r}, low={low_value!r}"
+        if reason:
+            detail += f"; {reason}"
+        super().__init__(detail)
+        self.field = field
+        self.high_value = high_value
+        self.low_value = low_value
+        self.reason = reason

@@ -1,5 +1,7 @@
 """The exception contract: every promised error, and its dual catchability."""
 
+from dataclasses import replace
+
 import numpy as np
 import pytest
 
@@ -10,6 +12,7 @@ from fmriqc.exceptions import (
     InvalidChoiceError,
     MissingSidecarError,
 )
+from fmriqc.hilo import _require_compatible_scans
 from fmriqc.prep.detrend import detrend_fn
 from fmriqc.prep.geometry import resolve_roi
 from fmriqc.prep.imaging import extract_center_slice
@@ -66,6 +69,45 @@ def test_run_hilo_rejects_mismatched_geometry() -> None:
     low = _flat_scan(shape=(8, 8, 3, 12))  # different Z
     with pytest.raises(IncompatibleScansError, match="geometry"):
         q.run_hilo(high, low)
+
+
+@pytest.mark.parametrize("field", ["TR", "affine", "voxel size", "TE"])
+def test_hilo_rejects_mismatched_acquisition(field: str) -> None:
+    meta = q.ScanMeta(voxel_mm=(3.0, 3.0, 3.0), matrix=(16, 16), tr=2.0, te=0.03)
+    high = replace(_flat_scan(), affine=np.eye(4), meta=meta)
+    low = high
+    if field == "TR":
+        low = replace(low, tr=2.1)
+    elif field == "affine":
+        affine = np.eye(4)
+        affine[0, 3] = 1.0
+        low = replace(low, affine=affine)
+    elif field == "voxel size":
+        low = replace(low, meta=replace(meta, voxel_mm=(2.0, 3.0, 3.0)))
+    else:
+        low = replace(low, meta=replace(meta, te=0.04))
+
+    with pytest.raises(IncompatibleScansError) as info:
+        _require_compatible_scans(high, low)
+    assert info.value.field == field
+    assert repr(info.value.high_value) != repr(info.value.low_value)
+
+
+def test_hilo_accepts_small_affine_roundoff() -> None:
+    high = replace(_flat_scan(), affine=np.eye(4))
+    affine = np.eye(4)
+    affine[0, 3] = 1e-6
+    low = replace(high, affine=affine)
+    _require_compatible_scans(high, low)
+
+
+@pytest.mark.parametrize("kwargs", [{"erode": -1}, {"trim_sec": 1_000.0}])
+def test_run_hilo_validates_parameters_before_processing(
+    kwargs: dict[str, object],
+) -> None:
+    scan = _flat_scan()
+    with pytest.raises(q.InvalidScanError):
+        q.run_hilo(scan, scan, **kwargs)  # type: ignore[arg-type]
 
 
 @pytest.mark.parametrize(

@@ -183,6 +183,10 @@ Pass the high-flip scan first (a warning fires if the flip angles say otherwise)
 `--trim-sec`, `--detrend`, and `--erode` mirror the main command. This is a
 pair-level diagnostic, kept apart from the per-scan batch table.
 
+The pair must match in array geometry, frame count, affine, voxel size, TR, and
+TE (when recorded); incompatibilities are rejected before either scan is
+processed so differently sampled acquisitions cannot be pooled by array index.
+
 ## Install
 
 The project uses [uv](https://docs.astral.sh/uv/) and Python 3.13:
