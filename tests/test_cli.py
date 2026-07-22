@@ -64,6 +64,17 @@ def test_main_writes_a_nonempty_pdf(tmp_path) -> None:
     assert pdf.read_bytes().startswith(b"%PDF")
 
 
+def test_main_reports_pdf_failure_without_a_traceback(tmp_path, capsys) -> None:
+    missing_parent = tmp_path / "missing" / "qa.pdf"
+    rc = cli.main(
+        [_write_scan(tmp_path), "--roi-size", "9", "--pdf", str(missing_parent)]
+    )
+    captured = capsys.readouterr()
+    assert rc == 1
+    assert "ERROR: could not write PDF" in captured.err
+    assert "Traceback" not in captured.err
+
+
 def test_main_physics_tier_renders(tmp_path) -> None:
     pdf = tmp_path / "qa2.pdf"
     rc = cli.main(
@@ -201,6 +212,28 @@ def test_write_report_honours_a_custom_theme(tmp_path) -> None:
     pages = report.write_report([("scan", result)], pdf, theme=theme)
     assert pages == 1
     assert pdf.read_bytes().startswith(b"%PDF")
+
+
+def test_write_report_preserves_destination_on_render_failure(
+    tmp_path, monkeypatch
+) -> None:
+    import fmriqc as q
+    from fmriqc import report
+    from fmriqc.report.formats import reportlab as driver
+
+    scan = q.QAScan.from_nifti(_write_scan(tmp_path))
+    result = q.run_qa(scan, roi_size=9)
+    pdf = tmp_path / "existing.pdf"
+    pdf.write_bytes(b"existing report")
+
+    def fail_render(*args, **kwargs) -> int:
+        raise RuntimeError("injected render failure")
+
+    monkeypatch.setattr(driver, "_render_block", fail_render)
+    with pytest.raises(RuntimeError, match="injected"):
+        report.write_report([("scan", result)], pdf)
+    assert pdf.read_bytes() == b"existing report"
+    assert not list(tmp_path.glob(".existing.pdf.*"))
 
 
 def test_write_report_builds_a_cover_and_appendix_packet(tmp_path) -> None:

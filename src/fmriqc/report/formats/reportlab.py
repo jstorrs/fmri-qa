@@ -10,6 +10,8 @@ reuses `report.panels` and `report.summary` and only re-implements composition.
 """
 
 import io
+import os
+import tempfile
 from collections.abc import Callable, Iterable
 from pathlib import Path
 from typing import Any, cast
@@ -17,6 +19,7 @@ from typing import Any, cast
 import matplotlib
 from matplotlib.figure import Figure
 from reportlab.graphics.shapes import Group, Image
+from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfgen import canvas
 from svglib import svglib as _svglib
 from svglib.svglib import svg2rlg
@@ -60,6 +63,65 @@ PageRenderer = Callable[[canvas.Canvas, q.QAResult, str, Theme], None]
 
 _TILE_H = 34.0  # metric-tile height (pt)
 _TILE_GAP = 6.0
+_COVER_ROW_H = 14.0
+_APPENDIX_ROW_H = 33.0
+
+
+def _fit_text(text: str, font: str, size: float, width: float) -> str:
+    """Truncate one-line report text to ``width``, preserving an ellipsis."""
+    if pdfmetrics.stringWidth(text, font, size) <= width:
+        return text
+    ellipsis = "..."
+    available = width - pdfmetrics.stringWidth(ellipsis, font, size)
+    if available <= 0:
+        return ""
+    end = len(text)
+    while end > 0 and pdfmetrics.stringWidth(text[:end], font, size) > available:
+        end -= 1
+    return text[:end].rstrip() + ellipsis
+
+
+def _page_chunks[T](
+    rows: tuple[T, ...], first_capacity: int, next_capacity: int
+) -> list[tuple[T, ...]]:
+    """Split rows across a differently sized first page and continuation pages."""
+    first_capacity = max(first_capacity, 1)
+    next_capacity = max(next_capacity, 1)
+    chunks = [rows[:first_capacity]]
+    offset = first_capacity
+    while offset < len(rows):
+        chunks.append(rows[offset : offset + next_capacity])
+        offset += next_capacity
+    return chunks
+
+
+def _cover_chunks(cover: Cover, theme: Theme) -> list[tuple[str, ...]]:
+    """Paginate a cover inventory for the active page geometry."""
+    y = theme.page_size[1] * 0.70
+    if theme.logo is not None and theme.logo.is_file():
+        y -= 18
+    y -= 26
+    y -= 40
+    y -= 16
+    floor = theme.margin + 10
+    first = int((y - floor) // _COVER_ROW_H) + 1
+    continuation_y = theme.page_size[1] - 34 - 22 - 16 - 16
+    following = int((continuation_y - floor) // _COVER_ROW_H) + 1
+    return _page_chunks(cover.scans, first, following)
+
+
+def _appendix_chunks(
+    appendix: Appendix, theme: Theme
+) -> list[tuple[tuple[str, str], ...]]:
+    """Paginate provenance rows above the running-footer area."""
+    y = theme.page_size[1] - 34 - 20
+    if appendix.version:
+        y -= 20
+    floor = theme.margin + 15
+    first = int((y - floor) // _APPENDIX_ROW_H) + 1
+    continuation_y = theme.page_size[1] - 34 - 20
+    following = int((continuation_y - floor) // _APPENDIX_ROW_H) + 1
+    return _page_chunks(appendix.rows, first, following)
 
 
 def _patch_svglib_image_alignment() -> None:
@@ -509,12 +571,19 @@ def _draw_footer(c: canvas.Canvas, theme: Theme, page_no: int, total: int) -> No
     c.setFillGray(theme.text_primary_gray)
 
 
-def _cover_page(c: canvas.Canvas, cover: Cover, theme: Theme) -> None:
+def _cover_page(
+    c: canvas.Canvas,
+    cover: Cover,
+    scans: tuple[str, ...],
+    theme: Theme,
+    *,
+    continuation: bool,
+) -> None:
     """Draw the branded cover: logo, title, optional subtitle, scan inventory."""
     page_w, page_h = theme.page_size
     cx = page_w / 2
-    y = page_h * 0.70
-    if theme.logo is not None and theme.logo.is_file():
+    y = page_h - 34 if continuation else page_h * 0.70
+    if not continuation and theme.logo is not None and theme.logo.is_file():
         c.drawImage(
             str(theme.logo),
             cx - 60,
@@ -526,14 +595,15 @@ def _cover_page(c: canvas.Canvas, cover: Cover, theme: Theme) -> None:
         )
         y -= 18
     c.setFillGray(theme.text_primary_gray)
-    c.setFont(theme.font_title, 22)
-    c.drawCentredString(cx, y, theme.cover_title)
-    y -= 26
-    if cover.subtitle:
+    c.setFont(theme.font_title, 14 if continuation else 22)
+    title = "Scan inventory (continued)" if continuation else theme.cover_title
+    c.drawCentredString(cx, y, title)
+    y -= 22 if continuation else 26
+    if not continuation and cover.subtitle:
         c.setFont(theme.font_body, 12)
         c.setFillGray(theme.text_muted_gray)
         c.drawCentredString(cx, y, cover.subtitle)
-    y -= 40
+    y -= 16 if continuation else 40
 
     c.setFillGray(theme.text_primary_gray)
     c.setFont(theme.font_title, 11)
@@ -541,38 +611,59 @@ def _cover_page(c: canvas.Canvas, cover: Cover, theme: Theme) -> None:
     y -= 16
     c.setFont(theme.font_body, 10)
     c.setFillGray(theme.text_muted_gray)
-    for name in cover.scans:
-        c.drawString(theme.margin + 10, y, f"·  {name}")
-        y -= 14
+    for name in scans:
+        line = _fit_text(f"·  {name}", theme.font_body, 10, theme.content_width - 10)
+        c.drawString(theme.margin + 10, y, line)
+        y -= _COVER_ROW_H
     c.setFillGray(theme.text_primary_gray)
 
 
-def _appendix_page(c: canvas.Canvas, appendix: Appendix, theme: Theme) -> None:
+def _appendix_page(
+    c: canvas.Canvas,
+    appendix: Appendix,
+    rows: tuple[tuple[str, str], ...],
+    theme: Theme,
+    *,
+    continuation: bool,
+) -> None:
     """Draw the provenance appendix: the package version and per-scan rows."""
     y = theme.page_size[1] - 34
     c.setFont(theme.font_title, 14)
-    c.drawString(theme.margin, y, "Provenance")
+    title = "Provenance (continued)" if continuation else "Provenance"
+    c.drawString(theme.margin, y, title)
     y -= 20
-    if appendix.version:
+    if appendix.version and not continuation:
         c.setFont(theme.font_body, 9)
         c.setFillGray(theme.text_muted_gray)
         c.drawString(theme.margin, y, f"fmri-qa {appendix.version}")
         c.setFillGray(theme.text_primary_gray)
         y -= 20
-    for name, detail in appendix.rows:
+    for name, detail in rows:
         c.setFont(theme.font_title, 10)
-        c.drawString(theme.margin, y, name)
+        c.drawString(
+            theme.margin,
+            y,
+            _fit_text(name, theme.font_title, 10, theme.content_width),
+        )
         y -= 13
         c.setFont(theme.font_body, 8.5)
         c.setFillGray(theme.text_muted_gray)
-        c.drawString(theme.margin + 10, y, detail)
+        c.drawString(
+            theme.margin + 10,
+            y,
+            _fit_text(detail, theme.font_body, 8.5, theme.content_width - 10),
+        )
         c.setFillGray(theme.text_primary_gray)
         y -= 20
 
 
-def _block_pages(block: Block) -> int:
+def _block_pages(block: Block, theme: Theme) -> int:
     """How many pages a block draws: its parts for a scan, else one."""
-    return len(block.parts) if isinstance(block, ScanSection) else 1
+    if isinstance(block, ScanSection):
+        return len(block.parts)
+    if isinstance(block, Cover):
+        return len(_cover_chunks(block, theme))
+    return len(_appendix_chunks(block, theme))
 
 
 def _render_block(
@@ -584,14 +675,17 @@ def _render_block(
     gets the running footer.
     """
     if isinstance(block, Cover):
-        _cover_page(c, block, theme)
-        c.showPage()
-        return page_no + 1
+        for index, scans in enumerate(_cover_chunks(block, theme)):
+            _cover_page(c, block, scans, theme, continuation=index > 0)
+            c.showPage()
+            page_no += 1
+        return page_no
     if isinstance(block, Appendix):
-        page_no += 1
-        _appendix_page(c, block, theme)
-        _draw_footer(c, theme, page_no, total)
-        c.showPage()
+        for index, rows in enumerate(_appendix_chunks(block, theme)):
+            page_no += 1
+            _appendix_page(c, block, rows, theme, continuation=index > 0)
+            _draw_footer(c, theme, page_no, total)
+            c.showPage()
         return page_no
     with matplotlib.rc_context(cast("Any", theme.rc_params())):
         for part in block.parts:
@@ -621,10 +715,20 @@ def write_report(
     if isinstance(items, q.QAResult):
         items = [("", items)]
     blocks = compose(items, tier, cover=cover, appendix=appendix)
-    total = sum(_block_pages(b) for b in blocks)
-    c = canvas.Canvas(str(pdf_path), pagesize=theme.page_size)
-    page_no = 0
-    for block in blocks:
-        page_no = _render_block(c, block, theme, page_no, total)
-    c.save()
+    total = sum(_block_pages(b, theme) for b in blocks)
+    target = Path(pdf_path)
+    fd, temporary_name = tempfile.mkstemp(
+        prefix=f".{target.name}.", suffix=".tmp", dir=target.parent
+    )
+    os.close(fd)
+    temporary = Path(temporary_name)
+    try:
+        c = canvas.Canvas(str(temporary), pagesize=theme.page_size)
+        page_no = 0
+        for block in blocks:
+            page_no = _render_block(c, block, theme, page_no, total)
+        c.save()
+        temporary.replace(target)
+    finally:
+        temporary.unlink(missing_ok=True)
     return total

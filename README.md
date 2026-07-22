@@ -317,3 +317,7 @@ report.write_report(
     tier="physics", theme=theme, cover=True, appendix=True,
 )
 ```
+
+Large scan inventories and provenance appendices continue onto additional
+pages. PDF output is written atomically: a rendering failure leaves any
+existing destination file unchanged and makes the CLI exit non-zero.

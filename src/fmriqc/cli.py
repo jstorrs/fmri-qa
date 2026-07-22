@@ -213,14 +213,22 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.pdf and reports:
         from . import report as report_mod
 
-        pages = report_mod.write_report(
-            reports,
-            args.pdf,
-            tier=args.pdf_tier,
-            cover=args.pdf_cover,
-            appendix=args.pdf_appendix,
-        )
-        print(f"# wrote {args.pdf} ({len(reports)} scan(s), {pages} pages)", file=info)
+        try:
+            pages = report_mod.write_report(
+                reports,
+                args.pdf,
+                tier=args.pdf_tier,
+                cover=args.pdf_cover,
+                appendix=args.pdf_appendix,
+            )
+        except Exception as exc:  # noqa: BLE001 - CLI boundary reports cleanly
+            failed = True
+            print(f"ERROR: could not write PDF {args.pdf}: {exc}", file=sys.stderr)
+        else:
+            print(
+                f"# wrote {args.pdf} ({len(reports)} scan(s), {pages} pages)",
+                file=info,
+            )
 
     if args.json:
         document = {
