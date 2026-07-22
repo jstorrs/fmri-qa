@@ -13,7 +13,9 @@ import io
 import os
 import tempfile
 from collections.abc import Callable, Iterable
+from importlib.metadata import version
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any, cast
 
 import matplotlib
@@ -65,6 +67,7 @@ _TILE_H = 34.0  # metric-tile height (pt)
 _TILE_GAP = 6.0
 _COVER_ROW_H = 14.0
 _APPENDIX_ROW_H = 33.0
+_ImageConverter = Callable[[Any, Any], Any]
 
 
 def _fit_text(text: str, font: str, size: float, width: float) -> str:
@@ -124,6 +127,33 @@ def _appendix_chunks(
     return _page_chunks(appendix.rows, first, following)
 
 
+def _svglib_truncates_image_geometry(convert_image: _ImageConverter) -> bool:
+    """Probe a converter, returning whether it truncates fractional geometry."""
+
+    class ProbeConverter:
+        @staticmethod
+        def convert_length_attrs(*args: object) -> tuple[float, float, float, float]:
+            return (0.25, 1.25, 2.5, 3.5)
+
+    node = SimpleNamespace(_resolved_target="alignment-probe")
+    try:
+        group = convert_image(ProbeConverter(), node)
+        image = group.contents[0]
+        geometry = (image.x, image.y, image.width, image.height)
+    except (AttributeError, IndexError, TypeError) as exc:
+        raise RuntimeError(
+            f"svglib {version('svglib')} has an unsupported image converter API"
+        ) from exc
+
+    if geometry == (0.25, 4.75, 2.5, 3.5):
+        return False
+    if geometry == (0, 4, 2, 3):
+        return True
+    raise RuntimeError(
+        f"svglib {version('svglib')} returned unexpected image geometry {geometry!r}"
+    )
+
+
 def _patch_svglib_image_alignment() -> None:
     """Fix svglib truncating embedded-image geometry to whole points.
 
@@ -132,9 +162,15 @@ def _patch_svglib_image_alignment() -> None:
     group by the *un*-truncated `(y + height) * 2`. For an `imshow` panel the
     raster then lands up to a point off from the mask contour and ROI box (which
     keep full precision), so the phantom outline visibly drifts off the image.
-    This reinstates the method verbatim without the `int()` casts. Pinned to the
-    svglib in `uv.lock`; revisit on upgrade.
+    The converter is behavior-probed before patching. A future svglib that keeps
+    fractional geometry needs no patch; an unknown private API fails clearly
+    instead of silently misaligning the raster and vector layers. The dependency
+    range is capped in `pyproject.toml` until a newer release is verified.
     """
+
+    original = _svglib.Svg2RlgShapeConverter.convertImage
+    if not _svglib_truncates_image_geometry(original):
+        return
 
     def convertImage(self: Any, node: Any) -> Any:
         x, y, width, height = self.convert_length_attrs(
@@ -148,6 +184,9 @@ def _patch_svglib_image_alignment() -> None:
         return group
 
     _svglib.Svg2RlgShapeConverter.convertImage = convertImage
+
+    if _svglib_truncates_image_geometry(convertImage):
+        raise RuntimeError("failed to install the svglib image-alignment fix")
 
 
 _patch_svglib_image_alignment()

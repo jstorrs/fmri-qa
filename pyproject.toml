@@ -11,7 +11,9 @@ dependencies = [
     "reportlab>=5.0.0",
     "scikit-image>=0.25.2",
     "scipy>=1.16.2",
-    "svglib>=2.0.2",
+    # reportlab.py probes and patches svglib's private image converter. Verify
+    # that adapter before widening this bound.
+    "svglib>=2.0.2,<2.1",
 ]
 
 [project.optional-dependencies]

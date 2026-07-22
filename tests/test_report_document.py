@@ -2,12 +2,14 @@
 
 import pytest
 from reportlab.pdfbase import pdfmetrics
+from svglib import svglib as _svglib
 
 from fmriqc import report
 from fmriqc.report.formats.reportlab import (
     _appendix_chunks,
     _cover_chunks,
     _fit_text,
+    _svglib_truncates_image_geometry,
 )
 
 
@@ -49,3 +51,16 @@ def test_report_text_is_truncated_to_the_available_width() -> None:
     fitted = _fit_text("a very long scan name" * 20, "Helvetica", 10, 100)
     assert fitted.endswith("...")
     assert pdfmetrics.stringWidth(fitted, "Helvetica", 10) <= 100
+
+
+def test_svglib_converter_preserves_fractional_image_geometry() -> None:
+    converter = _svglib.Svg2RlgShapeConverter.convertImage
+    assert not _svglib_truncates_image_geometry(converter)
+
+
+def test_svglib_probe_rejects_an_unknown_converter_shape() -> None:
+    def unknown_converter(self, node):
+        return object()
+
+    with pytest.raises(RuntimeError, match="unsupported image converter API"):
+        _svglib_truncates_image_geometry(unknown_converter)
