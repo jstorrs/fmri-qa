@@ -34,3 +34,18 @@ jobs:
 
       - name: Run the gate
         run: make check
+
+      - name: Build wheel and source distribution
+        run: uv build
+
+      # Exercise the artifact users install, independently of the editable
+      # environment used by the source-tree gate above.
+      - name: Smoke-test the built wheel
+        run: |
+          wheels=(dist/*.whl)
+          test -f "${wheels[0]}"
+          uv venv --python 3.13 .venv-wheel-smoke
+          uv pip install --python .venv-wheel-smoke/bin/python "${wheels[0]}"
+          .venv-wheel-smoke/bin/fmri-qa --version
+          .venv-wheel-smoke/bin/fmri-qa-hilo --help > /dev/null
+          .venv-wheel-smoke/bin/python -c "from importlib.resources import files; assert files('fmriqc').joinpath('py.typed').is_file()"

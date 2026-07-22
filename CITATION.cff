@@ -1,0 +1,8 @@
+cff-version: 1.2.0
+message: "If you use fmri-qa in published work, please cite this software."
+title: "fmri-qa"
+type: software
+authors:
+  - family-names: "Storrs"
+    given-names: "Judd"
+version: 0.1.0

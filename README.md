@@ -195,6 +195,10 @@ The project uses [uv](https://docs.astral.sh/uv/) and Python 3.13:
 uv sync
 ```
 
+Published work using the package should cite the software metadata in
+[`CITATION.cff`](CITATION.cff). User-facing changes are recorded in
+[`CHANGELOG.md`](CHANGELOG.md).
+
 The QA metrics and CLI need only the core dependencies installed above. The
 exploratory notebooks (DICOM conversion, BIDS, and interactive viewers) pull in
 a heavier stack — install it with the `notebooks` extra:

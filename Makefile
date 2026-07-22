@@ -3,7 +3,7 @@
 # Everything runs through `uv run` against the locked environment; sync with
 # all extras once so optional deps resolve (see style/tooling.md).
 
-.PHONY: all format lint typecheck pyright test check sync
+.PHONY: all format lint typecheck pyright test check sync build
 
 all: lint typecheck pyright test
 
@@ -24,6 +24,9 @@ pyright:
 
 test:
 	uv run pytest
+
+build:
+	uv build
 
 # CI-style gate: fail on any formatting drift or lint hit, then both type
 # checkers + test with a coverage floor (guards the core from silent regression).

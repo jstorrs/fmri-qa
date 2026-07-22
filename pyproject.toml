@@ -4,6 +4,19 @@ version = "0.1.0"
 description = "Phantom fMRI quality-assurance metrics (SNR, SFNR, RDC, ghost)"
 readme = "README.md"
 requires-python = ">=3.13"
+authors = [
+    { name = "Judd Storrs", email = "jstorrs@gmail.com" },
+]
+keywords = ["fMRI", "MRI", "phantom", "quality assurance"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Healthcare Industry",
+    "Intended Audience :: Science/Research",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.13",
+    "Typing :: Typed",
+]
 dependencies = [
     "matplotlib>=3.10.7",
     "nibabel>=5.3.2",
