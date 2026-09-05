@@ -22,23 +22,28 @@ Create `exceptions.py` with a base exception and specific subclasses:
 ```python
 # mypackage/exceptions.py
 
+
 class MyPackageError(Exception):
     """Base exception for mypackage."""
+
     pass
 
 
 class ConfigurationError(MyPackageError):
     """Invalid or missing configuration."""
+
     pass
 
 
 class ValidationError(MyPackageError):
     """Data validation failed."""
+
     pass
 
 
 class ParseError(MyPackageError):
     """Failed to parse input data."""
+
     pass
 ```
 

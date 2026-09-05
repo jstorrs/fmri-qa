@@ -67,6 +67,7 @@ Deprecation markers are useful *during* a refactoring session:
 ```python
 import warnings
 
+
 def old_function():
     warnings.warn("Use new_function instead", DeprecationWarning, stacklevel=2)
     return new_function()

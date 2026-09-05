@@ -117,7 +117,7 @@ class Theme:
     # typography (family names resolved to registered fonts)
     font_title: str = "Helvetica-Bold"
     font_body: str = "Helvetica"
-    font_numeric: str = "Helvetica-Bold"   # the big tile values
+    font_numeric: str = "Helvetica-Bold"  # the big tile values
     # colour
     text_gray: float = 0.40
     tile_fill: float = 0.96
@@ -125,13 +125,13 @@ class Theme:
     pass_warn_fail: tuple[str, str, str] = ("#2e7d32", "#f9a825", "#c62828")  # reserved
     # panels
     panel_cmap: str = "gray"
-    panel_accent: str = "#1f77b4"          # matplotlib "tab:blue"
+    panel_accent: str = "#1f77b4"  # matplotlib "tab:blue"
     # brand furniture
     logo: Path | None = None
     footer: str = ""
     cover_title: str = "fMRI QA Report"
 
-    def rc_params(self) -> dict[str, object]: ...   # matplotlib rcParams for the panels
+    def rc_params(self) -> dict[str, object]: ...  # matplotlib rcParams for the panels
 ```
 
 The panels wrap figure construction in `matplotlib.rc_context(theme.rc_params())`
