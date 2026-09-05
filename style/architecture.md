@@ -23,7 +23,7 @@ Implement core logic in pure functions that:
 def calculate_statistics(values: list[float]) -> Statistics:
     mean = sum(values) / len(values)
     variance = sum((x - mean) ** 2 for x in values) / len(values)
-    return Statistics(mean=mean, std_dev=variance ** 0.5)
+    return Statistics(mean=mean, std_dev=variance**0.5)
 
 
 # Avoid - logic mixed with I/O
@@ -177,8 +177,7 @@ def _write_index_segment(
     compression: CompressionConfig,
     checksum_algorithm: str,
     alignment: int,
-) -> SegmentInfo:
-    ...
+) -> SegmentInfo: ...
 ```
 
 ### API Design Guidelines
@@ -447,7 +446,7 @@ it, compute on it, aggregate, present it — and each stage becomes a subpackage
 one-topic rule applied a level up: `ls` on the package answers "which *stage* owns this?" the
 way `ls` on a subpackage answers "which *file* owns this?".
 
-The concrete shape this repo uses (`fmriqc`):
+The concrete shape this repo uses (`fmriqc`, the calculation package):
 
 ```
 fmriqc/
@@ -457,12 +456,16 @@ fmriqc/
     prep/               # preprocessing: raw-array ops -> the analysis images
     metrics/            # the domain operations, one family per module
     pipeline.py         # aggregation: orchestrate the operations + the combined result
-    report/             # presentation
+    analysis/           # publication: the artifact those results are published as
 ```
+
+Presentation is not a layer of this package at all — it is a second distribution,
+`fmri-qa-report`, sitting on top of `analysis/`. See
+[Split the Product at Its Widest Seam](#split-the-product-at-its-widest-seam) below.
 
 Three rules keep the layering honest:
 
-- **Dependencies point down the stack.** `load < prep < metrics < pipeline < report`. A lower
+- **Dependencies point down the stack.** `load < prep < metrics < pipeline < analysis`. A lower
   layer never imports a higher one, and a leaf module (e.g. pure raw-array transforms) imports
   nothing but the shared vocabulary. If you reach for an upward import, the thing you want is
   usually sitting in the wrong layer. Where a genuine domain dependency crosses layers (a
@@ -480,18 +483,59 @@ Three rules keep the layering honest:
   scattered constant instantly; a central "ledger of every knob" is just a grab-bag sorted by
   being-a-constant.
 
-### Separate Content from Format
+### Split the Product at Its Widest Seam
 
-At the presentation layer, split what a report *says* from how a particular format *renders
-it*. The content — the numbers, strings, and figures derived from a result — carries no
-dependency on the output format; a per-format **driver** composes that content into a document.
+Layered subpackages order the stages *inside* a package. Sometimes two stages have so
+little in common that the boundary between them deserves to be a **package boundary** —
+separate distributions, separate dependency sets, installable apart.
+
+The seam worth splitting on is where the two sides differ in almost everything: what they
+depend on, how fast they run, what changes them, and who deploys them. In this repo that
+seam is calculation versus presentation. Computing needs numpy, scipy, and the acquisition
+on disk, and changes when the physics changes; drawing needs matplotlib and ReportLab and
+changes when someone wants a different report. Nothing but a *result* passes between them.
 
 ```
-report/
-    summary.py          # format-agnostic text/tiles from a result
-    panels/             # format-agnostic figures from a result
+packages/
+    fmri-qa-core/       # fmriqc         -- metrics, pipeline, and the artifact
+    fmri-qa-report/     # fmriqc_report  -- plots and PDF packets, from an artifact
+```
+
+Three rules make such a split hold:
+
+- **One value object crosses, and it is complete.** Define the seam as a single published
+  type (here `QAArtifact`) and resolve *everything* a consumer could need while producing
+  it — derived properties settled into fields, curves extracted, masks and outlines
+  materialized. If the consuming side has to compute something, that is a gap in the seam
+  type, not a reason to reach back across. Nothing heavy or private crosses: the raw series
+  stays behind.
+- **Make the seam serializable, then use the serialized form.** A boundary you can write to
+  disk and read back is a boundary you have actually proved is complete — and it buys real
+  capability (render later, elsewhere, without the inputs). Version the layout and refuse an
+  unknown version by name. Test that a round-tripped value behaves identically to a live one.
+- **Enforce the direction mechanically.** "The report half must not import the pipeline" is
+  a rule that erodes one convenient import at a time. Make it a test: parse the consuming
+  package's sources and fail on any import outside the allowlist, and check the packaging
+  claim too (install the lower wheel alone and assert the upper stack is absent).
+
+Don't split on a narrow seam. Two distributions cost a workspace, two release trains, and a
+version constraint between them; that is worth paying where the dependency sets and change
+rates genuinely diverge, and not worth paying to separate two modules that will always be
+installed together. See `notes/analysis_report_split.md` for this split's full rationale.
+
+### Separate Content from Format
+
+Within the presentation package, split what a report *says* from how a particular format
+*renders it*. The content — the numbers, strings, and figures derived from an artifact —
+carries no dependency on the output format; a per-format **driver** composes that content
+into a document.
+
+```
+fmriqc_report/
+    summary.py          # format-agnostic text/tiles from an artifact
+    panels/             # format-agnostic figures from an artifact
     formats/
-        pdf.py          # one driver: composes summary + panels into a PDF
+        reportlab.py    # one driver: composes summary + panels into a PDF
         # html.py, ...  # a second format reuses summary + panels unchanged
 ```
 

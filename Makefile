@@ -1,14 +1,16 @@
 # Standard development loop for fmri-qa. See style/tooling.md.
 #
-# Everything runs through `uv run` against the locked environment; sync with
-# all extras once so optional deps resolve (see style/tooling.md).
+# The repo is a uv workspace of two distributions (fmri-qa-core and
+# fmri-qa-report); every target runs against the whole workspace, so a change
+# to the analysis artifact is checked on both sides at once. Sync all packages
+# and extras once so optional deps resolve (see style/tooling.md).
 
 .PHONY: all format lint typecheck pyright test check sync build
 
 all: lint typecheck pyright test
 
 sync:
-	uv sync --all-extras
+	uv sync --all-packages --all-extras
 
 format:
 	uv run ruff format .
@@ -26,7 +28,7 @@ test:
 	uv run pytest
 
 build:
-	uv build
+	uv build --all-packages
 
 # CI-style gate: fail on any formatting drift or lint hit, then both type
 # checkers + test with a coverage floor (guards the core from silent regression).

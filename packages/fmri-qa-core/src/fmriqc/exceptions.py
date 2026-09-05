@@ -84,3 +84,18 @@ class IncompatibleScansError(FmriqcError, ValueError):
         self.high_value = high_value
         self.low_value = low_value
         self.reason = reason
+
+
+class InvalidArtifactError(FmriqcError, ValueError):
+    """An analysis artifact on disk cannot be read back.
+
+    Raised by `analysis.load_artifact` for a file that is not an artifact
+    archive, is malformed, or was written under a schema version this build does
+    not understand. Also a `ValueError`, the natural stdlib type for unusable
+    input. `path` is the file that failed and `reason` states what was wrong.
+    """
+
+    def __init__(self, path: Path, reason: str) -> None:
+        super().__init__(f"cannot read artifact {path}: {reason}")
+        self.path = path
+        self.reason = reason

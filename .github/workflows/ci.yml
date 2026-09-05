@@ -30,22 +30,36 @@ jobs:
       # --locked fails if uv.lock is out of date with pyproject.toml, so a stale
       # lockfile is caught here rather than drifting silently.
       - name: Sync the locked environment
-        run: uv sync --all-extras --locked
+        run: uv sync --all-packages --all-extras --locked
 
       - name: Run the gate
         run: make check
 
-      - name: Build wheel and source distribution
-        run: uv build
+      - name: Build both wheels and source distributions
+        run: uv build --all-packages
 
-      # Exercise the artifact users install, independently of the editable
-      # environment used by the source-tree gate above.
-      - name: Smoke-test the built wheel
+      # Exercise the artifacts users install, independently of the editable
+      # environment used by the source-tree gate above. The core wheel is
+      # installed alone first: the calculation half must stand up without the
+      # report half (and so without matplotlib or ReportLab).
+      - name: Smoke-test the core wheel on its own
         run: |
-          wheels=(dist/*.whl)
-          test -f "${wheels[0]}"
-          uv venv --python 3.13 .venv-wheel-smoke
-          uv pip install --python .venv-wheel-smoke/bin/python "${wheels[0]}"
-          .venv-wheel-smoke/bin/fmri-qa --version
-          .venv-wheel-smoke/bin/fmri-qa-hilo --help > /dev/null
-          .venv-wheel-smoke/bin/python -c "from importlib.resources import files; assert files('fmriqc').joinpath('py.typed').is_file()"
+          core=(dist/fmri_qa_core-*.whl)
+          test -f "${core[0]}"
+          uv venv --python 3.13 .venv-core-smoke
+          uv pip install --python .venv-core-smoke/bin/python "${core[0]}"
+          .venv-core-smoke/bin/fmri-qa --version
+          .venv-core-smoke/bin/fmri-qa-hilo --help > /dev/null
+          .venv-core-smoke/bin/python -c "from importlib.resources import files; assert files('fmriqc').joinpath('py.typed').is_file()"
+          # The seam, checked against the installed artifact: no drawing stack.
+          .venv-core-smoke/bin/python -c "import importlib.util as u; assert u.find_spec('matplotlib') is None and u.find_spec('reportlab') is None"
+
+      - name: Smoke-test the report wheel against the core wheel
+        run: |
+          core=(dist/fmri_qa_core-*.whl)
+          report=(dist/fmri_qa_report-*.whl)
+          test -f "${report[0]}"
+          uv venv --python 3.13 .venv-report-smoke
+          uv pip install --python .venv-report-smoke/bin/python "${core[0]}" "${report[0]}"
+          .venv-report-smoke/bin/fmri-qa-report --version
+          .venv-report-smoke/bin/python -c "from importlib.resources import files; assert files('fmriqc_report').joinpath('py.typed').is_file()"

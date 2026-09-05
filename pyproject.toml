@@ -1,78 +1,35 @@
-[project]
-name = "fmri-qa"
-version = "0.1.0"
-description = "Phantom fMRI quality-assurance metrics (SNR, SFNR, RDC, ghost)"
-readme = "README.md"
-requires-python = ">=3.13"
-license = "MIT"
-license-files = ["LICENSE"]
-authors = [
-    { name = "Judd Storrs", email = "jstorrs@gmail.com" },
-]
-keywords = ["fMRI", "MRI", "phantom", "quality assurance"]
-classifiers = [
-    "Development Status :: 3 - Alpha",
-    "Intended Audience :: Healthcare Industry",
-    "Intended Audience :: Science/Research",
-    "Operating System :: OS Independent",
-    "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.13",
-    "Typing :: Typed",
-]
-dependencies = [
-    "matplotlib>=3.10.7",
-    "nibabel>=5.3.2",
-    "numpy>=2.3.4",
-    "reportlab>=5.0.0",
-    "scikit-image>=0.25.2",
-    "scipy>=1.16.2",
-    # reportlab.py probes and patches svglib's private image converter. Verify
-    # that adapter before widening this bound.
-    "svglib>=2.0.2,<2.1",
-]
+# uv workspace root for fmri-qa. The project ships as two distributions:
+#
+#   packages/fmri-qa-core    the calculation half -- metrics, pipeline, and the
+#                            QAArtifact it publishes (`fmri-qa`, `fmri-qa-hilo`)
+#   packages/fmri-qa-report  the presentation half -- plots and PDF packets built
+#                            from an artifact (`fmri-qa-report`)
+#
+# This root is virtual: it builds nothing of its own and only holds the shared
+# development environment and the tool configuration both members are checked
+# against. See style/architecture.md and notes/analysis_report_split.md.
 
-[project.optional-dependencies]
-notebooks = [
-    "dcm2bids>=3.2.0",
-    "dcm2niix>=1.0.20250506",
-    "ipympl>=0.9.8",
-    "ipython>=9.6.0",
-    "ipywidgets>=8.1.7",
-    "jupyterlab>=4.4.10",
-    "nilearn>=0.12.1",
-    "niwidgets>=0.2.1",
-    "pydicom>=3.0.1",
-    "scikit-fem>=12.0.2",
-]
-
-[project.scripts]
-fmri-qa = "fmriqc.cli:main"
-fmri-qa-hilo = "fmriqc.cli:hilo_main"
+[tool.uv.workspace]
+members = ["packages/*"]
 
 [dependency-groups]
 dev = [
     "hypothesis>=6.100",
     "mypy>=1.18",
+    "pillow>=11.0",
     "pyright>=1.1.390",
     "pytest>=8.0",
     "pytest-cov>=6.0",
     "ruff>=0.13",
 ]
 
-[build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
-
-[tool.hatch.build.targets.wheel]
-packages = ["src/fmriqc"]
-
 [tool.ruff]
 line-length = 88
 target-version = "py313"
-src = ["src"]
+src = ["packages/fmri-qa-core/src", "packages/fmri-qa-report/src"]
 # Reference notebooks and standalone repro scripts are exploratory scratch, not
 # maintained code — skip them.
-extend-exclude = ["notebooks", "examples"]
+extend-exclude = ["notebooks", "packages/fmri-qa-report/examples"]
 
 [tool.ruff.format]
 quote-style = "double"
@@ -99,7 +56,7 @@ select = [
     "RUF",           # ruff-specific rules
 ]
 ignore = [
-    "PLC0415",  # allow function-local imports (the CLI lazily imports report)
+    "PLC0415",  # allow function-local imports
 ]
 
 [tool.ruff.lint.per-file-ignores]
@@ -108,20 +65,21 @@ ignore = [
 # Output belongs to the binary (see style/logging.md).
 "**/cli.py" = ["T201"]
 "**/__main__.py" = ["T201"]
-# The report renders human-facing text with intentional typography (× ° —).
-"src/fmriqc/report/**" = ["RUF001"]
+# The report renders human-facing text with intentional typography (× ° —), and
+# its tests assert on that text.
+"packages/fmri-qa-report/**" = ["RUF001"]
 # Stubs mirror external library signatures verbatim (e.g. scipy's `input` param).
 "stubs/**" = ["A002"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["fmriqc"]
+known-first-party = ["fmriqc", "fmriqc_report"]
 
 [tool.mypy]
 python_version = "3.13"
 strict = true
 warn_unused_ignores = true
 warn_return_any = true
-files = ["src"]
+files = ["packages/fmri-qa-core/src", "packages/fmri-qa-report/src"]
 # Local partial stubs (see stubs/) fix the return types nibabel and scipy ship
 # imprecisely; both type checkers read them first (pyright via tool.pyright.stubPath).
 mypy_path = "stubs"
@@ -141,21 +99,23 @@ ignore_missing_imports = true
 follow_imports = "skip"
 
 [tool.pyright]
-include = ["src"]
+include = ["packages/fmri-qa-core/src", "packages/fmri-qa-report/src"]
 stubPath = "stubs"
 pythonVersion = "3.13"
 typeCheckingMode = "standard"
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
+testpaths = ["packages/fmri-qa-core/tests", "packages/fmri-qa-report/tests"]
 python_files = ["test_*.py"]
 python_functions = ["test_*"]
 # Coverage is opt-in (the `check` gate passes --cov) so a bare `pytest` on one
-# file stays fast and doesn't trip the package-wide floor.
-addopts = "-v --tb=short"
+# file stays fast and doesn't trip the package-wide floor. `importlib` import
+# mode lets both packages name a test file for what it tests (each has a
+# `test_cli.py`) without the rootdir-relative module names colliding.
+addopts = "-v --tb=short --import-mode=importlib"
 
 [tool.coverage.run]
-source = ["src/fmriqc"]
+source = ["packages/fmri-qa-core/src/fmriqc", "packages/fmri-qa-report/src/fmriqc_report"]
 branch = true
 
 [tool.coverage.report]

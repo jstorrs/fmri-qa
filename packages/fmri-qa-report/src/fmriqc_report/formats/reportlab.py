@@ -26,7 +26,7 @@ from reportlab.pdfgen import canvas
 from svglib import svglib as _svglib
 from svglib.svglib import svg2rlg
 
-import fmriqc as q
+from fmriqc.analysis import Curves, Measurements, QAArtifact
 
 from ..content import METRIC_DOCS, characterization_rows, metric_tiles
 from ..document import (
@@ -51,7 +51,6 @@ from ..panels.timeseries import (
     _plot_signal,
     _plot_spectrum,
     _plot_weisskoff,
-    _timeseries,
 )
 from ..summary import (
     _acquisition_line,
@@ -61,7 +60,7 @@ from ..summary import (
 from ..theme import DEFAULT_THEME, Theme
 
 # A page-part renderer: draw one scan's part onto the canvas (no showPage).
-PageRenderer = Callable[[canvas.Canvas, q.QAResult, str, Theme], None]
+PageRenderer = Callable[[canvas.Canvas, QAArtifact, str, Theme], None]
 
 _TILE_H = 34.0  # metric-tile height (pt)
 _TILE_GAP = 6.0
@@ -237,14 +236,14 @@ def _draw_tiles(
     return bottom
 
 
-def _header(c: canvas.Canvas, result: q.QAResult, title: str, theme: Theme) -> float:
+def _header(c: canvas.Canvas, artifact: QAArtifact, title: str, theme: Theme) -> float:
     """Draw the scan name, metadata lines, and metric tiles; return the y below."""
     page_w, page_h = theme.page_size
     y = page_h - 32
     if title:
         c.setFont(theme.font_title, 14)
         c.drawString(theme.margin, y, title)
-    device = _device_line(result.meta)
+    device = _device_line(artifact.provenance)
     if device:
         c.setFont(theme.font_body, 9)
         c.setFillGray(theme.text_muted_gray)
@@ -254,14 +253,14 @@ def _header(c: canvas.Canvas, result: q.QAResult, title: str, theme: Theme) -> f
 
     c.setFont(theme.font_body, 8.3)
     c.setFillGray(theme.text_muted_gray)
-    c.drawString(theme.margin, y, _acquisition_line(result))
-    prov = _provenance_line(result.meta)
+    c.drawString(theme.margin, y, _acquisition_line(artifact))
+    prov = _provenance_line(artifact.provenance)
     if prov:
         y -= 11
         c.drawString(theme.margin, y, prov)
     c.setFillGray(theme.text_primary_gray)
 
-    bottom = _draw_tiles(c, metric_tiles(result.metrics), y - 12, theme)
+    bottom = _draw_tiles(c, metric_tiles(artifact.measurements), y - 12, theme)
     return bottom - 10
 
 
@@ -277,22 +276,58 @@ def _panel_row(
     return top - ph
 
 
-def _condensed_page(
-    c: canvas.Canvas, result: q.QAResult, title: str, theme: Theme
+def _stability_strip(
+    c: canvas.Canvas,
+    curves: Curves,
+    m: Measurements,
+    theme: Theme,
+    y: float,
+    *,
+    fs: int,
+    figsize: tuple[float, float],
+    height: float,
+    gap: float = 16.0,
 ) -> None:
-    wk = result.metrics.weisskoff
-    y = _header(c, result, title, theme)
+    """Draw the five narrow stability panels in one row across the content width.
 
-    y = _panel_row(c, _panel_figs(result), y - 6, theme)
+    The same strip closes the dashboard overview and the physics stability page;
+    only the type size, figure size, and drawn height differ between them.
+    """
+    draws: tuple[Callable[[Any], object], ...] = (
+        lambda ax: _plot_spectrum(ax, curves, fs=fs, spec_outlier=m.spec_outlier),
+        lambda ax: _plot_outliers(ax, curves, fs=fs),
+        lambda ax: _plot_motion(ax, curves, fs=fs),
+        lambda ax: _plot_com(ax, curves, fs=fs),
+        lambda ax: _plot_psf(ax, curves.psf, fs=fs),
+    )
+    width = (theme.content_width - (len(draws) - 1) * gap) / len(draws)
+    for i, draw in enumerate(draws):
+        _draw_fig(
+            c,
+            _plot_fig(draw, figsize),
+            theme.margin + i * (width + gap),
+            y,
+            width,
+            height,
+        )
 
-    t, signal, trend, resid = _timeseries(result)
+
+def _condensed_page(
+    c: canvas.Canvas, artifact: QAArtifact, title: str, theme: Theme
+) -> None:
+    """Dashboard: header tiles, the phantom-image row, and the core curves."""
+    curves, m = artifact.curves, artifact.measurements
+    wk = curves.weisskoff
+    y = _header(c, artifact, title, theme)
+    y = _panel_row(c, _panel_figs(artifact), y - 6, theme)
+
     gap, row_h = 16.0, 150.0
     half = (theme.content_width - gap) / 2
 
     y -= 10
     _draw_fig(
         c,
-        _plot_fig(lambda ax: _plot_weisskoff(ax, wk), (3.6, 2.5)),
+        _plot_fig(lambda ax: _plot_weisskoff(ax, wk, m.rdc), (3.6, 2.5)),
         theme.margin,
         y,
         half,
@@ -308,10 +343,9 @@ def _condensed_page(
     )
     y -= row_h + 6
 
-    spikes = result.metrics.spikes
     _draw_fig(
         c,
-        _plot_fig(lambda ax: _plot_signal(ax, t, signal, trend), (3.6, 2.5)),
+        _plot_fig(lambda ax: _plot_signal(ax, curves), (3.6, 2.5)),
         theme.margin,
         y,
         half,
@@ -320,8 +354,7 @@ def _condensed_page(
     _draw_fig(
         c,
         _plot_fig(
-            lambda ax: _plot_residual(ax, t, resid, tc_outlier=spikes.tc_outlier),
-            (3.6, 2.5),
+            lambda ax: _plot_residual(ax, curves, tc_outlier=m.tc_outlier), (3.6, 2.5)
         ),
         theme.margin + half + gap,
         y,
@@ -330,63 +363,15 @@ def _condensed_page(
     )
     y -= row_h + 6
 
-    fifth = (theme.content_width - 4 * gap) / 5
-    _draw_fig(
-        c,
-        _plot_fig(
-            lambda ax: _plot_spectrum(
-                ax, resid, result.images.tr, spec_outlier=spikes.spec_outlier
-            ),
-            (3.0, 2.0),
-        ),
-        theme.margin,
-        y,
-        fifth,
-        120.0,
-    )
-    _draw_fig(
-        c,
-        _plot_fig(
-            lambda ax: _plot_outliers(ax, t, result.metrics.outliers), (3.0, 2.0)
-        ),
-        theme.margin + fifth + gap,
-        y,
-        fifth,
-        120.0,
-    )
-    _draw_fig(
-        c,
-        _plot_fig(lambda ax: _plot_motion(ax, t, result.metrics.motion), (3.0, 2.0)),
-        theme.margin + 2 * (fifth + gap),
-        y,
-        fifth,
-        120.0,
-    )
-    _draw_fig(
-        c,
-        _plot_fig(
-            lambda ax: _plot_com(ax, t, result.metrics.center_of_mass), (3.0, 2.0)
-        ),
-        theme.margin + 3 * (fifth + gap),
-        y,
-        fifth,
-        120.0,
-    )
-    _draw_fig(
-        c,
-        _plot_fig(lambda ax: _plot_psf(ax, result.metrics.smoothness), (3.0, 2.0)),
-        theme.margin + 4 * (fifth + gap),
-        y,
-        fifth,
-        120.0,
-    )
+    _stability_strip(c, curves, m, theme, y, fs=9, figsize=(3.0, 2.0), height=120.0)
 
 
 def _analysis_page(
-    c: canvas.Canvas, result: q.QAResult, title: str, theme: Theme
+    c: canvas.Canvas, artifact: QAArtifact, title: str, theme: Theme
 ) -> None:
-    wk = result.metrics.weisskoff
-    t, signal, trend, resid = _timeseries(result)
+    """Physics: the same stability curves at full page size."""
+    curves, m = artifact.curves, artifact.measurements
+    wk = curves.weisskoff
 
     page_w, page_h = theme.page_size
     y = page_h - 34
@@ -398,7 +383,7 @@ def _analysis_page(
     half = (theme.content_width - gap) / 2
     _draw_fig(
         c,
-        _plot_fig(lambda ax: _plot_weisskoff(ax, wk, fs=10), (3.6, 3.0)),
+        _plot_fig(lambda ax: _plot_weisskoff(ax, wk, m.rdc, fs=10), (3.6, 3.0)),
         theme.margin,
         y,
         half,
@@ -414,10 +399,9 @@ def _analysis_page(
     )
     y -= row_h + 12
 
-    spikes = result.metrics.spikes
     _draw_fig(
         c,
-        _plot_fig(lambda ax: _plot_signal(ax, t, signal, trend, fs=10), (3.6, 3.0)),
+        _plot_fig(lambda ax: _plot_signal(ax, curves, fs=10), (3.6, 3.0)),
         theme.margin,
         y,
         half,
@@ -426,9 +410,7 @@ def _analysis_page(
     _draw_fig(
         c,
         _plot_fig(
-            lambda ax: _plot_residual(
-                ax, t, resid, fs=10, tc_outlier=spikes.tc_outlier
-            ),
+            lambda ax: _plot_residual(ax, curves, fs=10, tc_outlier=m.tc_outlier),
             (3.6, 3.0),
         ),
         theme.margin + half + gap,
@@ -438,61 +420,7 @@ def _analysis_page(
     )
     y -= row_h + 12
 
-    fifth = (theme.content_width - 4 * gap) / 5
-    _draw_fig(
-        c,
-        _plot_fig(
-            lambda ax: _plot_spectrum(
-                ax, resid, result.images.tr, fs=10, spec_outlier=spikes.spec_outlier
-            ),
-            (3.0, 2.2),
-        ),
-        theme.margin,
-        y,
-        fifth,
-        150.0,
-    )
-    _draw_fig(
-        c,
-        _plot_fig(
-            lambda ax: _plot_outliers(ax, t, result.metrics.outliers, fs=10), (3.0, 2.2)
-        ),
-        theme.margin + fifth + gap,
-        y,
-        fifth,
-        150.0,
-    )
-    _draw_fig(
-        c,
-        _plot_fig(
-            lambda ax: _plot_motion(ax, t, result.metrics.motion, fs=10), (3.0, 2.2)
-        ),
-        theme.margin + 2 * (fifth + gap),
-        y,
-        fifth,
-        150.0,
-    )
-    _draw_fig(
-        c,
-        _plot_fig(
-            lambda ax: _plot_com(ax, t, result.metrics.center_of_mass, fs=10),
-            (3.0, 2.2),
-        ),
-        theme.margin + 3 * (fifth + gap),
-        y,
-        fifth,
-        150.0,
-    )
-    _draw_fig(
-        c,
-        _plot_fig(
-            lambda ax: _plot_psf(ax, result.metrics.smoothness, fs=10), (3.0, 2.2)
-        ),
-        theme.margin + 4 * (fifth + gap),
-        y,
-        fifth,
-        150.0,
-    )
+    _stability_strip(c, curves, m, theme, y, fs=10, figsize=(3.0, 2.2), height=150.0)
 
 
 def _page_title(c: canvas.Canvas, title: str, heading: str, theme: Theme) -> float:
@@ -506,7 +434,7 @@ def _page_title(c: canvas.Canvas, title: str, heading: str, theme: Theme) -> flo
 
 
 def _characterization_page(
-    c: canvas.Canvas, result: q.QAResult, title: str, theme: Theme
+    c: canvas.Canvas, artifact: QAArtifact, title: str, theme: Theme
 ) -> None:
     """Physics: a per-metric table of value, definition, and acceptance window.
 
@@ -516,7 +444,7 @@ def _characterization_page(
     y = _page_title(c, title, "characterization", theme)
     value_x = theme.margin + 90
     accept_x = theme.page_size[0] - theme.margin
-    for doc, value in characterization_rows(result.metrics):
+    for doc, value in characterization_rows(artifact.measurements):
         c.setFont(theme.font_title, 9)
         c.setFillGray(theme.text_primary_gray)
         c.drawString(theme.margin, y, doc.label)
@@ -533,7 +461,7 @@ def _characterization_page(
 
 
 def _methods_page(
-    c: canvas.Canvas, result: q.QAResult, title: str, theme: Theme
+    c: canvas.Canvas, artifact: QAArtifact, title: str, theme: Theme
 ) -> None:
     """Physics: the per-metric methods/provenance narrative."""
     y = _page_title(c, title, "methods", theme)
@@ -569,14 +497,14 @@ def _render_section(c: canvas.Canvas, section: ScanSection, theme: Theme) -> int
     # valid rc keys built by the theme.
     with matplotlib.rc_context(cast("Any", theme.rc_params())):
         for part in section.parts:
-            _PART_RENDERERS[part](c, section.result, section.title, theme)
+            _PART_RENDERERS[part](c, section.artifact, section.title, theme)
             c.showPage()
     return len(section.parts)
 
 
 def add_report_pages(
     c: canvas.Canvas,
-    result: "q.QAResult",
+    artifact: QAArtifact,
     title: str = "",
     tier: Tier = "dashboard",
     theme: Theme = DEFAULT_THEME,
@@ -589,7 +517,7 @@ def add_report_pages(
     per-scan primitive with no packet furniture; `write_report` adds the cover,
     appendix, and page footers.
     """
-    return _render_section(c, ScanSection(title, result, parts_for(tier)), theme)
+    return _render_section(c, ScanSection(title, artifact, parts_for(tier)), theme)
 
 
 def _draw_footer(c: canvas.Canvas, theme: Theme, page_no: int, total: int) -> None:
@@ -674,7 +602,7 @@ def _appendix_page(
     if appendix.version and not continuation:
         c.setFont(theme.font_body, 9)
         c.setFillGray(theme.text_muted_gray)
-        c.drawString(theme.margin, y, f"fmri-qa {appendix.version}")
+        c.drawString(theme.margin, y, f"fmri-qa-report {appendix.version}")
         c.setFillGray(theme.text_primary_gray)
         y -= 20
     for name, detail in rows:
@@ -729,14 +657,14 @@ def _render_block(
     with matplotlib.rc_context(cast("Any", theme.rc_params())):
         for part in block.parts:
             page_no += 1
-            _PART_RENDERERS[part](c, block.result, block.title, theme)
+            _PART_RENDERERS[part](c, block.artifact, block.title, theme)
             _draw_footer(c, theme, page_no, total)
             c.showPage()
     return page_no
 
 
 def write_report(
-    items: Iterable[tuple[str, q.QAResult]] | q.QAResult,
+    items: Iterable[tuple[str, QAArtifact]] | QAArtifact,
     pdf_path: str | Path,
     tier: Tier = "dashboard",
     theme: Theme = DEFAULT_THEME,
@@ -746,12 +674,12 @@ def write_report(
 ) -> int:
     """Write a combined PDF packet: optional cover, the scans, optional appendix.
 
-    `items` is an iterable of `(title, QAResult)`, or a single `QAResult`.
+    `items` is an iterable of `(title, QAArtifact)`, or a single `QAArtifact`.
     `cover` prepends a branded cover with the scan inventory; `appendix` appends
     a provenance page. Multi-page packets carry a running footer with the theme's
     brand text and page numbers. Returns the total number of pages written.
     """
-    if isinstance(items, q.QAResult):
+    if isinstance(items, QAArtifact):
         items = [("", items)]
     blocks = compose(items, tier, cover=cover, appendix=appendix)
     total = sum(_block_pages(b, theme) for b in blocks)

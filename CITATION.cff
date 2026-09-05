@@ -2,6 +2,9 @@ cff-version: 1.2.0
 message: "If you use fmri-qa in published work, please cite this software."
 title: "fmri-qa"
 type: software
+abstract: >-
+  Phantom fMRI quality assurance, distributed as two packages: fmri-qa-core
+  (metrics and the analysis artifact) and fmri-qa-report (plots and PDF packets).
 authors:
   - family-names: "Storrs"
     given-names: "Judd"

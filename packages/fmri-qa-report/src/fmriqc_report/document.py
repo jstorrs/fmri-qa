@@ -14,7 +14,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import Literal, get_args
 
-import fmriqc as q
+from fmriqc.analysis import QAArtifact
 
 from .summary import _appendix_rows, package_version
 
@@ -47,10 +47,10 @@ class Cover:
 
 @dataclass(frozen=True, slots=True)
 class ScanSection:
-    """One scan's block: its title, result, and the parts to render for it."""
+    """One scan's block: its title, artifact, and the parts to render for it."""
 
     title: str
-    result: q.QAResult
+    artifact: QAArtifact
     parts: tuple[Part, ...]
 
 
@@ -58,8 +58,8 @@ class ScanSection:
 class Appendix:
     """The packet's provenance appendix: per-scan rows plus the package version.
 
-    Rows are `(scan title, provenance text)`, pre-extracted from the results so
-    the block stays format-agnostic.
+    Rows are `(scan title, provenance text)`, pre-extracted from the artifacts
+    so the block stays format-agnostic.
     """
 
     rows: tuple[tuple[str, str], ...]
@@ -79,7 +79,7 @@ def parts_for(tier: Tier) -> tuple[Part, ...]:
 
 
 def compose(
-    items: Iterable[tuple[str, q.QAResult]],
+    items: Iterable[tuple[str, QAArtifact]],
     tier: Tier,
     *,
     cover: bool = False,
@@ -95,7 +95,7 @@ def compose(
     blocks: list[Block] = []
     if cover:
         blocks.append(Cover(scans=tuple(title for title, _ in scans)))
-    blocks.extend(ScanSection(title, result, parts) for title, result in scans)
+    blocks.extend(ScanSection(title, artifact, parts) for title, artifact in scans)
     if appendix:
         blocks.append(
             Appendix(rows=tuple(_appendix_rows(scans)), version=package_version())

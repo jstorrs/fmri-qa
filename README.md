@@ -4,7 +4,32 @@ Phantom fMRI quality-assurance metrics, following the Glover/fBIRN stability
 protocol (Friedman & Glover, 2006). Given a 4-D phantom time series it reports
 SNR, SFNR, the Weisskoff radius of decorrelation (RDC), drift, temporal
 fluctuation, and two Nyquist-ghost measures (fBIRN percent ghost and the
-ACR/AAPM ghosting ratio), and can render a one-page PDF report per scan.
+ACR/AAPM ghosting ratio), and can render a PDF report per scan.
+
+## Two halves
+
+The project ships as two installable packages, split at the widest seam in it —
+calculating a result, and presenting one:
+
+| Package | Import | Does | Needs |
+| --- | --- | --- | --- |
+| **`fmri-qa-core`** | `fmriqc` | the metrics, the pipeline, and the **analysis artifact** they are published as | numpy, scipy, nibabel, scikit-image |
+| **`fmri-qa-report`** | `fmriqc_report` | plots and multi-page PDF packets, built from an artifact | matplotlib, reportlab, svglib (+ core) |
+
+A `QAArtifact` is the only thing that crosses: the run's settings, provenance,
+scalar measurements, stability curves, and the four fBIRN summary images —
+everything a report needs, and none of the heavy inputs. It saves to a single
+`.npz`, so calculation and reporting are separate steps:
+
+```bash
+uv run fmri-qa scan.nii.gz --artifact qa.npz      # calculate once
+uv run fmri-qa-report qa.npz --pdf report.pdf     # render as often as you like
+```
+
+Install the core alone where you only want numbers (a trend database, a console
+script, a cron job) and skip the drawing stack entirely. See
+[`notes/analysis_report_split.md`](notes/analysis_report_split.md) for the
+rationale and the artifact's layout.
 
 ## Metrics
 
@@ -189,22 +214,31 @@ processed so differently sampled acquisitions cannot be pooled by array index.
 
 ## Install
 
-The project uses [uv](https://docs.astral.sh/uv/) and Python 3.13:
+The project uses [uv](https://docs.astral.sh/uv/) and Python 3.13. The repo is a
+uv workspace holding both packages; syncing all of it gives the full development
+environment:
 
 ```bash
-uv sync
+uv sync --all-packages
+```
+
+Downstream, install whichever half you need — `fmri-qa-report` pulls in
+`fmri-qa-core`, so installing it gives you both commands:
+
+```bash
+pip install fmri-qa-core      # metrics and artifacts only
+pip install fmri-qa-report    # + plots and PDF packets
 ```
 
 Published work using the package should cite the software metadata in
 [`CITATION.cff`](CITATION.cff). User-facing changes are recorded in
 [`CHANGELOG.md`](CHANGELOG.md).
 
-The QA metrics and CLI need only the core dependencies installed above. The
-exploratory notebooks (DICOM conversion, BIDS, and interactive viewers) pull in
-a heavier stack — install it with the `notebooks` extra:
+The exploratory notebooks (DICOM conversion, BIDS, and interactive viewers) pull
+in a heavier stack — install it with the core package's `notebooks` extra:
 
 ```bash
-uv sync --extra notebooks
+uv sync --all-packages --all-extras
 ```
 
 ## Command line
@@ -231,83 +265,108 @@ Options:
 | `--center` | `image` | localization mode (`image` or `phantom`) |
 | `--roi-size` | `21` | summary/Weisskoff ROI side, in voxels |
 | `--json` | — | emit the metrics as JSON on stdout instead of the text table |
-| `--pdf` | — | write a PDF report to this file |
-| `--pdf-tier` | `dashboard` | `dashboard` (condensed overview) or `physics` (adds a stability page) per scan |
-| `--pdf-cover` | — | prepend a cover page listing the scans in the packet |
-| `--pdf-appendix` | — | append a provenance page (per-scan metadata + version) |
+| `--artifact` | — | save the full analysis artifact for later reporting |
 
 `--version` prints the version and exits.
 
-Multiple scans are summarized in one table and, with `--pdf`, combined into a
-single PDF (one page per scan by default). A bad file is reported to stderr and
+Multiple scans are summarized in one table. A bad file is reported to stderr and
 the batch continues; the process exits non-zero if any file failed.
+
+`--artifact PATH` writes the complete analysis result — settings, provenance,
+every measurement and curve, and the summary images — as a compressed `.npz`.
+With a single scan `PATH` is the output file; with several it is a directory
+taking one `<scan>.qa.npz` per scan:
+
+```bash
+uv run fmri-qa data/*_fMRI_*.nii.gz --artifact artifacts/
+```
 
 With `--json`, stdout carries a single versioned JSON document —
 `{"schema_version": 1, "config": {...}, "scans": [...]}`, one record per scan
 with the same fields as the table columns as raw numbers. A metric that cannot
 be computed for a scan is JSON `null` (for example, a ghost ratio with no clear
 ghost region), never a non-standard `NaN` or `Infinity` token. The banner, any
-errors, and the PDF notice go to stderr, so
+errors, and any save notices go to stderr, so
 `fmri-qa --json scan.nii.gz | jq` stays clean:
 
 ```bash
 uv run fmri-qa --json data/*_fMRI_*.nii.gz > qa.json
 ```
 
-### PDF report
+## PDF report
+
+Reporting reads artifacts, never scans:
 
 ```bash
-uv run fmri-qa --pdf qa.pdf data/*_fMRI_*.nii.gz
+uv run fmri-qa data/*_fMRI_*.nii.gz --artifact artifacts/
+uv run fmri-qa-report artifacts/*.qa.npz --pdf qa.pdf
 ```
+
+| Flag | Default | Meaning |
+| --- | --- | --- |
+| `--pdf` | required | write the PDF report to this file |
+| `--tier` | `dashboard` | `dashboard` (condensed overview) or `physics` (adds stability, characterization, and methods pages) per scan |
+| `--cover` | — | prepend a cover page listing the scans in the packet |
+| `--appendix` | — | append a provenance page (per-scan metadata + version) |
 
 Each page carries the metadata and metrics, the four summary images (signal,
 SFNR, fluctuation noise, static spatial noise) with the phantom mask and ROI
 overlaid, the Weisskoff plot, the ROI signal with its fitted trend, and the
 residual time course, spectrum, per-frame outlier fraction, per-frame in-plane
 motion (translation and scale/shear strain), and the directional PSF curves (PE
-and RO). `--pdf-tier physics` follows that dashboard overview with a full-size
+and RO). `--tier physics` follows that dashboard overview with a full-size
 stability page, a per-metric characterization table (value + definition), and a
 methods page describing how each metric is computed.
 
-Several scans combine into one branded packet: `--pdf-cover` prepends a cover
-with the scan inventory and `--pdf-appendix` appends a provenance page, and a
-running footer carries page numbers once the packet spans pages. The cover
+Several scans combine into one branded packet: `--cover` prepends a cover with
+the scan inventory and `--appendix` appends a provenance page, and a running
+footer carries page numbers once the packet spans pages. The cover
 title, logo, footer text, fonts, and colours all come from a `report.Theme`, so
 a group brands every packet it issues from one object (see the library section).
 
 ## Library
 
+### Calculating
+
 ```python
 import fmriqc as q
 
 scan = q.QAScan.from_nifti("scan.nii.gz")
-result = q.run_qa(scan)              # QAResult: images, geom, roi, metrics
-m = result.metrics
+artifact = q.analyze(scan, name="scan.nii.gz")
+m = artifact.measurements
 print(m.snr, m.sfnr, m.rdc, m.drift_pct)
+
+q.save_artifact(artifact, "qa.npz")
 ```
 
-The pipeline is a linear chain of small functions, each usable on its own:
+`analyze` is the front door, but the pipeline underneath is a linear chain of
+small functions, each usable on its own:
 
 ```
 QAScan → preprocess → QAImages → detect_phantom → resolve_roi
        → {weisskoff, snr, sfnr, ghost_ratio, acr_ghosting_ratio}
+       → QAResult → build_artifact → QAArtifact
 ```
 
 `preprocess` trims the series, selects the slice, detrends per voxel, and
 returns a `QAImages` holding the center slice plus its fluctuations; the summary
 images (mean, MIP, static noise, fluctuation noise, trend) are derived
 properties. The full multi-slice volume can be discarded once `QAImages` exists.
-PDF rendering lives in the `fmriqc/report/` subpackage: format-agnostic content
-(`summary` metadata text, `content` per-metric catalog, `panels` figures) and a
-`theme` (one `Theme` object driving both the page furniture and the matplotlib
-panels), composed by a `formats` driver that walks the `document` block model
-(cover, tiered scan sections, appendix). Imported only when `--pdf` is used. A
-group brands its packets by passing a custom `report.Theme` to
-`report.write_report`:
+`run_qa` gathers the metrics into a `QAResult` — the pipeline's working output,
+with the images still attached — and `build_artifact` projects that into the
+`QAArtifact` everything downstream reads. The artifact has five sections
+(`settings`, `provenance`, `measurements`, `curves`, `images`) and is fully
+resolved: a consumer never recomputes a metric.
+
+### Reporting
 
 ```python
 from pathlib import Path
-from fmriqc import report
+
+import fmriqc as q
+import fmriqc_report as report
+
+artifact = q.load_artifact("qa.npz")
 
 theme = report.Theme(
     font_title="Times-Bold",
@@ -317,10 +376,21 @@ theme = report.Theme(
     cover_title="Acme Phantom QA",
 )
 report.write_report(
-    [("run-1", result)], "packet.pdf",
-    tier="physics", theme=theme, cover=True, appendix=True,
+    [("run-1", artifact)],
+    "packet.pdf",
+    tier="physics",
+    theme=theme,
+    cover=True,
+    appendix=True,
 )
 ```
+
+Inside `fmriqc_report`, content is separated from format: `summary` (metadata
+text), `content` (the per-metric catalog), and `panels` (the figures) know
+nothing about PDFs, while `theme` supplies one `Theme` object driving both the
+page furniture and the matplotlib panels, and a `formats` driver composes them
+by walking the `document` block model (cover, tiered scan sections, appendix).
+A group brands every packet it issues from that one `Theme`.
 
 Large scan inventories and provenance appendices continue onto additional
 pages. PDF output is written atomically: a rendering failure leaves any

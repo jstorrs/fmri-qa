@@ -12,18 +12,42 @@ subpackages (`ls` the package to find a concern):
                  `saturation`, `motion`, `center_of_mass`, `smoothness`
 * `pipeline`  -- `preprocess`, the full `run_qa` orchestration, and the
                  aggregate `QAMetrics`/`QAResult`
+* `analysis`  -- the publishable `QAArtifact`: `analyze` (scan -> artifact) and
+                 `save_artifact`/`load_artifact` (the `.npz` on-disk form)
 * `hilo`      -- high/low flip-angle thermal/instability separation (its own pipeline)
-* `report`    -- multi-page reports (format-agnostic panels + a ReportLab driver)
 * `types`     -- the shared array dtypes and option Literals
+
+This package is the *calculation* half of fmri-qa. Reports and plots live in the
+separate `fmri-qa-report` distribution, which consumes a `QAArtifact` and never
+imports the layers above.
 
 Everything named in `__all__` below is importable straight from `fmriqc`.
 """
 
 import logging
 
+from .analysis import (
+    ARTIFACT_SCHEMA_VERSION,
+    AnalysisSettings,
+    ArtifactImages,
+    Curves,
+    GhostRegions,
+    Measurements,
+    Provenance,
+    PsfCurves,
+    QAArtifact,
+    RoiBox,
+    WeisskoffCurve,
+    analyze,
+    build_artifact,
+    core_version,
+    load_artifact,
+    save_artifact,
+)
 from .exceptions import (
     FmriqcError,
     IncompatibleScansError,
+    InvalidArtifactError,
     InvalidChoiceError,
     InvalidScanError,
     MissingSidecarError,
@@ -106,6 +130,7 @@ from .types import (
 logging.getLogger(__name__).addHandler(logging.NullHandler())
 
 __all__ = [
+    "ARTIFACT_SCHEMA_VERSION",
     "DETREND_METHODS",
     "FBIRN_ROI_SIZE",
     "GHOST_RADIUS",
@@ -114,28 +139,42 @@ __all__ = [
     "PE_ROWCOL",
     "ROI",
     "ROI_CENTER_MODES",
+    "AnalysisSettings",
+    "ArtifactImages",
     "CenterOfMassResult",
+    "Curves",
     "DetrendMethod",
     "FmriqcError",
+    "GhostRegions",
     "HiLoResult",
     "IncompatibleScansError",
+    "InvalidArtifactError",
     "InvalidChoiceError",
     "InvalidScanError",
+    "Measurements",
     "MissingSidecarError",
     "MotionResult",
     "OutlierResult",
     "PhantomGeometry",
+    "Provenance",
+    "PsfCurves",
+    "QAArtifact",
     "QAImages",
     "QAMetrics",
     "QAResult",
     "QAScan",
+    "RoiBox",
     "RoiCenter",
     "SaturationResult",
     "ScanMeta",
     "SmoothnessResult",
     "SpikeResult",
+    "WeisskoffCurve",
     "WeisskoffResult",
     "acr_ghosting_ratio",
+    "analyze",
+    "build_artifact",
+    "core_version",
     "detect_phantom",
     "detect_saturation",
     "detrend_fn",
@@ -152,6 +191,7 @@ __all__ = [
     "ghost_ratio",
     "ghost_top_ratio",
     "image_center",
+    "load_artifact",
     "odd_even_difference",
     "outlier_fraction",
     "percent_fluctuation",
@@ -165,6 +205,7 @@ __all__ = [
     "roi_indexes",
     "run_hilo",
     "run_qa",
+    "save_artifact",
     "segment_phantom",
     "separate_noise",
     "sfnr",

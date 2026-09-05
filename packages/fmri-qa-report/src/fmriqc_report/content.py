@@ -1,7 +1,9 @@
 """Per-metric vocabulary: the label, definition, method, and value formatter.
 
 One `MetricDoc` per reported metric is the single source for what a metric is
-called, how its value is formatted, what it means, and how it is computed. The
+called, how its value is formatted, what it means, and how it is computed. Every
+formatter reads the artifact's flat `Measurements`, so a report needs nothing
+but the artifact to render a metric. The
 header tiles (`metric_tiles`) and the physics characterization/methods pages
 (`characterization_rows`, `method_rows`) all read this catalog, so a metric's
 name and formatting can't drift between the dashboard and the physics report.
@@ -13,7 +15,7 @@ full derivations.
 from collections.abc import Callable
 from dataclasses import dataclass
 
-import fmriqc as q
+from fmriqc.analysis import Measurements
 
 
 @dataclass(frozen=True, slots=True)
@@ -23,14 +25,12 @@ class MetricDoc:
     label: str
     definition: str
     method: str
-    fmt: Callable[[q.QAMetrics], str]
+    fmt: Callable[[Measurements], str]
 
 
-def _fwhm_label(m: q.QAMetrics) -> str:
+def _fwhm_label(m: Measurements) -> str:
     """Combined FWHM tile text: mm when the voxel size is known, else voxels."""
-    s = m.smoothness
-    unit = "mm" if s.voxel_mm is not None else "vox"
-    return f"{s.fwhm:.2f}{unit}"
+    return f"{m.fwhm:.2f}{m.fwhm_unit}"
 
 
 # The reported metrics, in display order. The tile label and value formatter here
@@ -94,31 +94,31 @@ METRIC_DOCS: tuple[MetricDoc, ...] = (
         "outl",
         "Worst single-frame outlier-voxel fraction.",
         "AFNI 3dToutcount; a clean run sits near the per-voxel chance level.",
-        lambda m: f"{100.0 * m.outliers.max_fraction:.2f}%",
+        lambda m: f"{m.outlier_max_pct:.2f}%",
     ),
     MetricDoc(
         "tcOut",
         "Time-domain spike score of the ROI-mean residual.",
         "cran: max|residual| over its MAD; a transient volume stands high.",
-        lambda m: f"{m.spikes.tc_outlier:.1f}",
+        lambda m: f"{m.tc_outlier:.1f}",
     ),
     MetricDoc(
         "spec",
         "Spectral spike score of the residual (dominant periodic artifact).",
         "cran: max FFT magnitude (DC dropped) over its MAD.",
-        lambda m: f"{m.spikes.spec_outlier:.1f}",
+        lambda m: f"{m.spec_outlier:.1f}",
     ),
     MetricDoc(
         "motn",
         "Peak in-plane phantom translation vs the temporal mean (voxels).",
         "3dvolreg-style registration with rotation dropped (a rigid phantom).",
-        lambda m: f"{m.motion.max_translation:.2f}",
+        lambda m: f"{m.max_translation:.2f}",
     ),
     MetricDoc(
         "com",
         "Peak whole-slice center-of-mass shift (voxels).",
         "Circular intensity centroid (bxh volmeasures); first-moment instability.",
-        lambda m: f"{m.center_of_mass.max_displacement:.2f}",
+        lambda m: f"{m.max_com_displacement:.2f}",
     ),
     MetricDoc(
         "fwhm",
@@ -129,11 +129,11 @@ METRIC_DOCS: tuple[MetricDoc, ...] = (
 )
 
 
-def metric_tiles(m: q.QAMetrics) -> list[tuple[str, str]]:
+def metric_tiles(m: Measurements) -> list[tuple[str, str]]:
     """(label, value) pairs for the header metric tiles, in display order."""
     return [(d.label, d.fmt(m)) for d in METRIC_DOCS]
 
 
-def characterization_rows(m: q.QAMetrics) -> list[tuple[MetricDoc, str]]:
+def characterization_rows(m: Measurements) -> list[tuple[MetricDoc, str]]:
     """(doc, formatted value) per metric for the physics characterization table."""
     return [(d, d.fmt(m)) for d in METRIC_DOCS]

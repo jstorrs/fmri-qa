@@ -1,16 +1,26 @@
+"""Command-line entry points for the calculation half.
+
+`main` (`fmri-qa`) analyzes one or more series and reports the metrics as a
+fixed-width table or a JSON document, optionally saving each run's full
+`QAArtifact` to disk. `hilo_main` (`fmri-qa-hilo`) runs the high/low flip-angle
+noise separation. Rendering an artifact into a PDF is the separate
+`fmri-qa-report` distribution's job (`fmri-qa-report`), so nothing here imports
+matplotlib or ReportLab.
+"""
+
 import argparse
 import json
 import math
 import sys
 from collections.abc import Sequence
-from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
+from typing import TextIO
 
 import fmriqc as q
 
-# Shared in-plane row/col labels (i->row, j->col).
-_PE_LABEL = q.PE_ROWCOL
 _JSON_SCHEMA_VERSION = 1
+# Suffix for a saved artifact, so a batch's files are recognizable at a glance.
+_ARTIFACT_SUFFIX = ".qa.npz"
 
 
 def _nonnegative_float(value: str) -> float:
@@ -38,25 +48,36 @@ def _nonnegative_int(value: str) -> int:
     return parsed
 
 
-def _version() -> str:
-    try:
-        return version("fmri-qa")
-    except PackageNotFoundError:  # running from a source tree without an install
-        return "unknown"
+def _scan_stem(path: str) -> str:
+    """The scan's base name with any NIfTI extension removed."""
+    name = Path(path).name
+    for ext in (".nii.gz", ".nii"):
+        if name.endswith(ext):
+            return name[: -len(ext)]
+    return Path(name).stem
 
 
-def _metric_record(name: str, pe: str, result: q.QAResult) -> dict[str, object]:
+def _artifact_path(base: str, path: str, batch: bool) -> Path:
+    """Where one scan's artifact is written under `--artifact BASE`.
+
+    A single-scan run writes exactly `BASE`. A batch cannot share one file, so
+    `BASE` is a directory and each scan gets `<scan stem>.qa.npz` inside it.
+    """
+    if not batch:
+        return Path(base)
+    return Path(base) / f"{_scan_stem(path)}{_ARTIFACT_SUFFIX}"
+
+
+def _metric_record(artifact: q.QAArtifact) -> dict[str, object]:
     """The scalar metrics for one scan as a JSON-serializable record.
 
     Mirrors the human table's columns one-to-one, but as raw numbers (not the
     fixed-width formatting), so downstream tools can consume `--json` directly.
     """
-    m = result.metrics
-    sat = m.saturation
-    sm = m.smoothness
+    m = artifact.measurements
     record: dict[str, object] = {
-        "scan": name,
-        "pe": pe,
+        "scan": artifact.provenance.scan,
+        "pe": m.pe_label,
         "pe_axis": m.pe_axis,
         "snr": m.snr,
         "sfnr": m.sfnr,
@@ -66,18 +87,18 @@ def _metric_record(name: str, pe: str, result: q.QAResult) -> dict[str, object]:
         "ghost_top_pct": m.ghost_top_pct,
         "ro_ghost_pct": m.ro_ghost_pct,
         "acr_ghost_pct": m.acr_ghost_pct,
-        "outl_pct": 100.0 * m.outliers.max_fraction,
-        "tc_outlier": m.spikes.tc_outlier,
-        "spec_outlier": m.spikes.spec_outlier,
-        "clip": sat.n_clipped_kept,
-        "clip_kept": sat.clipped_kept,  # any clip biases the analyzed data
-        "clip_pre": sat.n_clipped_pre,
-        "motn": m.motion.max_translation,
-        "scl_pct": m.motion.max_scale_pct,
-        "shr_pct": m.motion.max_shear_pct,
-        "com": m.center_of_mass.max_displacement,
-        "fw_pe": sm.fwhm_pe if sm.fwhm_pe is not None else sm.fwhm,
-        "fw_ro": sm.fwhm_ro if sm.fwhm_ro is not None else sm.fwhm,
+        "outl_pct": m.outlier_max_pct,
+        "tc_outlier": m.tc_outlier,
+        "spec_outlier": m.spec_outlier,
+        "clip": m.n_clipped_kept,
+        "clip_kept": m.clipped_kept,  # any clip biases the analyzed data
+        "clip_pre": m.n_clipped_pre,
+        "motn": m.max_translation,
+        "scl_pct": m.max_scale_pct,
+        "shr_pct": m.max_shear_pct,
+        "com": m.max_com_displacement,
+        "fw_pe": m.fwhm_pe if m.fwhm_pe is not None else m.fwhm,
+        "fw_ro": m.fwhm_ro if m.fwhm_ro is not None else m.fwhm,
     }
     # Undefined numerical metrics are JSON null, not Python's non-standard NaN
     # or Infinity tokens. This keeps stdout consumable by strict JSON parsers.
@@ -92,7 +113,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         prog="fmri-qa",
         description="Phantom fMRI QA: SNR, SFNR, RDC (Weisskoff), Nyquist ghost.",
     )
-    parser.add_argument("--version", action="version", version=f"%(prog)s {_version()}")
+    parser.add_argument(
+        "--version", action="version", version=f"%(prog)s {q.core_version()}"
+    )
     parser.add_argument("paths", nargs="+", help="NIfTI (.nii/.nii.gz) QA scans")
     parser.add_argument(
         "--trim-sec",
@@ -132,35 +155,28 @@ def main(argv: Sequence[str] | None = None) -> int:
         "--json",
         action="store_true",
         help="Emit the metrics as JSON on stdout instead of the text table "
-        "(informational lines and the PDF notice move to stderr).",
+        "(informational lines move to stderr).",
     )
     parser.add_argument(
-        "--pdf",
-        metavar="FILE",
+        "--artifact",
+        metavar="PATH",
         default=None,
-        help="Write a PDF report to FILE.",
-    )
-    parser.add_argument(
-        "--pdf-tier",
-        choices=("dashboard", "physics"),
-        default="dashboard",
-        help="Report depth per scan: 'dashboard' (condensed overview) or 'physics' "
-        "(adds a full-size stability page) (default: dashboard).",
-    )
-    parser.add_argument(
-        "--pdf-cover",
-        action="store_true",
-        help="Prepend a cover page listing the scans in the PDF packet.",
-    )
-    parser.add_argument(
-        "--pdf-appendix",
-        action="store_true",
-        help="Append a provenance page (per-scan metadata + version) to the PDF.",
+        help="Save the full analysis artifact (settings, provenance, curves, "
+        "images) for later reporting. With one scan PATH is the output file; "
+        f"with several it is a directory taking one <scan>{_ARTIFACT_SUFFIX} "
+        "per scan. Render one with `fmri-qa-report`.",
     )
     args = parser.parse_args(argv)
 
+    settings = q.AnalysisSettings(
+        trim_sec=args.trim_sec,
+        detrend=args.detrend,
+        center=args.center,
+        roi_size=args.roi_size,
+        pe_axis_override=args.pe_axis,
+    )
     # In --json mode stdout carries only the JSON document; the config banner,
-    # table, and PDF notice go to stderr so a consumer can pipe stdout cleanly.
+    # table, and save notices go to stderr so a consumer can pipe stdout cleanly.
     info = sys.stderr if args.json else sys.stdout
     print(
         f"# detrend={args.detrend}  trim_sec={args.trim_sec}  "
@@ -168,67 +184,25 @@ def main(argv: Sequence[str] | None = None) -> int:
         file=info,
     )
     if not args.json:
-        header = (
-            f"{'scan':40s} {'PE':>3s} "
-            f"{'SNR':>9s} {'SFNR':>9s} {'RDC':>8s} {'drift%':>8s} "
-            f"{'ghost%':>8s} {'ghT%':>8s} {'RO%':>8s} {'ACRg%':>8s} {'outl%':>7s} "
-            f"{'tcOut':>7s} {'spcOut':>7s} "
-            f"{'clip':>6s} {'clipPre':>8s} {'motn':>7s} {'scl%':>7s} {'shr%':>7s} "
-            f"{'com':>6s} {'fwPE':>6s} {'fwRO':>6s}"
-        )
-        print(header)
-        print("-" * len(header))
+        _print_header()
 
     failed = False
-    reports = []
     records = []
+    batch = len(args.paths) > 1
     for path in args.paths:
-        name = Path(path).name
         try:
             scan = q.QAScan.from_nifti(path)
-            result = q.run_qa(
-                scan,
-                trim_sec=args.trim_sec,
-                pe_axis=args.pe_axis,
-                detrend=args.detrend,
-                center=args.center,
-                roi_size=args.roi_size,
-            )
+            artifact = q.analyze(scan, settings, name=Path(path).name, source=str(path))
         except Exception as exc:  # noqa: BLE001 - report and continue the batch
             failed = True
-            print(f"{name:40s} ERROR: {exc}", file=sys.stderr)
+            print(f"{Path(path).name:40s} ERROR: {exc}", file=sys.stderr)
             continue
-        # Prefer the sidecar's DICOM row/col; fall back to the axis mapping.
-        if args.pe_axis is None and result.meta and result.meta.pe_dir:
-            pe = result.meta.pe_dir
-        else:
-            axis = args.pe_axis if args.pe_axis is not None else scan.pe_axis
-            pe = "?" if axis is None else _PE_LABEL.get(axis, "?")
-        reports.append((name, result))
         if args.json:
-            records.append(_metric_record(name, pe, result))
+            records.append(_metric_record(artifact))
         else:
-            _print_row(name, pe, result)
-
-    if args.pdf and reports:
-        from . import report as report_mod
-
-        try:
-            pages = report_mod.write_report(
-                reports,
-                args.pdf,
-                tier=args.pdf_tier,
-                cover=args.pdf_cover,
-                appendix=args.pdf_appendix,
-            )
-        except Exception as exc:  # noqa: BLE001 - CLI boundary reports cleanly
+            _print_row(artifact)
+        if args.artifact and not _save(artifact, args.artifact, path, batch, info):
             failed = True
-            print(f"ERROR: could not write PDF {args.pdf}: {exc}", file=sys.stderr)
-        else:
-            print(
-                f"# wrote {args.pdf} ({len(reports)} scan(s), {pages} pages)",
-                file=info,
-            )
 
     if args.json:
         document = {
@@ -242,10 +216,24 @@ def main(argv: Sequence[str] | None = None) -> int:
     return 1 if failed else 0
 
 
+def _save(
+    artifact: q.QAArtifact, base: str, path: str, batch: bool, info: TextIO
+) -> bool:
+    """Write one artifact, reporting a failure cleanly. True if it was written."""
+    out = _artifact_path(base, path, batch)
+    try:
+        q.save_artifact(artifact, out)
+    except OSError as exc:  # a bad destination is a user error, not a crash
+        print(f"ERROR: could not write artifact {out}: {exc}", file=sys.stderr)
+        return False
+    print(f"# wrote {out}", file=info)
+    return True
+
+
 def _config(args: argparse.Namespace) -> dict[str, object]:
     """The run parameters echoed into the JSON document's header."""
     return {
-        "version": _version(),
+        "version": q.core_version(),
         "detrend": args.detrend,
         "trim_sec": args.trim_sec,
         "center": args.center,
@@ -254,51 +242,59 @@ def _config(args: argparse.Namespace) -> dict[str, object]:
     }
 
 
-def _print_row(name: str, pe: str, result: q.QAResult) -> None:
+def _print_header() -> None:
+    """Print the fixed-width table header and its rule."""
+    header = (
+        f"{'scan':40s} {'PE':>3s} "
+        f"{'SNR':>9s} {'SFNR':>9s} {'RDC':>8s} {'drift%':>8s} "
+        f"{'ghost%':>8s} {'ghT%':>8s} {'RO%':>8s} {'ACRg%':>8s} {'outl%':>7s} "
+        f"{'tcOut':>7s} {'spcOut':>7s} "
+        f"{'clip':>6s} {'clipPre':>8s} {'motn':>7s} {'scl%':>7s} {'shr%':>7s} "
+        f"{'com':>6s} {'fwPE':>6s} {'fwRO':>6s}"
+    )
+    print(header)
+    print("-" * len(header))
+
+
+def _print_row(artifact: q.QAArtifact) -> None:
     """Print one fixed-width metrics row for the human table."""
-    m = result.metrics
+    m = artifact.measurements
     # ghT%: PE percent ghost of the brightest 10% of ghost voxels (Greve /
     # bxh fmriqa_ghostiness), same scale as ghost% -- a localized bright ghost
     # the region-mean ghost% dilutes shows here (ghT% >= ghost% always).
     # clip: samples clipped in the analyzed data (they bias the metrics); a
     # trailing "!" flags any. clipPre: samples clipped only in the dropped
     # warm-up volumes -- reported apart because they don't reach the stats.
-    sat = m.saturation
-    clip = f"{sat.n_clipped_kept}{'!' if sat.clipped_kept else ''}"
+    clip = f"{m.n_clipped_kept}{'!' if m.clipped_kept else ''}"
     # outl%: worst single-frame outlier-voxel fraction (3dToutcount); a clean
     # run sits near the per-voxel chance level (qthr, ~0.1%).
-    outl = 100.0 * m.outliers.max_fraction
     # motn/scl%/shr%: peak per-volume in-plane phantom motion vs the temporal
     # mean (3dvolreg-style, rotation dropped) -- translation (voxels), and the
     # gradient-heating scale/shear strain (percent).
-    mo = m.motion
     # tcOut/spcOut: cran MAD-normalized spike scores of the ROI-mean residual
     # -- peak / robust spread in the time domain (a transient volume) and on
     # its DC-dropped FFT magnitude (a dominant periodic artifact). Unitless; a
     # clean phantom sits low (a few), a spike stands well above.
-    sp = m.spikes
     # com: peak per-volume shift of the whole-slice intensity centroid from
     # its temporal mean (circular COM, bxh volmeasures), in voxels -- the
     # circular mean cancels uniform background and the N/2 ghost, so no phantom
     # mask is used (only a Siemens zeroed edge is healed); a cheap first-moment
     # jump/drift trace complementing motn.
-    com = m.center_of_mass.max_displacement
     # fwPE/fwRO: spatial smoothness of the noise field along the phase-encode
     # and readout axes (AFNI 3dFWHMx), in mm when the voxel size is known --
     # the RDC smoothness confound; PE/RO asymmetry is anisotropic smoothing.
-    sm = m.smoothness
-    fw_pe = sm.fwhm_pe if sm.fwhm_pe is not None else sm.fwhm
-    fw_ro = sm.fwhm_ro if sm.fwhm_ro is not None else sm.fwhm
+    fw_pe = m.fwhm_pe if m.fwhm_pe is not None else m.fwhm
+    fw_ro = m.fwhm_ro if m.fwhm_ro is not None else m.fwhm
     print(
-        f"{name:40s} {pe:>3s} "
+        f"{artifact.provenance.scan:40s} {m.pe_label:>3s} "
         f"{m.snr:>9.1f} {m.sfnr:>9.1f} {m.rdc:>8.3f} "
         f"{m.drift_pct:>8.3f} {m.ghost_pct:>8.3f} {m.ghost_top_pct:>8.3f} "
-        f"{m.ro_ghost_pct:>8.3f} {m.acr_ghost_pct:>8.3f} {outl:>7.3f} "
-        f"{sp.tc_outlier:>7.2f} {sp.spec_outlier:>7.2f} "
-        f"{clip:>6s} {sat.n_clipped_pre:>8d} "
-        f"{mo.max_translation:>7.3f} "
-        f"{mo.max_scale_pct:>7.3f} {mo.max_shear_pct:>7.3f} "
-        f"{com:>6.3f} {fw_pe:>6.2f} {fw_ro:>6.2f}"
+        f"{m.ro_ghost_pct:>8.3f} {m.acr_ghost_pct:>8.3f} {m.outlier_max_pct:>7.3f} "
+        f"{m.tc_outlier:>7.2f} {m.spec_outlier:>7.2f} "
+        f"{clip:>6s} {m.n_clipped_pre:>8d} "
+        f"{m.max_translation:>7.3f} "
+        f"{m.max_scale_pct:>7.3f} {m.max_shear_pct:>7.3f} "
+        f"{m.max_com_displacement:>6.3f} {fw_pe:>6.2f} {fw_ro:>6.2f}"
     )
 
 

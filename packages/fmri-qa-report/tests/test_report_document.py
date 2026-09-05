@@ -4,8 +4,8 @@ import pytest
 from reportlab.pdfbase import pdfmetrics
 from svglib import svglib as _svglib
 
-from fmriqc import report
-from fmriqc.report.formats.reportlab import (
+import fmriqc_report as report
+from fmriqc_report.formats.reportlab import (
     _appendix_chunks,
     _cover_chunks,
     _fit_text,
@@ -22,7 +22,7 @@ def test_dashboard_is_a_strict_prefix_of_physics() -> None:
 
 
 def test_every_tier_composes_to_that_tiers_parts() -> None:
-    items = [("a", object()), ("b", object())]  # results are opaque to compose
+    items = [("a", object()), ("b", object())]  # artifacts are opaque to compose
     for tier in report.TIERS:
         sections = report.compose(items, tier)  # type: ignore[arg-type]
         assert [s.title for s in sections] == ["a", "b"]
