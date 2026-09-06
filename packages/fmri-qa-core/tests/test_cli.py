@@ -209,6 +209,33 @@ def test_json_record_maps_undefined_metrics_to_null(tmp_path, write_scan) -> Non
     assert record["snr"] == artifact.measurements.snr  # finite values pass through
 
 
+def test_json_record_leaves_an_unnamed_direction_null(tmp_path, write_scan) -> None:
+    """No phase-encode axis means no PE or RO number -- not the combined one.
+
+    `fwhm` is the geometric mean of both axes; publishing it as `fw_pe` would
+    file a different quantity under that name, and a trend database would never
+    see the substitution. The combined value rides along under its own key, so
+    nothing is lost by refusing to rename it.
+    """
+    scan = q.QAScan.from_nifti(write_scan(tmp_path))
+    artifact = q.analyze(scan, q.AnalysisSettings(roi_size=9))
+    unnamed = replace(artifact.measurements, fwhm_pe=None, fwhm_ro=None)
+    record = cli._metric_record(replace(artifact, measurements=unnamed))
+    assert record["fw_pe"] is None
+    assert record["fw_ro"] is None
+    assert record["fwhm"] == artifact.measurements.fwhm
+    assert record["fwhm_unit"] == "mm"
+
+
+def test_table_marks_an_unnamed_direction_unknown(tmp_path, write_scan, capsys) -> None:
+    """The `fwPE`/`fwRO` cells read `?`, not a plausible number from elsewhere."""
+    scan = q.QAScan.from_nifti(write_scan(tmp_path))
+    artifact = q.analyze(scan, q.AnalysisSettings(roi_size=9))
+    unnamed = replace(artifact.measurements, fwhm_pe=None, fwhm_ro=None)
+    cli._print_row(replace(artifact, measurements=unnamed))
+    assert capsys.readouterr().out.rstrip("\n").endswith("     ?      ?")
+
+
 def _reject_json_constant(value: str) -> None:
     raise ValueError(f"non-standard JSON constant: {value}")
 

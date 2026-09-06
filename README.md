@@ -53,7 +53,7 @@ fBIRN size) on a single slice.
 | **motn** | peak per-volume in-plane translation of the phantom vs. its temporal mean (voxels), from a 3dvolreg-style registration |
 | **scl %** / **shr %** | peak per-volume scaling and shear strain of the phantom (percent) — the gradient-heating deformation the rotation-free motion model isolates |
 | **com** | peak per-volume shift of the whole-slice intensity centroid from its temporal mean (circular COM, bxh volmeasures), in voxels — a cheap first-moment jump/drift trace complementing `motn` |
-| **fwPE** / **fwRO** | spatial smoothness of the noise field (AFNI 3dFWHMx): Gaussian FWHM of the detrended fluctuations over the phantom along the phase-encode and readout axes, in mm (voxels if the voxel size is unknown) |
+| **fwPE** / **fwRO** | spatial smoothness of the noise field (AFNI 3dFWHMx): Gaussian FWHM of the detrended fluctuations over the phantom along the phase-encode and readout axes, in mm (voxels if the voxel size is unknown); `?` in the table and `null` in the JSON when no phase-encode axis resolved and neither direction has a name |
 
 Drift is removed before the noise metrics are measured, using either a Legendre
 polynomial (`--detrend poly`, default) or a least-squares B-spline

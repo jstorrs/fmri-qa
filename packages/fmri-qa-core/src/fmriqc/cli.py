@@ -103,6 +103,17 @@ def _localization_flag(m: q.Measurements) -> str:
     return "?" if any(ok is None for _, ok in verdicts) else "ok"
 
 
+def _fwhm_cell(value: float | None) -> str:
+    """One directional FWHM as a table cell: the number, or `?` if unmeasured.
+
+    `fwhm_pe`/`fwhm_ro` are None when no phase-encode axis resolved, so neither
+    direction has a name. The combined FWHM is *not* shown in their place: it is
+    the geometric mean of both axes, and printing it under `fwPE` would label a
+    number that answers a different question as the answer to this one.
+    """
+    return "?" if value is None else f"{value:.2f}"
+
+
 def _metric_record(artifact: q.QAArtifact) -> dict[str, object]:
     """The scalar metrics for one scan as a JSON-serializable record.
 
@@ -111,6 +122,10 @@ def _metric_record(artifact: q.QAArtifact) -> dict[str, object]:
     one `loc` cell is three fields here: a consumer that files these away —
     the trend database this output exists for — needs the measured fraction and
     both verdicts, not the abbreviation an operator reads.
+
+    A directional FWHM the run could not name (no phase-encode axis) is `null`,
+    with the combined `fwhm` and its `fwhm_unit` alongside so the numbers that
+    *were* measured stay interpretable.
     """
     m = artifact.measurements
     record: dict[str, object] = {
@@ -140,8 +155,10 @@ def _metric_record(artifact: q.QAArtifact) -> dict[str, object]:
         "scl_pct": m.max_scale_pct,
         "shr_pct": m.max_shear_pct,
         "com": m.max_com_displacement,
-        "fw_pe": m.fwhm_pe if m.fwhm_pe is not None else m.fwhm,
-        "fw_ro": m.fwhm_ro if m.fwhm_ro is not None else m.fwhm,
+        "fw_pe": m.fwhm_pe,
+        "fw_ro": m.fwhm_ro,
+        "fwhm": m.fwhm,  # combined (AFNI ccomb), defined on either axis or none
+        "fwhm_unit": m.fwhm_unit,  # "mm", or "vox" when the voxel size is unknown
     }
     # Undefined numerical metrics are JSON null, not Python's non-standard NaN
     # or Infinity tokens. This keeps stdout consumable by strict JSON parsers.
@@ -347,8 +364,8 @@ def _print_row(artifact: q.QAArtifact) -> None:
     # fwPE/fwRO: spatial smoothness of the noise field along the phase-encode
     # and readout axes (AFNI 3dFWHMx), in mm when the voxel size is known --
     # the RDC smoothness confound; PE/RO asymmetry is anisotropic smoothing.
-    fw_pe = m.fwhm_pe if m.fwhm_pe is not None else m.fwhm
-    fw_ro = m.fwhm_ro if m.fwhm_ro is not None else m.fwhm
+    # "?" where no PE axis resolved, so neither direction has a name (the
+    # combined FWHM is not substituted -- see `_fwhm_cell`).
     print(
         f"{artifact.provenance.scan:40s} {m.pe_label:>3s} "
         f"{_localization_flag(m):>8s} "
@@ -359,7 +376,8 @@ def _print_row(artifact: q.QAArtifact) -> None:
         f"{clip:>6s} {m.n_clipped_pre:>8d} "
         f"{m.max_translation:>7.3f} "
         f"{m.max_scale_pct:>7.3f} {m.max_shear_pct:>7.3f} "
-        f"{m.max_com_displacement:>6.3f} {fw_pe:>6.2f} {fw_ro:>6.2f}"
+        f"{m.max_com_displacement:>6.3f} "
+        f"{_fwhm_cell(m.fwhm_pe):>6s} {_fwhm_cell(m.fwhm_ro):>6s}"
     )
 
 
