@@ -1,20 +1,15 @@
 """Validation at the boundary between loaded scans and numerical metrics."""
 
-from typing import TYPE_CHECKING
-
 import numpy as np
 
 from .exceptions import InvalidScanError
-
-if TYPE_CHECKING:
-    from .load.scan import QAScan
-
+from .load.scan import QAScan
 
 MIN_ANALYSIS_FRAMES = 4
 SUPPORTED_PE_AXES = (0, 1)
 
 
-def validate_scan(scan: "QAScan", *, minimum_frames: int = 1) -> None:
+def validate_scan(scan: QAScan, *, minimum_frames: int = 1) -> None:
     """Validate the structure shared by the main and high/low pipelines."""
     if scan.data.ndim != 4:
         raise InvalidScanError(
@@ -41,7 +36,7 @@ def validate_scan(scan: "QAScan", *, minimum_frames: int = 1) -> None:
 
 
 def validate_qa_run(
-    scan: "QAScan", *, trim_sec: float, roi_size: int, pe_axis: int | None
+    scan: QAScan, *, trim_sec: float, roi_size: int, pe_axis: int | None
 ) -> None:
     """Validate parameters required by the single-slice QA pipeline."""
     validate_scan(scan, minimum_frames=MIN_ANALYSIS_FRAMES)
@@ -77,7 +72,7 @@ def validate_qa_run(
 
 
 def validate_hilo_run(
-    high: "QAScan", low: "QAScan", *, trim_sec: float, erode: int
+    high: QAScan, low: QAScan, *, trim_sec: float, erode: int
 ) -> None:
     """Validate parameters shared by both sides of a high/low analysis."""
     validate_scan(high, minimum_frames=MIN_ANALYSIS_FRAMES)

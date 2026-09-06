@@ -2,9 +2,11 @@
 
 `QAScan` is the imperative shell's entry point: `from_nifti` does the file I/O
 and header/sidecar parsing, then hands the pure pipeline a plain array plus the
-metadata it needs. The phase-encode axis is resolved from the sidecar first,
-then the NIfTI `dim_info`, then — only if both are absent — the ghost estimate;
-the TR likewise prefers the sidecar over the unit-converted header pixdim.
+metadata it needs. It reads the phase-encode axis from the sidecar first and the
+NIfTI `dim_info` second; if neither carries one it says so and leaves the axis
+None, because estimating it from the Nyquist ghost is the *pipeline's* job (see
+`pipeline.run_qa`) and would make this layer depend on the metrics above it. The
+TR likewise prefers the sidecar over the unit-converted header pixdim.
 """
 
 import warnings
@@ -14,7 +16,6 @@ from pathlib import Path
 import nibabel as nib
 
 from ..exceptions import InvalidScanError
-from ..metrics.ghost import phase_encode_axis
 from ..types import FloatArray
 from .metadata import ScanMeta, _load_sidecar, _scan_meta
 from .pe_axis import _pe_axis_from_header, _pe_axis_from_sidecar
@@ -28,10 +29,9 @@ class QAScan:
     `pe_axis` is the phase-encode axis as a NIfTI voxel-array index (0/1/2). The
     single-slice QA pipeline supports the in-plane axes 0/1 and rejects axis 2.
     The value comes from the sidecar `PhaseEncodingDirection` (authoritative),
-    falling back
-    to the header `dim_info` phase field, then — only if both are absent — to the
-    Nyquist-ghost estimate (with a warning; `None` if `estimate_pe=False`).
-    Polarity is dropped (unneeded here). `tr` is in seconds, from the sidecar
+    falling back to the header `dim_info` phase field; it is `None` when the
+    metadata names no axis, and `run_qa` then estimates one from the Nyquist
+    ghost. Polarity is dropped (unneeded here). `tr` is in seconds, from the sidecar
     `RepetitionTime` or the header pixdim converted by its declared time unit.
     `meta` holds the human-readable acquisition metadata for the report; the
     BIDS JSON sidecar it comes from is optional, and its fields are `None` when
@@ -49,7 +49,7 @@ class QAScan:
     inter: float = 0.0
 
     @classmethod
-    def from_nifti(cls, path: str | Path, estimate_pe: bool = True) -> "QAScan":
+    def from_nifti(cls, path: str | Path) -> "QAScan":
         img = nib.load(str(path))
         if len(img.shape) != 4:
             raise InvalidScanError(
@@ -65,15 +65,12 @@ class QAScan:
         if pe_axis is None:
             pe_axis = _pe_axis_from_header(img.header)
         if pe_axis is None:
-            msg = f"{path}: no phase-encode axis in sidecar or NIfTI dim_info"
-            if estimate_pe:
-                pe_axis = phase_encode_axis(data)
-                msg += (
-                    f"; falling back to ghost estimate (axis {pe_axis})"
-                    if pe_axis is not None
-                    else "; the ghost estimate could not resolve one either"
-                )
-            warnings.warn(msg, stacklevel=2)
+            warnings.warn(
+                f"{path}: no phase-encode axis in sidecar or NIfTI dim_info; "
+                "the pipeline will estimate it from the Nyquist ghost. Pass "
+                "--pe-axis to name the acquisition's direction instead.",
+                stacklevel=2,
+            )
 
         tr = _repetition_time(img.header, sidecar, path)
         return cls(

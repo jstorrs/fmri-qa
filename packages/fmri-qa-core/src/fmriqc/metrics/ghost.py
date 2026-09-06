@@ -2,17 +2,21 @@
 
 The ghost is located by rolling the phantom half the FOV along the phase-encode
 axis; every statistic here is a region-matched ghost-to-signal ratio built on
-that idea. When no sidecar/header PE axis is available, the same machinery picks
-the axis where the ghost actually lands (`estimate_pe_axis`), which the loader
-uses as its last-resort fallback (see `load.pe_axis`).
+that idea. `estimate_ghost` builds the masks for both in-plane axes once and
+measures the whole family from them, returning a `GhostResult` that carries the
+masks it sampled — so a report draws the regions the numbers came from rather
+than rebuilding them. When no sidecar/header PE axis is available, the same
+machinery picks the axis where the ghost actually lands (`estimate_pe_axis`),
+which `run_qa` uses as its last-resort fallback (see `load.pe_axis`).
 """
 
+from dataclasses import dataclass
 from typing import Literal, overload
 
 import numpy as np
 from skimage.morphology import isotropic_dilation, isotropic_erosion
 
-from ..prep.imaging import edge_valid_mask, segment_phantom
+from ..prep.imaging import edge_valid_mask
 from ..types import BoolArray, FloatArray
 
 # Fraction of the brightest ghost-region voxels averaged for the localized-ghost
@@ -58,6 +62,142 @@ def ghost_masks(
     return signal_mask, ghost_mask
 
 
+def _mean_ratio(
+    mean_image: FloatArray, signal_mask: BoolArray, ghost_mask: BoolArray
+) -> float:
+    """Region-mean ghost-to-signal ratio over one matched mask pair.
+
+    The single definition of the fBIRN ghost ratio. NaN when either region came
+    back empty -- no measurement at all, which is not the same as a low one.
+    """
+    if not ghost_mask.any() or not signal_mask.any():
+        return float("nan")
+    return float(mean_image[ghost_mask].mean() / mean_image[signal_mask].mean())
+
+
+def _top_ratio(
+    mean_image: FloatArray,
+    signal_mask: BoolArray,
+    ghost_mask: BoolArray,
+    top: float = GHOST_TOP_FRACTION,
+) -> float:
+    """Top-fraction ghost-to-signal ratio over one matched mask pair.
+
+    The single definition of the localized ghost ratio: `_mean_ratio` with the
+    numerator narrowed to the brightest `top` fraction of ghost voxels, so a
+    concentrated bright ghost shows where the region mean dilutes it. At least
+    one voxel is always averaged, so this can only exceed the region mean.
+    """
+    ghost = mean_image[ghost_mask]
+    if ghost.size == 0 or not signal_mask.any():
+        return float("nan")
+    k = max(1, round(top * ghost.size))
+    brightest = np.partition(ghost, -k)[-k:]  # the k largest ghost-voxel intensities
+    return float(brightest.mean() / mean_image[signal_mask].mean())
+
+
+@dataclass(frozen=True, eq=False)
+class GhostResult:
+    """The whole Nyquist-ghost family, measured on one pair of axes at once.
+
+    Built by `estimate_ghost` from the masks it carries: `pe_signal`/`pe_ghost`
+    are the region-matched pair along the resolved phase-encode axis, and
+    `ro_signal`/`ro_ghost` the same pair along the readout axis (`1 - pe_axis`),
+    which is a background-relative baseline because no N/2 ghost lands there.
+    Every ratio below was averaged over exactly these masks, so a report drawing
+    them is drawing what was measured.
+
+    `pe_ratio` is the fBIRN ghost-to-signal ratio, `pe_top_ratio` its localized
+    (Greve / bxh `fmriqa_ghostiness`) companion over the brightest `top` fraction
+    of ghost voxels, and `ro_ratio` the readout baseline. A NaN ratio means the
+    region it needed came back empty -- the phantom spans the FOV along that
+    axis, or the segmentation collapsed.
+    """
+
+    pe_axis: int
+    radius: int
+    pe_signal: BoolArray
+    pe_ghost: BoolArray
+    ro_signal: BoolArray
+    ro_ghost: BoolArray
+    pe_ratio: float
+    ro_ratio: float
+    pe_top_ratio: float
+
+    @property
+    def acr_ratio(self) -> float:
+        """ACR/AAPM-equivalent ghosting ratio: `|pe_ratio - ro_ratio|`.
+
+        The classic ACR/AAPM "percent-signal-ghosting" subtracts a background
+        estimate (the frequency axis, which carries no N/2 ghost) from the
+        phase-encode ghost, normalized by the central signal:
+        `|ghost_pe - ghost_freq| / signal`. This is that same contrast in fBIRN
+        region-matched space -- each ghost patch normalized by the exact tissue
+        that produced it, with the phantom/ghost overlap zone excluded from both.
+
+        Because each direction carries its own matched denominator, the readout
+        ratio is a genuine background-relative-to-signal baseline; subtracting it
+        cancels the background exactly as ACR intends, without ACR's
+        single-signal assumption (for a uniform phantom the two denominators
+        coincide and this reduces to the classic form).
+        """
+        return abs(self.pe_ratio - self.ro_ratio)
+
+    @property
+    def ghost_pct(self) -> float:
+        """fBIRN percent ghost along the phase-encode axis."""
+        return 100.0 * self.pe_ratio
+
+    @property
+    def ghost_top_pct(self) -> float:
+        """Localized (top-fraction) percent ghost along the phase-encode axis."""
+        return 100.0 * self.pe_top_ratio
+
+    @property
+    def ro_ghost_pct(self) -> float:
+        """Percent ghost along the readout axis: the background-relative baseline."""
+        return 100.0 * self.ro_ratio
+
+    @property
+    def acr_ghost_pct(self) -> float:
+        """ACR/AAPM percent-signal-ghosting: `|ghost_pct - ro_ghost_pct|`."""
+        return 100.0 * self.acr_ratio
+
+
+def estimate_ghost(
+    mean_image: FloatArray,
+    phantom_mask: BoolArray,
+    pe_axis: int,
+    *,
+    valid_mask: BoolArray,
+    radius: int = GHOST_RADIUS,
+    top: float = GHOST_TOP_FRACTION,
+) -> GhostResult:
+    """Measure every Nyquist-ghost statistic for a known phase-encode axis.
+
+    Builds the region-matched masks once per in-plane axis and takes all three
+    ratios from them, so no two of the family can disagree and the caller keeps
+    the masks that were sampled. `pe_axis` is the resolved phase-encode axis (0
+    or 1); the readout axis is the other one. `radius` sets the erosion/dilation
+    band width and `top` the localized-ghost fraction -- both are
+    acquisition-dependent and should be verified per protocol. `valid_mask`
+    excludes zeroed image edges (see `edge_valid_mask`).
+    """
+    pe_signal, pe_ghost = ghost_masks(phantom_mask, pe_axis, radius, valid_mask)
+    ro_signal, ro_ghost = ghost_masks(phantom_mask, 1 - pe_axis, radius, valid_mask)
+    return GhostResult(
+        pe_axis=pe_axis,
+        radius=radius,
+        pe_signal=pe_signal,
+        pe_ghost=pe_ghost,
+        ro_signal=ro_signal,
+        ro_ghost=ro_ghost,
+        pe_ratio=_mean_ratio(mean_image, pe_signal, pe_ghost),
+        ro_ratio=_mean_ratio(mean_image, ro_signal, ro_ghost),
+        pe_top_ratio=_top_ratio(mean_image, pe_signal, pe_ghost, top),
+    )
+
+
 def ghost_ratio(
     mean_image: FloatArray,
     phantom_mask: BoolArray,
@@ -65,94 +205,18 @@ def ghost_ratio(
     radius: int = GHOST_RADIUS,
     valid_mask: BoolArray | None = None,
 ) -> float:
-    """fBIRN Nyquist ghost-to-signal ratio (mean ghost / mean signal).
+    """fBIRN Nyquist ghost-to-signal ratio for one candidate axis.
 
-    The fBIRN "percent ghost" is 100x this value. The ghost is located by rolling
-    the phantom half the FOV along the phase-encode axis; `pe_axis` and the
-    erosion/dilation `radius` are acquisition-dependent and should be verified per
-    protocol. `valid_mask` excludes zeroed image edges (see `edge_valid_mask`);
-    it defaults to detecting them from `mean_image`.
+    A single axis' worth of `estimate_ghost` — what `estimate_pe_axis` needs to
+    score a candidate, before any axis is settled. A run that has settled its
+    axis calls `estimate_ghost` and reads `pe_ratio`, so the whole family comes
+    off one set of masks. `valid_mask` excludes zeroed image edges (see
+    `edge_valid_mask`); it defaults to detecting them from `mean_image`.
     """
     if valid_mask is None:
         valid_mask = edge_valid_mask(mean_image)
     signal_mask, ghost_mask = ghost_masks(phantom_mask, pe_axis, radius, valid_mask)
-    if not ghost_mask.any() or not signal_mask.any():
-        return float("nan")  # no clear ghost/signal region (matches ghost_top_ratio)
-    return float(mean_image[ghost_mask].mean() / mean_image[signal_mask].mean())
-
-
-def ghost_top_ratio(
-    mean_image: FloatArray,
-    phantom_mask: BoolArray,
-    pe_axis: int = 0,
-    radius: int = GHOST_RADIUS,
-    valid_mask: BoolArray | None = None,
-    top: float = GHOST_TOP_FRACTION,
-) -> float:
-    """Localized (top-fraction) Nyquist ghost ratio (Greve / bxh fmriqa_ghostiness).
-
-    Identical to `ghost_ratio` but the numerator is the mean of the brightest
-    `top` fraction of ghost-region voxels rather than the whole-region mean, so a
-    concentrated bright ghost (a localized reconstruction artifact) shows up where
-    the region mean would dilute it. The signal denominator is the same
-    region-matched source patch as `ghost_ratio`, so this ratio shares that scale
-    and is always >= the mean ghost ratio; 100x it is the "top-10% percent ghost".
-    At least one voxel is always averaged; NaN if the ghost region is empty.
-    """
-    if valid_mask is None:
-        valid_mask = edge_valid_mask(mean_image)
-    signal_mask, ghost_mask = ghost_masks(phantom_mask, pe_axis, radius, valid_mask)
-    g = mean_image[ghost_mask]
-    if g.size == 0:
-        return float("nan")
-    k = max(1, round(top * g.size))
-    bright = np.partition(g, -k)[-k:]  # the k largest ghost-voxel intensities
-    return float(bright.mean() / mean_image[signal_mask].mean())
-
-
-def acr_ghosting_ratio(
-    mean_image: FloatArray,
-    phantom_mask: BoolArray,
-    pe_axis: int = 0,
-    radius: int = GHOST_RADIUS,
-    valid_mask: BoolArray | None = None,
-) -> float:
-    """ACR/AAPM-equivalent ghosting ratio from region-matched percent ghosts.
-
-    The classic ACR/AAPM "percent-signal-ghosting" subtracts a background estimate
-    (the frequency axis, which carries no N/2 ghost) from the phase-encode ghost,
-    normalized by the central signal: |ghost_pe - ghost_freq| / signal. This builds
-    the same contrast in fBIRN region-matched space: `ghost_ratio` is evaluated
-    independently along the PE and frequency axes -- each ghost patch normalized by
-    the exact tissue that produced it (`ghost_masks`), with the phantom/ghost
-    overlap zone excluded from both -- and the ACR-equivalent is the absolute
-    difference of the two ratios.
-
-    Because each direction carries its own matched denominator, the frequency-axis
-    ratio is a genuine background-relative-to-signal baseline; subtracting it cancels
-    the background exactly as ACR intends, without ACR's single-signal assumption
-    (for a uniform phantom the two denominators coincide and this reduces to the
-    classic form). 100x this value is the percent-signal-ghosting. `valid_mask`
-    excludes zeroed image edges (see `edge_valid_mask`); it defaults to detecting
-    them from `mean_image`.
-    """
-    if valid_mask is None:
-        valid_mask = edge_valid_mask(mean_image)
-    freq_axis = 1 - pe_axis
-    pe = ghost_ratio(mean_image, phantom_mask, pe_axis, radius, valid_mask)
-    ro = ghost_ratio(mean_image, phantom_mask, freq_axis, radius, valid_mask)
-    return abs(pe - ro)
-
-
-def phase_encode_axis(data: FloatArray, radius: int = GHOST_RADIUS) -> int | None:
-    """Estimate the PE axis from a MIP over time and all slices.
-
-    Collapsing time and slices concentrates the ghost, giving a stronger signal
-    than any single slice — the fallback when no sidecar is available. None when
-    the ghost resolves neither axis (see `estimate_pe_axis`).
-    """
-    mip = data.max(axis=(-2, -1))  # (X, Y): max over Z and T
-    return estimate_pe_axis(mip, segment_phantom(mip), radius=radius)
+    return _mean_ratio(mean_image, signal_mask, ghost_mask)
 
 
 @overload

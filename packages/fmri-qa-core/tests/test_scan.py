@@ -23,20 +23,6 @@ import pytest
 import fmriqc as q
 
 
-def _ghosted_series(n: int = 24, z: int = 2, t: int = 6) -> np.ndarray:
-    """A disk phantom with an 8% N/2 ghost injected along axis 1, over noise.
-
-    What the ghost estimate needs to read: a constant volume carries no ghost at
-    all, and the estimate rightly answers that it does not know.
-    """
-    rng = np.random.default_rng(0)
-    yy, xx = np.mgrid[0:n, 0:n]
-    disk = ((xx - n / 2) ** 2 + (yy - n / 2) ** 2) < (n / 5) ** 2
-    base = np.where(disk, 1000.0, 0.0)
-    frame = base + 0.08 * np.roll(base, n // 2, axis=1)
-    return frame[:, :, None, None] + np.abs(rng.normal(scale=8.0, size=(n, n, z, t)))
-
-
 def _write_scan(
     directory: Path,
     sidecar: dict | None = None,
@@ -44,11 +30,9 @@ def _write_scan(
     pixdim_t: float = 2.0,
     time_unit: str | None = None,
     phase: int | None = 1,
-    data: np.ndarray | None = None,
 ) -> Path:
     """Write a minimal 4-D NIfTI; write a sidecar only when one is given."""
-    if data is None:
-        data = np.ones((8, 8, 2, 6), dtype=np.float32)
+    data = np.ones((8, 8, 2, 6), dtype=np.float32)
     img = nib.Nifti1Image(data, affine=np.eye(4))
     img.header.set_zooms((3.0, 3.0, 3.0, pixdim_t))
     if time_unit is not None:
@@ -153,17 +137,17 @@ def test_missing_sidecar_warns_and_still_loads(tmp_path) -> None:
     assert scan.meta.series is None
 
 
-def test_missing_sidecar_falls_back_to_the_ghost_estimate(tmp_path) -> None:
-    # No sidecar and no dim_info: the last resort still applies, and both the
-    # absent sidecar and the guessed axis are announced.
-    nifti = _write_scan(tmp_path, sidecar=None, phase=None, data=_ghosted_series())
+def test_missing_sidecar_and_dim_info_leaves_the_axis_unresolved(tmp_path) -> None:
+    # No sidecar and no dim_info: the loader has nothing to read, and says so
+    # twice -- the absent sidecar, and the axis it is leaving to the pipeline.
+    nifti = _write_scan(tmp_path, sidecar=None, phase=None)
     with pytest.warns(UserWarning) as caught:
         scan = q.QAScan.from_nifti(nifti)
 
     messages = [str(warning.message) for warning in caught]
     assert any("no BIDS JSON sidecar" in message for message in messages)
-    assert any("ghost estimate" in message for message in messages)
-    assert scan.pe_axis == 1  # the axis the injected ghost lands on
+    assert any("estimate it from the Nyquist ghost" in message for message in messages)
+    assert scan.pe_axis is None  # for `run_qa` to estimate on the analyzed slice
 
 
 def test_missing_nifti_fails_on_the_nifti_not_the_sidecar(tmp_path) -> None:
