@@ -21,6 +21,8 @@ rather than flattened.
 """
 
 import json
+import os
+import tempfile
 import warnings
 from collections.abc import Callable
 from dataclasses import asdict
@@ -61,16 +63,33 @@ def save_artifact(artifact: QAArtifact, path: str | Path) -> Path:
 
     Missing parent directories are created. The file name is used exactly as
     given (NumPy's own `savez` would append `.npz` to a name lacking it).
+
+    The write is atomic: the archive goes to a temporary file beside the
+    destination and is moved into place only once it is whole. A QA archive is
+    read months later by something that never saw the run that wrote it, and a
+    truncated `.npz` looks exactly like a complete one until it is opened — so
+    an interrupted write must leave the destination untouched, not half-written.
     """
     document, arrays = _decompose(artifact)
     out = Path(path)
     out.parent.mkdir(parents=True, exist_ok=True)
     payload: dict[str, Member] = {_DOCUMENT: np.array(json.dumps(document)), **arrays}
-    with out.open("wb") as fh:
-        # savez_compressed takes member names as **kwargs, which collides with its
-        # own keyword-only `allow_pickle` for a checker: a `dict[str, ...]` splat
-        # could in principle carry that name. Our keys are dotted paths, never it.
-        np.savez_compressed(fh, **payload)  # type: ignore[arg-type]
+    # In the destination's own directory: a move is only atomic within a single
+    # filesystem, and the system temporary directory is often on another.
+    fd, name = tempfile.mkstemp(dir=out.parent, prefix=f".{out.name}.", suffix=".tmp")
+    tmp = Path(name)
+    try:
+        with os.fdopen(fd, "wb") as fh:
+            # savez_compressed takes member names as **kwargs, which collides with
+            # its own keyword-only `allow_pickle` for a checker: a `dict[str, ...]`
+            # splat could in principle carry that name. Our keys are dotted paths,
+            # never it.
+            np.savez_compressed(fh, **payload)  # type: ignore[arg-type]
+        tmp.replace(out)
+    finally:
+        # A no-op once the move succeeded; the cleanup that matters is the one
+        # after a failure, which must not leave debris beside the archive.
+        tmp.unlink(missing_ok=True)
     return out
 
 
@@ -98,9 +117,13 @@ def load_artifact(path: str | Path) -> QAArtifact:
     except (OSError, ValueError, json.JSONDecodeError) as exc:
         raise InvalidArtifactError(src, str(exc)) from exc
 
-    document = _migrated(document, src)
     try:
-        return _compose(document, arrays)
+        # Migration reads the stored document too, so a document that is missing
+        # what its own schema carried fails here; that is malformedness, and
+        # belongs under the same guard as composing the current layout.
+        return _compose(_migrated(document, src), arrays)
+    except InvalidArtifactError:
+        raise
     except (KeyError, TypeError, ValueError) as exc:
         raise InvalidArtifactError(src, f"malformed artifact: {exc}") from exc
 

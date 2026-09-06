@@ -223,6 +223,27 @@ def test_save_uses_the_exact_path_given(tmp_path, artifact) -> None:
     assert q.load_artifact(path).measurements.snr == artifact.measurements.snr
 
 
+def test_a_failed_save_leaves_neither_a_file_nor_a_temporary(
+    tmp_path, artifact, monkeypatch
+) -> None:
+    """An interrupted write must not leave debris in a QA archive.
+
+    The archive a trend database reads is a directory of these files, and a
+    truncated one is indistinguishable from a whole one until it is opened. The
+    bytes go to a temporary beside the destination and are moved in only once
+    they are complete, so a failure leaves the directory exactly as it was.
+    """
+
+    def fails(*args, **kwargs):
+        raise OSError("no space left on device")
+
+    monkeypatch.setattr(np, "savez_compressed", fails)
+    archive_dir = tmp_path / "archive"
+    with pytest.raises(OSError, match="no space left on device"):
+        q.save_artifact(artifact, archive_dir / "qa.npz")
+    assert list(archive_dir.iterdir()) == []
+
+
 def test_load_rejects_a_file_that_is_not_an_artifact(tmp_path) -> None:
     plain = tmp_path / "plain.npz"
     np.savez_compressed(plain, values=np.arange(3))
@@ -324,6 +345,27 @@ def _as_schema(version: int):
 def test_load_rejects_a_document_missing_a_section(tmp_path, artifact) -> None:
     path = q.save_artifact(artifact, tmp_path / "qa.npz")
     _rewrite_document(path, lambda doc: {**doc, "images": {}})
+    with pytest.raises(q.InvalidArtifactError, match="malformed artifact"):
+        q.load_artifact(path)
+
+
+def test_load_rejects_a_schema_1_archive_missing_its_measurements(
+    tmp_path, artifact
+) -> None:
+    """A migration reads the stored document, so its failures are read failures.
+
+    Bringing a v1 document forward assumes it carries the sections v1 carried.
+    One that does not is malformed, and must be refused as such rather than
+    raise the bare KeyError of whichever migration step reached for it.
+    """
+    path = q.save_artifact(artifact, tmp_path / "qa.npz")
+    _rewrite_document(
+        path,
+        lambda doc: (
+            {k: v for k, v in doc.items() if k != "measurements"}
+            | {"schema_version": 1}
+        ),
+    )
     with pytest.raises(q.InvalidArtifactError, match="malformed artifact"):
         q.load_artifact(path)
 
