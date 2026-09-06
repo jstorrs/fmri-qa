@@ -74,8 +74,8 @@ The `--center` mode controls both slice and ROI placement:
 The phase-encode axis (used to place the ghost) comes from the BIDS JSON
 sidecar `PhaseEncodingDirection` (or `InPlanePhaseEncodingDirectionDICOM`)
 where one is present; failing that, from the NIfTI header `dim_info`; and only
-if both are missing, from estimating the axis by where the Nyquist ghost lands.
-`--pe-axis` overrides all three.
+if both are missing, from estimating the axis on the analyzed slice by where the
+Nyquist ghost lands. `--pe-axis` overrides all three.
 
 The current metrics operate on one image slice, so phase encoding must be
 in-plane (NIfTI axis `0`/`i` or `1`/`j`). Through-plane (`2`/`k`) acquisitions
@@ -358,7 +358,7 @@ small functions, each usable on its own:
 
 ```
 QAScan → preprocess → QAImages → detect_phantom → resolve_roi
-       → {weisskoff, snr, sfnr, ghost_ratio, acr_ghosting_ratio}
+       → {weisskoff, snr, sfnr, estimate_ghost}
        → QAResult → build_artifact → QAArtifact
 ```
 

@@ -55,7 +55,10 @@ Two deliberate **refinements** over the literal spec (both documented in-code):
   single-voxel anchor.
 - **ACR-equivalent ghost** (`acr_ghost_pct = |PE% − RO%|`) is a region-matched
   synthesis of the fBIRN and ACR/AAPM definitions; not literal in any note but
-  principled (readout axis gives a background-relative baseline).
+  principled (readout axis gives a background-relative baseline). The whole
+  family — PE, RO, top-10%, ACR — comes off one build of the region-matched
+  masks (`estimate_ghost` → `GhostResult`), which the artifact publishes, so the
+  regions a report draws are the regions the numbers were sampled on.
 
 ---
 
@@ -228,8 +231,8 @@ Ranked by value for phantom QA.
   tcOut 2.5 / spec 5.2, ABCD at 3.3 / 5.9.
 - **Top-10% localized ghost (Greve / bxh `fmriqa_ghostiness`)** (was Medium
   gap #1): a companion to the PE mean ghost that averages only the brightest 10%
-  of ghost-region voxels (`ghost_top_ratio`, `GHOST_TOP_FRACTION = 0.10`), on the
-  **same** region-matched signal denominator as `ghost_ratio` — so it shares the
+  of ghost-region voxels (`GhostResult.pe_top_ratio`, `GHOST_TOP_FRACTION =
+  0.10`), on the **same** region-matched masks as the mean ghost — so it shares the
   scale, is always ≥ the mean ghost, and a concentrated bright ghost the region
   mean dilutes still shows. Surfaced as the `ghT%` CLI column and a `ghostT` PDF
   tile. Validated: matches an explicit top-k sort exactly and never drops below
