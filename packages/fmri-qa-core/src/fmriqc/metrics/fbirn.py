@@ -98,11 +98,23 @@ def snr(images: QAImages, roi: ROI) -> float:
     noise is the ROI variance of the (odd-sum minus even-sum) difference image;
     SNR = signal / sqrt(variance / n_frames). The difference uses frame *sums*,
     not means, so the normalization matches the fBIRN definition.
+
+    Which is why the difference is formed over an *even* number of frames. With
+    an odd count the two subsets differ by one frame, so the difference carries
+    a whole frame of signal, and that frame's spatial variation across the ROI —
+    not noise — dominates the variance: a phantom shaded 25% across the FOV reads
+    25% low. Frame parity is set by `--trim-sec`, so the same series would score
+    differently for a one-volume change in the warm-up trim. The trailing frame
+    is dropped from the difference only; the signal still averages the full
+    series. NaN for a series too short to hold one odd/even pair.
     """
     idx = roi.index
     cs = images.center_slice
-    n_frames = cs.shape[-1]
-    diff = cs[..., 1::2].sum(axis=-1) - cs[..., 0::2].sum(axis=-1)
+    n_frames = cs.shape[-1] - cs.shape[-1] % 2  # balanced odd/even subsets
+    if n_frames == 0:
+        return float("nan")
+    paired = cs[..., :n_frames]
+    diff = paired[..., 1::2].sum(axis=-1) - paired[..., 0::2].sum(axis=-1)
     signal = images.mean_image[*idx].mean()
     var_summary = diff[*idx].var()
     return float(signal / np.sqrt(var_summary / n_frames))

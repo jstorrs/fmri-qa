@@ -54,6 +54,44 @@ def test_snr_matches_the_glover_static_noise_formula() -> None:
     assert np.isclose(snr(images, _full_roi(4)), 100.0 / np.sqrt(32.0))
 
 
+def _shaded_snr_series(n_frames: int) -> np.ndarray:
+    """The SNR test's series over a strongly shaded phantom, `n_frames` long.
+
+    Signal is a steep ramp across the FOV (a caricature of receive shading) with
+    ROI mean 100; the only temporal structure is the same static odd/even
+    imbalance `d = +/-2`. Over an even frame count the ramp cancels exactly out
+    of the (odd-sum - even-sum) difference, leaving -T*d, so the SNR is the same
+    100/sqrt(32) the unshaded case gives -- shading is signal, not noise.
+    """
+    ramp = np.linspace(50.0, 150.0, 4)[:, None] * np.ones((4, 4))  # ROI mean 100
+    d = np.where(np.arange(4)[:, None] < 2, 2.0, -2.0) * np.ones((4, 4))
+    sign = np.where(np.arange(n_frames) % 2 == 0, 1.0, -1.0)
+    return ramp[:, :, None] + d[:, :, None] * sign
+
+
+def test_snr_is_unchanged_by_an_odd_trailing_frame() -> None:
+    """The static-noise difference is formed over balanced odd/even subsets.
+
+    An odd frame count leaves the two sums one frame apart, so the difference
+    carries a whole frame of *signal* -- and its spatial variation across the
+    ROI, not the noise, then sets the denominator. The shaded phantom here reads
+    ~35% low that way. Parity is a function of `--trim-sec`, so without this the
+    same series scores differently for a one-volume change in the warm-up trim.
+    """
+    even = _shaded_snr_series(8)
+    odd = _shaded_snr_series(9)  # one extra frame, same phantom
+
+    expected = 100.0 / np.sqrt(32.0)  # the closed form of the 8-frame case
+    assert np.isclose(snr(_images(even, even - 100.0), _full_roi(4)), expected)
+    assert np.isclose(snr(_images(odd, odd - 100.0), _full_roi(4)), expected)
+
+
+def test_snr_is_undefined_without_a_complete_frame_pair() -> None:
+    """A single frame has no odd/even pair to difference: NaN, not a number."""
+    one = np.full((4, 4, 1), 100.0)
+    assert np.isnan(snr(_images(one, np.zeros_like(one)), _full_roi(4)))
+
+
 def test_sfnr_is_the_roi_mean_of_signal_over_fluctuation_noise() -> None:
     # Signal 100, per-voxel temporal fluctuation of RMS 2 (alternating +/-2), so
     # the voxelwise SFNR image is a uniform 100/2 and its ROI mean is 50.

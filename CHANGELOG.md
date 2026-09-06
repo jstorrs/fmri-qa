@@ -46,6 +46,14 @@ versioning when the first stable public interface is released.
   A slice now counts only if what its mask selected stands clear of the
   background it was separated from; if no slice does, the middle slice is used
   and a warning says so.
+- **SNR biased low on an odd number of analyzed frames.** The static-noise
+  difference image sums the odd frames against the even ones; with an odd frame
+  count the two subsets differ by one, so the difference carried a whole frame of
+  *signal* and its spatial variation across the ROI — not noise — set the
+  denominator. A phantom shaded 25% across the FOV read 25% low, and because
+  parity follows `--trim-sec`, the same series scored differently for a
+  one-volume change in the warm-up trim. The difference is now formed over
+  balanced subsets; the signal still averages the full series.
 - **`fmri-qa --artifact` silently discarding a scan.** A batch names each
   artifact after the scan's stem, so inputs sharing a file name across
   directories (`a/scan.nii.gz`, `b/scan.nii.gz`) overwrote one another and a
