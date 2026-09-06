@@ -167,9 +167,13 @@ def run_qa(
 
     roi = resolve_roi(images, geom, roi_size, center)
     if not roi_fits(geom.phantom_mask, roi.index):
+        # Name the mode the run did *not* use: the two localizations disagree
+        # only on an off-center phantom, which is exactly when one of them can
+        # rescue an ROI the other cannot fit.
+        other: RoiCenter = "phantom" if center == "image" else "image"
         warnings.warn(
             f"{roi.size}x{roi.size} ROI ({center} center) is not fully inside the "
-            f"phantom; reduce roi_size or try center='image'.",
+            f"phantom; reduce roi_size or try center={other!r}.",
             stacklevel=2,
         )
 
