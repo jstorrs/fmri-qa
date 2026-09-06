@@ -1,7 +1,7 @@
 # Style Guides
 
 Conventions for Python packages in this repository. Many of these rules are enforced by the
-workspace tooling (`ruff`, `mypy`/`pyright`/`pyrefly`, `pytest` — see
+workspace tooling (`ruff`, `mypy`/`pyright`, `pytest` — see
 [tooling.md](tooling.md)); the guides explain the *why* behind them.
 
 **Start with [zen.md](zen.md).** It is the index of principles these guides descend from —
@@ -17,7 +17,7 @@ expressions of those principles; read them when you need the specifics.
 | [documentation.md](documentation.md) | Naming, docstrings (contract, not implementation), comments that explain *why*, the coherence test between code and docs. |
 | [exceptions.md](exceptions.md) | Per-package exception hierarchies, wrapping foreign errors, structured payloads, when to use stdlib exceptions, when to raise vs. silence. |
 | [logging.md](logging.md) | Libraries stay silent and return values; binaries talk. stdout-vs-stderr discipline, keeping `print` out of libraries, and the `logging` module conventions. |
-| [tooling.md](tooling.md) | `uv`, `ruff` format/lint, the `mypy`/`pyright`/`pyrefly` type checkers, local stubs for third-party types, `pytest`, security scanners, pre-commit, and the standard `make` loop. |
+| [tooling.md](tooling.md) | `uv`, `ruff` format/lint, the `mypy`/`pyright` type checkers, local stubs for third-party types, `pytest`, supply-chain posture, pre-commit, and the standard `make` loop. |
 | [stability.md](stability.md) | Code is cheap, data is precious: refactor internal APIs freely; treat on-disk formats, CLI flags, and output as interfaces. |
 | [testing.md](testing.md) | Test the pure core with values and the shell with I/O; assert behavior not implementation; round-trips, property tests, and error cases; deterministic tests. |
 
@@ -35,7 +35,7 @@ raising are the ones those tie-breakers don't cleanly resolve.
 - **Libraries are silent and return values; binaries talk and decide.**
 - **Explicit over implicit** — in APIs, errors, and output; type your public surface.
 - **Let the tools and the type checkers enforce the rules** — `ruff` and
-  `mypy`/`pyright`/`pyrefly` run aggressively; design types so illegal states can't be
+  `mypy`/`pyright` run aggressively; design types so illegal states can't be
   constructed.
 - **Errors never pass silently** — fail fast, name the bad value, report once at the top.
 - **If it's hard to explain, the code (not the doc) needs work.**

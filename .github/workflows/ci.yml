@@ -53,6 +53,9 @@ jobs:
           .venv-core-smoke/bin/python -c "from importlib.resources import files; assert files('fmriqc').joinpath('py.typed').is_file()"
           # The seam, checked against the installed artifact: no drawing stack.
           .venv-core-smoke/bin/python -c "import importlib.util as u; assert u.find_spec('matplotlib') is None and u.find_spec('reportlab') is None"
+          # The MIT text has to reach whoever installs the wheel. hatchling puts
+          # a declared license file under the dist-info `licenses/` directory.
+          .venv-core-smoke/bin/python -c "from importlib.metadata import distribution; text = distribution('fmri-qa-core').read_text('licenses/LICENSE'); assert text and 'MIT License' in text, 'the core wheel ships no license text'"
 
       - name: Smoke-test the report wheel against the core wheel
         run: |
@@ -63,3 +66,4 @@ jobs:
           uv pip install --python .venv-report-smoke/bin/python "${core[0]}" "${report[0]}"
           .venv-report-smoke/bin/fmri-qa-report --version
           .venv-report-smoke/bin/python -c "from importlib.resources import files; assert files('fmriqc_report').joinpath('py.typed').is_file()"
+          .venv-report-smoke/bin/python -c "from importlib.metadata import distribution; text = distribution('fmri-qa-report').read_text('licenses/LICENSE'); assert text and 'MIT License' in text, 'the report wheel ships no license text'"

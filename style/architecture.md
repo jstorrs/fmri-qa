@@ -236,7 +236,7 @@ class Statistics:
 
 ## Type-Driven Design
 
-The type checkers (mypy, pyright, pyrefly — see [tooling.md](tooling.md)) are an always-on
+The type checkers (mypy, pyright — see [tooling.md](tooling.md)) are an always-on
 check that runs on every file. The leverage is in *what you give them to check*. Design
 types so a mistake fails type-checking rather than surfacing as a runtime bug that a
 reviewer has to catch — a state the types forbid is a bug that can't be written, reviewed
