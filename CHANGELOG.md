@@ -56,7 +56,10 @@ versioning when the first stable public interface is released.
   overrode the axis, so the header could disagree with the metrics table.
 - Phase encoding is explicitly limited to the in-plane axes supported by the
   single-slice metrics.
-- The svglib image-alignment workaround now probes compatibility before use.
+- The svglib image-alignment workaround now probes compatibility before use, and
+  is installed on the first render rather than at import: it mutates a
+  third-party class process-wide, and an unrecognized svglib should fail the
+  render that needs it rather than `import fmriqc_report`.
 
 ### Removed
 

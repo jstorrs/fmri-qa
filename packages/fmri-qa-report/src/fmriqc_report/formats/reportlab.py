@@ -13,6 +13,7 @@ import io
 import os
 import tempfile
 from collections.abc import Callable, Iterable
+from functools import cache
 from importlib.metadata import version
 from pathlib import Path
 from types import SimpleNamespace
@@ -165,6 +166,11 @@ def _patch_svglib_image_alignment() -> None:
     fractional geometry needs no patch; an unknown private API fails clearly
     instead of silently misaligning the raster and vector layers. The dependency
     range is capped in `pyproject.toml` until a newer release is verified.
+
+    Called on the first render rather than at import (see `_ensure_svglib_patch`):
+    this mutates a third-party class for the whole process, so it should happen
+    when a caller actually asks for a PDF, and an unrecognized svglib must fail
+    that render rather than turn `import fmriqc_report` into an error.
     """
 
     original = _svglib.Svg2RlgShapeConverter.convertImage
@@ -188,7 +194,15 @@ def _patch_svglib_image_alignment() -> None:
         raise RuntimeError("failed to install the svglib image-alignment fix")
 
 
-_patch_svglib_image_alignment()
+@cache
+def _ensure_svglib_patch() -> None:
+    """Install the svglib alignment fix once, on the first figure embedded.
+
+    `cache` memoizes only a successful call, so an svglib whose API this build
+    does not recognize keeps raising on every render rather than failing once and
+    then silently rendering misaligned pages.
+    """
+    _patch_svglib_image_alignment()
 
 
 def _draw_fig(
@@ -199,6 +213,7 @@ def _draw_fig(
     The figure is scaled uniformly to fit `w` x `h` (preserving aspect) with its
     top edge at `top` and centered horizontally within the box.
     """
+    _ensure_svglib_patch()  # the raster/vector alignment fix; see its docstring
     buf = io.BytesIO()
     fig.savefig(buf, format="svg")
     buf.seek(0)
