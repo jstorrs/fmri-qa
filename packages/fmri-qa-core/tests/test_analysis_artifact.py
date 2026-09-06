@@ -15,6 +15,7 @@ import pytest
 
 import fmriqc as q
 from fmriqc.analysis import ARTIFACT_SCHEMA_VERSION
+from fmriqc.analysis.build import _convex_hull
 
 
 @pytest.fixture
@@ -143,6 +144,19 @@ def test_images_carry_the_fbirn_quartet_and_its_annotations(artifact) -> None:
     assert roi.size == 9 and roi.row1 - roi.row0 == roi.col1 - roi.col0
 
 
+def test_a_collinear_mask_has_no_hull_rather_than_no_artifact() -> None:
+    """A one-row mask has pixels but no area, and Qhull refuses to hull it.
+
+    The outline is built after the whole analysis has run, so letting the
+    geometry library's error out would throw away a completed scan over an
+    annotation nothing can draw anyway. The empty polygon the docstring promises
+    for a mask too small to have a hull covers this case too.
+    """
+    mask = np.zeros((8, 8), dtype=bool)
+    mask[3, 2:7] = True
+    assert _convex_hull(mask).shape == (0, 2)
+
+
 def test_ghost_regions_are_region_matched(artifact) -> None:
     """Each ghost patch and its source are the same patch, rolled half the FOV.
 
@@ -207,6 +221,27 @@ def test_save_uses_the_exact_path_given(tmp_path, artifact) -> None:
     path = q.save_artifact(artifact, tmp_path / "nested" / "run1.artifact")
     assert path.is_file() and path.name == "run1.artifact"
     assert q.load_artifact(path).measurements.snr == artifact.measurements.snr
+
+
+def test_a_failed_save_leaves_neither_a_file_nor_a_temporary(
+    tmp_path, artifact, monkeypatch
+) -> None:
+    """An interrupted write must not leave debris in a QA archive.
+
+    The archive a trend database reads is a directory of these files, and a
+    truncated one is indistinguishable from a whole one until it is opened. The
+    bytes go to a temporary beside the destination and are moved in only once
+    they are complete, so a failure leaves the directory exactly as it was.
+    """
+
+    def fails(*args, **kwargs):
+        raise OSError("no space left on device")
+
+    monkeypatch.setattr(np, "savez_compressed", fails)
+    archive_dir = tmp_path / "archive"
+    with pytest.raises(OSError, match="no space left on device"):
+        q.save_artifact(artifact, archive_dir / "qa.npz")
+    assert list(archive_dir.iterdir()) == []
 
 
 def test_load_rejects_a_file_that_is_not_an_artifact(tmp_path) -> None:
@@ -307,9 +342,69 @@ def _as_schema(version: int):
     return edit
 
 
+def _with_measurement(name: str, value: object):
+    """An edit replacing one stored measurement."""
+    return lambda doc: {**doc, "measurements": doc["measurements"] | {name: value}}
+
+
+def _with_psf_unit(value: object):
+    """An edit replacing the stored PSF unit."""
+    return lambda doc: {
+        **doc,
+        "curves": {**doc["curves"], "psf": doc["curves"]["psf"] | {"unit": value}},
+    }
+
+
+def test_the_default_roi_size_is_the_shared_fbirn_constant() -> None:
+    """The ROI side has one definition, spoken by prep and by the artifact."""
+    assert q.AnalysisSettings().roi_size == q.FBIRN_ROI_SIZE
+
+
+def test_load_rejects_a_closed_set_value_from_outside_the_set(
+    tmp_path, artifact
+) -> None:
+    """A stored string must be held to the set its field promises.
+
+    `fwhm_unit`, `pe_label` and the PSF unit are closed sets a reader switches
+    on, and JSON carries none of that. Without the check a hand-edited or
+    foreign document hands the reader a value its own type says cannot exist,
+    and the mistake surfaces wherever that reader happens to branch.
+    """
+    for field, edit in (
+        ("fwhm_unit", _with_measurement("fwhm_unit", "cm")),
+        ("pe_label", _with_measurement("pe_label", "diagonal")),
+        ("psf.unit", _with_psf_unit("cm")),
+    ):
+        path = q.save_artifact(artifact, tmp_path / f"{field}.npz")
+        _rewrite_document(path, edit)
+        with pytest.raises(q.InvalidArtifactError, match=field):
+            q.load_artifact(path)
+
+
 def test_load_rejects_a_document_missing_a_section(tmp_path, artifact) -> None:
     path = q.save_artifact(artifact, tmp_path / "qa.npz")
     _rewrite_document(path, lambda doc: {**doc, "images": {}})
+    with pytest.raises(q.InvalidArtifactError, match="malformed artifact"):
+        q.load_artifact(path)
+
+
+def test_load_rejects_a_schema_1_archive_missing_its_measurements(
+    tmp_path, artifact
+) -> None:
+    """A migration reads the stored document, so its failures are read failures.
+
+    Bringing a v1 document forward assumes it carries the sections v1 carried.
+    One that does not is malformed, and must be refused as such rather than
+    raise the bare KeyError of whichever migration step reached for it.
+    """
+    path = q.save_artifact(artifact, tmp_path / "qa.npz")
+    _rewrite_document(
+        path,
+        lambda doc: (
+            {k: v for k, v in doc.items() if k != "measurements"}
+            | {"schema_version": 1}
+        ),
+    )
     with pytest.raises(q.InvalidArtifactError, match="malformed artifact"):
         q.load_artifact(path)
 

@@ -92,6 +92,34 @@ def test_snr_is_undefined_without_a_complete_frame_pair() -> None:
     assert np.isnan(snr(_images(one, np.zeros_like(one)), _full_roi(4)))
 
 
+def test_snr_is_undefined_without_static_noise_to_measure_against() -> None:
+    """A noiseless series has no static noise, so SNR is undefined, not infinite.
+
+    A constant phantom differences to exactly zero, and dividing the signal by
+    that would report a perfect scanner where the truth is that the measurement
+    had nothing to measure. NaN is the same answer the metric already gives for
+    a series too short to difference.
+    """
+    flat = np.full((4, 4, 8), 100.0)
+    assert np.isnan(snr(_images(flat, np.zeros_like(flat)), _full_roi(4)))
+
+
+def test_sfnr_is_undefined_when_a_roi_voxel_has_no_fluctuation() -> None:
+    """One noiseless voxel makes the ROI average of the ratios undefined.
+
+    The voxelwise SFNR is signal over temporal noise, so a voxel with no
+    temporal noise has no ratio; an average cannot be better defined than the
+    values it averages.
+    """
+    m = np.full((4, 4), 100.0)
+    sign = np.where(np.arange(8) % 2 == 0, 1.0, -1.0)
+    fluct = 2.0 * np.ones((4, 4))[:, :, None] * sign
+    fluct[0, 0] = 0.0  # one voxel is perfectly stable over time
+    images = _images(m[:, :, None] + fluct, fluct)
+
+    assert np.isnan(sfnr(images, _full_roi(4)))
+
+
 def test_sfnr_is_the_roi_mean_of_signal_over_fluctuation_noise() -> None:
     # Signal 100, per-voxel temporal fluctuation of RMS 2 (alternating +/-2), so
     # the voxelwise SFNR image is a uniform 100/2 and its ROI mean is 50.

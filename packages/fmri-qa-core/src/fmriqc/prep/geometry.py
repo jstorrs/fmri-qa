@@ -11,7 +11,7 @@ from dataclasses import dataclass
 import numpy as np
 
 from ..exceptions import InvalidChoiceError
-from ..types import ROI_CENTER_MODES, BoolArray, IntArray, RoiCenter
+from ..types import FBIRN_ROI_SIZE, ROI_CENTER_MODES, BoolArray, IntArray, RoiCenter
 from .images import QAImages
 from .imaging import (
     DEGENERATE_PHANTOM_MAX,
@@ -22,9 +22,6 @@ from .imaging import (
     roi_indexes,
     segment_phantom,
 )
-
-# Fixed summary-ROI side (voxels). Glover/fBIRN uses 21; user-configurable.
-FBIRN_ROI_SIZE = 21
 
 
 @dataclass(frozen=True, eq=False)

@@ -21,6 +21,8 @@ rather than flattened.
 """
 
 import json
+import os
+import tempfile
 import warnings
 from collections.abc import Callable
 from dataclasses import asdict
@@ -30,7 +32,7 @@ from typing import Any
 import numpy as np
 
 from ..exceptions import InvalidArtifactError
-from ..types import BoolArray, FloatArray
+from ..types import LENGTH_UNITS, PE_LABELS, BoolArray, FloatArray
 from .artifact import (
     ARTIFACT_SCHEMA_VERSION,
     AnalysisSettings,
@@ -61,16 +63,33 @@ def save_artifact(artifact: QAArtifact, path: str | Path) -> Path:
 
     Missing parent directories are created. The file name is used exactly as
     given (NumPy's own `savez` would append `.npz` to a name lacking it).
+
+    The write is atomic: the archive goes to a temporary file beside the
+    destination and is moved into place only once it is whole. A QA archive is
+    read months later by something that never saw the run that wrote it, and a
+    truncated `.npz` looks exactly like a complete one until it is opened — so
+    an interrupted write must leave the destination untouched, not half-written.
     """
     document, arrays = _decompose(artifact)
     out = Path(path)
     out.parent.mkdir(parents=True, exist_ok=True)
     payload: dict[str, Member] = {_DOCUMENT: np.array(json.dumps(document)), **arrays}
-    with out.open("wb") as fh:
-        # savez_compressed takes member names as **kwargs, which collides with its
-        # own keyword-only `allow_pickle` for a checker: a `dict[str, ...]` splat
-        # could in principle carry that name. Our keys are dotted paths, never it.
-        np.savez_compressed(fh, **payload)  # type: ignore[arg-type]
+    # In the destination's own directory: a move is only atomic within a single
+    # filesystem, and the system temporary directory is often on another.
+    fd, name = tempfile.mkstemp(dir=out.parent, prefix=f".{out.name}.", suffix=".tmp")
+    tmp = Path(name)
+    try:
+        with os.fdopen(fd, "wb") as fh:
+            # savez_compressed takes member names as **kwargs, which collides with
+            # its own keyword-only `allow_pickle` for a checker: a `dict[str, ...]`
+            # splat could in principle carry that name. Our keys are dotted paths,
+            # never it.
+            np.savez_compressed(fh, **payload)  # type: ignore[arg-type]
+        tmp.replace(out)
+    finally:
+        # A no-op once the move succeeded; the cleanup that matters is the one
+        # after a failure, which must not leave debris beside the archive.
+        tmp.unlink(missing_ok=True)
     return out
 
 
@@ -98,9 +117,13 @@ def load_artifact(path: str | Path) -> QAArtifact:
     except (OSError, ValueError, json.JSONDecodeError) as exc:
         raise InvalidArtifactError(src, str(exc)) from exc
 
-    document = _migrated(document, src)
     try:
-        return _compose(document, arrays)
+        # Migration reads the stored document too, so a document that is missing
+        # what its own schema carried fails here; that is malformedness, and
+        # belongs under the same guard as composing the current layout.
+        return _compose(_migrated(document, src), arrays)
+    except InvalidArtifactError:
+        raise
     except (KeyError, TypeError, ValueError) as exc:
         raise InvalidArtifactError(src, f"malformed artifact: {exc}") from exc
 
@@ -273,6 +296,22 @@ def _decompose_images(
 # -- read ------------------------------------------------------------------- #
 
 
+def _one_of[T: str](value: Any, allowed: tuple[T, ...], field: str) -> T:
+    """`value` as one of `allowed`, or a `ValueError` naming the field.
+
+    A closed-set field is a plain string in the JSON document, and the artifact
+    types promise a `Literal`. Checking on the way back in is what makes that
+    promise true of a *loaded* artifact rather than only of a freshly built one:
+    a hand-edited or foreign document must fail here (as an
+    `InvalidArtifactError`, via `load_artifact`'s conversion) instead of being
+    handed to a reader that switches on the value.
+    """
+    for candidate in allowed:
+        if value == candidate:
+            return candidate
+    raise ValueError(f"{field} {value!r} is not one of {allowed}")
+
+
 def _floats(arrays: dict[str, Any], key: str) -> FloatArray:
     """A required float array member."""
     return np.asarray(arrays[key], dtype=np.float64)
@@ -289,11 +328,16 @@ def _compose(document: dict[str, Any], arrays: dict[str, Any]) -> QAArtifact:
     for field in _PROVENANCE_TUPLES:
         if provenance.get(field) is not None:
             provenance[field] = tuple(provenance[field])
+    measurements = dict(document["measurements"])
+    measurements["fwhm_unit"] = _one_of(
+        measurements["fwhm_unit"], LENGTH_UNITS, "fwhm_unit"
+    )
+    measurements["pe_label"] = _one_of(measurements["pe_label"], PE_LABELS, "pe_label")
     return QAArtifact(
         schema_version=document["schema_version"],
         settings=AnalysisSettings(**document["settings"]),
         provenance=Provenance(**provenance),
-        measurements=Measurements(**document["measurements"]),
+        measurements=Measurements(**measurements),
         curves=_compose_curves(document["curves"], arrays),
         images=_compose_images(document["images"], arrays),
     )
@@ -326,7 +370,7 @@ def _compose_curves(document: dict[str, Any], arrays: dict[str, Any]) -> Curves:
         psf=PsfCurves(
             labels=(labels[0], labels[1]),
             fwhm=(fwhm[0], fwhm[1]),
-            unit=psf["unit"],
+            unit=_one_of(psf["unit"], LENGTH_UNITS, "psf.unit"),
             displacement=_floats(arrays, "curves.psf.displacement"),
             empirical=_floats(arrays, "curves.psf.empirical"),
             model_x=_floats(arrays, "curves.psf.model_x"),

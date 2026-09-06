@@ -15,7 +15,7 @@ from datetime import UTC, datetime
 from importlib.metadata import PackageNotFoundError, version
 
 import numpy as np
-from scipy.spatial import ConvexHull
+from scipy.spatial import ConvexHull, QhullError
 
 from ..load.metadata import ScanMeta
 from ..load.pe_axis import PE_ROWCOL
@@ -24,7 +24,7 @@ from ..metrics.ghost import GHOST_RADIUS, ghost_masks
 from ..metrics.smoothness import SmoothnessResult
 from ..pipeline import QAResult, run_qa
 from ..prep.geometry import ROI, roi_fits
-from ..types import BoolArray, FloatArray
+from ..types import BoolArray, FloatArray, LengthUnit, PeLabel
 from .artifact import (
     AnalysisSettings,
     ArtifactImages,
@@ -149,17 +149,27 @@ def _provenance(result: QAResult, *, name: str, source: str) -> Provenance:
     )
 
 
-def _pe_label(result: QAResult, settings: AnalysisSettings) -> str:
+# The two direction words, narrowed to the set the artifact publishes. Both
+# sources hand this module a plain `str`: `PE_ROWCOL` is the single definition
+# of the axis -> word map and sits in `load`, below the layer that owns the
+# published set, and the sidecar's DICOM direction is whatever the converter
+# wrote. Looking the word up here is what makes `pe_label` true of its type.
+_PE_LABELS: dict[str, PeLabel] = {"row": "row", "col": "col"}
+
+
+def _pe_label(result: QAResult, settings: AnalysisSettings) -> PeLabel:
     """The phase-encode direction to display: "row", "col", or "?".
 
     The sidecar's DICOM direction is authoritative, but only when the run took
     the axis from metadata; an explicit `--pe-axis` override wins, so the label
-    always names the axis the ghost masks actually used.
+    always names the axis the ghost masks actually used. A direction that is
+    neither word — a sidecar can carry any string — is "?", the same answer as
+    no axis at all.
     """
     if settings.pe_axis_override is None and result.meta and result.meta.pe_dir:
-        return result.meta.pe_dir
+        return _PE_LABELS.get(result.meta.pe_dir, "?")
     axis = result.metrics.pe_axis
-    return "?" if axis is None else PE_ROWCOL.get(axis, "?")
+    return "?" if axis is None else _PE_LABELS.get(PE_ROWCOL.get(axis, ""), "?")
 
 
 def _measurements(result: QAResult, settings: AnalysisSettings) -> Measurements:
@@ -261,6 +271,7 @@ def _psf_curves(s: SmoothnessResult) -> PsfCurves:
         dirs = (("PE", s.pe_axis), ("RO", 1 - s.pe_axis))
     else:  # no PE axis resolved -- fall back to raw array axes
         dirs = (("axis0", 0), ("axis1", 1))
+    unit: LengthUnit = "mm" if s.voxel_mm is not None else "vox"
     mm_per = [s.voxel_mm[a] if s.voxel_mm is not None else 1.0 for _, a in dirs]
     fwhm = [s.fwhm_axis(a) for _, a in dirs]
     # An unresolvable axis yields a NaN FWHM; fall back to the voxel-scale floor
@@ -274,7 +285,7 @@ def _psf_curves(s: SmoothnessResult) -> PsfCurves:
     return PsfCurves(
         labels=(dirs[0][0], dirs[1][0]),
         fwhm=(fwhm[0], fwhm[1]),
-        unit="mm" if s.voxel_mm is not None else "vox",
+        unit=unit,
         displacement=np.stack([s.displacement(a) for _, a in dirs]),
         empirical=np.stack([s.psf_empirical(a) for _, a in dirs]),
         model_x=model_x,
@@ -290,12 +301,21 @@ def _convex_hull(mask: BoolArray) -> FloatArray:
     computational geometry. `imshow` maps column -> x and row -> y, so the mask's
     (row, col) pixels are emitted as (col, row). A mask too small to have a hull
     yields an empty polygon.
+
+    Too small is not only a matter of count: a mask that is a single row or
+    column has no area either, however many pixels it holds, and Qhull refuses
+    it ("initial simplex is flat"). That is a degenerate segmentation, not a bad
+    scan, and it arrives after the whole analysis has run — so it yields the same
+    empty polygon rather than losing the artifact to a geometry library's error.
     """
     ys, xs = np.nonzero(mask)
     if xs.size < 3:
         return np.zeros((0, 2), dtype=np.float64)
     pts = np.column_stack([xs, ys]).astype(np.float64)
-    verts = ConvexHull(pts).vertices
+    try:
+        verts = ConvexHull(pts).vertices
+    except QhullError:  # collinear: pixels but no area to enclose
+        return np.zeros((0, 2), dtype=np.float64)
     loop = np.append(verts, verts[0])  # close the polygon
     return np.asarray(pts[loop], dtype=np.float64)
 

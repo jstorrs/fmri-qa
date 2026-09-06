@@ -1,10 +1,13 @@
-"""Shared type vocabulary: array dtypes and closed-set option Literals.
+"""Shared type vocabulary: array dtypes, closed-set Literals, and the ROI size.
 
 The type primitives every layer speaks in — the three numpy array aliases and
-the `Literal` option sets whose values callers pass as strings. Kept central
-(not scattered to the operation modules) precisely because they are the
+the `Literal` sets whose values are passed and published as strings. Kept
+central (not scattered to the operation modules) precisely because they are the
 cross-cutting vocabulary: nearly every module annotates against them, and a
-closed option set defined once is a set that can't drift.
+closed option set defined once is a set that can't drift. The one constant here
+is here for the same reason: `FBIRN_ROI_SIZE` is spoken by the layer that
+resolves an ROI and by the artifact that records the one a run asked for, and
+the artifact may not import the prep layer to learn it.
 
 The frozen dataclass *value objects* used to live here too; they now sit with
 the operation that produces them (`ls` the package): `QAImages` in
@@ -37,3 +40,18 @@ DETREND_METHODS: tuple[DetrendMethod, ...] = get_args(DetrendMethod)
 # "phantom": largest-cross-section slice + detected phantom-center ROI.
 RoiCenter = Literal["image", "phantom"]
 ROI_CENTER_MODES: tuple[RoiCenter, ...] = get_args(RoiCenter)
+
+# Unit a reported length carries: millimetres when the header gave a voxel size,
+# voxels when it did not. Published on `Measurements.fwhm_unit` and
+# `PsfCurves.unit`, so it is a closed set a reader can switch on.
+LengthUnit = Literal["mm", "vox"]
+LENGTH_UNITS: tuple[LengthUnit, ...] = get_args(LengthUnit)
+
+# Phase-encode direction as *displayed*: the two DICOM in-plane words, or "?"
+# when no axis resolved. "?" is a real answer, not a missing one -- see
+# `analysis.artifact.Measurements`.
+PeLabel = Literal["row", "col", "?"]
+PE_LABELS: tuple[PeLabel, ...] = get_args(PeLabel)
+
+# Fixed summary-ROI side (voxels). Glover/fBIRN uses 21; user-configurable.
+FBIRN_ROI_SIZE = 21

@@ -20,7 +20,15 @@ Nothing here imports the metric, prep, or load layers: an artifact is inert data
 
 from dataclasses import dataclass
 
-from ..types import BoolArray, DetrendMethod, FloatArray, RoiCenter
+from ..types import (
+    FBIRN_ROI_SIZE,
+    BoolArray,
+    DetrendMethod,
+    FloatArray,
+    LengthUnit,
+    PeLabel,
+    RoiCenter,
+)
 
 # Bumped whenever the on-disk layout changes incompatibly (see `serialize`).
 # 2: added the `phantom_fraction` / `roi_inside_phantom` localization diagnostics.
@@ -43,7 +51,7 @@ class AnalysisSettings:
     trim_sec: float = 5.0
     detrend: DetrendMethod = "poly"
     center: RoiCenter = "image"
-    roi_size: int = 21
+    roi_size: int = FBIRN_ROI_SIZE
     pe_axis_override: int | None = None
     detrend_order: int | None = None
 
@@ -127,7 +135,7 @@ class Measurements:
     ro_ghost_pct: float
     acr_ghost_pct: float
     pe_axis: int | None
-    pe_label: str
+    pe_label: PeLabel
     # transient artifacts
     outlier_max_pct: float
     outlier_worst_frame: int
@@ -149,7 +157,7 @@ class Measurements:
     fwhm: float  # combined (AFNI ccomb), in `fwhm_unit`
     fwhm_pe: float | None
     fwhm_ro: float | None
-    fwhm_unit: str  # "mm" when the voxel size is known, else "vox"
+    fwhm_unit: LengthUnit  # "mm" when the voxel size is known, else "vox"
     # localization sanity (see the class docstring); None = not recorded
     phantom_fraction: float  # share of the frame the phantom mask covers, [0, 1]
     phantom_mask_ok: bool | None  # that share is one a real phantom mask can take
@@ -187,7 +195,7 @@ class PsfCurves:
 
     labels: tuple[str, str]
     fwhm: tuple[float, float]
-    unit: str  # "mm" or "vox"; matches `Measurements.fwhm_unit`
+    unit: LengthUnit  # matches `Measurements.fwhm_unit`
     displacement: FloatArray  # (2, n_lag)
     empirical: FloatArray  # (2, n_lag)
     model_x: FloatArray  # (2, n_model)

@@ -85,6 +85,20 @@ def test_both_centering_modes_agree_on_a_centered_phantom(make_scan: MakeScan) -
     assert by_image.size == by_phantom.size
 
 
+def test_the_roi_warning_suggests_the_other_centering_mode(make_scan: MakeScan) -> None:
+    """Advice the run has already taken is no advice at all.
+
+    An ROI that will not fit leaves two ways out, and which of them is worth
+    trying depends on the mode in use: recommending `center='image'` to a run
+    that is already image-centered spends the operator's next attempt on the
+    setting that just failed.
+    """
+    scan = make_scan()
+    for center, suggested in (("image", "phantom"), ("phantom", "image")):
+        with pytest.warns(UserWarning, match=f"center='{suggested}'"):
+            q.run_qa(scan, roi_size=31, center=center)
+
+
 def test_unknown_centering_mode_is_rejected(make_scan: MakeScan) -> None:
     with pytest.raises(q.InvalidChoiceError):
         q.run_qa(make_scan(), center="middle")  # type: ignore[arg-type]
