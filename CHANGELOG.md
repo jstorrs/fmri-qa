@@ -30,6 +30,12 @@ versioning when the first stable public interface is released.
   fields (`phantom_fraction`, `phantom_mask_ok`, `roi_inside_phantom`) so a
   trend database can tell a measurement from a measurement of air. Artifact
   schema version 3; JSON schema version 2.
+- Artifacts written under an older schema are migrated forward on read, with a
+  warning, instead of being refused: a QA archive outlives the build that wrote
+  it. Fields the older schema did not carry come back as "not recorded" — `None`
+  for the localization verdicts, which `fmri-qa` shows as `loc ?` and a report
+  as a quiet note — never as a fabricated pass. Only an artifact from a *newer*
+  build, whose layout this one cannot know, is still refused.
 - `python -m fmriqc_report`, matching `python -m fmriqc`.
 
 ### Fixed

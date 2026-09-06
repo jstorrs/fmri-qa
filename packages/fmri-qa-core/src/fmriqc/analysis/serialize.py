@@ -10,7 +10,9 @@ pulled out without materializing the rest.
 The mapping is written out explicitly, section by section, rather than derived
 by reflection over the dataclasses: the layout is a published contract pinned by
 `ARTIFACT_SCHEMA_VERSION`, and adding a field should be a deliberate edit here,
-not a silent change of file format.
+not a silent change of file format. Bumping that version is likewise deliberate,
+and comes with a migration: an artifact outlives the build that wrote it, so
+older layouts are brought forward on read (`_migrated`) rather than refused.
 
 The JSON document uses Python's `NaN`/`Infinity` tokens. A NaN measurement is
 meaningful — it says an estimator could not resolve the value, which is distinct
@@ -19,6 +21,8 @@ rather than flattened.
 """
 
 import json
+import warnings
+from collections.abc import Callable
 from dataclasses import asdict
 from pathlib import Path
 from typing import Any
@@ -73,9 +77,13 @@ def save_artifact(artifact: QAArtifact, path: str | Path) -> Path:
 def load_artifact(path: str | Path) -> QAArtifact:
     """Read a `QAArtifact` back from an `.npz` written by `save_artifact`.
 
+    A file written under an older schema is migrated forward on read (see
+    `_migrated`), with a warning; only a version this build has no route from —
+    or one from a newer build, which it cannot know the layout of — is refused.
+
     Raises:
-        InvalidArtifactError: If the file is not a readable artifact archive, or
-            its `schema_version` is not the one this package understands.
+        InvalidArtifactError: If the file is not a readable artifact archive, is
+            malformed, or carries a `schema_version` this build cannot reach.
     """
     src = Path(path)
     try:
@@ -90,15 +98,98 @@ def load_artifact(path: str | Path) -> QAArtifact:
     except (OSError, ValueError, json.JSONDecodeError) as exc:
         raise InvalidArtifactError(src, str(exc)) from exc
 
-    found = document.get("schema_version")
-    if found != ARTIFACT_SCHEMA_VERSION:
-        raise InvalidArtifactError(
-            src, f"schema version {found!r}; this build reads {ARTIFACT_SCHEMA_VERSION}"
-        )
+    document = _migrated(document, src)
     try:
         return _compose(document, arrays)
     except (KeyError, TypeError, ValueError) as exc:
         raise InvalidArtifactError(src, f"malformed artifact: {exc}") from exc
+
+
+# -- migration -------------------------------------------------------------- #
+
+
+def _v1_to_v2(document: dict[str, Any]) -> dict[str, Any]:
+    """Schema 1 predates the localization diagnostics: record them as unknown.
+
+    A v1 artifact was analyzed by a build that never asked whether the phantom
+    segmentation or the summary ROI held, so nothing in the file answers it.
+    Inventing a pass would vouch for numbers this package cannot vouch for, and
+    inventing a failure would condemn scans that were probably fine; the
+    diagnostics are therefore *absent*, not false (see `Measurements`).
+    """
+    document["measurements"] |= {
+        "phantom_fraction": float("nan"),
+        "roi_inside_phantom": None,
+    }
+    return document
+
+
+def _v2_to_v3(document: dict[str, Any]) -> dict[str, Any]:
+    """Schema 2 has the phantom fraction but not the verdict on it.
+
+    The verdict is not re-derived from the stored fraction even though it could
+    be: the bounds belong to the segmentation in `prep`, which this module does
+    not import at read time (see `analysis`), and a verdict reached by some other
+    build's bounds would be a fact about this build, not about the artifact.
+    """
+    document["measurements"]["phantom_mask_ok"] = None
+    return document
+
+
+# One step per version: `_MIGRATIONS[n]` takes a document at schema `n` and
+# returns it at `n + 1`. Applied in sequence, so a v1 file reaches the current
+# schema through every intermediate step and each migration only has to know
+# about its own version bump.
+_MIGRATIONS: dict[int, Callable[[dict[str, Any]], dict[str, Any]]] = {
+    1: _v1_to_v2,
+    2: _v2_to_v3,
+}
+
+
+def _migrated(document: dict[str, Any], path: Path) -> dict[str, Any]:
+    """Bring a stored document up to the current schema, or refuse it.
+
+    Artifacts outlive the build that wrote them — that is the point of saving
+    one — so a schema bump must not orphan a QA archive that a trend database
+    has been filling for months. Every older layout this build knows a route
+    from is migrated forward here, in memory, and the caller is warned that some
+    of what it is reading was reconstructed rather than measured.
+
+    Refused, because neither has an honest answer: a version from a newer build
+    (whose layout this one cannot know) and an older version with no route from.
+    """
+    found = document.get("schema_version")
+    if found == ARTIFACT_SCHEMA_VERSION:
+        return document
+    if not isinstance(found, int) or isinstance(found, bool):
+        raise InvalidArtifactError(path, f"schema version {found!r} is not a version")
+    if found > ARTIFACT_SCHEMA_VERSION:
+        raise InvalidArtifactError(
+            path,
+            f"schema version {found}, newer than the {ARTIFACT_SCHEMA_VERSION} this "
+            f"build understands; upgrade fmri-qa-core to read it",
+        )
+
+    version = found
+    while version < ARTIFACT_SCHEMA_VERSION:
+        step = _MIGRATIONS.get(version)
+        if step is None:
+            raise InvalidArtifactError(
+                path,
+                f"schema version {found}; this build reads "
+                f"{ARTIFACT_SCHEMA_VERSION} and has no migration from {version}",
+            )
+        document = step(document)
+        version += 1
+    document["schema_version"] = ARTIFACT_SCHEMA_VERSION
+
+    warnings.warn(
+        f"{path}: artifact written under schema {found}, migrated to "
+        f"{ARTIFACT_SCHEMA_VERSION}; fields the older schema did not carry are "
+        f"recorded as unknown, not as measurements.",
+        stacklevel=3,
+    )
+    return document
 
 
 # -- write ------------------------------------------------------------------ #

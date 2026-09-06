@@ -92,13 +92,15 @@ def _localization_flag(m: q.Measurements) -> str:
     looking like an ordinary value. The table's other columns cannot show that,
     so it gets a column of its own — in capitals, ahead of the metrics it
     invalidates.
+
+    `?` is the third answer: an artifact migrated from a schema that predates the
+    check carries no verdict, which is not the same as passing it.
     """
-    failed = [
-        name
-        for name, ok in (("MASK", m.phantom_mask_ok), ("ROI", m.roi_inside_phantom))
-        if not ok
-    ]
-    return "+".join(failed) if failed else "ok"
+    verdicts = (("MASK", m.phantom_mask_ok), ("ROI", m.roi_inside_phantom))
+    failed = [name for name, ok in verdicts if ok is False]
+    if failed:
+        return "+".join(failed)
+    return "?" if any(ok is None for _, ok in verdicts) else "ok"
 
 
 def _metric_record(artifact: q.QAArtifact) -> dict[str, object]:

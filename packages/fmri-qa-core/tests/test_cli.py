@@ -175,6 +175,9 @@ def test_localization_flag_names_every_failure(tmp_path, write_scan) -> None:
     assert cli._localization_flag(replace(m, roi_inside_phantom=False)) == "ROI"
     both = replace(m, phantom_mask_ok=False, roi_inside_phantom=False)
     assert cli._localization_flag(both) == "MASK+ROI"
+    # an artifact migrated from a schema without the check: not a pass
+    unrecorded = replace(m, phantom_mask_ok=None, roi_inside_phantom=None)
+    assert cli._localization_flag(unrecorded) == "?"
 
 
 def test_json_document_is_strict_json(tmp_path, write_scan, capsys) -> None:

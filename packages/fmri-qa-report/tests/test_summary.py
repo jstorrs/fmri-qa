@@ -109,3 +109,14 @@ def test_an_off_phantom_roi_is_called_out(artifact) -> None:
 
 def test_a_well_localized_run_carries_no_localization_note(artifact) -> None:
     assert summary._localization_note(artifact) == ""
+
+
+def test_an_unrecorded_localization_is_noted_without_alarm(artifact) -> None:
+    """A migrated artifact predating the check is neither vouched for nor damned.
+
+    The page must not read as though the checks were made and passed, but there
+    is nothing to condemn either -- so it is stated plainly, in lower case, apart
+    from the failures that are called out in capitals.
+    """
+    migrated = _clipped(artifact, phantom_mask_ok=None, roi_inside_phantom=None)
+    assert summary._localization_note(migrated) == "localization not recorded"

@@ -205,12 +205,88 @@ def test_load_rejects_unreadable_bytes(tmp_path) -> None:
         q.load_artifact(junk)
 
 
-def test_load_rejects_an_unknown_schema_version(tmp_path, artifact) -> None:
-    """A future artifact is refused by name, not misread field by field."""
+def test_load_rejects_an_artifact_from_a_newer_build(tmp_path, artifact) -> None:
+    """A future layout is refused by name, not misread field by field.
+
+    The one direction that cannot be migrated: this build does not know what a
+    later schema put in the file, so guessing would be worse than refusing.
+    """
     path = q.save_artifact(artifact, tmp_path / "qa.npz")
     _rewrite_document(path, lambda doc: doc | {"schema_version": 99})
-    with pytest.raises(q.InvalidArtifactError, match="schema version 99"):
+    with pytest.raises(q.InvalidArtifactError, match="schema version 99, newer"):
         q.load_artifact(path)
+
+
+def test_load_rejects_an_old_version_it_cannot_migrate_from(tmp_path, artifact) -> None:
+    """An older version with no route forward is named, not silently mangled."""
+    path = q.save_artifact(artifact, tmp_path / "qa.npz")
+    _rewrite_document(path, lambda doc: doc | {"schema_version": 0})
+    with pytest.raises(q.InvalidArtifactError, match="no migration from 0"):
+        q.load_artifact(path)
+
+
+def test_load_migrates_a_schema_1_artifact(tmp_path, artifact) -> None:
+    """An archive predating the localization diagnostics still reads back.
+
+    An artifact outlives the build that wrote it -- that is what saving one is
+    for -- so a schema bump must not orphan a QA archive a trend database has
+    been filling for months. Everything schema 1 did carry survives; the two
+    diagnostics it did not are unknown rather than invented, since a fabricated
+    pass would vouch for numbers nothing here can vouch for.
+    """
+    path = q.save_artifact(artifact, tmp_path / "qa.npz")
+    _rewrite_document(path, _as_schema(1))
+
+    with pytest.warns(UserWarning, match="migrated to"):
+        loaded = q.load_artifact(path)
+
+    assert loaded.schema_version == ARTIFACT_SCHEMA_VERSION
+    assert loaded.measurements.phantom_mask_ok is None
+    assert loaded.measurements.roi_inside_phantom is None
+    assert np.isnan(loaded.measurements.phantom_fraction)
+    # everything schema 1 did carry is untouched
+    assert loaded.measurements.snr == artifact.measurements.snr
+    assert loaded.provenance == artifact.provenance
+    assert np.array_equal(loaded.images.phantom_mask, artifact.images.phantom_mask)
+
+
+def test_load_migrating_a_schema_2_artifact_keeps_what_it_recorded(
+    tmp_path, artifact
+) -> None:
+    """Only the field the older schema lacked comes back unknown.
+
+    Schema 2 measured the phantom fraction and the ROI fit; it just had no
+    verdict field. The migration must not throw away the two it does have.
+    """
+    path = q.save_artifact(artifact, tmp_path / "qa.npz")
+    _rewrite_document(path, _as_schema(2))
+
+    with pytest.warns(UserWarning, match="schema 2, migrated"):
+        loaded = q.load_artifact(path)
+
+    m, before = loaded.measurements, artifact.measurements
+    assert m.phantom_mask_ok is None  # the one field schema 2 lacked
+    assert m.phantom_fraction == before.phantom_fraction
+    assert m.roi_inside_phantom is True
+
+
+# Fields each schema version introduced, so a current document can be rewritten
+# as the older one it grew out of (the reverse of `serialize._MIGRATIONS`).
+_ADDED_IN = {2: ("phantom_fraction", "roi_inside_phantom"), 3: ("phantom_mask_ok",)}
+
+
+def _as_schema(version: int):
+    """An edit turning a current document into one at `version`."""
+
+    def edit(document):
+        measurements = dict(document["measurements"])
+        for added, names in _ADDED_IN.items():
+            if added > version:
+                for name in names:
+                    del measurements[name]
+        return {**document, "schema_version": version, "measurements": measurements}
+
+    return edit
 
 
 def test_load_rejects_a_document_missing_a_section(tmp_path, artifact) -> None:

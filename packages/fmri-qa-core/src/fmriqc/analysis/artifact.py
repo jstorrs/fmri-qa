@@ -107,6 +107,12 @@ class Measurements:
     do not carry. `phantom_mask_ok` is the verdict on `phantom_fraction`, settled
     here so that every consumer agrees on it: the bounds live with the
     segmentation, which a reader in another distribution cannot import.
+
+    Both verdicts are `None` — and `phantom_fraction` NaN — in an artifact
+    migrated from a schema that predates the check (see `serialize`). `analyze`
+    never produces that; it means "not recorded", which is neither a pass nor a
+    failure, and a reader that treats it as either is drawing a conclusion the
+    data does not support.
     """
 
     # fBIRN ROI stability
@@ -144,10 +150,10 @@ class Measurements:
     fwhm_pe: float | None
     fwhm_ro: float | None
     fwhm_unit: str  # "mm" when the voxel size is known, else "vox"
-    # localization sanity (see the class docstring)
+    # localization sanity (see the class docstring); None = not recorded
     phantom_fraction: float  # share of the frame the phantom mask covers, [0, 1]
-    phantom_mask_ok: bool  # that share is one a real phantom mask can take
-    roi_inside_phantom: bool  # the summary ROI lies wholly within the phantom
+    phantom_mask_ok: bool | None  # that share is one a real phantom mask can take
+    roi_inside_phantom: bool | None  # the ROI lies wholly within the phantom
 
 
 @dataclass(frozen=True, eq=False, slots=True)

@@ -85,13 +85,19 @@ def _localization_note(artifact: QAArtifact) -> str:
     The verdict on the mask is the artifact's (`phantom_mask_ok`), not this
     module's: the bounds belong to the segmentation, which lives in the
     calculation half and is not importable from here.
+
+    A verdict of `None` — an artifact migrated from a schema written before the
+    check existed — is reported quietly rather than in capitals: nothing is known
+    to be wrong, but the page must not imply the checks were made and passed.
     """
     m = artifact.measurements
     notes = []
-    if not m.phantom_mask_ok:
+    if m.phantom_mask_ok is False:
         notes.append(f"BAD PHANTOM MASK ({100 * m.phantom_fraction:.0f}% of frame)")
-    if not m.roi_inside_phantom:
+    if m.roi_inside_phantom is False:
         notes.append("ROI NOT INSIDE PHANTOM")
+    if not notes and None in (m.phantom_mask_ok, m.roi_inside_phantom):
+        notes.append("localization not recorded")
     return _SEP.join(notes)
 
 

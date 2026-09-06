@@ -281,6 +281,12 @@ taking one `<scan>.qa.npz` per scan:
 uv run fmri-qa data/*_fMRI_*.nii.gz --artifact artifacts/
 ```
 
+The file records the schema it was written under, and a later build reads it:
+an older layout is migrated forward on load, with a warning, and any field that
+schema did not carry comes back as "not recorded" rather than as a value nothing
+measured. Only an artifact from a *newer* build than the one reading it is
+refused, since its layout cannot be known.
+
 With `--json`, stdout carries a single versioned JSON document —
 `{"schema_version": 2, "config": {...}, "scans": [...]}`, one record per scan
 with the same fields as the table columns as raw numbers. A metric that cannot
