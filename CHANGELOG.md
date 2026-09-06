@@ -22,6 +22,17 @@ versioning when the first stable public interface is released.
 - Build-artifact smoke tests in CI.
 - MIT licensing and distributable package-license metadata.
 
+### Fixed
+
+- **Phantom segmentation on an exactly-zero background.** The intensity
+  quantiles seeding the watershed used strict comparisons, so an image whose air
+  is exactly 0 — a background-suppressed or mask-multiplied reconstruction —
+  seeded no background at all and the whole frame was labelled phantom. Every
+  mask-based metric then read background silently: the ROI-fit guard passed
+  vacuously, the N/2 ghost region eroded to nothing (NaN ghost percentages), and
+  SFNR divided by a noiseless floor. The seeds are now inclusive, and
+  `detect_phantom` warns when a mask comes out degenerate either way.
+
 ### Changed
 
 - **The project is now two distributions.** `fmri-qa-core` (import `fmriqc`)

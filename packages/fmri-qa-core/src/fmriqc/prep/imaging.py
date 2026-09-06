@@ -25,12 +25,24 @@ def trim_initial(data: FloatArray, tr: float, trim_sec: float) -> FloatArray:
 
 
 def segment_phantom(image: FloatArray) -> BoolArray:
+    """Watershed the phantom out of the background, seeded by intensity quantiles.
+
+    The seeds are inclusive (`<=` / `>=`) rather than strict. A strict `<` seeds
+    *nothing* whenever a tenth or more of the image sits exactly on the minimum —
+    an exactly-zero background, which vendors do produce (background-suppressed
+    or mask-multiplied reconstructions). Watershed with no background seed floods
+    the whole frame as phantom, and every downstream statistic then silently
+    reads background: the ROI-fit guard passes vacuously, SFNR divides by a
+    noiseless floor, and the N/2 ghost region erodes to nothing. The same holds
+    symmetrically at the bright end. `detect_phantom` still checks the result for
+    the degenerate masks a pathological image can produce anyway.
+    """
     # mode="wrap": MRI images are periodic (FFT reconstruction), so the edge
     # filter must wrap rather than pad.
     edges = filters.sobel(image, mode="wrap")
     labels = np.zeros_like(image, dtype=np.uint8)
-    labels[image < np.quantile(image, 0.1)] = 1
-    labels[image > np.quantile(image, 0.9)] = 2
+    labels[image <= np.quantile(image, 0.1)] = 1
+    labels[image >= np.quantile(image, 0.9)] = 2
     return np.asarray(segmentation.watershed(edges, labels) == 2)
 
 

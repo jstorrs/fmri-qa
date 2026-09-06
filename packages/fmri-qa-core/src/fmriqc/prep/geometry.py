@@ -5,6 +5,7 @@ Operates on the preprocessed `QAImages`, turning the raw-array primitives in
 detected center (`PhantomGeometry`), and the fixed-size, on-image summary `ROI`.
 """
 
+import warnings
 from dataclasses import dataclass
 
 import numpy as np
@@ -23,6 +24,13 @@ from .imaging import (
 # Fixed summary-ROI side (voxels). Glover/fBIRN uses 21; user-configurable.
 FBIRN_ROI_SIZE = 21
 
+# Open bounds on the plausible share of the frame a phantom mask covers. Outside
+# them the segmentation has collapsed rather than found an unusual phantom: a
+# QA phantom is prescribed to fill a good part of the FOV but never all of it,
+# and never none. Deliberately wide — this catches collapse, not miscalibration.
+DEGENERATE_PHANTOM_MIN = 0.0
+DEGENERATE_PHANTOM_MAX = 0.95
+
 
 @dataclass(frozen=True, eq=False)
 class PhantomGeometry:
@@ -30,6 +38,18 @@ class PhantomGeometry:
 
     phantom_mask: BoolArray  # (X, Y) bool
     roi_center: IntArray  # (row, col) in array-index order — detected phantom center
+
+    @property
+    def fraction(self) -> float:
+        """Share of the frame the phantom mask covers, in [0, 1].
+
+        A sanity figure for the segmentation itself: a real phantom occupies a
+        middling fraction of the FOV, so a value at either extreme means the
+        watershed collapsed rather than that the phantom is unusual (see
+        `detect_phantom`). Carried into the artifact so a reader months later can
+        tell a NaN metric from a bad mask.
+        """
+        return float(self.phantom_mask.mean())
 
 
 @dataclass(frozen=True, eq=False)
@@ -50,12 +70,30 @@ class ROI:
 
 
 def detect_phantom(images: QAImages) -> PhantomGeometry:
-    """Locate the phantom from the preprocessed images: mask and detected center."""
+    """Locate the phantom from the preprocessed images: mask and detected center.
+
+    Warns when the resulting mask is degenerate — empty, or covering essentially
+    the whole frame. Either means the watershed did not separate phantom from
+    background, and every statistic measured through the mask is then unusable:
+    a whole-frame mask in particular passes `roi_fits` vacuously and erodes the
+    N/2 ghost region to nothing, so nothing further would flag it. The geometry
+    is still returned (the caller records `fraction` in the artifact and the
+    affected metrics resolve to NaN on their own) rather than raised on, so a
+    batch reports the bad scan and keeps going.
+    """
     phantom_mask = segment_phantom(images.mip)
-    return PhantomGeometry(
+    geom = PhantomGeometry(
         phantom_mask=phantom_mask,
         roi_center=find_phantom_center(phantom_mask),
     )
+    if not DEGENERATE_PHANTOM_MIN < geom.fraction < DEGENERATE_PHANTOM_MAX:
+        warnings.warn(
+            f"phantom segmentation covers {100 * geom.fraction:.1f}% of the frame; "
+            f"the mask did not separate phantom from background, so the "
+            f"mask-based metrics (SFNR, ghost, outliers, smoothness) are unusable.",
+            stacklevel=2,
+        )
+    return geom
 
 
 def resolve_roi(

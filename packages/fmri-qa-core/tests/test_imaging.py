@@ -1,7 +1,11 @@
 """Low-level image primitives: masks, ROI indexing, summary images."""
 
-import numpy as np
+import warnings
 
+import numpy as np
+import pytest
+
+import fmriqc as q
 from fmriqc.prep.imaging import (
     _clamp_center,
     edge_valid_mask,
@@ -9,8 +13,15 @@ from fmriqc.prep.imaging import (
     image_center,
     odd_even_difference,
     roi_indexes,
+    segment_phantom,
     trim_initial,
 )
+
+
+def _disk(n: int = 32) -> np.ndarray:
+    """A centered boolean disk of radius n/4 — the fixtures' phantom shape."""
+    yy, xx = np.mgrid[0:n, 0:n]
+    return np.asarray(((xx - n / 2) ** 2 + (yy - n / 2) ** 2) < (n / 4) ** 2)
 
 
 def test_trim_initial_drops_leading_volumes() -> None:
@@ -70,3 +81,55 @@ def test_fluctuation_noise_is_rms_about_zero() -> None:
     assert np.allclose(fluctuation_noise(resid), 0.0)
     resid[0, 0, :] = np.array([1.0, -1.0] * 5)  # RMS about 0 is 1.0
     assert np.isclose(fluctuation_noise(resid)[0, 0], 1.0)
+
+
+def test_segment_phantom_separates_a_disk_from_a_noisy_background() -> None:
+    disk = _disk()
+    rng = np.random.default_rng(0)
+    image = np.where(disk, 1000.0, 0.0) + np.abs(rng.normal(scale=8.0, size=disk.shape))
+    assert np.array_equal(segment_phantom(image), disk)
+
+
+def test_segment_phantom_separates_a_disk_over_an_exactly_zero_background() -> None:
+    """The seeds must be inclusive, or an exact-zero background seeds nothing.
+
+    A vendor that background-suppresses or mask-multiplies its reconstruction
+    leaves the air at exactly 0. More than a tenth of the frame then sits on the
+    minimum, so a strict `image < quantile(image, 0.1)` selects no background
+    seed at all and the watershed floods the whole frame as phantom -- which
+    passes `roi_fits` vacuously, erodes the N/2 ghost region to nothing, and
+    divides SFNR by a noiseless floor, all without raising anything.
+    """
+    disk = _disk()
+    image = np.where(disk, 1000.0, 0.0)  # air is exactly zero
+    mask = segment_phantom(image)
+    assert np.array_equal(mask, disk)
+    assert 0 < mask.mean() < 1  # neither collapsed direction
+
+
+def test_detect_phantom_warns_when_the_mask_covers_the_whole_frame() -> None:
+    """A collapsed segmentation is announced rather than passed on in silence.
+
+    Nothing downstream would catch it: a whole-frame mask satisfies `roi_fits`
+    for any ROI, so the pipeline's own ROI guard stays quiet too. A constant
+    image is the reliable way to collapse the watershed once the seeds are
+    inclusive.
+    """
+    flat = np.full((16, 16, 8), 5.0)
+    images = q.QAImages(center_slice=flat, fluctuations=np.zeros_like(flat), tr=2.0)
+    with pytest.warns(UserWarning, match="did not separate phantom from background"):
+        geom = q.detect_phantom(images)
+    assert geom.fraction == 1.0
+
+
+def test_detect_phantom_is_quiet_on_a_separable_phantom() -> None:
+    disk = _disk()
+    rng = np.random.default_rng(0)
+    series = np.where(disk, 1000.0, 0.0)[:, :, None] + np.abs(
+        rng.normal(scale=8.0, size=(*disk.shape, 8))
+    )
+    images = q.QAImages(center_slice=series, fluctuations=np.zeros_like(series), tr=2.0)
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")  # any warning here fails the test
+        geom = q.detect_phantom(images)
+    assert 0.0 < geom.fraction < 0.95

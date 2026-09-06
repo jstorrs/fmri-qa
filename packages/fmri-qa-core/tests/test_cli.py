@@ -8,6 +8,7 @@ a PDF is `fmri-qa-report`'s job and is tested there.
 """
 
 import json
+from dataclasses import replace
 
 import pytest
 
@@ -94,13 +95,33 @@ def test_json_emits_a_parseable_document(tmp_path, write_scan, capsys) -> None:
     assert "# detrend" in captured.err  # the banner moved off stdout
 
 
-def test_json_uses_null_for_undefined_metrics(tmp_path, write_scan, capsys) -> None:
+def test_json_document_is_strict_json(tmp_path, write_scan, capsys) -> None:
+    """stdout must parse under a strict reader: no NaN/Infinity tokens."""
     rc = cli.main([write_scan(tmp_path), "--roi-size", "9", "--json"])
     captured = capsys.readouterr()
     assert rc == 0
     assert "NaN" not in captured.out and "Infinity" not in captured.out
     doc = json.loads(captured.out, parse_constant=_reject_json_constant)
-    assert doc["scans"][0]["ghost_pct"] is None
+    assert doc["scans"][0]["snr"] > 0
+
+
+def test_json_record_maps_undefined_metrics_to_null(tmp_path, write_scan) -> None:
+    """A NaN measurement becomes `null`, not Python's non-standard `NaN` token.
+
+    Driven by injecting the NaN rather than by finding a phantom that produces
+    one: an undefined metric is an estimator outcome the record has to survive,
+    and pinning it to whichever metric happens to be NaN on the fixture would
+    make this test a hostage to the fixture's geometry.
+    """
+    scan = q.QAScan.from_nifti(write_scan(tmp_path))
+    artifact = q.analyze(scan, q.AnalysisSettings(roi_size=9))
+    undefined = replace(
+        artifact.measurements, ghost_pct=float("nan"), sfnr=float("inf")
+    )
+    record = cli._metric_record(replace(artifact, measurements=undefined))
+    assert record["ghost_pct"] is None
+    assert record["sfnr"] is None
+    assert record["snr"] == artifact.measurements.snr  # finite values pass through
 
 
 def _reject_json_constant(value: str) -> None:

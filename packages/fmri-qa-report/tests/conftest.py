@@ -13,12 +13,19 @@ import fmriqc as q
 
 
 def _phantom(n: int = 32, z: int = 3, t: int = 40, seed: int = 0) -> q.QAScan:
-    """A synthetic bright-disk phantom series with seeded temporal noise."""
+    """A synthetic bright-disk phantom series with seeded temporal noise.
+
+    The background gets a magnitude noise floor, mirroring the calculation half's
+    fixture: an exactly-constant background degenerates the intensity quantiles
+    that seed the phantom segmentation, and a report rendered from a collapsed
+    mask would be a report of NaNs rather than of panels.
+    """
     rng = np.random.default_rng(seed)
     yy, xx = np.mgrid[0:n, 0:n]
     disk = ((xx - n / 2) ** 2 + (yy - n / 2) ** 2) < (n / 4) ** 2
     noise = rng.normal(scale=5.0, size=(n, n, z, t)) * disk[:, :, None, None]
-    data = np.where(disk, 1000.0, 0.0)[:, :, None, None] + noise
+    floor = np.abs(rng.normal(scale=8.0, size=(n, n, z, t)))
+    data = np.where(disk, 1000.0, 0.0)[:, :, None, None] + noise + floor
     meta = q.ScanMeta(
         voxel_mm=(3.0, 3.0, 3.0),
         matrix=(n, n),
