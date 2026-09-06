@@ -62,6 +62,8 @@ versioning when the first stable public interface is released.
   is installed on the first render rather than at import: it mutates a
   third-party class process-wide, and an unrecognized svglib should fail the
   render that needs it rather than `import fmriqc_report`.
+- `fmri-qa-report` declares its dependency on `cycler`, which its `Theme` imports
+  directly and which had until now arrived only as a matplotlib transitive.
 
 ### Removed
 

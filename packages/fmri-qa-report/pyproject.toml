@@ -24,6 +24,9 @@ classifiers = [
 # and scikit-image are not needed here (they arrive only via core).
 dependencies = [
     "fmri-qa-core==0.1.0",
+    # The Theme builds an axes.prop_cycle directly, so cycler is a direct
+    # dependency even though matplotlib always brings it along.
+    "cycler>=0.10",
     "matplotlib>=3.10.7",
     "numpy>=2.3.4",
     "reportlab>=5.0.0",
