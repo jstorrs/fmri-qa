@@ -20,7 +20,6 @@ from scipy.spatial import ConvexHull, QhullError
 from ..load.metadata import ScanMeta
 from ..load.pe_axis import PE_ROWCOL
 from ..load.scan import QAScan
-from ..metrics.ghost import GHOST_RADIUS, ghost_masks
 from ..metrics.smoothness import SmoothnessResult
 from ..pipeline import QAResult, run_qa
 from ..prep.geometry import ROI, roi_fits
@@ -175,17 +174,21 @@ def _pe_label(result: QAResult, settings: AnalysisSettings) -> PeLabel:
 def _measurements(result: QAResult, settings: AnalysisSettings) -> Measurements:
     """Settle every reported scalar, resolving the metric objects' properties."""
     m = result.metrics
-    sat, sm = m.saturation, m.smoothness
+    sat, sm, ghost = m.saturation, m.smoothness, m.ghost
+    # The four ghost percentages stand or fall together: with no PE axis there is
+    # no ghost result, and each of them is NaN -- an estimator that could not
+    # resolve the quantity, which is what the artifact's NaN means.
+    undefined = float("nan")
     return Measurements(
         snr=m.snr,
         sfnr=m.sfnr,
         rdc=m.rdc,
         drift_pct=m.drift_pct,
         percent_fluctuation=m.percent_fluctuation,
-        ghost_pct=m.ghost_pct,
-        ghost_top_pct=m.ghost_top_pct,
-        ro_ghost_pct=m.ro_ghost_pct,
-        acr_ghost_pct=m.acr_ghost_pct,
+        ghost_pct=ghost.ghost_pct if ghost is not None else undefined,
+        ghost_top_pct=ghost.ghost_top_pct if ghost is not None else undefined,
+        ro_ghost_pct=ghost.ro_ghost_pct if ghost is not None else undefined,
+        acr_ghost_pct=ghost.acr_ghost_pct if ghost is not None else undefined,
         pe_axis=m.pe_axis,
         pe_label=_pe_label(result, settings),
         outlier_max_pct=100.0 * m.outliers.max_fraction,
@@ -323,21 +326,19 @@ def _convex_hull(mask: BoolArray) -> FloatArray:
 def _ghost_regions(result: QAResult) -> GhostRegions | None:
     """The region-matched signal/ghost masks per in-plane axis, or None.
 
-    Rebuilds exactly the masks `ghost_ratio` averaged over, using the PE axis the
-    run resolved. None when no axis resolved — there is nothing meaningful to
-    sample or draw.
+    Copied off the `GhostResult` the run measured on, not rebuilt here: the
+    published regions are the ones the percentages were averaged over, by
+    construction rather than by two call sites agreeing. None when no axis
+    resolved — nothing was sampled, so there is nothing to draw.
     """
-    pe_axis = result.metrics.pe_axis
-    if pe_axis not in (0, 1):
+    ghost = result.metrics.ghost
+    if ghost is None:
         return None
-    phantom, valid = result.geom.phantom_mask, result.images.valid_mask
-    pe_signal, pe_ghost = ghost_masks(phantom, pe_axis, GHOST_RADIUS, valid)
-    ro_signal, ro_ghost = ghost_masks(phantom, 1 - pe_axis, GHOST_RADIUS, valid)
     return GhostRegions(
-        pe_signal=pe_signal,
-        pe_ghost=pe_ghost,
-        ro_signal=ro_signal,
-        ro_ghost=ro_ghost,
+        pe_signal=ghost.pe_signal,
+        pe_ghost=ghost.pe_ghost,
+        ro_signal=ghost.ro_signal,
+        ro_ghost=ghost.ro_ghost,
     )
 
 

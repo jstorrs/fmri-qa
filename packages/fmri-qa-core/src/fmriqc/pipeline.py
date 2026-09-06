@@ -28,12 +28,7 @@ from .metrics.fbirn import (
     snr,
     weisskoff,
 )
-from .metrics.ghost import (
-    acr_ghosting_ratio,
-    estimate_pe_axis,
-    ghost_ratio,
-    ghost_top_ratio,
-)
+from .metrics.ghost import GhostResult, estimate_ghost, estimate_pe_axis
 from .metrics.motion import MotionResult, estimate_motion
 from .metrics.saturation import SaturationResult, detect_saturation
 from .metrics.smoothness import SmoothnessResult, estimate_smoothness
@@ -58,10 +53,9 @@ class QAMetrics:
     snr: float
     sfnr: float
     rdc: float
-    ghost_pct: float  # fBIRN percent ghost along PE: 100 * (mean ghost / mean signal)
-    ghost_top_pct: float  # PE percent ghost of the brightest 10% of ghost voxels
-    ro_ghost_pct: float  # same along the readout axis: background-relative baseline
-    acr_ghost_pct: float  # ACR/AAPM-equivalent percent-signal-ghosting: |PE% - RO%|
+    # The whole ghost family off one set of masks, or None when no PE axis
+    # resolved: every ghost statistic is defined relative to an axis.
+    ghost: GhostResult | None
     pe_axis: int | None  # phase-encode axis actually used for the ghost masks
     drift_pct: float
     percent_fluctuation: float
@@ -130,10 +124,11 @@ def run_qa(
 ) -> QAResult:
     """Full pipeline: scan -> preprocess -> phantom -> Weisskoff/RDC + ghost ratio.
 
-    `pe_axis=None` takes the axis from the scan's header, and failing that
-    estimates it from the ghost regions; if the ghost resolves neither axis the
-    run continues with the ghost metrics undefined (NaN) and a warning, since
-    every one of them is defined relative to an axis.
+    `pe_axis=None` takes the axis from the scan's metadata, and failing that
+    estimates it from the ghost regions of the analyzed slice — the one place
+    that estimate is made. If the ghost resolves neither axis the run continues
+    with `metrics.ghost` None and a warning, since every ghost statistic is
+    defined relative to an axis.
     `detrend` selects the detrending method ("poly" or "spline").
     `center` localizes both the QA slice and the ROI: "image" (middle slice +
     image-center ROI, Glover) or "phantom" (largest slice + detected center).
@@ -187,9 +182,10 @@ def run_qa(
     if pe_axis is None:
         pe_axis = estimate_pe_axis(mean_image, geom.phantom_mask, valid_mask=valid_mask)
     # Every ghost statistic is defined *relative to an axis*, so with none
-    # resolved there is nothing to report and the four resolve to NaN. Saying so
-    # is the point: the alternative is naming an axis nothing measured and
+    # resolved there is nothing to measure and no result to carry. Saying so is
+    # the point: the alternative is naming an axis nothing measured and
     # publishing four numbers sampled from wherever it happened to point.
+    ghost: GhostResult | None = None
     if pe_axis is None:
         warnings.warn(
             "no phase-encode axis: absent from the header and the Nyquist ghost "
@@ -197,27 +193,13 @@ def run_qa(
             "Pass pe_axis explicitly if the acquisition's direction is known.",
             stacklevel=2,
         )
-        pe_ratio = ro_ratio = pe_top_ratio = acr_ratio = float("nan")
     else:
-        # Region-matched percent ghost on each in-plane axis: pe_ratio feeds
-        # ghost%, ro_ratio feeds RO% (the readout-axis background-relative
-        # baseline). The ACR-equivalent |PE - RO| comes from
-        # `acr_ghosting_ratio`, which owns that metric's definition (matched
-        # signal/ghost ROIs per direction).
-        pe_ratio = ghost_ratio(
-            mean_image, geom.phantom_mask, pe_axis=pe_axis, valid_mask=valid_mask
-        )
-        ro_ratio = ghost_ratio(
-            mean_image, geom.phantom_mask, pe_axis=1 - pe_axis, valid_mask=valid_mask
-        )
-        # Localized-ghost companion to the PE mean ratio: the brightest 10% of
-        # ghost voxels (Greve / bxh fmriqa_ghostiness), on the same
-        # region-matched scale.
-        pe_top_ratio = ghost_top_ratio(
-            mean_image, geom.phantom_mask, pe_axis=pe_axis, valid_mask=valid_mask
-        )
-        acr_ratio = acr_ghosting_ratio(
-            mean_image, geom.phantom_mask, pe_axis=pe_axis, valid_mask=valid_mask
+        # The whole family -- PE and readout percent ghost, the localized top-10%
+        # companion, and the ACR-equivalent difference -- off one build of the
+        # region-matched masks, which the result carries so the artifact can
+        # publish the regions the numbers were sampled on.
+        ghost = estimate_ghost(
+            mean_image, geom.phantom_mask, pe_axis, valid_mask=valid_mask
         )
 
     # Directional spatial smoothness (AFNI 3dFWHMx): the Gaussian FWHM of the
@@ -232,10 +214,7 @@ def run_qa(
         snr=snr(images, roi),
         sfnr=sfnr(images, roi),
         rdc=wk.rdc,
-        ghost_pct=100.0 * pe_ratio,
-        ghost_top_pct=100.0 * pe_top_ratio,
-        ro_ghost_pct=100.0 * ro_ratio,
-        acr_ghost_pct=100.0 * acr_ratio,
+        ghost=ghost,
         pe_axis=pe_axis,
         drift_pct=drift_percent(images, roi),
         percent_fluctuation=percent_fluctuation(images, roi),

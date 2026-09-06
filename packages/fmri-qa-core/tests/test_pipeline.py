@@ -30,11 +30,28 @@ def test_run_qa_resolves_the_ghost_on_a_separable_phantom(make_scan: MakeScan) -
     every ghost percentage into a silent NaN, so finite values here say the mask
     separated phantom from background.
     """
-    m = q.run_qa(make_scan(), roi_size=9).metrics
-    assert np.isfinite(m.ghost_pct)
-    assert np.isfinite(m.ghost_top_pct)
+    ghost = q.run_qa(make_scan(), roi_size=9).metrics.ghost
+    assert ghost is not None
+    assert np.isfinite(ghost.ghost_pct)
+    assert np.isfinite(ghost.ghost_top_pct)
     # the localized top-10% ghost shares ghost%'s scale and can only exceed it
-    assert m.ghost_top_pct >= m.ghost_pct
+    assert ghost.ghost_top_pct >= ghost.ghost_pct
+
+
+def test_the_ghost_masks_are_built_once_for_both_axes(make_scan: MakeScan) -> None:
+    """One `GhostResult` per run carries the regions every ghost number came from.
+
+    The percentages and the masks a report draws are the same measurement, so
+    they cannot drift apart: each ghost patch is its signal patch rolled half the
+    FOV, and the axis it names is the axis the run resolved.
+    """
+    m = q.run_qa(make_scan(), roi_size=9).metrics
+    ghost = m.ghost
+    assert ghost is not None
+    assert ghost.pe_axis == m.pe_axis == 1
+    assert ghost.radius == q.GHOST_RADIUS
+    assert ghost.pe_signal.sum() == ghost.pe_ghost.sum() > 0
+    assert ghost.ro_signal.sum() == ghost.ro_ghost.sum() > 0
 
 
 def test_run_qa_is_deterministic(make_scan: MakeScan) -> None:
@@ -109,9 +126,9 @@ def test_an_unresolvable_pe_axis_leaves_the_ghost_metrics_undefined() -> None:
 
     A constant volume has no ghost to locate on either axis, so the estimate
     declines. The run continues -- the ROI stability metrics do not need a PE
-    axis -- but the four ghost percentages are NaN and the axis stays None,
-    rather than the run naming an axis nothing measured and publishing four
-    numbers sampled from wherever it pointed.
+    axis -- but there is no ghost result at all, rather than the run naming an
+    axis nothing measured and publishing four numbers sampled from wherever it
+    pointed.
     """
     flat = q.QAScan(data=np.ones((16, 16, 3, 8)), tr=2.0)
 
@@ -119,7 +136,4 @@ def test_an_unresolvable_pe_axis_leaves_the_ghost_metrics_undefined() -> None:
         m = q.run_qa(flat, trim_sec=0.0, roi_size=5).metrics
 
     assert m.pe_axis is None
-    assert np.isnan(m.ghost_pct)
-    assert np.isnan(m.ghost_top_pct)
-    assert np.isnan(m.ro_ghost_pct)
-    assert np.isnan(m.acr_ghost_pct)
+    assert m.ghost is None

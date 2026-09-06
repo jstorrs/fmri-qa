@@ -9,7 +9,9 @@ subpackages (`ls` the package to find a concern):
 * `prep`      -- preprocessing infrastructure: `imaging` (raw-array ops),
                  `detrend`, `geometry` (phantom/ROI), `images` (`QAImages`)
 * `metrics`   -- the physics tests, one module per family: `fbirn`
-                 (SNR/SFNR/RDC/drift), `artifacts` (spikes/outliers), `ghost`,
+                 (SNR/SFNR/RDC/drift), `artifacts` (spikes/outliers), `ghost`
+                 (`estimate_ghost`: the whole Nyquist-ghost family off one build
+                 of the region-matched masks, which the result carries),
                  `saturation`, `motion`, `center_of_mass`, `smoothness`
 * `pipeline`  -- `preprocess`, the full `run_qa` orchestration, and the
                  aggregate `QAMetrics`/`QAResult`
@@ -80,12 +82,11 @@ from .metrics.fbirn import (
 from .metrics.ghost import (
     GHOST_RADIUS,
     GHOST_TOP_FRACTION,
-    acr_ghosting_ratio,
+    GhostResult,
+    estimate_ghost,
     estimate_pe_axis,
     ghost_masks,
     ghost_ratio,
-    ghost_top_ratio,
-    phase_encode_axis,
 )
 from .metrics.motion import MotionResult, estimate_motion
 from .metrics.saturation import SaturationResult, detect_saturation
@@ -147,6 +148,7 @@ __all__ = [
     "DetrendMethod",
     "FmriqcError",
     "GhostRegions",
+    "GhostResult",
     "HiLoResult",
     "IncompatibleScansError",
     "InvalidArtifactError",
@@ -171,7 +173,6 @@ __all__ = [
     "SpikeResult",
     "WeisskoffCurve",
     "WeisskoffResult",
-    "acr_ghosting_ratio",
     "analyze",
     "build_artifact",
     "core_version",
@@ -181,6 +182,7 @@ __all__ = [
     "drift_percent",
     "edge_valid_mask",
     "estimate_center_of_mass",
+    "estimate_ghost",
     "estimate_motion",
     "estimate_pe_axis",
     "estimate_smoothness",
@@ -189,7 +191,6 @@ __all__ = [
     "fluctuation_noise",
     "ghost_masks",
     "ghost_ratio",
-    "ghost_top_ratio",
     "image_center",
     "load_artifact",
     "odd_even_difference",
@@ -197,7 +198,6 @@ __all__ = [
     "percent_fluctuation",
     "phantom_area",
     "phantom_core_mask",
-    "phase_encode_axis",
     "poly_degree",
     "poly_residuals",
     "preprocess",
