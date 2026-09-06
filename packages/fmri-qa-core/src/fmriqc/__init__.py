@@ -99,7 +99,6 @@ from .prep.detrend import (
     spline_residuals,
 )
 from .prep.geometry import (
-    FBIRN_ROI_SIZE,
     ROI,
     PhantomGeometry,
     detect_phantom,
@@ -122,6 +121,7 @@ from .prep.imaging import (
 )
 from .types import (
     DETREND_METHODS,
+    FBIRN_ROI_SIZE,
     ROI_CENTER_MODES,
     DetrendMethod,
     RoiCenter,

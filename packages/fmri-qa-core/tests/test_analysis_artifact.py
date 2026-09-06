@@ -342,6 +342,45 @@ def _as_schema(version: int):
     return edit
 
 
+def _with_measurement(name: str, value: object):
+    """An edit replacing one stored measurement."""
+    return lambda doc: {**doc, "measurements": doc["measurements"] | {name: value}}
+
+
+def _with_psf_unit(value: object):
+    """An edit replacing the stored PSF unit."""
+    return lambda doc: {
+        **doc,
+        "curves": {**doc["curves"], "psf": doc["curves"]["psf"] | {"unit": value}},
+    }
+
+
+def test_the_default_roi_size_is_the_shared_fbirn_constant() -> None:
+    """The ROI side has one definition, spoken by prep and by the artifact."""
+    assert q.AnalysisSettings().roi_size == q.FBIRN_ROI_SIZE
+
+
+def test_load_rejects_a_closed_set_value_from_outside_the_set(
+    tmp_path, artifact
+) -> None:
+    """A stored string must be held to the set its field promises.
+
+    `fwhm_unit`, `pe_label` and the PSF unit are closed sets a reader switches
+    on, and JSON carries none of that. Without the check a hand-edited or
+    foreign document hands the reader a value its own type says cannot exist,
+    and the mistake surfaces wherever that reader happens to branch.
+    """
+    for field, edit in (
+        ("fwhm_unit", _with_measurement("fwhm_unit", "cm")),
+        ("pe_label", _with_measurement("pe_label", "diagonal")),
+        ("psf.unit", _with_psf_unit("cm")),
+    ):
+        path = q.save_artifact(artifact, tmp_path / f"{field}.npz")
+        _rewrite_document(path, edit)
+        with pytest.raises(q.InvalidArtifactError, match=field):
+            q.load_artifact(path)
+
+
 def test_load_rejects_a_document_missing_a_section(tmp_path, artifact) -> None:
     path = q.save_artifact(artifact, tmp_path / "qa.npz")
     _rewrite_document(path, lambda doc: {**doc, "images": {}})

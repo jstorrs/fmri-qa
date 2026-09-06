@@ -39,7 +39,6 @@ from .metrics.saturation import SaturationResult, detect_saturation
 from .metrics.smoothness import SmoothnessResult, estimate_smoothness
 from .prep.detrend import detrend_fn
 from .prep.geometry import (
-    FBIRN_ROI_SIZE,
     ROI,
     PhantomGeometry,
     detect_phantom,
@@ -48,7 +47,7 @@ from .prep.geometry import (
 )
 from .prep.images import QAImages
 from .prep.imaging import extract_center_slice, trim_count, trim_initial
-from .types import DetrendMethod, RoiCenter
+from .types import FBIRN_ROI_SIZE, DetrendMethod, RoiCenter
 from .validation import validate_qa_run
 
 

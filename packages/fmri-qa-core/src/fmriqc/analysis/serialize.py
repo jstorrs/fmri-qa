@@ -32,7 +32,7 @@ from typing import Any
 import numpy as np
 
 from ..exceptions import InvalidArtifactError
-from ..types import BoolArray, FloatArray
+from ..types import LENGTH_UNITS, PE_LABELS, BoolArray, FloatArray
 from .artifact import (
     ARTIFACT_SCHEMA_VERSION,
     AnalysisSettings,
@@ -296,6 +296,22 @@ def _decompose_images(
 # -- read ------------------------------------------------------------------- #
 
 
+def _one_of[T: str](value: Any, allowed: tuple[T, ...], field: str) -> T:
+    """`value` as one of `allowed`, or a `ValueError` naming the field.
+
+    A closed-set field is a plain string in the JSON document, and the artifact
+    types promise a `Literal`. Checking on the way back in is what makes that
+    promise true of a *loaded* artifact rather than only of a freshly built one:
+    a hand-edited or foreign document must fail here (as an
+    `InvalidArtifactError`, via `load_artifact`'s conversion) instead of being
+    handed to a reader that switches on the value.
+    """
+    for candidate in allowed:
+        if value == candidate:
+            return candidate
+    raise ValueError(f"{field} {value!r} is not one of {allowed}")
+
+
 def _floats(arrays: dict[str, Any], key: str) -> FloatArray:
     """A required float array member."""
     return np.asarray(arrays[key], dtype=np.float64)
@@ -312,11 +328,16 @@ def _compose(document: dict[str, Any], arrays: dict[str, Any]) -> QAArtifact:
     for field in _PROVENANCE_TUPLES:
         if provenance.get(field) is not None:
             provenance[field] = tuple(provenance[field])
+    measurements = dict(document["measurements"])
+    measurements["fwhm_unit"] = _one_of(
+        measurements["fwhm_unit"], LENGTH_UNITS, "fwhm_unit"
+    )
+    measurements["pe_label"] = _one_of(measurements["pe_label"], PE_LABELS, "pe_label")
     return QAArtifact(
         schema_version=document["schema_version"],
         settings=AnalysisSettings(**document["settings"]),
         provenance=Provenance(**provenance),
-        measurements=Measurements(**document["measurements"]),
+        measurements=Measurements(**measurements),
         curves=_compose_curves(document["curves"], arrays),
         images=_compose_images(document["images"], arrays),
     )
@@ -349,7 +370,7 @@ def _compose_curves(document: dict[str, Any], arrays: dict[str, Any]) -> Curves:
         psf=PsfCurves(
             labels=(labels[0], labels[1]),
             fwhm=(fwhm[0], fwhm[1]),
-            unit=psf["unit"],
+            unit=_one_of(psf["unit"], LENGTH_UNITS, "psf.unit"),
             displacement=_floats(arrays, "curves.psf.displacement"),
             empirical=_floats(arrays, "curves.psf.empirical"),
             model_x=_floats(arrays, "curves.psf.model_x"),
