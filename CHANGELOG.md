@@ -27,6 +27,7 @@ versioning when the first stable public interface is released.
   the summary ROI held — the difference between "the estimator declined" and
   "the analysis was measuring background". A report calls either failure out on
   the acquisition line. Artifact schema version 2.
+- `python -m fmriqc_report`, matching `python -m fmriqc`.
 
 ### Fixed
 
