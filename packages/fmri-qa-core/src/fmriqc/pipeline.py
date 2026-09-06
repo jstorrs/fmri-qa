@@ -111,6 +111,10 @@ def preprocess(
         center_slice=center_slice,
         fluctuations=fluctuations,
         tr=float(scan.tr),
+        # Recorded here because this is where it happens: everything downstream
+        # indexes the trimmed series, and once `scan.data` is dropped nothing
+        # else can say which acquired volume frame 0 was.
+        n_trimmed=trim_count(scan.tr, trim_sec),
         # The value a stored zero reads back as, so a nulled image edge is
         # recognizable under a nonzero intercept (see `edge_valid_mask`).
         zero_value=float(scan.inter),

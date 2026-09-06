@@ -50,6 +50,9 @@ def test_preprocess_discards_the_full_volume(make_scan: MakeScan) -> None:
     # only the center slice survives: (X, Y, T_trimmed), not the 4-D volume
     assert images.center_slice.ndim == 3
     assert images.detrend_method == "poly"
+    # ...so the trim it counts from has to be recorded here or lost with the scan
+    assert images.n_trimmed == 2  # 4 s at TR 2 s
+    assert images.n_trimmed + images.center_slice.shape[-1] == 40
 
 
 def test_weisskoff_rdc_matches_the_metric(make_scan: MakeScan) -> None:

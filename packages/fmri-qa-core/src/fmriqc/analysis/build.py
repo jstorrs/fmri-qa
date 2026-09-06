@@ -119,6 +119,7 @@ def _provenance(result: QAResult, *, name: str, source: str) -> Provenance:
         core_version=core_version(),
         tr=float(result.images.tr),
         n_frames=int(result.images.center_slice.shape[-1]),
+        n_trimmed=int(result.images.n_trimmed),
     )
     if meta is None:
         return base
@@ -132,6 +133,7 @@ def _provenance(result: QAResult, *, name: str, source: str) -> Provenance:
         core_version=base.core_version,
         tr=base.tr,
         n_frames=base.n_frames,
+        n_trimmed=base.n_trimmed,
         voxel_mm=meta.voxel_mm,
         matrix=meta.matrix,
         te=meta.te,

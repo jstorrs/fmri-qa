@@ -47,6 +47,18 @@ def test_analyze_records_provenance_from_the_sidecar(artifact) -> None:
     assert prov.created and prov.core_version
 
 
+def test_provenance_records_the_trim_that_frame_indices_count_from(artifact) -> None:
+    """`n_trimmed` + `n_frames` accounts for every acquired volume.
+
+    Without the trim count the artifact's frame indices -- the worst outlier
+    frame, the seconds in `Curves.time` -- are unmappable: they count from the
+    first volume kept, and nothing else in the file says which volume that was.
+    """
+    prov = artifact.provenance
+    assert prov.n_trimmed == 2  # 5 s of warm-up at TR 2 s
+    assert prov.n_trimmed + prov.n_frames == 40  # the fixture's acquired volumes
+
+
 def test_measurements_are_flat_scalars(artifact) -> None:
     """Every reported number is settled -- no metric result object survives."""
     m = artifact.measurements
@@ -299,7 +311,8 @@ def test_load_migrates_a_schema_1_artifact(tmp_path, artifact) -> None:
     assert np.isnan(loaded.measurements.phantom_fraction)
     # everything schema 1 did carry is untouched
     assert loaded.measurements.snr == artifact.measurements.snr
-    assert loaded.provenance == artifact.provenance
+    assert loaded.provenance.scan == artifact.provenance.scan
+    assert loaded.provenance.n_frames == artifact.provenance.n_frames
     assert np.array_equal(loaded.images.phantom_mask, artifact.images.phantom_mask)
 
 
@@ -323,21 +336,51 @@ def test_load_migrating_a_schema_2_artifact_keeps_what_it_recorded(
     assert m.roi_inside_phantom is True
 
 
-# Fields each schema version introduced, so a current document can be rewritten
-# as the older one it grew out of (the reverse of `serialize._MIGRATIONS`).
-_ADDED_IN = {2: ("phantom_fraction", "roi_inside_phantom"), 3: ("phantom_mask_ok",)}
+def test_load_migrating_a_schema_3_artifact_leaves_the_trim_unrecorded(
+    tmp_path, artifact
+) -> None:
+    """Schema 3 trimmed warm-up volumes but never wrote down how many.
+
+    The count is not re-derived from the stored `trim_sec` and `tr`: that would
+    publish this build's rounding as the writing build's decision, and a frame
+    index mapped through a guess is worse than one a reader knows it cannot map.
+    Everything schema 3 did record survives.
+    """
+    path = q.save_artifact(artifact, tmp_path / "qa.npz")
+    _rewrite_document(path, _as_schema(3))
+
+    with pytest.warns(UserWarning, match="schema 3, migrated"):
+        loaded = q.load_artifact(path)
+
+    assert loaded.provenance.n_trimmed is None  # the one field schema 3 lacked
+    assert loaded.provenance.n_frames == artifact.provenance.n_frames
+    assert loaded.provenance.tr == artifact.provenance.tr
+    assert loaded.measurements.phantom_mask_ok is True
+
+
+# Fields each schema version introduced, per document section, so a current
+# document can be rewritten as the older one it grew out of (the reverse of
+# `serialize._MIGRATIONS`).
+_ADDED_IN = {
+    2: {"measurements": ("phantom_fraction", "roi_inside_phantom")},
+    3: {"measurements": ("phantom_mask_ok",)},
+    4: {"provenance": ("n_trimmed",)},
+}
 
 
 def _as_schema(version: int):
     """An edit turning a current document into one at `version`."""
 
     def edit(document):
-        measurements = dict(document["measurements"])
-        for added, names in _ADDED_IN.items():
+        sections = {
+            name: dict(document[name]) for name in ("measurements", "provenance")
+        }
+        for added, removals in _ADDED_IN.items():
             if added > version:
-                for name in names:
-                    del measurements[name]
-        return {**document, "schema_version": version, "measurements": measurements}
+                for section, names in removals.items():
+                    for name in names:
+                        del sections[section][name]
+        return {**document, "schema_version": version, **sections}
 
     return edit
 

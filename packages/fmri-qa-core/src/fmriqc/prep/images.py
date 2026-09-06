@@ -34,11 +34,17 @@ class QAImages:
     image many times. That is a cache, not second state: the fields it is
     derived from are frozen, so the answer cannot go stale, and there is still
     exactly one place a summary image is defined.
+
+    `n_trimmed` is how many warm-up volumes `preprocess` dropped. Every frame
+    index and time here counts from the *trimmed* series, so it is the only
+    thing that maps one back to an acquired volume number, and the trim is
+    otherwise unrecoverable once `scan.data` is discarded.
     """
 
     center_slice: FloatArray  # (X, Y, T) trimmed center slice (raw signal)
     fluctuations: FloatArray  # (X, Y, T) detrended residuals
     tr: float
+    n_trimmed: int = 0  # warm-up volumes dropped ahead of `center_slice`
     zero_value: float = 0.0  # image value a stored zero maps to (NIfTI scl_inter)
     pe_axis: int | None = None
     detrend_method: DetrendMethod = "poly"

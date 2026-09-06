@@ -123,7 +123,7 @@ def test_json_emits_a_parseable_document(tmp_path, write_scan, capsys) -> None:
     captured = capsys.readouterr()
     assert rc == 0
     doc = json.loads(captured.out)  # stdout is pure JSON, nothing else
-    assert doc["schema_version"] == 2
+    assert doc["schema_version"] == 3
     assert doc["config"]["detrend"] == "poly"
     assert "version" in doc["config"]
     assert len(doc["scans"]) == 1
@@ -131,6 +131,27 @@ def test_json_emits_a_parseable_document(tmp_path, write_scan, capsys) -> None:
     assert scan["scan"] == "scan.nii.gz"
     assert scan["snr"] > 0 and scan["pe_axis"] == 1
     assert "# detrend" in captured.err  # the banner moved off stdout
+
+
+def test_json_record_says_what_series_the_numbers_describe(
+    tmp_path, write_scan, capsys
+) -> None:
+    """A stored row must be identifiable and its frame indices mappable.
+
+    `outlier_worst_frame` counts from the analyzed series, so on its own it
+    names a volume nobody can find in the acquisition again; `n_trimmed` is what
+    turns it back into an acquired volume number. The source path and TR/frame
+    count let a trend database key and interpret the row without the artifact.
+    """
+    rc = cli.main([write_scan(tmp_path), "--roi-size", "9", "--json"])
+    assert rc == 0
+    scan = json.loads(capsys.readouterr().out)["scans"][0]
+    assert scan["source"].endswith("scan.nii.gz")
+    assert scan["tr"] == 2.0
+    assert scan["n_frames"] == 38  # 40 volumes, 5 s of warm-up dropped at TR 2 s
+    assert scan["n_trimmed"] == 2
+    assert 0 <= scan["outlier_worst_frame"] < scan["n_frames"]
+    assert scan["datetime"] is None  # the sidecar carries no acquisition time
 
 
 def test_json_record_carries_the_localization_verdicts(

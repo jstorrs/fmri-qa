@@ -33,7 +33,8 @@ from ..types import (
 # Bumped whenever the on-disk layout changes incompatibly (see `serialize`).
 # 2: added the `phantom_fraction` / `roi_inside_phantom` localization diagnostics.
 # 3: added `phantom_mask_ok`, the verdict on `phantom_fraction`.
-ARTIFACT_SCHEMA_VERSION = 3
+# 4: added `Provenance.n_trimmed`, the warm-up volumes dropped before analysis.
+ARTIFACT_SCHEMA_VERSION = 4
 
 
 @dataclass(frozen=True, slots=True)
@@ -64,9 +65,14 @@ class Provenance:
     path it was read from, `created` an ISO-8601 UTC timestamp, `core_version`
     the calculating package's version). `tr` and `n_frames` describe the
     *analyzed* series — after the warm-up trim — so a reader can state the
-    duration without the data. The rest is acquisition metadata copied from the
-    BIDS sidecar and NIfTI header; every field is optional because a scan
-    without a sidecar still analyzes.
+    duration without the data, and `n_trimmed` is how many volumes that trim
+    dropped: every frame index in the artifact (`Measurements.outlier_worst_frame`,
+    `Curves.time`) counts from the trimmed series, and this is what maps one back
+    to an acquired volume number. `None` means *not recorded* — an artifact
+    migrated from a schema that predates the field, where the trim happened but
+    nothing wrote down how large it was. The rest is acquisition metadata copied
+    from the BIDS sidecar and NIfTI header; every field is optional because a
+    scan without a sidecar still analyzes.
     """
 
     scan: str = ""
@@ -75,6 +81,7 @@ class Provenance:
     core_version: str = ""
     tr: float = 0.0
     n_frames: int = 0
+    n_trimmed: int | None = None  # warm-up volumes dropped; None = not recorded
     voxel_mm: tuple[float, float, float] | None = None
     matrix: tuple[int, int] | None = None
     te: float | None = None  # s

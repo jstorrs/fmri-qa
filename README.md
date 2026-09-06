@@ -292,14 +292,21 @@ measured. Only an artifact from a *newer* build than the one reading it is
 refused, since its layout cannot be known.
 
 With `--json`, stdout carries a single versioned JSON document —
-`{"schema_version": 2, "config": {...}, "scans": [...]}`, one record per scan
-with the same fields as the table columns as raw numbers. A metric that cannot
-be computed for a scan is JSON `null` (for example, a ghost ratio with no clear
-ghost region), never a non-standard `NaN` or `Infinity` token. Each record leads
-with `phantom_fraction`, `phantom_mask_ok`, and `roi_inside_phantom` — the
-table's `loc` column — which say whether the phantom mask and the summary ROI
-landed where they must; when either failed, every mask-based number in that
-record was measured on background. The banner, any
+`{"schema_version": 3, "config": {...}, "scans": [...]}`, one record per scan
+with the table's columns as raw numbers. A metric that cannot be computed for a
+scan is JSON `null` (for example, a ghost ratio with no clear ghost region),
+never a non-standard `NaN` or `Infinity` token. Each record leads with
+`phantom_fraction`, `phantom_mask_ok`, and `roi_inside_phantom` — the table's
+`loc` column — which say whether the phantom mask and the summary ROI landed
+where they must; when either failed, every mask-based number in that record was
+measured on background.
+
+A record also carries a little the table has no room for, because a row filed in
+a trend database outlives the terminal it was printed to: `source` and
+`datetime` key and date it, `tr`, `n_frames` and `n_trimmed` say what series the
+numbers describe, and `outlier_worst_frame` names the worst outlier volume —
+counted from the analyzed series, so adding `n_trimmed` gives the acquired
+volume number. The banner, any
 errors, and any save notices go to stderr, so
 `fmri-qa --json scan.nii.gz | jq` stays clean:
 

@@ -159,6 +159,20 @@ def _v2_to_v3(document: dict[str, Any]) -> dict[str, Any]:
     return document
 
 
+def _v3_to_v4(document: dict[str, Any]) -> dict[str, Any]:
+    """Schema 3 was trimmed but never recorded by how much.
+
+    The trim is not recomputed from the stored `trim_sec` and `tr` even though
+    the arithmetic is one line: `trim_count` belongs to `prep`, and a count this
+    build derives would be a fact about this build's rounding, not about the
+    volumes the writing build actually dropped. So the field says "not recorded",
+    and a reader keeps its frame indices in the analyzed series where they were
+    measured (see `Provenance`).
+    """
+    document["provenance"]["n_trimmed"] = None
+    return document
+
+
 # One step per version: `_MIGRATIONS[n]` takes a document at schema `n` and
 # returns it at `n + 1`. Applied in sequence, so a v1 file reaches the current
 # schema through every intermediate step and each migration only has to know
@@ -166,6 +180,7 @@ def _v2_to_v3(document: dict[str, Any]) -> dict[str, Any]:
 _MIGRATIONS: dict[int, Callable[[dict[str, Any]], dict[str, Any]]] = {
     1: _v1_to_v2,
     2: _v2_to_v3,
+    3: _v3_to_v4,
 }
 
 
