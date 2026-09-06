@@ -15,7 +15,7 @@ from datetime import UTC, datetime
 from importlib.metadata import PackageNotFoundError, version
 
 import numpy as np
-from scipy.spatial import ConvexHull
+from scipy.spatial import ConvexHull, QhullError
 
 from ..load.metadata import ScanMeta
 from ..load.pe_axis import PE_ROWCOL
@@ -290,12 +290,21 @@ def _convex_hull(mask: BoolArray) -> FloatArray:
     computational geometry. `imshow` maps column -> x and row -> y, so the mask's
     (row, col) pixels are emitted as (col, row). A mask too small to have a hull
     yields an empty polygon.
+
+    Too small is not only a matter of count: a mask that is a single row or
+    column has no area either, however many pixels it holds, and Qhull refuses
+    it ("initial simplex is flat"). That is a degenerate segmentation, not a bad
+    scan, and it arrives after the whole analysis has run — so it yields the same
+    empty polygon rather than losing the artifact to a geometry library's error.
     """
     ys, xs = np.nonzero(mask)
     if xs.size < 3:
         return np.zeros((0, 2), dtype=np.float64)
     pts = np.column_stack([xs, ys]).astype(np.float64)
-    verts = ConvexHull(pts).vertices
+    try:
+        verts = ConvexHull(pts).vertices
+    except QhullError:  # collinear: pixels but no area to enclose
+        return np.zeros((0, 2), dtype=np.float64)
     loop = np.append(verts, verts[0])  # close the polygon
     return np.asarray(pts[loop], dtype=np.float64)
 

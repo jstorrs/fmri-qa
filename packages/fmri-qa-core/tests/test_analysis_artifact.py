@@ -15,6 +15,7 @@ import pytest
 
 import fmriqc as q
 from fmriqc.analysis import ARTIFACT_SCHEMA_VERSION
+from fmriqc.analysis.build import _convex_hull
 
 
 @pytest.fixture
@@ -141,6 +142,19 @@ def test_images_carry_the_fbirn_quartet_and_its_annotations(artifact) -> None:
     assert np.array_equal(images.phantom_hull[0], images.phantom_hull[-1])
     roi = images.roi
     assert roi.size == 9 and roi.row1 - roi.row0 == roi.col1 - roi.col0
+
+
+def test_a_collinear_mask_has_no_hull_rather_than_no_artifact() -> None:
+    """A one-row mask has pixels but no area, and Qhull refuses to hull it.
+
+    The outline is built after the whole analysis has run, so letting the
+    geometry library's error out would throw away a completed scan over an
+    annotation nothing can draw anyway. The empty polygon the docstring promises
+    for a mask too small to have a hull covers this case too.
+    """
+    mask = np.zeros((8, 8), dtype=bool)
+    mask[3, 2:7] = True
+    assert _convex_hull(mask).shape == (0, 2)
 
 
 def test_ghost_regions_are_region_matched(artifact) -> None:
