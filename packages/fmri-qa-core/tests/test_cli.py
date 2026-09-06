@@ -123,7 +123,7 @@ def test_json_emits_a_parseable_document(tmp_path, write_scan, capsys) -> None:
     captured = capsys.readouterr()
     assert rc == 0
     doc = json.loads(captured.out)  # stdout is pure JSON, nothing else
-    assert doc["schema_version"] == 1
+    assert doc["schema_version"] == 2
     assert doc["config"]["detrend"] == "poly"
     assert "version" in doc["config"]
     assert len(doc["scans"]) == 1
@@ -131,6 +131,50 @@ def test_json_emits_a_parseable_document(tmp_path, write_scan, capsys) -> None:
     assert scan["scan"] == "scan.nii.gz"
     assert scan["snr"] > 0 and scan["pe_axis"] == 1
     assert "# detrend" in captured.err  # the banner moved off stdout
+
+
+def test_json_record_carries_the_localization_verdicts(
+    tmp_path, write_scan, capsys
+) -> None:
+    """A consumer must be able to tell measurements from measurements of air.
+
+    The report says so on the page; a trend database reading `--json` had no way
+    to know, and would file a scan whose phantom mask collapsed alongside good
+    ones. The measured fraction rides along with the verdicts so a consumer can
+    set its own bar.
+    """
+    rc = cli.main([write_scan(tmp_path), "--roi-size", "9", "--json"])
+    assert rc == 0
+    scan = json.loads(capsys.readouterr().out)["scans"][0]
+    assert scan["phantom_mask_ok"] is True
+    assert scan["roi_inside_phantom"] is True
+    assert 0.0 < scan["phantom_fraction"] < 0.95
+
+
+def test_table_flags_a_localization_failure(tmp_path, write_scan, capsys) -> None:
+    """The `loc` column names what failed, ahead of the numbers it invalidates.
+
+    An oversized ROI still produces a full row of plausible-looking metrics --
+    measured, at the corners, on background. The warning that says so is
+    transient; the row must carry it.
+    """
+    with pytest.warns(UserWarning, match="not fully inside the phantom"):
+        rc = cli.main([write_scan(tmp_path), "--roi-size", "31"])
+    header, _rule, row = capsys.readouterr().out.splitlines()[1:4]
+    assert rc == 0
+    assert "loc" in header
+    assert "ROI" in row
+
+
+def test_localization_flag_names_every_failure(tmp_path, write_scan) -> None:
+    """Both localizations can fail at once, and the cell says so."""
+    scan = q.QAScan.from_nifti(write_scan(tmp_path))
+    m = q.analyze(scan, q.AnalysisSettings(roi_size=9)).measurements
+    assert cli._localization_flag(m) == "ok"
+    assert cli._localization_flag(replace(m, phantom_mask_ok=False)) == "MASK"
+    assert cli._localization_flag(replace(m, roi_inside_phantom=False)) == "ROI"
+    both = replace(m, phantom_mask_ok=False, roi_inside_phantom=False)
+    assert cli._localization_flag(both) == "MASK+ROI"
 
 
 def test_json_document_is_strict_json(tmp_path, write_scan, capsys) -> None:

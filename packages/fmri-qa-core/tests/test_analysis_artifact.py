@@ -68,6 +68,7 @@ def test_measurements_record_the_localization_diagnostics(artifact) -> None:
     """
     m = artifact.measurements
     assert 0.0 < m.phantom_fraction < 0.95
+    assert m.phantom_mask_ok is True
     assert m.roi_inside_phantom is True
 
 

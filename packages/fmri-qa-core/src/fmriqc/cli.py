@@ -18,7 +18,7 @@ from typing import TextIO
 
 import fmriqc as q
 
-_JSON_SCHEMA_VERSION = 1
+_JSON_SCHEMA_VERSION = 2
 # Suffix for a saved artifact, so a batch's files are recognizable at a glance.
 _ARTIFACT_SUFFIX = ".qa.npz"
 
@@ -84,17 +84,42 @@ def _artifact_collisions(base: str, paths: Sequence[str]) -> dict[Path, list[str
     return {dest: srcs for dest, srcs in destinations.items() if len(srcs) > 1}
 
 
+def _localization_flag(m: q.Measurements) -> str:
+    """The table's `loc` cell: `ok`, or which localization failed.
+
+    A collapsed phantom mask or an ROI that is not inside the phantom makes every
+    mask-based number on the row a measurement of background, while leaving it
+    looking like an ordinary value. The table's other columns cannot show that,
+    so it gets a column of its own — in capitals, ahead of the metrics it
+    invalidates.
+    """
+    failed = [
+        name
+        for name, ok in (("MASK", m.phantom_mask_ok), ("ROI", m.roi_inside_phantom))
+        if not ok
+    ]
+    return "+".join(failed) if failed else "ok"
+
+
 def _metric_record(artifact: q.QAArtifact) -> dict[str, object]:
     """The scalar metrics for one scan as a JSON-serializable record.
 
-    Mirrors the human table's columns one-to-one, but as raw numbers (not the
-    fixed-width formatting), so downstream tools can consume `--json` directly.
+    Mirrors the human table's columns, but as raw numbers (not the fixed-width
+    formatting), so downstream tools can consume `--json` directly. The table's
+    one `loc` cell is three fields here: a consumer that files these away —
+    the trend database this output exists for — needs the measured fraction and
+    both verdicts, not the abbreviation an operator reads.
     """
     m = artifact.measurements
     record: dict[str, object] = {
         "scan": artifact.provenance.scan,
         "pe": m.pe_label,
         "pe_axis": m.pe_axis,
+        # Localization first: these say whether the rest of the row means
+        # anything (see `_localization_flag`).
+        "phantom_fraction": m.phantom_fraction,
+        "phantom_mask_ok": m.phantom_mask_ok,
+        "roi_inside_phantom": m.roi_inside_phantom,
         "snr": m.snr,
         "sfnr": m.sfnr,
         "rdc": m.rdc,
@@ -279,7 +304,7 @@ def _config(args: argparse.Namespace) -> dict[str, object]:
 def _print_header() -> None:
     """Print the fixed-width table header and its rule."""
     header = (
-        f"{'scan':40s} {'PE':>3s} "
+        f"{'scan':40s} {'PE':>3s} {'loc':>8s} "
         f"{'SNR':>9s} {'SFNR':>9s} {'RDC':>8s} {'drift%':>8s} "
         f"{'ghost%':>8s} {'ghT%':>8s} {'RO%':>8s} {'ACRg%':>8s} {'outl%':>7s} "
         f"{'tcOut':>7s} {'spcOut':>7s} "
@@ -293,6 +318,9 @@ def _print_header() -> None:
 def _print_row(artifact: q.QAArtifact) -> None:
     """Print one fixed-width metrics row for the human table."""
     m = artifact.measurements
+    # loc: whether the phantom mask and the summary ROI landed where they must.
+    # "ok", or MASK/ROI naming what failed -- in which case every mask-based
+    # column to its right was measured on background (see `_localization_flag`).
     # ghT%: PE percent ghost of the brightest 10% of ghost voxels (Greve /
     # bxh fmriqa_ghostiness), same scale as ghost% -- a localized bright ghost
     # the region-mean ghost% dilutes shows here (ghT% >= ghost% always).
@@ -321,6 +349,7 @@ def _print_row(artifact: q.QAArtifact) -> None:
     fw_ro = m.fwhm_ro if m.fwhm_ro is not None else m.fwhm
     print(
         f"{artifact.provenance.scan:40s} {m.pe_label:>3s} "
+        f"{_localization_flag(m):>8s} "
         f"{m.snr:>9.1f} {m.sfnr:>9.1f} {m.rdc:>8.3f} "
         f"{m.drift_pct:>8.3f} {m.ghost_pct:>8.3f} {m.ghost_top_pct:>8.3f} "
         f"{m.ro_ghost_pct:>8.3f} {m.acr_ghost_pct:>8.3f} {m.outlier_max_pct:>7.3f} "

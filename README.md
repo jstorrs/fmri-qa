@@ -249,10 +249,10 @@ uv run fmri-qa [options] scan.nii.gz [more.nii.gz ...]
 
 ```
 # detrend=poly  trim_sec=5.0  center=image  roi_size=21
-scan                                      PE       SNR      SFNR      RDC   drift%   ghost%     ghT%      RO%    ACRg%   outl%   tcOut  spcOut   clip  clipPre    motn    scl%    shr%    com   fwPE   fwRO
------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-FBIRN_QA_fMRI_flip77_13.nii.gz           col     467.3     452.0   10.953    0.303    4.092    6.643    4.059    0.033   0.211    2.48    5.19      0        0   0.017   0.198   0.015  0.007   2.19   2.72
-ABCD_QA_fMRI_16.nii.gz                   col      76.7      75.3   13.355    0.682    5.074   10.084    3.192    1.882   0.077    3.30    5.86      0       68   0.025   0.268   0.034  0.094   1.53   2.17
+scan                                      PE      loc       SNR      SFNR      RDC   drift%   ghost%     ghT%      RO%    ACRg%   outl%   tcOut  spcOut   clip  clipPre    motn    scl%    shr%    com   fwPE   fwRO
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+FBIRN_QA_fMRI_flip77_13.nii.gz           col       ok     467.3     452.0   10.953    0.303    4.092    6.643    4.059    0.033   0.211    2.48    5.19      0        0   0.017   0.198   0.015  0.007   2.19   2.72
+ABCD_QA_fMRI_16.nii.gz                   col       ok      76.7      75.3   13.355    0.682    5.074   10.084    3.192    1.882   0.077    3.30    5.86      0       68   0.025   0.268   0.034  0.094   1.53   2.17
 ```
 
 Options:
@@ -282,10 +282,14 @@ uv run fmri-qa data/*_fMRI_*.nii.gz --artifact artifacts/
 ```
 
 With `--json`, stdout carries a single versioned JSON document —
-`{"schema_version": 1, "config": {...}, "scans": [...]}`, one record per scan
+`{"schema_version": 2, "config": {...}, "scans": [...]}`, one record per scan
 with the same fields as the table columns as raw numbers. A metric that cannot
 be computed for a scan is JSON `null` (for example, a ghost ratio with no clear
-ghost region), never a non-standard `NaN` or `Infinity` token. The banner, any
+ghost region), never a non-standard `NaN` or `Infinity` token. Each record leads
+with `phantom_fraction`, `phantom_mask_ok`, and `roi_inside_phantom` — the
+table's `loc` column — which say whether the phantom mask and the summary ROI
+landed where they must; when either failed, every mask-based number in that
+record was measured on background. The banner, any
 errors, and any save notices go to stderr, so
 `fmri-qa --json scan.nii.gz | jq` stays clean:
 

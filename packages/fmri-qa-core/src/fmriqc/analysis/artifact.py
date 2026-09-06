@@ -24,7 +24,8 @@ from ..types import BoolArray, DetrendMethod, FloatArray, RoiCenter
 
 # Bumped whenever the on-disk layout changes incompatibly (see `serialize`).
 # 2: added the `phantom_fraction` / `roi_inside_phantom` localization diagnostics.
-ARTIFACT_SCHEMA_VERSION = 2
+# 3: added `phantom_mask_ok`, the verdict on `phantom_fraction`.
+ARTIFACT_SCHEMA_VERSION = 3
 
 
 @dataclass(frozen=True, slots=True)
@@ -103,7 +104,9 @@ class Measurements:
     yields an average. Recording them here means a reader of a stored artifact
     can tell "the estimator declined" (a NaN with good localization) from "the
     analysis was measuring background" — a distinction the metric values alone
-    do not carry.
+    do not carry. `phantom_mask_ok` is the verdict on `phantom_fraction`, settled
+    here so that every consumer agrees on it: the bounds live with the
+    segmentation, which a reader in another distribution cannot import.
     """
 
     # fBIRN ROI stability
@@ -143,6 +146,7 @@ class Measurements:
     fwhm_unit: str  # "mm" when the voxel size is known, else "vox"
     # localization sanity (see the class docstring)
     phantom_fraction: float  # share of the frame the phantom mask covers, [0, 1]
+    phantom_mask_ok: bool  # that share is one a real phantom mask can take
     roi_inside_phantom: bool  # the summary ROI lies wholly within the phantom
 
 

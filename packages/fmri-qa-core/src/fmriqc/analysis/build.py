@@ -197,6 +197,7 @@ def _measurements(result: QAResult, settings: AnalysisSettings) -> Measurements:
         fwhm_ro=sm.fwhm_ro,
         fwhm_unit="mm" if sm.voxel_mm is not None else "vox",
         phantom_fraction=result.geom.fraction,
+        phantom_mask_ok=result.geom.plausible,
         roi_inside_phantom=roi_fits(result.geom.phantom_mask, result.roi.index),
     )
 

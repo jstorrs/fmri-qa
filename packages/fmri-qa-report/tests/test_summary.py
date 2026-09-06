@@ -93,9 +93,12 @@ def test_a_collapsed_phantom_mask_is_called_out(artifact) -> None:
     """A bad mask invalidates every mask-based number on the page.
 
     It has to say so on the acquisition line: the metrics themselves still look
-    like ordinary measurements, so a reader has nothing else to go on.
+    like ordinary measurements, so a reader has nothing else to go on. The
+    verdict is the artifact's -- the bounds it was reached by live with the
+    segmentation, in a package this one cannot import -- and the fraction beside
+    it is what the reader is shown.
     """
-    collapsed = _clipped(artifact, phantom_fraction=1.0)
+    collapsed = _clipped(artifact, phantom_fraction=1.0, phantom_mask_ok=False)
     assert "BAD PHANTOM MASK (100% of frame)" in summary._acquisition_line(collapsed)
 
 

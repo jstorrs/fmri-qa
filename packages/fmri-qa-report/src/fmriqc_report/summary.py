@@ -81,10 +81,14 @@ def _localization_note(artifact: QAArtifact) -> str:
     leaving it looking like an ordinary measurement, so they are called out in
     capitals next to the metrics they invalidate rather than left for a reader to
     infer from a NaN.
+
+    The verdict on the mask is the artifact's (`phantom_mask_ok`), not this
+    module's: the bounds belong to the segmentation, which lives in the
+    calculation half and is not importable from here.
     """
     m = artifact.measurements
     notes = []
-    if not 0.0 < m.phantom_fraction < 0.95:
+    if not m.phantom_mask_ok:
         notes.append(f"BAD PHANTOM MASK ({100 * m.phantom_fraction:.0f}% of frame)")
     if not m.roi_inside_phantom:
         notes.append("ROI NOT INSIDE PHANTOM")

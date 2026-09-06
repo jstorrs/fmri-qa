@@ -46,6 +46,17 @@ class PhantomGeometry:
         """
         return float(self.phantom_mask.mean())
 
+    @property
+    def plausible(self) -> bool:
+        """Whether `fraction` is one a real phantom mask can take.
+
+        The single definition of "this segmentation held": `detect_phantom`
+        warns on it, and `build` records it in the artifact so a reader —
+        including one in another distribution, which cannot import this layer —
+        gets the verdict rather than the bounds to re-apply.
+        """
+        return DEGENERATE_PHANTOM_MIN < self.fraction < DEGENERATE_PHANTOM_MAX
+
 
 @dataclass(frozen=True, eq=False)
 class ROI:
@@ -81,7 +92,7 @@ def detect_phantom(images: QAImages) -> PhantomGeometry:
         phantom_mask=phantom_mask,
         roi_center=find_phantom_center(phantom_mask),
     )
-    if not DEGENERATE_PHANTOM_MIN < geom.fraction < DEGENERATE_PHANTOM_MAX:
+    if not geom.plausible:
         warnings.warn(
             f"phantom segmentation covers {100 * geom.fraction:.1f}% of the frame; "
             f"the mask did not separate phantom from background, so the "
