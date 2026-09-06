@@ -11,7 +11,7 @@ from collections.abc import Callable
 import numpy as np
 from scipy.interpolate import make_lsq_spline
 
-from ..exceptions import InvalidChoiceError
+from ..exceptions import InvalidChoiceError, InvalidScanError
 from ..types import DETREND_METHODS, DetrendMethod, FloatArray
 
 # Detrend cutoff period (s). Drift slower than this is removed before noise is
@@ -19,6 +19,11 @@ from ..types import DETREND_METHODS, DetrendMethod, FloatArray
 # because only `poly` feeds the settled pipeline.
 POLY_CUTOFF_S = 200.0
 SPLINE_CUTOFF_S = 256.0
+
+# B-spline degree of the `spline` detrender. Named because the fit's coefficient
+# count -- `n_nodes + SPLINE_DEGREE + 1`, what `detrend_fn` weighs against the
+# frame count -- depends on it.
+SPLINE_DEGREE = 2
 
 
 def spline_nodes(y: FloatArray, tr: float, cutoff_s: float = SPLINE_CUTOFF_S) -> int:
@@ -34,7 +39,7 @@ def spline_nodes(y: FloatArray, tr: float, cutoff_s: float = SPLINE_CUTOFF_S) ->
 def spline_residuals(
     y: FloatArray,
     n_nodes: int,
-    degree: int = 2,
+    degree: int = SPLINE_DEGREE,
 ) -> FloatArray:
     """Detrend along the last axis with a least-squares B-spline (handles N-D).
 
@@ -91,13 +96,43 @@ def detrend_fn(
     length and `tr`, then applied to the full slice and each ROI timeseries. The
     returned order is that complexity, surfaced for the report.
 
+    The order comes from the run *duration*, so a TR in the wrong unit inflates
+    it without bound: a header carrying milliseconds makes the fit as many
+    coefficients as there are frames, `lstsq` obliges by fitting the noise as
+    well as the drift, and every stability metric downstream is then measured on
+    a residual of nothing. Refuse the fit rather than return zeros that look
+    like a very stable scanner.
+
     Raises:
         InvalidChoiceError: If `method` is not one of `DETREND_METHODS`.
+        InvalidScanError: If the derived order leaves the fit determined by
+            fewer frames than it has coefficients (see above).
     """
+    n_frames = center_slice.shape[-1]
     if method == "poly":
         degree = poly_degree(center_slice, tr)
+        if degree >= n_frames:
+            raise InvalidScanError(
+                "detrend order",
+                degree,
+                f"a Legendre fit of degree {degree} carries more coefficients "
+                f"than the {n_frames} analyzed frames can determine, so it would "
+                f"absorb the signal it is meant to detrend; the order follows "
+                f"from the run duration, so check that the TR of {tr:g} is in "
+                f"seconds",
+            )
         return (lambda y: poly_residuals(y, degree)), degree
     if method == "spline":
         n_nodes = spline_nodes(center_slice, tr)
+        n_coefficients = n_nodes + SPLINE_DEGREE + 1
+        if n_coefficients > n_frames:
+            raise InvalidScanError(
+                "detrend order",
+                n_nodes,
+                f"{n_nodes} interior knots make {n_coefficients} spline "
+                f"coefficients, more than the {n_frames} analyzed frames can "
+                f"determine; the knot count follows from the run duration, so "
+                f"check that the TR of {tr:g} is in seconds",
+            )
         return (lambda y: spline_residuals(y, n_nodes)), n_nodes
     raise InvalidChoiceError("detrend method", method, DETREND_METHODS)

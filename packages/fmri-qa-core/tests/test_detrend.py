@@ -1,9 +1,11 @@
 """Detrending removes the low-frequency trend it is meant to and keeps the rest."""
 
 import numpy as np
+import pytest
 from hypothesis import given
 from hypothesis import strategies as st
 
+from fmriqc.exceptions import InvalidScanError
 from fmriqc.prep.detrend import detrend_fn, poly_residuals, spline_residuals
 from fmriqc.prep.imaging import trim_count
 
@@ -40,6 +42,24 @@ def test_detrend_fn_returns_operator_and_order() -> None:
     op, order = detrend_fn(cs, tr=2.0, method="poly")
     assert order >= 0
     assert op(cs).shape == cs.shape
+
+
+def test_detrend_fn_refuses_an_order_the_frames_cannot_determine() -> None:
+    """A TR in the wrong unit inflates the fit until it absorbs the whole signal.
+
+    The order follows from the run duration, so a header reporting 2000 for a
+    2 s TR asks for a degree-400 fit of 40 frames. `lstsq` obliges without
+    complaint and returns a residual of nothing, which every stability metric
+    downstream would read as a perfectly stable scanner -- so the fit is refused
+    and the message names the TR as the thing to check.
+    """
+    series = np.zeros((2, 2, 40))
+    for method in ("poly", "spline"):
+        with pytest.raises(InvalidScanError) as excinfo:
+            detrend_fn(series, tr=2000.0, method=method)
+        assert excinfo.value.field == "detrend order"
+        assert "40 analyzed frames" in str(excinfo.value)
+        assert "TR of 2000" in str(excinfo.value)
 
 
 @given(
