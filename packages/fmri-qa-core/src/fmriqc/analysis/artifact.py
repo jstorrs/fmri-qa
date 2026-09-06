@@ -23,7 +23,8 @@ from dataclasses import dataclass
 from ..types import BoolArray, DetrendMethod, FloatArray, RoiCenter
 
 # Bumped whenever the on-disk layout changes incompatibly (see `serialize`).
-ARTIFACT_SCHEMA_VERSION = 1
+# 2: added the `phantom_fraction` / `roi_inside_phantom` localization diagnostics.
+ARTIFACT_SCHEMA_VERSION = 2
 
 
 @dataclass(frozen=True, slots=True)
@@ -94,6 +95,15 @@ class Measurements:
     `pe_label` is the phase-encode direction as it should be *displayed* ("row",
     "col", or "?"): the sidecar's DICOM direction when the run did not override
     the axis, otherwise the label of the axis actually used.
+
+    The two localization fields say whether the numbers beside them can be
+    trusted at all. Every mask-based metric is measured through the phantom
+    segmentation and the summary ROI, and both can fail *quietly*: a collapsed
+    segmentation still yields a mask, and an ROI sitting in background still
+    yields an average. Recording them here means a reader of a stored artifact
+    can tell "the estimator declined" (a NaN with good localization) from "the
+    analysis was measuring background" — a distinction the metric values alone
+    do not carry.
     """
 
     # fBIRN ROI stability
@@ -131,6 +141,9 @@ class Measurements:
     fwhm_pe: float | None
     fwhm_ro: float | None
     fwhm_unit: str  # "mm" when the voxel size is known, else "vox"
+    # localization sanity (see the class docstring)
+    phantom_fraction: float  # share of the frame the phantom mask covers, [0, 1]
+    roi_inside_phantom: bool  # the summary ROI lies wholly within the phantom
 
 
 @dataclass(frozen=True, eq=False, slots=True)

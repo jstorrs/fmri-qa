@@ -58,6 +58,34 @@ def test_measurements_are_flat_scalars(artifact) -> None:
         assert isinstance(value, float | int | str | bool | type(None))
 
 
+def test_measurements_record_the_localization_diagnostics(artifact) -> None:
+    """A reader can tell a declined estimate from an analysis of background.
+
+    Both localizations can fail quietly -- a collapsed segmentation still yields
+    a mask and an off-phantom ROI still yields an average -- so the artifact
+    carries whether they held. On the fixture phantom the mask covers a middling
+    share of the frame and the small ROI sits inside it.
+    """
+    m = artifact.measurements
+    assert 0.0 < m.phantom_fraction < 0.95
+    assert m.roi_inside_phantom is True
+
+
+def test_an_oversized_roi_is_recorded_as_outside_the_phantom(
+    tmp_path, write_scan
+) -> None:
+    """The ROI-fit warning is transient; the artifact must keep the verdict.
+
+    Analysis still completes (the metrics are simply measured over background at
+    the ROI corners), so nothing else in the stored result says the numbers are
+    unusable.
+    """
+    scan = q.QAScan.from_nifti(write_scan(tmp_path))
+    with pytest.warns(UserWarning, match="not fully inside the phantom"):
+        artifact = q.analyze(scan, q.AnalysisSettings(roi_size=31))
+    assert artifact.measurements.roi_inside_phantom is False
+
+
 def test_pe_label_follows_an_axis_override(tmp_path, write_scan) -> None:
     """An explicit axis wins over the sidecar, so the label names what was used."""
     scan = q.QAScan.from_nifti(write_scan(tmp_path))

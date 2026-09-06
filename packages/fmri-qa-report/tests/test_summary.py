@@ -87,3 +87,22 @@ def test_appendix_rows_name_the_computing_version(artifact) -> None:
 def test_appendix_accounts_for_a_scan_without_a_sidecar(bare_artifact) -> None:
     ((_, detail),) = summary._appendix_rows([("bare", bare_artifact)])
     assert "computed by fmri-qa-core" in detail  # still accounted for
+
+
+def test_a_collapsed_phantom_mask_is_called_out(artifact) -> None:
+    """A bad mask invalidates every mask-based number on the page.
+
+    It has to say so on the acquisition line: the metrics themselves still look
+    like ordinary measurements, so a reader has nothing else to go on.
+    """
+    collapsed = _clipped(artifact, phantom_fraction=1.0)
+    assert "BAD PHANTOM MASK (100% of frame)" in summary._acquisition_line(collapsed)
+
+
+def test_an_off_phantom_roi_is_called_out(artifact) -> None:
+    outside = _clipped(artifact, roi_inside_phantom=False)
+    assert "ROI NOT INSIDE PHANTOM" in summary._acquisition_line(outside)
+
+
+def test_a_well_localized_run_carries_no_localization_note(artifact) -> None:
+    assert summary._localization_note(artifact) == ""

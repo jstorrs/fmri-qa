@@ -21,6 +21,12 @@ versioning when the first stable public interface is released.
 - Atomic PDF writes and pagination for packet cover and provenance sections.
 - Build-artifact smoke tests in CI.
 - MIT licensing and distributable package-license metadata.
+- Localization diagnostics in the artifact. `Measurements` now carries
+  `phantom_fraction` (the share of the frame the phantom mask covers) and
+  `roi_inside_phantom`, so a stored artifact says whether the segmentation and
+  the summary ROI held — the difference between "the estimator declined" and
+  "the analysis was measuring background". A report calls either failure out on
+  the acquisition line. Artifact schema version 2.
 
 ### Fixed
 

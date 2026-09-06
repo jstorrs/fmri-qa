@@ -23,7 +23,7 @@ from ..load.scan import QAScan
 from ..metrics.ghost import GHOST_RADIUS, ghost_masks
 from ..metrics.smoothness import SmoothnessResult
 from ..pipeline import QAResult, run_qa
-from ..prep.geometry import ROI
+from ..prep.geometry import ROI, roi_fits
 from ..types import BoolArray, FloatArray
 from .artifact import (
     AnalysisSettings,
@@ -196,6 +196,8 @@ def _measurements(result: QAResult, settings: AnalysisSettings) -> Measurements:
         fwhm_pe=sm.fwhm_pe,
         fwhm_ro=sm.fwhm_ro,
         fwhm_unit="mm" if sm.voxel_mm is not None else "vox",
+        phantom_fraction=result.geom.fraction,
+        roi_inside_phantom=roi_fits(result.geom.phantom_mask, result.roi.index),
     )
 
 

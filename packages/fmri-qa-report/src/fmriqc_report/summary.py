@@ -69,7 +69,26 @@ def _acquisition_line(artifact: QAArtifact) -> str:
     parts.append(detrend)
     if clip := _clipping_note(artifact):
         parts.append(clip)
+    if localization := _localization_note(artifact):
+        parts.append(localization)
     return _SEP.join(parts)
+
+
+def _localization_note(artifact: QAArtifact) -> str:
+    """The phantom/ROI localization warning for the acquisition line; empty if fine.
+
+    Both failures make every mask-based number on the page meaningless while
+    leaving it looking like an ordinary measurement, so they are called out in
+    capitals next to the metrics they invalidate rather than left for a reader to
+    infer from a NaN.
+    """
+    m = artifact.measurements
+    notes = []
+    if not 0.0 < m.phantom_fraction < 0.95:
+        notes.append(f"BAD PHANTOM MASK ({100 * m.phantom_fraction:.0f}% of frame)")
+    if not m.roi_inside_phantom:
+        notes.append("ROI NOT INSIDE PHANTOM")
+    return _SEP.join(notes)
 
 
 def _clipping_note(artifact: QAArtifact) -> str:
