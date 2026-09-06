@@ -9,9 +9,11 @@ import fmriqc as q
 from fmriqc.prep.imaging import (
     _clamp_center,
     edge_valid_mask,
+    extract_center_slice,
     fluctuation_noise,
     image_center,
     odd_even_difference,
+    phantom_area,
     roi_indexes,
     segment_phantom,
     trim_initial,
@@ -22,6 +24,12 @@ def _disk(n: int = 32) -> np.ndarray:
     """A centered boolean disk of radius n/4 — the fixtures' phantom shape."""
     yy, xx = np.mgrid[0:n, 0:n]
     return np.asarray(((xx - n / 2) ** 2 + (yy - n / 2) ** 2) < (n / 4) ** 2)
+
+
+def _air(shape: tuple[int, ...], seed: int = 0, scale: float = 8.0) -> np.ndarray:
+    """A magnitude noise floor — one frame's worth of air, holding no phantom."""
+    rng = np.random.default_rng(seed)
+    return np.abs(rng.normal(scale=scale, size=shape))
 
 
 def test_trim_initial_drops_leading_volumes() -> None:
@@ -133,3 +141,53 @@ def test_detect_phantom_is_quiet_on_a_separable_phantom() -> None:
         warnings.simplefilter("error")  # any warning here fails the test
         geom = q.detect_phantom(images)
     assert 0.0 < geom.fraction < 0.95
+
+
+def test_phantom_area_scores_a_frame_of_air_as_no_phantom() -> None:
+    """Segmenting noise yields a mask; it must not count as a cross-section.
+
+    The watershed seeds one quantile of the noise against the other and labels
+    roughly half the frame, which is *larger* than a real phantom's share -- so
+    area alone would rank an empty slice above the phantom. What separates them
+    is contrast: the labelled half of the air stands barely above the rest.
+    """
+    air = _air((64, 64))
+    assert 0.3 < segment_phantom(air).mean() < 0.6  # a mask, and a big one
+    assert phantom_area(air) == 0  # but not a phantom
+
+
+def test_phantom_area_counts_a_real_cross_section() -> None:
+    disk = _disk(64)
+    image = np.where(disk, 1000.0, 0.0) + _air((64, 64))
+    assert phantom_area(image) == disk.sum()
+
+
+def test_extract_center_slice_prefers_the_phantom_over_a_larger_air_mask() -> None:
+    """A prescription running off the end of the phantom must not win the argmax.
+
+    Slices past the phantom hold only air, which segments to ~45% of the frame
+    against the cross-section's ~20%: ranking slices by segmented area alone
+    selects one of them, and every metric is then measured on background.
+    """
+    disk = _disk(64)
+    air = np.stack([_air((64, 64), seed=s) for s in (1, 2)], axis=-1)
+    phantom = np.where(disk, 1000.0, 0.0)[:, :, None] + _air((64, 64, 2), seed=3)
+    # (X, Y, Z, T) with the phantom in slice 1 and air either side of it
+    data = np.stack([air, phantom, air], axis=2)
+
+    chosen = extract_center_slice(data, center="phantom")
+
+    assert np.array_equal(chosen, data[:, :, 1, :])
+
+
+def test_extract_center_slice_falls_back_when_no_slice_holds_a_phantom() -> None:
+    """An all-air volume has no cross-section to find, and says so.
+
+    Silently returning the largest patch of segmented noise would be the old
+    behavior wearing a different mask; the middle slice is the honest answer and
+    matches what center='image' would have given.
+    """
+    data = _air((32, 32, 3, 4))
+    with pytest.warns(UserWarning, match="no slice holds a recognizable phantom"):
+        chosen = extract_center_slice(data, center="phantom")
+    assert np.array_equal(chosen, data[:, :, 1, :])  # the middle slice

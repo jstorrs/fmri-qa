@@ -7,12 +7,29 @@ primitives, and a couple of numeric helpers. Everything here is a pure
 types, so it can be shared without import cycles.
 """
 
+import warnings
+
 import numpy as np
 from scipy import ndimage
 from skimage import filters, segmentation
 
 from ..exceptions import InvalidChoiceError
 from ..types import ROI_CENTER_MODES, BoolArray, FloatArray, IntArray, RoiCenter
+
+# Open bounds on the plausible share of a frame a phantom mask covers. Outside
+# them the segmentation has collapsed rather than found an unusual phantom: a
+# QA phantom is prescribed to fill a good part of the FOV but never all of it,
+# and never none. Deliberately wide — this catches collapse, not miscalibration.
+# Defined here beside `segment_phantom`, whose output they describe; `geometry`
+# imports them for the warning `detect_phantom` raises.
+DEGENERATE_PHANTOM_MIN = 0.0
+DEGENERATE_PHANTOM_MAX = 0.95
+
+# Least in-mask/out-of-mask intensity ratio a mask must show to be a phantom
+# rather than a partition of noise (see `phantom_area`). Measured on synthetic
+# frames: air segments at ~1.5-1.9, a phantom only 7x above the air floor at
+# ~10, a normal phantom at ~160. Deliberately nearer the noise end.
+MIN_PHANTOM_CONTRAST = 4.0
 
 
 def trim_count(tr: float, trim_sec: float) -> int:
@@ -46,11 +63,38 @@ def segment_phantom(image: FloatArray) -> BoolArray:
     return np.asarray(segmentation.watershed(edges, labels) == 2)
 
 
+def phantom_area(image: FloatArray) -> int:
+    """Segmented phantom area (voxels), or 0 for an image holding no phantom.
+
+    `segment_phantom` always returns *some* mask: given a frame of pure air it
+    seeds one quantile of the noise against the other and labels about half of
+    it. Area alone therefore cannot rank slices — an air slice (~45% of the
+    frame) out-votes a real cross-section (~20%) — so the mask must first be
+    shown to *be* a phantom. Two cheap tests do it: the mask covers a plausible
+    share of the frame, and what it selected stands `MIN_PHANTOM_CONTRAST` above
+    the background it was separated from, which a partition of noise never does.
+    """
+    mask = segment_phantom(image)
+    if not DEGENERATE_PHANTOM_MIN < mask.mean() < DEGENERATE_PHANTOM_MAX:
+        return 0
+    inside = float(image[mask].mean())
+    background = float(image[~mask].mean())
+    # An exactly-zero background (a background-suppressed reconstruction) makes
+    # the ratio infinite; any signal at all is then contrast enough.
+    if background <= 0:
+        return int(mask.sum()) if inside > 0 else 0
+    return int(mask.sum()) if inside / background >= MIN_PHANTOM_CONTRAST else 0
+
+
 def extract_center_slice(data: FloatArray, center: RoiCenter = "image") -> FloatArray:
     """Select the QA slice from a volume.
 
     "image": the geometric middle slice (Glover/fBIRN convention).
-    "phantom": the slice with the largest phantom cross-section (detected).
+    "phantom": the slice with the largest phantom cross-section, measured by
+    `phantom_area` — which scores a slice holding no phantom as 0, so a
+    prescription that runs off the end of the phantom cannot win on the strength
+    of a segmentation of its own air. If no slice holds a recognizable phantom,
+    the middle slice is used and a warning says so.
 
     Raises:
         InvalidChoiceError: If `center` is not one of `ROI_CENTER_MODES`.
@@ -59,7 +103,17 @@ def extract_center_slice(data: FloatArray, center: RoiCenter = "image") -> Float
         z = data.shape[2] // 2
     elif center == "phantom":
         mip = data.max(axis=-1)
-        z = int(np.argmax([segment_phantom(s).sum() for s in np.moveaxis(mip, -1, 0)]))
+        areas = [phantom_area(s) for s in np.moveaxis(mip, -1, 0)]
+        if any(areas):
+            z = int(np.argmax(areas))
+        else:
+            z = data.shape[2] // 2
+            warnings.warn(
+                "no slice holds a recognizable phantom (every segmentation was "
+                "degenerate or indistinguishable from background); using the "
+                f"middle slice {z} as center='image' would.",
+                stacklevel=2,
+            )
     else:
         raise InvalidChoiceError("center", center, ROI_CENTER_MODES)
     return data[:, :, z, :]

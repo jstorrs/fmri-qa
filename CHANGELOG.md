@@ -39,6 +39,13 @@ versioning when the first stable public interface is released.
   vacuously, the N/2 ghost region eroded to nothing (NaN ghost percentages), and
   SFNR divided by a noiseless floor. The seeds are now inclusive, and
   `detect_phantom` warns when a mask comes out degenerate either way.
+- **`--center phantom` selecting a slice with no phantom in it.** The mode took
+  the slice with the largest *segmented* area, but segmenting a slice of pure
+  air still labels about half the frame — more than a real cross-section — so a
+  prescription running past the end of the phantom analyzed background instead.
+  A slice now counts only if what its mask selected stands clear of the
+  background it was separated from; if no slice does, the middle slice is used
+  and a warning says so.
 - **`fmri-qa --artifact` silently discarding a scan.** A batch names each
   artifact after the scan's stem, so inputs sharing a file name across
   directories (`a/scan.nii.gz`, `b/scan.nii.gz`) overwrote one another and a

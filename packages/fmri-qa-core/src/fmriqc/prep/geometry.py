@@ -14,6 +14,8 @@ from ..exceptions import InvalidChoiceError
 from ..types import ROI_CENTER_MODES, BoolArray, IntArray, RoiCenter
 from .images import QAImages
 from .imaging import (
+    DEGENERATE_PHANTOM_MAX,
+    DEGENERATE_PHANTOM_MIN,
     _clamp_center,
     find_phantom_center,
     image_center,
@@ -23,13 +25,6 @@ from .imaging import (
 
 # Fixed summary-ROI side (voxels). Glover/fBIRN uses 21; user-configurable.
 FBIRN_ROI_SIZE = 21
-
-# Open bounds on the plausible share of the frame a phantom mask covers. Outside
-# them the segmentation has collapsed rather than found an unusual phantom: a
-# QA phantom is prescribed to fill a good part of the FOV but never all of it,
-# and never none. Deliberately wide — this catches collapse, not miscalibration.
-DEGENERATE_PHANTOM_MIN = 0.0
-DEGENERATE_PHANTOM_MAX = 0.95
 
 
 @dataclass(frozen=True, eq=False)
