@@ -235,10 +235,12 @@ Published work using the package should cite the software metadata in
 [`CHANGELOG.md`](CHANGELOG.md).
 
 The exploratory notebooks (DICOM conversion, BIDS, and interactive viewers) pull
-in a heavier stack — install it with the core package's `notebooks` extra:
+in a heavier stack. It is development tooling, not part of either published
+distribution, so it lives in the workspace's `notebooks` dependency group and
+stays out of the default sync:
 
 ```bash
-uv sync --all-packages --all-extras
+make sync-notebooks    # uv sync --all-packages --all-extras --group notebooks
 ```
 
 ## Command line

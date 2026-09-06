@@ -29,15 +29,20 @@ alongside the code. Integration tests go through the import surface a real calle
 (`import mypackage; mypackage.load(path)`), which makes them a second check that the public
 API ([architecture.md](architecture.md#simple-public-interfaces)) is actually usable.
 
-The workspace pins the layout in each package's `[tool.pytest.ini_options]`:
+The workspace pins the layout once, in the root `pyproject.toml` — one `pytest` run
+covers both packages, so a change to the artifact is tested on both sides of the seam
+together:
 
 ```toml
 [tool.pytest.ini_options]
-testpaths = ["tests"]
+testpaths = ["packages/fmri-qa-core/tests", "packages/fmri-qa-report/tests"]
 python_files = ["test_*.py"]
 python_functions = ["test_*"]
-addopts = "-v --tb=short"
+addopts = "-v --tb=short --import-mode=importlib"
 ```
+
+`--import-mode=importlib` is what lets both packages name a test file for what it tests —
+each has a `test_cli.py` — without the module names colliding.
 
 ## `assert` and `pytest.raises` Are the Assertion
 
@@ -97,12 +102,14 @@ Keep hypothesis deterministic: it manages its own seeds and example database —
 rather than seeding a strategy from the wall clock. A property that only holds "usually"
 is a bug in the property or the code, not a reason to retry.
 
-## Benchmarks
+## Performance
 
-Performance work uses **pytest-benchmark**, kept separate from correctness tests (see the
-root `Makefile`'s `benchmark` / `benchmark-compare` targets, which `--benchmark-autosave`
-to per-hostname storage). Benchmarks *measure*; they don't gate correctness — a slow test
-run is a signal, not a failed assertion.
+There is no benchmark suite here, and the test run is not one. **Benchmarks measure; tests
+assert** — so don't smuggle a timing assertion into the correctness tests, where a loaded
+CI runner turns it into a flake and violates the determinism rule above. If a metric's cost
+starts to matter, measure it in a scratch script and record the number in `notes/`; add a
+real benchmark harness (and a `make` target for it) only once the measurement needs to be
+repeatable, and keep it out of `make check`.
 
 ## Fixtures and Test Data
 
@@ -121,11 +128,15 @@ run is a signal, not a failed assertion.
 Part of the standard loop in [tooling.md](tooling.md):
 
 ```bash
-make test        # one package: uv run pytest tests/ -v
-make all         # whole workspace: lint typecheck test
+make test        # uv run pytest across both packages
+make all         # lint typecheck pyright test
+make check       # the gate: the above, plus a 90% coverage floor
 ```
 
-Green across the workspace is the bar before a change is done; CI runs the same.
+Coverage is opt-in — `make check` passes `--cov --cov-fail-under=90`, so a bare
+`uv run pytest packages/fmri-qa-core/tests/test_ghost.py` stays fast and doesn't trip the
+workspace-wide floor. Green across the workspace is the bar before a change is done; CI
+runs `make check`.
 
 ## Don't
 

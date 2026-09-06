@@ -22,6 +22,27 @@ dev = [
     "pytest-cov>=6.0",
     "ruff>=0.13",
 ]
+# The exploratory notebooks (DICOM conversion, BIDS, interactive viewers) need a
+# far heavier stack than either distribution ships. It is development tooling,
+# so it belongs to the workspace root as a group and not to a published extra —
+# whoever installs fmri-qa-core should never be offered JupyterLab. It is not in
+# the default sync; take it with `make sync-notebooks`.
+notebooks = [
+    "dcm2bids>=3.2.0",
+    "dcm2niix>=1.0.20250506",
+    "ipympl>=0.9.8",
+    "ipython>=9.6.0",
+    "ipywidgets>=8.1.7",
+    "jupyterlab>=4.4.10",
+    "nilearn>=0.12.1",
+    "niwidgets>=0.2.1",
+    "pydicom>=3.0.1",
+    "scikit-fem>=12.0.2",
+]
+
+# Sync the dev group by default; notebooks stays opt-in.
+[tool.uv]
+default-groups = ["dev"]
 
 [tool.ruff]
 line-length = 88

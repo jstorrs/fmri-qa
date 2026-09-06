@@ -1,15 +1,30 @@
 # Runs the standard loop earlier — see style/tooling.md.
 # Install once with `uv run pre-commit install`.
+#
+# Every hook is local and goes through `uv run`, so a commit is checked by the
+# exact ruff and mypy pinned in uv.lock. A remote hook pins its own copy of
+# ruff, which drifts from the locked one and lets the hook and `make check`
+# disagree about formatting.
+#
+# `--force-exclude` makes ruff honour the root pyproject's `extend-exclude` even
+# for the paths pre-commit hands it explicitly.
 repos:
-  - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.13.0
-    hooks:
-      - id: ruff
-        args: [--fix]
-      - id: ruff-format
-
   - repo: local
     hooks:
+      - id: ruff-check
+        name: ruff check
+        entry: uv run ruff check --fix --force-exclude
+        language: system
+        types_or: [python, pyi]
+        require_serial: true
+
+      - id: ruff-format
+        name: ruff format
+        entry: uv run ruff format --force-exclude
+        language: system
+        types_or: [python, pyi]
+        require_serial: true
+
       - id: mypy
         name: mypy
         entry: uv run mypy

@@ -12,7 +12,7 @@ the build.
 2. **No warnings left standing** — a lint hit or type error is either worth fixing or worth
    silencing explicitly, with a reason. Don't let them accumulate as background noise.
 3. **The type checkers are your always-on checker — design for them** — Python's types are
-   checked by `mypy`/`pyright`/`pyrefly`, not the interpreter. Lean on them by shaping types
+   checked by `mypy` and `pyright`, not the interpreter. Lean on them by shaping types
    so invalid states don't typecheck (see [architecture.md](architecture.md#type-driven-design)).
 
 ## Package Management: `uv`
@@ -23,8 +23,13 @@ declares `[tool.uv.workspace]` members, `.python-version` pins the interpreter (
 
 - Everything runs through `uv run` — `uv run pytest`, `uv run ruff check`, `uv run mypy`.
   Don't reach for a system `python`/`pip`; the locked environment is the source of truth.
-- Sync with **`uv sync --all-extras`** — in this workspace, syncing a subset breaks other
-  packages' optional deps. Always take all extras.
+- Sync with **`uv sync --all-packages --all-extras`** (`make sync`) — syncing one member
+  leaves the other's dependencies out, and the gate runs across both. Always take the whole
+  workspace.
+- **Development tooling belongs to a root dependency group, not to a package's extras.** An
+  extra is published metadata: whoever installs `fmri-qa-core` is offered it. The heavy
+  exploratory notebook stack (JupyterLab, nilearn, dcm2bids) is a `notebooks` group on the
+  workspace root instead, outside the default sync — take it with `make sync-notebooks`.
 
 ## Formatting: `ruff format`
 
@@ -52,12 +57,17 @@ The root config selects a broad rule set — the notable groups:
 | `UP` | pyupgrade — modern syntax for the target version |
 | `SIM`, `RET`, `PIE`, `FURB`, `C4` | simplifications: flatten `if`/`else`, drop dead branches, prefer comprehensions |
 | `S` | flake8-bandit security checks |
+| `BLE` | blind `except` (a justified batch catch carries a scoped `noqa`) |
 | `PERF` | performance anti-patterns |
-| `TCH` | move type-only imports under `TYPE_CHECKING` |
 | `PLE`/`PLC`/`PLW` | pylint errors, conventions, warnings |
 | `PTH` | prefer `pathlib` over `os.path` |
 | `G` | logging-format correctness (see [logging.md](logging.md)) |
 | `A` | shadowing builtins |
+| `T20` | `print` outside a binary (see [logging.md](logging.md)) |
+| `RUF` | ruff's own rules, including ambiguous Unicode |
+
+`TC` (moving type-only imports under `TYPE_CHECKING`) and `D` (docstrings) are deliberately
+left out for now, and the config says so in a comment.
 
 - Run `uv run ruff check` (or `--fix` to auto-apply, `make lint`). A hit fails the build.
 - **Fix, don't suppress.** A ruff hit usually points at a real simplification — the `SIM`,
@@ -68,7 +78,7 @@ The root config selects a broad rule set — the notable groups:
   entry with a comment. Never blanket a whole package to dodge one line — this is the
   *practicality beats purity* exception from [zen.md](zen.md), made explicit.
 - The workspace already uses `per-file-ignores` deliberately: tests re-allow `assert`
-  (`S101`) and magic values (`PLR2004`); `cli.py`/`main.py` re-allow `print` (`T201`) —
+  (`S101`) and magic values (`PLR2004`); `cli.py`/`__main__.py` re-allow `print` (`T201`) —
   that last one is the "output belongs to the binary" rule from [logging.md](logging.md)
   turned into config.
 - Add or tighten a rule when a class of mistake recurs; the rule set is itself a living
@@ -76,18 +86,19 @@ The root config selects a broad rule set — the notable groups:
 
 ## Type Checking: the always-on checker
 
-Rust has a compiler; Python has a stack of type checkers, and this workspace runs several —
+Rust has a compiler; Python has a stack of type checkers, and this workspace runs two —
 a clean pass on each is the bar:
 
-- **`mypy`** — per package `strict = true`, with `warn_unused_ignores` and
+- **`mypy`** — `strict = true` at the workspace root, with `warn_unused_ignores` and
   `warn_return_any`; third-party stubs live in `stubs/`.
 - **`pyright`** — `typeCheckingMode = "standard"`; fast, and stricter than mypy on some
   inference.
-- **`pyrefly`** and **`ty`** — newer, very fast checkers run as their own targets.
 
-Why more than one? Each catches things the others miss, and they disagree at the edges of
-inference — **agreement across them is strong signal** that the types are sound.
-`make typecheck` runs mypy + pyright; `make pyrefly` and `make ty` are separate targets.
+Why more than one? Each catches things the other misses, and they disagree at the edges of
+inference — **agreement across them is strong signal** that the types are sound. Both read
+the same source list and the same local stubs, so neither half of the workspace is checked
+more loosely than the other. `make typecheck` runs mypy and `make pyright` runs pyright;
+`make all` runs both.
 
 This is the type-design counterpart to linting aggressively. The leverage is in *what you
 give the checkers to check* — see [architecture.md → Type-Driven Design](architecture.md#type-driven-design):
@@ -149,20 +160,33 @@ Writing a local stub:
 
 ## Security and Supply Chain
 
-Python code pulls in dependencies and touches the filesystem, so security scanning is part
-of the loop (`make security`):
+Python code pulls in dependencies and touches the filesystem, so the security posture is
+part of the standard loop rather than a separate audit step:
 
-- **`bandit`** — static security analysis (config in `bandit.yaml`); complements ruff's `S`.
-- **`pip-audit`** — flags dependencies with known CVEs.
-- **`semgrep`** — pattern-based static analysis.
-- **`licensecheck`** — audits dependency licenses for compatibility.
+- **ruff's `S` group** (flake8-bandit) runs on every `make lint`, so the static security
+  checks are in the gate that already has to pass — not in a scan someone remembers to run.
+- **`uv.lock` is committed**, and CI syncs with `--locked`, so a dependency cannot change
+  under a build without the change appearing in a diff.
+- **Dependency bounds are floors with a stated reason** when the reason isn't obvious —
+  `svglib>=2.0.2,<2.1` is capped because the report driver patches a private converter, and
+  the comment beside it says so.
+
+There is no separate scanner suite here (no bandit config, no `make security`). If a class
+of finding starts recurring, add the tool and give it a `make` target — but keep the
+principle: a check nobody runs protects nothing.
 
 ## Pre-commit
 
-`.pre-commit-config.yaml` runs the same tools earlier: `ruff --fix`, `ruff-format`, and
-per-package `mypy` on every commit. Install once with `uv run pre-commit install`; run
-across everything with `uv run pre-commit run --all-files`. The hook isn't a different
-standard — it's the standard loop moved left so drift never reaches a branch.
+`.pre-commit-config.yaml` runs the same tools earlier: `ruff check --fix`, `ruff format`,
+and `mypy` on every commit. Install once with `uv run pre-commit install`; run across
+everything with `uv run pre-commit run --all-files`. The hook isn't a different standard —
+it's the standard loop moved left so drift never reaches a branch.
+
+**Every hook is `local` and shells out through `uv run`**, so it uses the ruff and mypy
+pinned in `uv.lock`. A remote hook (`ruff-pre-commit`) pins a version of its own, which
+drifts from the locked one, and then the hook and `make check` disagree about formatting —
+the one thing the formatter exists to prevent. When a hook needs a tool, add the tool to the
+dev group and let `uv run` find it.
 
 ## The Standard Loop
 
@@ -171,13 +195,15 @@ Before considering a change done:
 ```bash
 uv run ruff format .      # or: make format
 uv run ruff check .       # or: make lint       — a hit fails the build
-make typecheck            # mypy + pyright  (+ make pyrefly / make ty)
+make typecheck            # mypy
+make pyright              # pyright
 make test                 # uv run pytest      — see testing.md
 ```
 
-Or just `make all` (= `lint typecheck test`). Green on all is the bar; CI enforces the same,
-so running it locally just shortens the feedback loop. `make -j` runs the packages in
-parallel.
+Or just `make all` (= `lint typecheck pyright test`). `make check` is the gate itself: the
+same steps with `ruff format --check` instead of a rewrite, plus a coverage floor and a
+`cmp` that each package's shipped `LICENSE` still matches the root one. Green is the bar;
+CI runs `make check` verbatim, so running it locally just shortens the feedback loop.
 
 ## Don't
 

@@ -26,7 +26,7 @@ State intent in the types and the API, not in the reader's head.
 - Don't hide behind a bare `except Exception` or a stringly-typed error — raise a named
   subclass of your package's base exception.
 - Positive boolean names (`is_valid`, not `not is_invalid`).
-- Type your public API and let mypy/pyright/pyrefly check it; annotations are the contract
+- Type your public API and let mypy/pyright check it; annotations are the contract
   written down.
 
 → [architecture.md](architecture.md), [exceptions.md](exceptions.md), [logging.md](logging.md), [tooling.md](tooling.md)
