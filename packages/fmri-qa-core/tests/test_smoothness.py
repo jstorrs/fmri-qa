@@ -6,6 +6,8 @@ the direction of an anisotropically smoothed noise field (larger FWHM along the
 smoothed axis).
 """
 
+import warnings
+
 import numpy as np
 from scipy.ndimage import gaussian_filter1d
 
@@ -62,3 +64,20 @@ def test_estimate_smoothness_recovers_the_smoothed_direction() -> None:
     assert res.fwhm_pe > res.fwhm_ro  # pe_axis=0 is the smoothed axis
     assert res.lags[0] == 0
     assert np.allclose(res.acf[:, 0], 1.0)  # zero-lag autocorrelation is 1
+
+
+def test_smoothness_of_a_constant_series_declines_quietly() -> None:
+    """No temporal variation leaves no working mask, and nothing to correlate.
+
+    `estimate_smoothness` drops voxels that are constant over time, so a
+    constant series leaves the working mask empty and the autocorrelation has
+    neither an in-mask mean nor a variance to normalize by. The estimator must
+    answer NaN rather than reduce an empty selection and let numpy's warning out
+    of a library that is only being asked a question it can decline.
+    """
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", RuntimeWarning)
+        res = estimate_smoothness(np.zeros((8, 8, 6)), np.ones((8, 8), dtype=bool))
+
+    assert np.isnan(res.fwhm_vox[0]) and np.isnan(res.fwhm_vox[1])
+    assert np.all(np.isnan(res.acf[:, 1:]))  # zero lag is 1 by construction

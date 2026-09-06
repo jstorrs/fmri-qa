@@ -171,11 +171,15 @@ def _acf_1d(image: FloatArray, mask: BoolArray, axis: int, max_lag: int) -> Floa
     the in-mask variance, so `rho[d]` is the correlation of the noise field with
     itself `d` voxels apart along `axis`, over neighbor pairs that are *both* in
     `mask`. `rho[0]` is 1 by construction; a lag with too few in-mask pairs (or a
-    constant frame) is NaN.
+    constant frame) is NaN. A mask holding fewer than two voxels — which the
+    working mask is whenever every voxel is constant over time — has neither a
+    mean nor a variance to normalize by, so every lag is NaN.
     """
     rho = np.full(max_lag + 1, np.nan)
     rho[0] = 1.0
     vals = image[mask]
+    if vals.size < 2:
+        return rho
     fbar = float(vals.mean())
     fvar = float(vals.var())
     if fvar <= 0:

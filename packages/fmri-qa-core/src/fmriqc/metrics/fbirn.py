@@ -106,7 +106,11 @@ def snr(images: QAImages, roi: ROI) -> float:
     25% low. Frame parity is set by `--trim-sec`, so the same series would score
     differently for a one-volume change in the warm-up trim. The trailing frame
     is dropped from the difference only; the signal still averages the full
-    series. NaN for a series too short to hold one odd/even pair.
+    series. NaN for a series too short to hold one odd/even pair, and NaN when
+    the difference image has no variance across the ROI at all: there is no
+    static noise to measure the signal against, so the ratio is undefined rather
+    than infinite — the same answer the sibling metrics give for a quantity they
+    cannot resolve.
     """
     idx = roi.index
     cs = images.center_slice
@@ -116,7 +120,9 @@ def snr(images: QAImages, roi: ROI) -> float:
     paired = cs[..., :n_frames]
     diff = paired[..., 1::2].sum(axis=-1) - paired[..., 0::2].sum(axis=-1)
     signal = images.mean_image[*idx].mean()
-    var_summary = diff[*idx].var()
+    var_summary = float(diff[*idx].var())
+    if var_summary == 0.0:
+        return float("nan")
     return float(signal / np.sqrt(var_summary / n_frames))
 
 
@@ -125,10 +131,18 @@ def sfnr(images: QAImages, roi: ROI) -> float:
 
     Mean over the ROI of the voxelwise SFNR image (temporal-mean signal divided
     by temporal fluctuation noise).
+
+    NaN if any ROI voxel has no fluctuation noise at all: its own ratio is
+    undefined, and an average over the ROI cannot be more defined than the
+    voxels it averages. (The per-voxel SFNR *image* in `analysis.build` is a
+    different question — it is drawn, not reduced, and floors the divisor so a
+    noiseless voxel renders instead of blanking the map.)
     """
     idx = roi.index
-    sfnr_image = images.mean_image[*idx] / images.fluctuation_noise[*idx]
-    return float(sfnr_image.mean())
+    noise = images.fluctuation_noise[*idx]
+    if not np.all(noise):
+        return float("nan")
+    return float((images.mean_image[*idx] / noise).mean())
 
 
 def drift_percent(images: QAImages, roi: ROI) -> float:
