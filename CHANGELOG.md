@@ -38,6 +38,11 @@ versioning when the first stable public interface is released.
   vacuously, the N/2 ghost region eroded to nothing (NaN ghost percentages), and
   SFNR divided by a noiseless floor. The seeds are now inclusive, and
   `detect_phantom` warns when a mask comes out degenerate either way.
+- **`fmri-qa --artifact` silently discarding a scan.** A batch names each
+  artifact after the scan's stem, so inputs sharing a file name across
+  directories (`a/scan.nii.gz`, `b/scan.nii.gz`) overwrote one another and a
+  later report packet was quietly missing scans. Such a batch is now refused
+  before any analysis runs.
 
 ### Changed
 

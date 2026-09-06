@@ -60,6 +60,44 @@ def test_main_saves_one_artifact_per_scan_in_a_batch(
     assert q.load_artifact(out / "first.qa.npz").provenance.scan == "first.nii.gz"
 
 
+def test_main_refuses_a_batch_whose_artifacts_would_collide(
+    tmp_path, write_scan, capsys
+) -> None:
+    """Same-named scans from different directories must not overwrite silently.
+
+    A batch names each artifact after the scan's stem, so `a/scan.nii.gz` and
+    `b/scan.nii.gz` land on one file: the second analysis replaces the first and
+    a later `fmri-qa-report BASE/*.npz` renders a packet quietly missing a scan.
+    The run is refused up front instead, before any analysis is done.
+    """
+    (tmp_path / "a").mkdir()
+    (tmp_path / "b").mkdir()
+    first = write_scan(tmp_path / "a", name="scan")
+    second = write_scan(tmp_path / "b", name="scan", seed=3)
+    out = tmp_path / "artifacts"
+
+    rc = cli.main([first, second, "--roi-size", "9", "--artifact", str(out)])
+
+    assert rc == 1
+    err = capsys.readouterr().err
+    assert "would both be saved as" in err
+    assert not out.exists()  # refused before analyzing, so nothing was written
+
+
+def test_main_allows_a_batch_of_distinctly_named_scans(
+    tmp_path, write_scan, capsys
+) -> None:
+    """The guard keys on the destination, not on the directory: no false alarm."""
+    (tmp_path / "a").mkdir()
+    (tmp_path / "b").mkdir()
+    first = write_scan(tmp_path / "a", name="run1")
+    second = write_scan(tmp_path / "b", name="run2", seed=3)
+    out = tmp_path / "artifacts"
+    rc = cli.main([first, second, "--roi-size", "9", "--artifact", str(out)])
+    assert rc == 0
+    assert sorted(p.name for p in out.glob("*.npz")) == ["run1.qa.npz", "run2.qa.npz"]
+
+
 def test_main_reports_artifact_failure_without_a_traceback(
     tmp_path, write_scan, capsys
 ) -> None:

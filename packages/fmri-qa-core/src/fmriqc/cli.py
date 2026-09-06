@@ -68,6 +68,22 @@ def _artifact_path(base: str, path: str, batch: bool) -> Path:
     return Path(base) / f"{_scan_stem(path)}{_ARTIFACT_SUFFIX}"
 
 
+def _artifact_collisions(base: str, paths: Sequence[str]) -> dict[Path, list[str]]:
+    """Destinations that more than one input scan would be written to.
+
+    A batch names each artifact by the scan's stem, so inputs from different
+    directories with the same file name (`sub-01/qa.nii.gz`, `sub-02/qa.nii.gz`)
+    collide. Writing them in turn would leave one file holding the last scan's
+    analysis and silently drop the rest, and a later `fmri-qa-report BASE/*.npz`
+    would render a packet quietly missing scans. `main` checks this up front and
+    refuses rather than analyze work it cannot keep.
+    """
+    destinations: dict[Path, list[str]] = {}
+    for path in paths:
+        destinations.setdefault(_artifact_path(base, path, batch=True), []).append(path)
+    return {dest: srcs for dest, srcs in destinations.items() if len(srcs) > 1}
+
+
 def _metric_record(artifact: q.QAArtifact) -> dict[str, object]:
     """The scalar metrics for one scan as a JSON-serializable record.
 
@@ -168,6 +184,25 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
 
+    batch = len(args.paths) > 1
+    # Refuse before analyzing anything: a collision would silently discard a
+    # completed analysis, so it is a usage error, not a per-scan failure.
+    if args.artifact and batch:
+        collisions = _artifact_collisions(args.artifact, args.paths)
+        if collisions:
+            for dest, sources in sorted(collisions.items()):
+                print(
+                    f"ERROR: {' and '.join(sources)} would both be saved as {dest}",
+                    file=sys.stderr,
+                )
+            print(
+                "ERROR: --artifact names each file after the scan, so scans "
+                "sharing a name overwrite each other; rename them or analyze "
+                "them in separate runs.",
+                file=sys.stderr,
+            )
+            return 1
+
     settings = q.AnalysisSettings(
         trim_sec=args.trim_sec,
         detrend=args.detrend,
@@ -188,7 +223,6 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     failed = False
     records = []
-    batch = len(args.paths) > 1
     for path in args.paths:
         try:
             scan = q.QAScan.from_nifti(path)
