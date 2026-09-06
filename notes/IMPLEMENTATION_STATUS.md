@@ -1,9 +1,9 @@
 # Implementation status vs. `notes/`
 
-How the `fmriqc` pipeline (`src/fmriqc/`) lines up with the methods described in
-the other `notes/` files. Read this alongside `fMRI_QA_Implementation_Guide.md`
-(the Glover 2005 / Friedman & Glover 2006 GSQAP rubric the rest are measured
-against).
+How the `fmriqc` pipeline (`packages/fmri-qa-core/src/fmriqc/`) lines up with
+the methods described in the other `notes/` files. Read this alongside
+`fMRI_QA_Implementation_Guide.md` (the Glover 2005 / Friedman & Glover 2006
+GSQAP rubric the rest are measured against).
 
 **Summary:** the implementation is a faithful GSQAP **core (conformance
 Levels A + B)** — every scalar metric matches the guide, and detrending matches
@@ -96,9 +96,9 @@ Ranked by value for phantom QA.
    flagging.
 2. **Background/air QA** (cran `max_bg_perc`) and **`@radial_correlate`**
    structured-artifact detection — future directions.
-3. **FFT spectrum normalization.** `report.py._plot_spectrum` plots raw
-   magnitude; `bxh` normalizes to percent-of-mean (`·100/m`) for cross-scan
-   comparability. Cosmetic.
+3. **FFT spectrum normalization.** The report's `_plot_spectrum`
+   (`fmriqc_report.panels.timeseries`) plots raw magnitude; `bxh` normalizes to
+   percent-of-mean (`·100/m`) for cross-scan comparability. Cosmetic.
 
 ---
 

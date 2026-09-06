@@ -3,9 +3,10 @@
 Status: implemented (all five phases; see [Phasing](#phasing)). Remaining
 follow-up: the deferred acceptance-threshold subsystem.
 
-This document describes the target structure for the `fmriqc.report` subpackage.
-It supersedes the ad-hoc `--pdf-layout summary|detailed` split with a design
-built around the three things reports are actually asked to do.
+This document describes the target structure for the `fmriqc_report` package —
+the `fmri-qa-report` distribution, which was the `fmriqc.report` subpackage when
+this was written. It supersedes the ad-hoc `--pdf-layout summary|detailed` split
+with a design built around the three things reports are actually asked to do.
 
 ## Motivation
 
