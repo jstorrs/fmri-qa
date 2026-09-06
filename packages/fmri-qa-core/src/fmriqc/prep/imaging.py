@@ -146,26 +146,35 @@ def _clamp_center(center: IntArray, n: int, shape: tuple[int, ...]) -> IntArray:
     return np.array([int(np.clip(center[i], lo, shape[i] - hi)) for i in (0, 1)])
 
 
-def edge_valid_mask(image: FloatArray) -> BoolArray:
-    """(X, Y) bool mask of real data, clearing only entirely-zeroed image edges.
+def edge_valid_mask(image: FloatArray, zero: float = 0.0) -> BoolArray:
+    """(X, Y) bool mask of real data, clearing only entirely-nulled image edges.
 
     Some vendors (e.g. Siemens) null one outer image row/column to encode the
-    phase-encode direction. A fully-zero border carries no signal and must not
-    enter ROI averages or ghost statistics, but blanket-trimming one voxel on
-    every side needlessly discards valid data on the other three. Each of the
-    four edges is tested independently and only the zeroed ones are cleared.
+    phase-encode direction. A nulled border carries no signal and must not enter
+    ROI averages or ghost statistics, but blanket-trimming one voxel on every
+    side needlessly discards valid data on the other three. Each of the four
+    edges is tested independently and only the nulled ones are cleared.
 
-    Pass the time-MIP for the most permissive test: a voxel that is nonzero in
-    any frame counts as valid, so only a genuinely dead line is trimmed.
+    `zero` is the image value a *stored* zero maps to. It is not always 0.0:
+    `get_fdata` returns `stored * slope + inter`, so under a nonzero
+    `scl_inter` a nulled edge reads as exactly `inter` — exactly, because
+    `0 * slope` is 0.0 and the intercept survives the addition unchanged. Pass
+    the scan's intercept (see `QAImages.zero_value`) or the edge is not
+    recognized at all and its constant line enters every statistic.
+
+    Pass the time-MIP for the most permissive test: a voxel that departs from
+    `zero` in any frame counts as valid, so only a genuinely dead line is
+    trimmed.
     """
+    nulled = image == zero
     valid = np.ones(image.shape[:2], dtype=bool)
-    if not image[0, :].any():
+    if nulled[0, :].all():
         valid[0, :] = False
-    if not image[-1, :].any():
+    if nulled[-1, :].all():
         valid[-1, :] = False
-    if not image[:, 0].any():
+    if nulled[:, 0].all():
         valid[:, 0] = False
-    if not image[:, -1].any():
+    if nulled[:, -1].all():
         valid[:, -1] = False
     return valid
 

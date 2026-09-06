@@ -23,13 +23,16 @@ class QAImages:
     from here. `fluctuations` is the per-voxel detrended residual, so ROI-averaging
     it equals detrending the ROI mean (detrending is a fixed linear operator that
     commutes with the spatial mean); `trend = center_slice - fluctuations` is the
-    fitted low-frequency drift needed for drift/SFNR summaries. The summary images
-    are derived properties so there is no redundant state to keep in sync.
+    fitted low-frequency drift needed for drift/SFNR summaries. `zero_value` is
+    the image value a stored zero maps to — the scan's `scl_inter`, without
+    which a nulled image edge is not recognizable as one. The summary images are
+    derived properties so there is no redundant state to keep in sync.
     """
 
     center_slice: FloatArray  # (X, Y, T) trimmed center slice (raw signal)
     fluctuations: FloatArray  # (X, Y, T) detrended residuals
     tr: float
+    zero_value: float = 0.0  # image value a stored zero maps to (NIfTI scl_inter)
     pe_axis: int | None = None
     detrend_method: DetrendMethod = "poly"
     detrend_order: int | None = None  # poly degree / spline interior-knot count
@@ -51,12 +54,13 @@ class QAImages:
 
     @property
     def valid_mask(self) -> BoolArray:
-        """(X, Y) real-data mask: True except on entirely-zeroed image edges.
+        """(X, Y) real-data mask: True except on entirely-nulled image edges.
 
-        Detected from the time-MIP so a voxel that is ever nonzero counts as
-        valid (see `edge_valid_mask`).
+        Detected from the time-MIP so a voxel that ever carries signal counts as
+        valid, and against `zero_value` rather than 0.0, since a stored zero
+        reads back as the scan's intercept (see `edge_valid_mask`).
         """
-        return edge_valid_mask(self.mip)
+        return edge_valid_mask(self.mip, zero=self.zero_value)
 
     @property
     def static_noise(self) -> FloatArray:
