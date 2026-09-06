@@ -699,6 +699,10 @@ def write_report(
     blocks = compose(items, tier, cover=cover, appendix=appendix)
     total = sum(_block_pages(b, theme) for b in blocks)
     target = Path(pdf_path)
+    # Match `save_artifact`: create the destination directory rather than fail
+    # on the temporary file, whose name is an implementation detail of the
+    # atomic write and has no business appearing in a user-facing error.
+    target.parent.mkdir(parents=True, exist_ok=True)
     fd, temporary_name = tempfile.mkstemp(
         prefix=f".{target.name}.", suffix=".tmp", dir=target.parent
     )

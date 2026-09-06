@@ -43,6 +43,8 @@ versioning when the first stable public interface is released.
   directories (`a/scan.nii.gz`, `b/scan.nii.gz`) overwrote one another and a
   later report packet was quietly missing scans. Such a batch is now refused
   before any analysis runs.
+- `fmri-qa-report --pdf` creates the destination directory instead of failing on
+  the name of the atomic write's temporary file.
 
 ### Changed
 

@@ -55,11 +55,22 @@ def test_main_fails_when_no_artifact_can_be_read(tmp_path, capsys) -> None:
 def test_main_reports_a_write_failure_without_a_traceback(
     tmp_path, saved, capsys
 ) -> None:
-    rc = cli.main([saved, "--pdf", str(tmp_path / "missing" / "qa.pdf")])
+    blocked = tmp_path / "blocked"
+    blocked.write_text("not a directory")  # a file where a parent dir must go
+    rc = cli.main([saved, "--pdf", str(blocked / "qa.pdf")])
     captured = capsys.readouterr()
     assert rc == 1
     assert "ERROR: could not write PDF" in captured.err
     assert "Traceback" not in captured.err
+    # the atomic write's temporary file is an implementation detail, not an error
+    assert ".tmp" not in captured.err
+
+
+def test_main_creates_the_pdf_destination_directory(tmp_path, saved) -> None:
+    """A missing output directory is created, as `--artifact` already does."""
+    pdf = tmp_path / "reports" / "2026-01" / "qa.pdf"
+    assert cli.main([saved, "--pdf", str(pdf)]) == 0
+    assert pdf.is_file()
 
 
 def test_main_titles_a_section_from_the_artifact_provenance(tmp_path, artifact) -> None:
