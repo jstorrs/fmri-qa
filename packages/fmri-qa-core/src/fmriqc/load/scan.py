@@ -3,7 +3,8 @@
 `QAScan` is the imperative shell's entry point: `from_nifti` does the file I/O
 and header/sidecar parsing, then hands the pure pipeline a plain array plus the
 metadata it needs. The phase-encode axis is resolved from the sidecar first,
-then the NIfTI `dim_info`, then — only if both are absent — the ghost estimate.
+then the NIfTI `dim_info`, then — only if both are absent — the ghost estimate;
+the TR likewise prefers the sidecar over the unit-converted header pixdim.
 """
 
 import warnings
@@ -17,6 +18,7 @@ from ..metrics.ghost import phase_encode_axis
 from ..types import FloatArray
 from .metadata import ScanMeta, _load_sidecar, _scan_meta
 from .pe_axis import _pe_axis_from_header, _pe_axis_from_sidecar
+from .repetition_time import _repetition_time
 
 
 @dataclass(frozen=True, eq=False)
@@ -29,9 +31,11 @@ class QAScan:
     falling back
     to the header `dim_info` phase field, then — only if both are absent — to the
     Nyquist-ghost estimate (with a warning; `None` if `estimate_pe=False`).
-    Polarity is dropped (unneeded here). `meta` holds the human-readable
-    acquisition metadata for the report; both are built from the BIDS JSON
-    sidecar, which `from_nifti` requires.
+    Polarity is dropped (unneeded here). `tr` is in seconds, from the sidecar
+    `RepetitionTime` or the header pixdim converted by its declared time unit.
+    `meta` holds the human-readable acquisition metadata for the report; the
+    BIDS JSON sidecar it comes from is optional, and its fields are `None` when
+    no sidecar sits beside the NIfTI.
     """
 
     data: FloatArray  # (X, Y, Z, T)
@@ -46,13 +50,14 @@ class QAScan:
 
     @classmethod
     def from_nifti(cls, path: str | Path, estimate_pe: bool = True) -> "QAScan":
-        sidecar = _load_sidecar(path)  # required; raises before the data load
         img = nib.load(str(path))
         if len(img.shape) != 4:
             raise InvalidScanError(
                 "data shape", img.shape, "expected a 4-D (X, Y, Z, T) NIfTI series"
             )
-        zooms = img.header.get_zooms()
+        # Optional: a scanner export never went through dcm2niix. Read after the
+        # image so a missing NIfTI fails on the NIfTI, not on its sidecar.
+        sidecar = _load_sidecar(path)
         data = img.get_fdata()
         slope, inter = img.header.get_slope_inter()  # (None, None) when unscaled
 
@@ -70,12 +75,13 @@ class QAScan:
                 )
             warnings.warn(msg, stacklevel=2)
 
+        tr = _repetition_time(img.header, sidecar, path)
         return cls(
             data=data,
-            tr=float(zooms[3]),
+            tr=tr,
             affine=img.affine,
             pe_axis=pe_axis,
-            meta=_scan_meta(img, sidecar, pe_axis),
+            meta=_scan_meta(img, sidecar, pe_axis, tr),
             slope=float(slope) if slope else 1.0,
             inter=float(inter) if inter else 0.0,
         )

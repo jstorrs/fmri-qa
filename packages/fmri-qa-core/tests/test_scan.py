@@ -1,0 +1,197 @@
+"""The NIfTI loader's contract: TR units, and the optional BIDS sidecar.
+
+Both concerns are file-I/O boundaries, so these go through real files on disk.
+The TR cases matter because pixdim[4] carries no unit of its own — a scan whose
+header says milliseconds must still arrive in seconds, or the pipeline trims no
+warm-up and fits a detrend of absurd order. The sidecar cases pin the decision
+that a NIfTI exported straight off the scanner still analyzes, with a warning
+and empty acquisition metadata rather than a refusal.
+
+These build their own files rather than using conftest's `write_scan`: that
+fixture always writes a sidecar at a 2 s TR in unlabelled units, which is
+exactly what is under test here.
+"""
+
+import json
+import warnings
+from pathlib import Path
+
+import nibabel as nib
+import numpy as np
+import pytest
+
+import fmriqc as q
+
+
+def _ghosted_series(n: int = 24, z: int = 2, t: int = 6) -> np.ndarray:
+    """A disk phantom with an 8% N/2 ghost injected along axis 1, over noise.
+
+    What the ghost estimate needs to read: a constant volume carries no ghost at
+    all, and the estimate rightly answers that it does not know.
+    """
+    rng = np.random.default_rng(0)
+    yy, xx = np.mgrid[0:n, 0:n]
+    disk = ((xx - n / 2) ** 2 + (yy - n / 2) ** 2) < (n / 5) ** 2
+    base = np.where(disk, 1000.0, 0.0)
+    frame = base + 0.08 * np.roll(base, n // 2, axis=1)
+    return frame[:, :, None, None] + np.abs(rng.normal(scale=8.0, size=(n, n, z, t)))
+
+
+def _write_scan(
+    directory: Path,
+    sidecar: dict | None = None,
+    *,
+    pixdim_t: float = 2.0,
+    time_unit: str | None = None,
+    phase: int | None = 1,
+    data: np.ndarray | None = None,
+) -> Path:
+    """Write a minimal 4-D NIfTI; write a sidecar only when one is given."""
+    if data is None:
+        data = np.ones((8, 8, 2, 6), dtype=np.float32)
+    img = nib.Nifti1Image(data, affine=np.eye(4))
+    img.header.set_zooms((3.0, 3.0, 3.0, pixdim_t))
+    if time_unit is not None:
+        img.header.set_xyzt_units(xyz="mm", t=time_unit)
+    if phase is not None:
+        img.header.set_dim_info(freq=None, phase=phase, slice=None)
+    nifti = directory / "scan.nii.gz"
+    nib.save(img, str(nifti))
+    if sidecar is not None:
+        (directory / "scan.json").write_text(json.dumps(sidecar))
+    return nifti
+
+
+@pytest.mark.parametrize(
+    ("time_unit", "pixdim_t", "expected"),
+    [
+        ("sec", 2.0, 2.0),
+        ("msec", 2000.0, 2.0),
+        ("usec", 2_000_000.0, 2.0),
+        (None, 2.0, 2.0),  # unlabelled pixdim is read as seconds
+    ],
+)
+def test_header_tr_converts_by_its_time_unit(
+    tmp_path, time_unit: str | None, pixdim_t: float, expected: float
+) -> None:
+    nifti = _write_scan(tmp_path, {}, pixdim_t=pixdim_t, time_unit=time_unit)
+    assert q.QAScan.from_nifti(nifti).tr == pytest.approx(expected)
+
+
+def test_sidecar_repetition_time_wins_over_the_header(tmp_path) -> None:
+    # The header claims 3 s, the sidecar 2 s; BIDS fixes its unit, so it wins —
+    # loudly, because one of the two files describes a different acquisition.
+    nifti = _write_scan(tmp_path, {"RepetitionTime": 2.0}, pixdim_t=3.0)
+    with pytest.warns(UserWarning, match="disagrees"):
+        scan = q.QAScan.from_nifti(nifti)
+    assert scan.tr == pytest.approx(2.0)
+
+
+def test_agreeing_sidecar_and_header_do_not_warn(tmp_path) -> None:
+    # 2000 msec in the header is 2 s in the sidecar: the same acquisition.
+    nifti = _write_scan(
+        tmp_path, {"RepetitionTime": 2.0}, pixdim_t=2000.0, time_unit="msec"
+    )
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        assert q.QAScan.from_nifti(nifti).tr == pytest.approx(2.0)
+
+
+def test_empty_header_tr_disagrees_with_nothing(tmp_path) -> None:
+    # A zeroed pixdim[4] makes no claim about the acquisition, so the sidecar
+    # supplying the TR is not a disagreement worth warning about.
+    nifti = _write_scan(tmp_path, {"RepetitionTime": 2.0}, pixdim_t=0.0)
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        assert q.QAScan.from_nifti(nifti).tr == pytest.approx(2.0)
+
+
+def test_sidecar_without_repetition_time_falls_back_to_the_header(tmp_path) -> None:
+    nifti = _write_scan(tmp_path, {"FlipAngle": 77}, pixdim_t=2500.0, time_unit="msec")
+    assert q.QAScan.from_nifti(nifti).tr == pytest.approx(2.5)
+
+
+@pytest.mark.parametrize("value", [0, -2.0, "2000", None, float("nan")])
+def test_unusable_sidecar_repetition_time_falls_back_to_the_header(
+    tmp_path, value: object
+) -> None:
+    nifti = _write_scan(tmp_path, {"RepetitionTime": value}, pixdim_t=2.0)
+    with pytest.warns(UserWarning, match="ignoring sidecar RepetitionTime"):
+        scan = q.QAScan.from_nifti(nifti)
+    assert scan.tr == pytest.approx(2.0)
+
+
+def test_meta_tr_is_the_tr_the_pipeline_runs_on(tmp_path) -> None:
+    # The report header must not quote a TR the metrics were never computed at.
+    nifti = _write_scan(tmp_path, {}, pixdim_t=2000.0, time_unit="msec")
+    scan = q.QAScan.from_nifti(nifti)
+    assert scan.meta is not None
+    assert scan.meta.tr == scan.tr == pytest.approx(2.0)
+
+
+def test_missing_sidecar_warns_and_still_loads(tmp_path) -> None:
+    nifti = _write_scan(tmp_path, sidecar=None, phase=1)
+    with pytest.warns(UserWarning, match="no BIDS JSON sidecar"):
+        scan = q.QAScan.from_nifti(nifti)
+
+    assert scan.pe_axis == 1  # from the header dim_info
+    assert scan.tr == pytest.approx(2.0)
+    assert scan.meta is not None
+    # Geometry survives; everything the sidecar would have supplied is absent.
+    assert scan.meta.matrix == (8, 8)
+    assert scan.meta.pe_dir == "col"  # derived from the header axis
+    assert scan.meta.te is None
+    assert scan.meta.flip_angle is None
+    assert scan.meta.slice_thickness is None
+    assert scan.meta.manufacturer is None
+    assert scan.meta.model is None
+    assert scan.meta.serial is None
+    assert scan.meta.coil is None
+    assert scan.meta.field_strength is None
+    assert scan.meta.software is None
+    assert scan.meta.datetime is None
+    assert scan.meta.series is None
+
+
+def test_missing_sidecar_falls_back_to_the_ghost_estimate(tmp_path) -> None:
+    # No sidecar and no dim_info: the last resort still applies, and both the
+    # absent sidecar and the guessed axis are announced.
+    nifti = _write_scan(tmp_path, sidecar=None, phase=None, data=_ghosted_series())
+    with pytest.warns(UserWarning) as caught:
+        scan = q.QAScan.from_nifti(nifti)
+
+    messages = [str(warning.message) for warning in caught]
+    assert any("no BIDS JSON sidecar" in message for message in messages)
+    assert any("ghost estimate" in message for message in messages)
+    assert scan.pe_axis == 1  # the axis the injected ghost lands on
+
+
+def test_missing_nifti_fails_on_the_nifti_not_the_sidecar(tmp_path) -> None:
+    # The sidecar warning would be noise when the image itself is not there.
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        with pytest.raises(FileNotFoundError):
+            q.QAScan.from_nifti(tmp_path / "absent.nii.gz")
+
+
+def test_unparseable_sidecar_is_an_error(tmp_path) -> None:
+    nifti = _write_scan(tmp_path, {})
+    (tmp_path / "scan.json").write_text("{not json at all")
+    with pytest.raises(q.InvalidScanError, match="BIDS JSON sidecar") as info:
+        q.QAScan.from_nifti(nifti)
+    assert info.value.value == str(tmp_path / "scan.json")
+
+
+def test_sidecar_that_is_not_an_object_is_an_error(tmp_path) -> None:
+    nifti = _write_scan(tmp_path, {})
+    (tmp_path / "scan.json").write_text("[1, 2, 3]")
+    with pytest.raises(q.InvalidScanError, match="JSON object"):
+        q.QAScan.from_nifti(nifti)
+
+
+def test_rejects_a_three_dimensional_nifti(tmp_path) -> None:
+    img = nib.Nifti1Image(np.ones((8, 8, 2), dtype=np.float32), affine=np.eye(4))
+    nifti = tmp_path / "scan.nii.gz"
+    nib.save(img, str(nifti))
+    with pytest.raises(q.InvalidScanError, match="data shape"):
+        q.QAScan.from_nifti(nifti)

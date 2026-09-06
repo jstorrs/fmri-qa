@@ -2,10 +2,10 @@
 
 One base class (`FmriqcError`) is the error contract: catch it to catch anything
 the package raises, and new subclasses can be added without breaking that catch.
-Each subclass also inherits the natural stdlib type (`ValueError`,
-`FileNotFoundError`) so code that already catches those keeps working — the dual
-base resolves the tension between "one base exception per package" and "use the
-standard exception when appropriate" (see style/exceptions.md).
+Each subclass also inherits the natural stdlib type (`ValueError`) so code that
+already catches that keeps working — the dual base resolves the tension between
+"one base exception per package" and "use the standard exception when
+appropriate" (see style/exceptions.md).
 """
 
 from collections.abc import Sequence
@@ -14,22 +14,6 @@ from pathlib import Path
 
 class FmriqcError(Exception):
     """Base exception for fmriqc; catch this to catch any error the package raises."""
-
-
-class MissingSidecarError(FmriqcError, FileNotFoundError):
-    """The required BIDS JSON sidecar was not found beside a NIfTI.
-
-    Also a `FileNotFoundError`, since the underlying condition is a missing file.
-    `sidecar` is the path that was looked for.
-    """
-
-    def __init__(self, sidecar: Path) -> None:
-        super().__init__(
-            f"required BIDS JSON sidecar not found: {sidecar} "
-            f"(convert the DICOM with dcm2niix so a .json is written alongside "
-            f"the NIfTI)"
-        )
-        self.sidecar = sidecar
 
 
 class InvalidChoiceError(FmriqcError, ValueError):

@@ -4,7 +4,8 @@ The public surface is re-exported here; the implementation lives in topical
 subpackages (`ls` the package to find a concern):
 
 * `load`      -- NIfTI + BIDS-sidecar I/O: `scan` (`QAScan`), `metadata`
-                 (`ScanMeta`), `pe_axis` (phase-encode resolution)
+                 (`ScanMeta`), `pe_axis` (phase-encode resolution),
+                 `repetition_time` (TR resolution)
 * `prep`      -- preprocessing infrastructure: `imaging` (raw-array ops),
                  `detrend`, `geometry` (phantom/ROI), `images` (`QAImages`)
 * `metrics`   -- the physics tests, one module per family: `fbirn`
@@ -50,7 +51,6 @@ from .exceptions import (
     InvalidArtifactError,
     InvalidChoiceError,
     InvalidScanError,
-    MissingSidecarError,
 )
 from .hilo import (
     HILO_ERODE,
@@ -153,7 +153,6 @@ __all__ = [
     "InvalidChoiceError",
     "InvalidScanError",
     "Measurements",
-    "MissingSidecarError",
     "MotionResult",
     "OutlierResult",
     "PhantomGeometry",

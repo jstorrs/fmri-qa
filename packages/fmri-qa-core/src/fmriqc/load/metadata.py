@@ -1,17 +1,20 @@
 """Parse the BIDS JSON sidecar into `ScanMeta`.
 
 dcm2niix writes a `.json` sidecar beside every NIfTI it converts; these helpers
-read the acquisition metadata out of it. Phase-encode *axis* resolution lives in
-`pe_axis`; the DICOM row/col *direction* string for the report header is derived
-here (`_pe_direction`) from the same sidecar.
+read the acquisition metadata out of it. The sidecar is optional — a NIfTI
+exported straight off the scanner never had one — so its absence leaves fields
+empty rather than failing. Phase-encode *axis* resolution lives in `pe_axis`
+and TR resolution in `repetition_time`; the DICOM row/col *direction* string
+for the report header is derived here (`_pe_direction`) from the same sidecar.
 """
 
 import json
+import warnings
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from ..exceptions import MissingSidecarError
+from ..exceptions import InvalidScanError
 from .pe_axis import PE_ROWCOL
 
 
@@ -19,12 +22,13 @@ from .pe_axis import PE_ROWCOL
 class ScanMeta:
     """Human-readable acquisition metadata for the report header.
 
-    Geometry (`voxel_mm`, `matrix`, `tr`) comes from the NIfTI header and is
-    always present. The rest comes from the BIDS JSON sidecar written alongside
-    the NIfTI (dcm2niix) and is `None` when no sidecar is found. `voxel_mm` is
-    (row, col, slice-spacing) from the header zooms; `slice_thickness` is the
-    excited slab from the sidecar (the zoom is spacing, which includes any gap).
-    `pe_dir` is the DICOM row/col direction.
+    Geometry (`voxel_mm`, `matrix`, `tr`) is always present: it comes from the
+    NIfTI header, with `tr` the resolved repetition time in seconds — the same
+    value the pipeline runs on (see `repetition_time`). The rest comes from the
+    BIDS JSON sidecar written alongside the NIfTI (dcm2niix) and is `None` when
+    no sidecar is found. `voxel_mm` is (row, col, slice-spacing) from the header
+    zooms; `slice_thickness` is the excited slab from the sidecar (the zoom is
+    spacing, which includes any gap). `pe_dir` is the DICOM row/col direction.
     """
 
     voxel_mm: tuple[float, float, float]
@@ -45,14 +49,17 @@ class ScanMeta:
 
 
 def _load_sidecar(path: str | Path) -> dict[str, Any]:
-    """Parse the required BIDS JSON sidecar beside `path` (.nii/.nii.gz -> .json).
+    """Parse the BIDS JSON sidecar beside `path` (.nii/.nii.gz -> .json).
 
-    dcm2niix writes this alongside every NIfTI it converts, so a missing sidecar
-    means the input did not go through the expected conversion; we refuse it
-    rather than silently dropping metadata.
+    dcm2niix writes one alongside every NIfTI it converts, but a scanner export
+    never went through that conversion, so a missing sidecar warns and yields an
+    empty mapping: the acquisition metadata is simply absent, which everything
+    downstream already tolerates. A sidecar that *is* there and cannot be read
+    is a different matter — the metadata exists and we would be misreading it —
+    so it fails loudly.
 
     Raises:
-        MissingSidecarError: If no `.json` sidecar is found beside `path`.
+        InvalidScanError: If the sidecar is not parseable as a JSON object.
     """
     p = Path(path)
     name = p.name
@@ -62,10 +69,28 @@ def _load_sidecar(path: str | Path) -> dict[str, Any]:
             break
     sidecar = p.with_name(name + ".json")
     if not sidecar.is_file():
-        raise MissingSidecarError(sidecar)
-    with sidecar.open() as f:
-        data: dict[str, Any] = json.load(f)
-    return data
+        warnings.warn(
+            f"{path}: no BIDS JSON sidecar found beside the NIfTI; the "
+            f"acquisition metadata, including the sidecar phase-encode "
+            f"direction and TR, will be absent",
+            stacklevel=3,  # report at the caller of `QAScan.from_nifti`
+        )
+        return {}
+    try:
+        parsed: object = json.loads(sidecar.read_text())
+    except json.JSONDecodeError as e:
+        raise InvalidScanError(
+            "BIDS JSON sidecar", str(sidecar), f"could not be parsed: {e}"
+        ) from e
+    if not isinstance(parsed, dict):
+        raise InvalidScanError(
+            "BIDS JSON sidecar",
+            str(sidecar),
+            "expected a JSON object of acquisition metadata",
+        )
+    # A JSON object's keys are always strings; rebuilding is how the type
+    # checkers are told so, `json.loads` being typed as returning anything.
+    return {str(key): value for key, value in parsed.items()}
 
 
 def _acq_datetime(sidecar: dict[str, Any]) -> str | None:
@@ -89,13 +114,19 @@ def _pe_direction(pe_axis: int | None, sidecar: dict[str, Any]) -> str | None:
     return PE_ROWCOL.get(pe_axis) if pe_axis is not None else None
 
 
-def _scan_meta(img: Any, sidecar: dict[str, Any], pe_axis: int | None) -> ScanMeta:
-    """Assemble `ScanMeta` from the NIfTI header and (optional) BIDS sidecar."""
+def _scan_meta(
+    img: Any, sidecar: dict[str, Any], pe_axis: int | None, tr: float
+) -> ScanMeta:
+    """Assemble `ScanMeta` from the NIfTI header and (optional) BIDS sidecar.
+
+    `tr` is handed in already resolved rather than re-read from pixdim[4], so
+    the TR the report shows is the one the pipeline ran on.
+    """
     zooms = img.header.get_zooms()
     return ScanMeta(
         voxel_mm=(float(zooms[0]), float(zooms[1]), float(zooms[2])),
         matrix=(int(img.shape[0]), int(img.shape[1])),
-        tr=float(zooms[3]),
+        tr=tr,
         te=sidecar.get("EchoTime"),
         flip_angle=sidecar.get("FlipAngle"),
         slice_thickness=sidecar.get("SliceThickness"),

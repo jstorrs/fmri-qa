@@ -10,7 +10,6 @@ from fmriqc.exceptions import (
     FmriqcError,
     IncompatibleScansError,
     InvalidChoiceError,
-    MissingSidecarError,
 )
 from fmriqc.hilo import _require_compatible_scans
 from fmriqc.prep.detrend import detrend_fn
@@ -48,20 +47,6 @@ def test_invalid_choice_carries_structured_payload() -> None:
     assert err.name == "detrend method"
     assert err.value == "bogus"
     assert err.choices == q.DETREND_METHODS
-
-
-def test_missing_sidecar_raised_for_absent_json(tmp_path) -> None:
-    nifti = tmp_path / "scan.nii.gz"
-    nifti.write_bytes(b"not really a nifti")  # never read: sidecar check comes first
-    with pytest.raises(MissingSidecarError) as info:
-        q.QAScan.from_nifti(nifti)
-    assert info.value.sidecar == tmp_path / "scan.json"
-
-
-def test_missing_sidecar_is_fmriqc_error_and_file_not_found(tmp_path) -> None:
-    with pytest.raises(FmriqcError) as info:
-        q.QAScan.from_nifti(tmp_path / "scan.nii")
-    assert isinstance(info.value, FileNotFoundError)
 
 
 def test_run_hilo_rejects_mismatched_geometry() -> None:
