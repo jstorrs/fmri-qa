@@ -8,6 +8,29 @@ versioning when the first stable public interface is released.
 
 ### Added
 
+- **The whole Nyquist-ghost family from one set of masks.** `estimate_ghost`
+  builds the region-matched signal/ghost masks once per in-plane axis and
+  returns a `GhostResult` carrying the masks and every ratio measured on them;
+  `QAMetrics.ghost` holds it, and the artifact's ghost regions are copied from
+  it rather than rebuilt. The four percentages a table shows are unchanged.
+- The BIDS sidecar is optional. A NIfTI exported without one (a scanner export
+  that never went through dcm2niix) now analyzes with a warning and empty
+  acquisition metadata instead of being refused.
+- The TR is taken from the sidecar `RepetitionTime` when it is there, and
+  otherwise from the header pixdim converted by the header's declared time
+  unit; a disagreement between the two warns and names both values.
+- `Provenance.n_trimmed` records how many warm-up volumes the analysis dropped,
+  so `outlier_worst_frame` and the curve time axis map back to acquired volume
+  numbers. Artifact schema version 4; older archives read it back as unknown.
+- `fmri-qa --json` records now carry `source`, `datetime`, `tr`, `n_frames`,
+  `n_trimmed`, `outlier_worst_frame`, the combined `fwhm`, and `fwhm_unit`.
+  JSON schema version 3.
+- `fmri-qa` and `fmri-qa-hilo` print each warning the analysis raised on
+  stderr as `<scan>: warning: <message>`, attributed to the scan that raised it,
+  instead of Python's default line naming a source file inside the package.
+- Both distributions ship the MIT license text, and CI asserts it is installed
+  with each wheel.
+
 - **The analysis artifact.** `QAArtifact` publishes one analyzed series — its
   settings, provenance, scalar measurements, stability curves, and the four
   fBIRN summary images — fully resolved, so no consumer recomputes a metric.
@@ -39,6 +62,36 @@ versioning when the first stable public interface is released.
 - `python -m fmriqc_report`, matching `python -m fmriqc`.
 
 ### Fixed
+
+- **A TR stored in milliseconds was read as seconds.** The loader took pixdim
+  without its unit, so a header in msec gave a TR of 2000 s: no warm-up volumes
+  were trimmed and the detrend order, which follows the run duration, exceeded
+  the frame count, so the fit absorbed the noise and every stability metric was
+  measured on a residual of nothing. The unit is converted now, the sidecar
+  value is preferred, and `detrend_fn` refuses an order the frames cannot
+  determine rather than returning zeros that look like a very stable scanner.
+- **The LICENSE never reached a built package.** `license-files` pointed
+  outside the package root, which the wheel dropped and the sdist recorded as
+  a `../../` path.
+- A directional FWHM the run could not name (no phase-encode axis resolved)
+  was printed under `fwPE`/`fwRO` as the combined FWHM, a number that answers a
+  different question. The table shows `?` and `--json` emits `null`.
+- A phantom mask that is a single row or column crashed `analyze` after the
+  whole analysis had run, from inside the convex-hull step; it now yields the
+  empty outline the artifact already allowed for.
+- `fmri-qa-hilo` raised a bare `ZeroDivisionError` on a zero low-flip mean.
+- The ROI-fit warning suggested `center='image'` even when that was the mode in
+  use; it names the other mode now.
+- `save_artifact` wrote the destination in place, so an interrupted write left
+  a truncated `.npz` in the archive. It writes a temporary file beside the
+  destination and moves it into place. A malformed document that failed inside
+  a schema migration escaped as a bare `KeyError` instead of
+  `InvalidArtifactError`.
+- A vendor-nulled image edge went undetected when the NIfTI carried a nonzero
+  `scl_inter`, since a stored zero reads back as the intercept.
+- `snr` and `sfnr` now return NaN, rather than infinity with a NumPy warning,
+  when the static-noise variance or a ROI voxel's fluctuation noise is zero.
+  The core test run went from 164 runtime warnings to none.
 
 - **Phantom segmentation on an exactly-zero background.** The intensity
   quantiles seeding the watershed used strict comparisons, so an image whose air
@@ -84,6 +137,22 @@ versioning when the first stable public interface is released.
 
 ### Changed
 
+- The phase-encode axis is estimated from the Nyquist ghost in one place, the
+  pipeline. `QAScan.from_nifti` no longer estimates it (its `estimate_pe`
+  parameter is gone) and only reports what the sidecar and header say, so the
+  load layer no longer depends on the metrics layer.
+- `Measurements.fwhm_unit`, `Measurements.pe_label`, and `PsfCurves.unit` are
+  closed sets (`LengthUnit`, `PeLabel` in `fmriqc.types`), and `load_artifact`
+  refuses a stored value outside them. `FBIRN_ROI_SIZE` lives in
+  `fmriqc.types`, shared by the ROI resolver and the artifact's default.
+- `QAImages` caches its derived summary images instead of recomputing each
+  full-slice reduction on every access.
+- The `notebooks` extra is no longer published with `fmri-qa-core`; the
+  notebook stack is a root dependency group taken with `make sync-notebooks`.
+- pre-commit runs the locked `ruff` through `uv run`, so the hook and
+  `make check` cannot disagree on formatting. The style guides describe the
+  tooling this repository actually has.
+
 - **The project is now two distributions.** `fmri-qa-core` (import `fmriqc`)
   holds the calculation half and depends on nothing that draws; `fmri-qa-report`
   (import `fmriqc_report`) holds the plots and PDF packets and consumes only a
@@ -102,6 +171,11 @@ versioning when the first stable public interface is released.
   directly and which had until now arrived only as a matplotlib transitive.
 
 ### Removed
+
+- `MissingSidecarError`: a missing sidecar is a warning now, not an error.
+- `ghost_top_ratio`, `acr_ghosting_ratio`, and `phase_encode_axis`; their
+  measurements come from `GhostResult`, and `QAMetrics` carries that result
+  instead of four loose percentages.
 
 - `fmri-qa --pdf`, `--pdf-tier`, `--pdf-cover`, and `--pdf-appendix`. Rendering
   moved to `fmri-qa-report`, whose equivalents are `--pdf`, `--tier`, `--cover`,
