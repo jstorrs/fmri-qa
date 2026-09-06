@@ -5,6 +5,7 @@ fixture builds (no file I/O), so the whole functional core runs deterministicall
 """
 
 import numpy as np
+import pytest
 
 import fmriqc as q
 
@@ -54,3 +55,36 @@ def test_preprocess_discards_the_full_volume(make_scan: MakeScan) -> None:
 def test_weisskoff_rdc_matches_the_metric(make_scan: MakeScan) -> None:
     result = q.run_qa(make_scan(), roi_size=9)
     assert result.metrics.rdc == result.metrics.weisskoff.rdc
+
+
+def test_phantom_centering_localizes_slice_and_roi(make_scan: MakeScan) -> None:
+    """`center="phantom"` runs end to end and lands the ROI inside the phantom.
+
+    The alternative localization mode is a documented CLI option, so it is walked
+    here: it selects the largest phantom cross-section rather than the middle
+    slice, and centers the ROI on the detected phantom center rather than the
+    image center.
+    """
+    result = q.run_qa(make_scan(), roi_size=9, center="phantom")
+    assert result.roi.size == 9
+    assert q.roi_fits(result.geom.phantom_mask, result.roi.index)
+    assert np.isfinite(result.metrics.snr) and result.metrics.snr > 0
+
+
+def test_both_centering_modes_agree_on_a_centered_phantom(make_scan: MakeScan) -> None:
+    """The fixture's disk is image-centered, so the two modes must coincide.
+
+    That makes this a real check on the "phantom" path rather than a tautology:
+    an off-by-one in the detected-center or largest-slice selection would move
+    the ROI and show up as a mismatch.
+    """
+    scan = make_scan()
+    by_image = q.run_qa(scan, roi_size=9, center="image").roi
+    by_phantom = q.run_qa(scan, roi_size=9, center="phantom").roi
+    assert np.array_equal(by_image.center, by_phantom.center)
+    assert by_image.size == by_phantom.size
+
+
+def test_unknown_centering_mode_is_rejected(make_scan: MakeScan) -> None:
+    with pytest.raises(q.InvalidChoiceError):
+        q.run_qa(make_scan(), center="middle")  # type: ignore[arg-type]
