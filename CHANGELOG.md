@@ -63,6 +63,17 @@ versioning when the first stable public interface is released.
   parity follows `--trim-sec`, the same series scored differently for a
   one-volume change in the warm-up trim. The difference is now formed over
   balanced subsets; the signal still averages the full series.
+- **A phase-encode axis reported when none was measured.** The estimate picks
+  the axis whose Nyquist ghost region is brighter, but an axis the ratio could
+  not be measured on scores NaN — and every comparison against NaN is False, so
+  `max` returned whichever axis it looked at first. An image with no measurable
+  ghost (a collapsed segmentation, a phantom spanning the FOV) therefore always
+  reported "axis 0", with four ghost percentages sampled from wherever that
+  pointed, and an axis measurable on only one side could be resolved to the
+  other. Only measurable axes are candidates now, and when neither is,
+  `estimate_pe_axis` returns `None`: the run continues with the ghost metrics
+  undefined and a warning, the artifact records no axis, and a report labels the
+  direction "?" and draws no ghost regions.
 - **`fmri-qa --artifact` silently discarding a scan.** A batch names each
   artifact after the scan's stem, so inputs sharing a file name across
   directories (`a/scan.nii.gz`, `b/scan.nii.gz`) overwrote one another and a

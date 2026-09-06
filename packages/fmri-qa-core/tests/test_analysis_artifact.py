@@ -158,6 +158,24 @@ def test_ghost_regions_are_region_matched(artifact) -> None:
     assert ghost.ro_signal.sum() == ghost.ro_ghost.sum()
 
 
+def test_an_unresolved_pe_axis_is_published_as_unknown() -> None:
+    """The artifact says "?", draws no ghost regions, and labels the raw axes.
+
+    A run whose phase-encode axis could not be resolved (see `run_qa`) has no
+    ghost regions to sample or draw, and no PE/RO direction to name. Each of
+    those degradations is a branch a reader depends on, so they are walked here
+    rather than left to a scan that happens to trigger them.
+    """
+    flat = q.QAScan(data=np.ones((16, 16, 3, 8)), tr=2.0)
+    with pytest.warns(UserWarning, match="no phase-encode axis"):
+        artifact = q.analyze(flat, q.AnalysisSettings(trim_sec=0.0, roi_size=5))
+
+    assert artifact.measurements.pe_axis is None
+    assert artifact.measurements.pe_label == "?"
+    assert artifact.images.ghost is None  # nothing to sample, nothing to draw
+    assert artifact.curves.psf.labels == ("axis0", "axis1")  # not PE / RO
+
+
 def test_save_load_round_trips_every_section(tmp_path, artifact) -> None:
     path = q.save_artifact(artifact, tmp_path / "qa.npz")
     loaded = q.load_artifact(path)

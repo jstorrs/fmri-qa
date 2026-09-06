@@ -88,3 +88,24 @@ def test_both_centering_modes_agree_on_a_centered_phantom(make_scan: MakeScan) -
 def test_unknown_centering_mode_is_rejected(make_scan: MakeScan) -> None:
     with pytest.raises(q.InvalidChoiceError):
         q.run_qa(make_scan(), center="middle")  # type: ignore[arg-type]
+
+
+def test_an_unresolvable_pe_axis_leaves_the_ghost_metrics_undefined() -> None:
+    """Every ghost statistic is defined relative to an axis; with none, none.
+
+    A constant volume has no ghost to locate on either axis, so the estimate
+    declines. The run continues -- the ROI stability metrics do not need a PE
+    axis -- but the four ghost percentages are NaN and the axis stays None,
+    rather than the run naming an axis nothing measured and publishing four
+    numbers sampled from wherever it pointed.
+    """
+    flat = q.QAScan(data=np.ones((16, 16, 3, 8)), tr=2.0)
+
+    with pytest.warns(UserWarning, match="no phase-encode axis"):
+        m = q.run_qa(flat, trim_sec=0.0, roi_size=5).metrics
+
+    assert m.pe_axis is None
+    assert np.isnan(m.ghost_pct)
+    assert np.isnan(m.ghost_top_pct)
+    assert np.isnan(m.ro_ghost_pct)
+    assert np.isnan(m.acr_ghost_pct)

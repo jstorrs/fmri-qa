@@ -144,11 +144,12 @@ def acr_ghosting_ratio(
     return abs(pe - ro)
 
 
-def phase_encode_axis(data: FloatArray, radius: int = GHOST_RADIUS) -> int:
+def phase_encode_axis(data: FloatArray, radius: int = GHOST_RADIUS) -> int | None:
     """Estimate the PE axis from a MIP over time and all slices.
 
     Collapsing time and slices concentrates the ghost, giving a stronger signal
-    than any single slice — the fallback when no sidecar is available.
+    than any single slice — the fallback when no sidecar is available. None when
+    the ghost resolves neither axis (see `estimate_pe_axis`).
     """
     mip = data.max(axis=(-2, -1))  # (X, Y): max over Z and T
     return estimate_pe_axis(mip, segment_phantom(mip), radius=radius)
@@ -162,7 +163,7 @@ def estimate_pe_axis(
     return_ratios: Literal[False] = ...,
     *,
     valid_mask: BoolArray | None = ...,
-) -> int: ...
+) -> int | None: ...
 @overload
 def estimate_pe_axis(
     mean_image: FloatArray,
@@ -171,23 +172,33 @@ def estimate_pe_axis(
     *,
     return_ratios: Literal[True],
     valid_mask: BoolArray | None = ...,
-) -> tuple[int, dict[int, float]]: ...
+) -> tuple[int | None, dict[int, float]]: ...
 def estimate_pe_axis(
     mean_image: FloatArray,
     phantom_mask: BoolArray,
     radius: int = GHOST_RADIUS,
     return_ratios: bool = False,
     valid_mask: BoolArray | None = None,
-) -> int | tuple[int, dict[int, float]]:
+) -> int | tuple[int | None, dict[int, float]] | None:
     """Guess the phase-encode axis from where the Nyquist ghost actually lands.
 
     Rolling the phantom along the *true* PE axis lines the ghost region up with
     real ghost signal (high mean); along the wrong axis it lands on background
     (low mean). The axis with the larger ghost-to-signal ratio wins.
 
-    Returns the axis index (0 or 1), or `(axis, {axis: ratio})` if
-    `return_ratios` is set. NOTE: shares the tuning caveats of `ghost_ratio` —
-    verify against the acquisition's known PE direction before trusting it.
+    Only axes the ratio could actually be measured on are candidates. An axis
+    whose ghost region came back empty — the phantom spans the FOV along it, or
+    the segmentation collapsed — scores NaN, which is not a low ratio but no
+    ratio at all: comparing against it is what a float comparison with NaN
+    silently gets wrong, always answering False and leaving whichever axis was
+    looked at first as the winner. When neither axis is measurable there is
+    nothing to compare and the answer is None, not a coin flip presented as a
+    measurement.
+
+    Returns the axis index (0 or 1), None if the ghost resolves neither, or
+    `(axis, {axis: ratio})` if `return_ratios` is set. NOTE: shares the tuning
+    caveats of `ghost_ratio` — a win by a hair is still a guess, so verify
+    against the acquisition's known PE direction before trusting it.
     """
     ratios = {
         axis: ghost_ratio(
@@ -195,5 +206,6 @@ def estimate_pe_axis(
         )
         for axis in (0, 1)
     }
-    best = max(ratios, key=ratios.__getitem__)
+    measurable = [axis for axis, ratio in ratios.items() if np.isfinite(ratio)]
+    best = max(measurable, key=ratios.__getitem__) if measurable else None
     return (best, ratios) if return_ratios else best

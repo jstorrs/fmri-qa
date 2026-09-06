@@ -68,9 +68,33 @@ def test_pe_axis_from_header_none_when_unset() -> None:
     assert _pe_axis_from_header(nib.Nifti1Header()) is None
 
 
-def _write_scan(directory: Path, sidecar: dict, phase: int | None = None) -> Path:
-    """Write a minimal NIfTI + sidecar; optionally stamp a dim_info phase axis."""
-    data = np.ones((8, 8, 2, 6), dtype=np.float32)
+def _ghosted_volume(n: int = 24, z: int = 2, t: int = 6) -> np.ndarray:
+    """A disk phantom with an 8% N/2 ghost injected along axis 1, over noise.
+
+    What the ghost estimate is meant to read: rolling the phantom half the FOV
+    along axis 1 lands on the injected ghost, along axis 0 on background.
+    """
+    rng = np.random.default_rng(0)
+    yy, xx = np.mgrid[0:n, 0:n]
+    disk = ((xx - n / 2) ** 2 + (yy - n / 2) ** 2) < (n / 5) ** 2
+    base = np.where(disk, 1000.0, 0.0)
+    frame = base + 0.08 * np.roll(base, n // 2, axis=1)
+    return frame[:, :, None, None] + np.abs(rng.normal(scale=8.0, size=(n, n, z, t)))
+
+
+def _write_scan(
+    directory: Path,
+    sidecar: dict,
+    phase: int | None = None,
+    data: np.ndarray | None = None,
+) -> Path:
+    """Write a minimal NIfTI + sidecar; optionally stamp a dim_info phase axis.
+
+    `data` defaults to a constant volume, which carries no ghost for the estimate
+    to find — fine for the tests that resolve the axis from metadata.
+    """
+    if data is None:
+        data = np.ones((8, 8, 2, 6), dtype=np.float32)
     img = nib.Nifti1Image(data, affine=np.eye(4))
     img.header.set_zooms((3.0, 3.0, 3.0, 2.0))
     if phase is not None:
@@ -95,10 +119,25 @@ def test_from_nifti_falls_back_to_header_dim_info(tmp_path) -> None:
 
 def test_from_nifti_falls_back_to_ghost_estimate_with_warning(tmp_path) -> None:
     # Neither source present: estimate from the ghost, warning that it did so.
-    nifti = _write_scan(tmp_path, {"FlipAngle": 77}, phase=None)
+    # The volume carries a real N/2 ghost on axis 1, so there is something to find.
+    nifti = _write_scan(tmp_path, {"FlipAngle": 77}, phase=None, data=_ghosted_volume())
     with pytest.warns(UserWarning, match="ghost estimate"):
         scan = q.QAScan.from_nifti(nifti)
-    assert scan.pe_axis in (0, 1)
+    assert scan.pe_axis == 1
+
+
+def test_from_nifti_says_when_the_ghost_estimate_resolves_nothing(tmp_path) -> None:
+    """No axis is better than an arbitrary one.
+
+    On an image with no measurable ghost region -- here a constant volume, whose
+    segmentation swallows the frame -- both candidate ratios are NaN. There is
+    nothing to compare, so the axis stays unknown and the warning says so rather
+    than naming the axis that happened to be tried first.
+    """
+    nifti = _write_scan(tmp_path, {"FlipAngle": 77}, phase=None)
+    with pytest.warns(UserWarning, match="could not resolve one either"):
+        scan = q.QAScan.from_nifti(nifti)
+    assert scan.pe_axis is None
 
 
 def test_from_nifti_no_estimate_leaves_axis_none(tmp_path) -> None:

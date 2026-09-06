@@ -63,7 +63,11 @@ class QAScan:
             msg = f"{path}: no phase-encode axis in sidecar or NIfTI dim_info"
             if estimate_pe:
                 pe_axis = phase_encode_axis(data)
-                msg += f"; falling back to ghost estimate (axis {pe_axis})"
+                msg += (
+                    f"; falling back to ghost estimate (axis {pe_axis})"
+                    if pe_axis is not None
+                    else "; the ghost estimate could not resolve one either"
+                )
             warnings.warn(msg, stacklevel=2)
 
         return cls(

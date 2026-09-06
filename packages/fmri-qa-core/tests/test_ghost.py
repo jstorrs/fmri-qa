@@ -58,6 +58,43 @@ def test_estimate_pe_axis_picks_the_axis_the_ghost_lands_on() -> None:
     assert ratios[0] > ratios[1]
 
 
+def test_estimate_pe_axis_is_none_when_neither_axis_is_measurable() -> None:
+    """A mask filling the frame leaves no ghost region on either axis.
+
+    Both ratios are then NaN -- no measurement, rather than a low one -- and
+    `max` over them silently answered with whichever axis it looked at first.
+    Nothing downstream could tell that from a real result.
+    """
+    img = np.full((8, 8), 5.0)
+    mask = np.ones((8, 8), dtype=bool)
+    axis, ratios = estimate_pe_axis(img, mask, radius=0, return_ratios=True)
+    assert axis is None
+    assert all(np.isnan(r) for r in ratios.values())
+
+
+def test_estimate_pe_axis_ignores_an_unmeasurable_axis() -> None:
+    """The one axis a ratio exists for wins, whichever order they come in.
+
+    A phantom spanning the FOV along axis 0 has no clear ghost region there, so
+    that ratio is NaN while axis 1's is real. `ratios[1] > ratios[0]` is False
+    against a NaN, which used to hand the answer to axis 0 -- the axis nothing
+    was measured on.
+    """
+    img = np.zeros((8, 8))
+    mask = np.zeros((8, 8), dtype=bool)
+    mask[:, 2:4] = True  # spans axis 0, so its N/2 roll never clears the phantom
+    img[:, 2:4] = 100.0
+    img[:, 6:8] = 5.0  # the axis-1 ghost
+    valid = np.ones((8, 8), dtype=bool)
+
+    axis, ratios = estimate_pe_axis(
+        img, mask, radius=0, return_ratios=True, valid_mask=valid
+    )
+
+    assert np.isnan(ratios[0]) and np.isfinite(ratios[1])
+    assert axis == 1
+
+
 def test_ghost_top_ratio_isolates_the_brightest_ghost_voxel() -> None:
     # One ghost voxel far brighter than the rest: the region mean dilutes it, but
     # the top-fraction ratio (k=1 of 4 voxels) reports it directly.
