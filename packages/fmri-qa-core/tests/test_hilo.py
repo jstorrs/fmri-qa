@@ -53,6 +53,17 @@ def test_separate_noise_is_nan_when_signal_does_not_change_with_flip() -> None:
     assert np.isnan(zero.thermal_var)
 
 
+def test_m_is_infinite_when_the_low_flip_signal_is_zero() -> None:
+    """No low-flip signal means no ratio, reported as infinity rather than raised.
+
+    `M` is printed by `fmri-qa-hilo` outside the block that turns an analysis
+    failure into a clean message, so a `ZeroDivisionError` here would surface as
+    a traceback on a scan the rest of the run already handled.
+    """
+    zero = separate_noise(100.0, 0.0, var_high=20.0, var_low=10.0)
+    assert zero.m == float("inf")
+
+
 def test_instability_fraction_is_share_of_high_variance() -> None:
     res = separate_noise(200.0, 100.0, var_high=30.0, var_low=15.0)
     assert np.isclose(res.instability_fraction, res.instability_var / res.var_high)

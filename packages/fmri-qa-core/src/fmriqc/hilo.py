@@ -8,7 +8,7 @@ flip-angle algebra, kept pure so it can be exercised directly.
 """
 
 import warnings
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 import numpy as np
 from scipy import ndimage
@@ -66,7 +66,15 @@ class HiLoResult:
 
     @property
     def m(self) -> float:
-        """Squared signal ratio `(mean_high / mean_low)**2`."""
+        """Squared signal ratio `(mean_high / mean_low)**2`.
+
+        Infinite when the low-flip mean is zero: there is no ratio, and the
+        split `separate_noise` reads this for is undefined either way. Saying so
+        keeps a degenerate pair a reportable result — the CLI prints `M` outside
+        the block that catches analysis failures — rather than a traceback.
+        """
+        if self.mean_low == 0.0:
+            return float("inf")
         return (self.mean_high / self.mean_low) ** 2
 
     @property
@@ -116,41 +124,39 @@ def separate_noise(
     pooled `mean_*`/`var_*` from a scan pair and calls this. Kept separate so the
     algebra can be exercised directly.
     """
-    m = (mean_high / mean_low) ** 2 if mean_low != 0.0 else float("inf")
+    # The unsolved result is built first and `m` read off it, so the squared
+    # signal ratio has one definition (`HiLoResult.m`) rather than a copy here
+    # that could drift from the one the report prints.
+    undefined = HiLoResult(
+        mean_high=mean_high,
+        mean_low=mean_low,
+        var_high=var_high,
+        var_low=var_low,
+        thermal_var=float("nan"),
+        instability_var=float("nan"),
+        n_voxels=n_voxels,
+        fell_back=False,
+        flip_high=flip_high,
+        flip_low=flip_low,
+    )
+    m = undefined.m
     if not np.isfinite(m) or m == 1.0:
         # Signal unchanged across the two flip angles (m == 1, e.g. the same scan
         # passed twice) or zero low-flip signal: the split divides by (m - 1) and
         # is undefined. Report NaN variances rather than dividing by zero -- the
         # FSNR properties already fold a non-positive variance to NaN.
-        return HiLoResult(
-            mean_high=mean_high,
-            mean_low=mean_low,
-            var_high=var_high,
-            var_low=var_low,
-            thermal_var=float("nan"),
-            instability_var=float("nan"),
-            n_voxels=n_voxels,
-            fell_back=False,
-            flip_high=flip_high,
-            flip_low=flip_low,
-        )
+        return undefined
     thermal_var = (m * var_low - var_high) / (m - 1.0)
     instability_var = var_high - thermal_var
     fell_back = instability_var < 0.0
     if fell_back:  # measurement noise pushed instability negative -- Greve fallback
         thermal_var = var_low
         instability_var = var_high - var_low
-    return HiLoResult(
-        mean_high=mean_high,
-        mean_low=mean_low,
-        var_high=var_high,
-        var_low=var_low,
+    return replace(
+        undefined,
         thermal_var=thermal_var,
         instability_var=instability_var,
-        n_voxels=n_voxels,
         fell_back=fell_back,
-        flip_high=flip_high,
-        flip_low=flip_low,
     )
 
 
