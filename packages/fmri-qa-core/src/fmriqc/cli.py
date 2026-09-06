@@ -12,7 +12,8 @@ import argparse
 import json
 import math
 import sys
-from collections.abc import Sequence
+import warnings
+from collections.abc import Iterable, Sequence
 from pathlib import Path
 from typing import TextIO
 
@@ -82,6 +83,20 @@ def _artifact_collisions(base: str, paths: Sequence[str]) -> dict[Path, list[str
     for path in paths:
         destinations.setdefault(_artifact_path(base, path, batch=True), []).append(path)
     return {dest: srcs for dest, srcs in destinations.items() if len(srcs) > 1}
+
+
+def _print_warnings(caught: Iterable[warnings.WarningMessage], subject: str) -> None:
+    """Reprint captured warnings on stderr, named for what was being analyzed.
+
+    Python's default formatter names the line that called `warn` — a path inside
+    this package — and the category, and says nothing about the data. In a batch
+    that is exactly backwards: which scan provoked the warning is the only thing
+    an operator can act on, and the source line is noise the pipeline's own
+    authors read. So the warnings are captured around each scan's analysis and
+    reprinted attributed, on stderr, where the table's diagnostics belong.
+    """
+    for entry in caught:
+        print(f"{subject}: warning: {entry.message}", file=sys.stderr)
 
 
 def _localization_flag(m: q.Measurements) -> str:
@@ -286,12 +301,20 @@ def main(argv: Sequence[str] | None = None) -> int:
     failed = False
     records = []
     for path in args.paths:
-        try:
-            scan = q.QAScan.from_nifti(path)
-            artifact = q.analyze(scan, settings, name=Path(path).name, source=str(path))
-        except Exception as exc:  # noqa: BLE001 - report and continue the batch
-            failed = True
-            print(f"{Path(path).name:40s} ERROR: {exc}", file=sys.stderr)
+        name = Path(path).name
+        artifact: q.QAArtifact | None = None
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            try:
+                scan = q.QAScan.from_nifti(path)
+                artifact = q.analyze(scan, settings, name=name, source=str(path))
+            except Exception as exc:  # noqa: BLE001 - report and continue the batch
+                failed = True
+                print(f"{name:40s} ERROR: {exc}", file=sys.stderr)
+        # After the attempt either way: a scan that failed may well have warned
+        # on the way down, and that warning is part of the diagnosis.
+        _print_warnings(caught, name)
+        if artifact is None:
             continue
         if args.json:
             records.append(_metric_record(artifact))
@@ -428,18 +451,30 @@ def hilo_main(argv: Sequence[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
 
-    try:
-        high = q.QAScan.from_nifti(args.high)
-        low = q.QAScan.from_nifti(args.low)
-        res = q.run_hilo(
-            high, low, trim_sec=args.trim_sec, detrend=args.detrend, erode=args.erode
-        )
-    except Exception as exc:  # noqa: BLE001 - report cleanly and exit non-zero
-        print(f"ERROR: {exc}", file=sys.stderr)
-        return 1
-
     hi_name = Path(args.high).name
     lo_name = Path(args.low).name
+    res: q.HiLoResult | None = None
+    # The pair is analyzed together, so a warning belongs to both scans; naming
+    # them is still the difference between an actionable line and one that only
+    # names a source file inside this package (see `_print_warnings`).
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        try:
+            high = q.QAScan.from_nifti(args.high)
+            low = q.QAScan.from_nifti(args.low)
+            res = q.run_hilo(
+                high,
+                low,
+                trim_sec=args.trim_sec,
+                detrend=args.detrend,
+                erode=args.erode,
+            )
+        except Exception as exc:  # noqa: BLE001 - report cleanly and exit non-zero
+            print(f"ERROR: {exc}", file=sys.stderr)
+    _print_warnings(caught, f"{hi_name} + {lo_name}")
+    if res is None:
+        return 1
+
     hi_flip = f" (flip {res.flip_high:g})" if res.flip_high is not None else ""
     lo_flip = f" (flip {res.flip_low:g})" if res.flip_low is not None else ""
     print("# hi/lo flip-angle thermal/instability noise separation (Greve)")

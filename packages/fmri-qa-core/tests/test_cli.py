@@ -179,12 +179,40 @@ def test_table_flags_a_localization_failure(tmp_path, write_scan, capsys) -> Non
     measured, at the corners, on background. The warning that says so is
     transient; the row must carry it.
     """
-    with pytest.warns(UserWarning, match="not fully inside the phantom"):
-        rc = cli.main([write_scan(tmp_path), "--roi-size", "31"])
-    header, _rule, row = capsys.readouterr().out.splitlines()[1:4]
+    rc = cli.main([write_scan(tmp_path), "--roi-size", "31"])
+    captured = capsys.readouterr()
+    header, _rule, row = captured.out.splitlines()[1:4]
     assert rc == 0
     assert "loc" in header
     assert "ROI" in row
+    # the transient form of the same news, now attributed (see `_print_warnings`)
+    assert "scan.nii.gz: warning: " in captured.err
+    assert "not fully inside the phantom" in captured.err
+
+
+def test_batch_warnings_name_the_scan_that_raised_them(
+    tmp_path, write_scan, capsys
+) -> None:
+    """A batch's warnings are useless unless they say which scan they are about.
+
+    Python's default formatter prints the `warnings.warn` call site inside this
+    package and the category, so two scans warning about the same thing produce
+    two identical lines naming a source file the operator does not have. Each is
+    reprinted on stderr against the scan's name instead.
+    """
+    first = write_scan(tmp_path, name="first")
+    second = write_scan(tmp_path, name="second", seed=3)
+
+    rc = cli.main([first, second, "--roi-size", "31"])
+
+    assert rc == 0
+    err = capsys.readouterr().err
+    attributed = [line for line in err.splitlines() if ": warning: " in line]
+    assert len(attributed) == 2
+    assert attributed[0].startswith("first.nii.gz: warning: ")
+    assert attributed[1].startswith("second.nii.gz: warning: ")
+    assert "UserWarning" not in err  # no category, and no path into this package
+    assert "cli.py" not in err and "pipeline.py" not in err
 
 
 def test_localization_flag_names_every_failure(tmp_path, write_scan) -> None:
