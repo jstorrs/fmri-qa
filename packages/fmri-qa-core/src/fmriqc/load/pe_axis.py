@@ -4,7 +4,8 @@ The two authoritative, header-only PE-axis sources, kept apart from the ghost
 metric that provides the last-resort estimate. The sidecar
 `PhaseEncodingDirection` is authoritative (see the project notes); the NIfTI
 `dim_info` phase field is the fallback. `scan.from_nifti` tries these in order
-and only then falls back to `metrics.ghost.phase_encode_axis`.
+and leaves the axis unresolved if neither answers, for `pipeline.run_qa` to
+estimate from the Nyquist ghost.
 """
 
 from typing import Any

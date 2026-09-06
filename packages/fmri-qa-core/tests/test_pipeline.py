@@ -9,7 +9,22 @@ import pytest
 
 import fmriqc as q
 
-from .conftest import MakeScan
+from .conftest import MakeScan, synthetic_series
+
+# Fraction of the phantom injected at its N/2-shifted location, big enough for
+# the ghost estimate to separate the two candidate axes on a noisy series.
+GHOST_FRACTION = 0.08
+
+
+def _scan_with_ghost_on_axis1(seed: int = 0) -> q.QAScan:
+    """A synthetic phantom carrying an injected N/2 ghost along axis 1.
+
+    No `pe_axis`: this is the scan the loader hands over when neither the sidecar
+    nor `dim_info` names an axis, so `run_qa` has to find it.
+    """
+    data = synthetic_series(seed=seed)
+    ghosted = data + GHOST_FRACTION * np.roll(data, data.shape[1] // 2, axis=1)
+    return q.QAScan(data=ghosted, tr=2.0)
 
 
 def test_run_qa_returns_finite_core_metrics(make_scan: MakeScan) -> None:
@@ -52,6 +67,20 @@ def test_the_ghost_masks_are_built_once_for_both_axes(make_scan: MakeScan) -> No
     assert ghost.radius == q.GHOST_RADIUS
     assert ghost.pe_signal.sum() == ghost.pe_ghost.sum() > 0
     assert ghost.ro_signal.sum() == ghost.ro_ghost.sum() > 0
+
+
+def test_run_qa_estimates_the_pe_axis_from_the_ghost() -> None:
+    """With no axis in the metadata, the pipeline reads it off the analyzed slice.
+
+    This is the only place the estimate is made -- the loader no longer guesses
+    on the full volume -- so an injected axis-1 ghost has to resolve here or
+    nowhere. Everything downstream (the masks, the four percentages, the PE/RO
+    smoothness labels) hangs off the answer.
+    """
+    m = q.run_qa(_scan_with_ghost_on_axis1(), roi_size=9).metrics
+    assert m.pe_axis == 1
+    assert m.ghost is not None
+    assert m.ghost.pe_axis == 1
 
 
 def test_run_qa_is_deterministic(make_scan: MakeScan) -> None:
