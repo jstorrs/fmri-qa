@@ -86,6 +86,7 @@ def write_scan() -> WriteScan:
 
         img = nib.Nifti1Image(data, affine=np.eye(4))
         img.header.set_zooms((3.0, 3.0, 3.0, 2.0))
+        img.header.set_xyzt_units("mm", "sec")
         nifti = directory / f"{name}.nii.gz"
         nib.save(img, str(nifti))
         (directory / f"{name}.json").write_text(

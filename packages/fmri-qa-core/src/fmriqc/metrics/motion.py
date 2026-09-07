@@ -6,11 +6,13 @@ phantom cannot rotate while gradient heating translates, scales, and shears the
 image. The analyzed series is not resampled from this fit; it is a diagnostic.
 """
 
+import warnings
 from dataclasses import dataclass
 
 import numpy as np
 from scipy import ndimage
 
+from .._arrays import ArrayValue
 from ..prep.imaging import normalize_voxel_mm
 from ..types import BoolArray, FloatArray
 
@@ -22,7 +24,7 @@ MOTION_TOL = 1e-4
 
 
 @dataclass(frozen=True)
-class MotionResult:
+class MotionResult(ArrayValue):
     """Per-volume in-plane deformation of the phantom (thermal-drift model).
 
     A phantom is rigid and stationary, so between volumes it cannot rotate; what
@@ -43,6 +45,16 @@ class MotionResult:
 
     params: FloatArray  # (n_t, 5): dr, dc, sr, sc, shear
     voxel_mm: tuple[float, float] | None = None  # in-plane (axis0, axis1) mm/voxel
+
+    @property
+    def converged(self) -> BoolArray:
+        """Frames with an identifiable, finite fit that met the tolerance.
+
+        Failed frames have all-NaN parameters. Their traces remain NaN in the
+        saved artifact, and any failed frame makes the run's peak metrics NaN
+        rather than publishing a peak over an incomplete series.
+        """
+        return np.isfinite(self.params).all(axis=1)
 
     @property
     def translation(self) -> FloatArray:
@@ -101,11 +113,12 @@ def _register_norotate(
     Forward-additive Lucas-Kanade for the 5-parameter warp
     `W(x) = center + U (x - center) + t`, with `U = [[1+sr, h], [h, 1+sc]]`
     symmetric (scale + shear, **no rotation**) and `t = (dr, dc)`. Each step
-    warps `moving` by the current parameters, then solves the Gauss-Newton normal
-    equations over `mask` for the additive update; the warp Jacobian is linear in
-    the (centered) coordinates `rr`/`cc` and independent of the parameters, so the
-    additive scheme is exact up to the image interpolation. Returns
-    `[dr, dc, sr, sc, h]`, the frame's pose relative to the reference.
+    warps `moving` by the current parameters, then solves the linearized
+    least-squares problem over `mask` for the additive update; the warp Jacobian
+    is linear in the centered coordinates `rr`/`cc` and independent of the
+    parameters, so the additive scheme is exact up to the image interpolation. Returns
+    `[dr, dc, sr, sc, h]`, the frame's pose relative to the reference, or all
+    NaNs if the fit is rank-deficient, non-finite, or exhausts its iterations.
     """
     m = mask.ravel()
     ref = reference.ravel()[m]
@@ -125,13 +138,15 @@ def _register_norotate(
         sd = np.stack([gr, gc, gr * rrm, gc * ccm, gr * ccm + gc * rrm], axis=1)
         err = warped.ravel()[m] - ref
         try:
-            dp = np.linalg.solve(sd.T @ sd, sd.T @ err)
+            dp, _, rank, _ = np.linalg.lstsq(sd, err, rcond=None)
         except np.linalg.LinAlgError:
+            break
+        if rank < 5 or not np.isfinite(dp).all():
             break
         p = p - dp
         if np.max(np.abs(dp)) < tol:
-            break
-    return p
+            return np.asarray(p, dtype=np.float64)
+    return np.full(5, np.nan)
 
 
 def estimate_motion(
@@ -169,4 +184,12 @@ def estimate_motion(
         params[t] = _register_norotate(
             center_slice[..., t], reference, rr, cc, center, mask, max_iter, tol
         )
-    return MotionResult(params=params, voxel_mm=normalize_voxel_mm(voxel_mm))
+    result = MotionResult(params=params, voxel_mm=normalize_voxel_mm(voxel_mm))
+    failed = int((~result.converged).sum())
+    if failed:
+        warnings.warn(
+            f"motion fit failed or did not converge for {failed}/{nt} frames; "
+            "their motion traces and the run's peak motion metrics are undefined",
+            stacklevel=2,
+        )
+    return result

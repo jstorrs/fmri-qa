@@ -105,18 +105,18 @@ def detrend_fn(
 
     Raises:
         InvalidChoiceError: If `method` is not one of `DETREND_METHODS`.
-        InvalidScanError: If the derived order leaves the fit determined by
-            fewer frames than it has coefficients (see above).
+        InvalidScanError: If the fit has at least as many coefficients as frames,
+            leaving no residual degrees of freedom for noise estimation.
     """
     n_frames = center_slice.shape[-1]
     if method == "poly":
         degree = poly_degree(center_slice, tr)
-        if degree >= n_frames:
+        if degree + 1 >= n_frames:
             raise InvalidScanError(
                 "detrend order",
                 degree,
-                f"a Legendre fit of degree {degree} carries more coefficients "
-                f"than the {n_frames} analyzed frames can determine, so it would "
+                f"a Legendre fit of degree {degree} leaves no residual degrees "
+                f"of freedom in the {n_frames} analyzed frames, so it would "
                 f"absorb the signal it is meant to detrend; the order follows "
                 f"from the run duration, so check that the TR of {tr:g} is in "
                 f"seconds",
@@ -125,13 +125,14 @@ def detrend_fn(
     if method == "spline":
         n_nodes = spline_nodes(center_slice, tr)
         n_coefficients = n_nodes + SPLINE_DEGREE + 1
-        if n_coefficients > n_frames:
+        if n_coefficients >= n_frames:
             raise InvalidScanError(
                 "detrend order",
                 n_nodes,
                 f"{n_nodes} interior knots make {n_coefficients} spline "
-                f"coefficients, more than the {n_frames} analyzed frames can "
-                f"determine; the knot count follows from the run duration, so "
+                f"coefficients, leaving no residual degrees of freedom in the "
+                f"{n_frames} analyzed frames; the knot count follows from the "
+                f"run duration, so "
                 f"check that the TR of {tr:g} is in seconds",
             )
         return (lambda y: spline_residuals(y, n_nodes)), n_nodes

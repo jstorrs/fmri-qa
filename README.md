@@ -129,6 +129,11 @@ where a slow monotonic strain ramp is the thermal-drift signature. This is a
 diagnostic only — the analyzed series is **not** resampled from the fit, so the
 FBIRN metrics stay measured on the acquired data.
 
+Each motion fit must be identifiable, finite, and converged. Failed frames
+raise a warning and carry NaN translation/strain values; `MotionResult.converged`
+identifies usable frames. If any frame fails, the run's peak motion metrics are
+undefined (`null` in CLI JSON), and the PDF labels the unresolved frame count.
+
 ## Smoothness
 
 The `fwPE` / `fwRO` metrics are the spatial smoothness of the noise field along
@@ -373,6 +378,9 @@ QAScan → preprocess → QAImages → detect_phantom → resolve_roi
 returns a `QAImages` holding the center slice plus its fluctuations; the summary
 images (mean, MIP, static noise, fluctuation noise, trend) are derived
 properties. The full multi-slice volume can be discarded once `QAImages` exists.
+`QAImages` owns read-only copies of its arrays, so changing the input cannot
+invalidate these cached summaries. Artifact arrays likewise own read-only
+copies; make an explicit array copy when writable working data is needed.
 `run_qa` gathers the metrics into a `QAResult` — the pipeline's working output,
 with the images still attached — and `build_artifact` projects that into the
 `QAArtifact` everything downstream reads. The artifact has five sections

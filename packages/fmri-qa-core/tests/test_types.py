@@ -1,6 +1,7 @@
 """Value-object behavior: the derived properties on the result dataclasses."""
 
 import numpy as np
+import pytest
 
 from fmriqc import ROI, MotionResult, QAImages, SaturationResult
 from fmriqc.prep.imaging import roi_indexes
@@ -91,3 +92,27 @@ def test_qaimages_finds_a_nulled_edge_under_a_nonzero_intercept() -> None:
 
     assert not images.valid_mask[0, :].any()
     assert images.valid_mask[1:, :].all()  # the other three edges survive
+
+
+def test_qaimages_owns_immutable_arrays_and_caches() -> None:
+    data = np.random.default_rng(2).normal(size=(8, 8, 20))
+    residual = data - data.mean(axis=-1, keepdims=True)
+    images = QAImages(data, residual, tr=2)
+    expected = images.mean_image.copy()
+    data[:] = 0
+    residual[:] = 0
+    assert np.array_equal(images.mean_image, expected)
+    assert np.array_equal(images.center_slice.mean(axis=-1), expected)
+    assert images.fluctuations.any()
+    for array in (
+        images.center_slice,
+        images.fluctuations,
+        images.mean_image,
+        images.mip,
+        images.trend,
+        images.valid_mask,
+        images.static_noise,
+        images.fluctuation_noise,
+    ):
+        with pytest.raises(ValueError, match="read-only"):
+            array.flat[0] = 0

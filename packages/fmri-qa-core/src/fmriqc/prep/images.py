@@ -10,12 +10,13 @@ of any dependency on the metric or report layers.
 from dataclasses import dataclass
 from functools import cached_property
 
+from .._arrays import ArrayValue, readonly
 from ..types import BoolArray, DetrendMethod, FloatArray
 from .imaging import edge_valid_mask, fluctuation_noise, odd_even_difference
 
 
 @dataclass(frozen=True, eq=False)
-class QAImages:
+class QAImages(ArrayValue):
     """The center slice and its detrended fluctuations, plus derived FBIRN images.
 
     Produced by `preprocess` before phantom detection. Only the center slice is
@@ -53,17 +54,17 @@ class QAImages:
     @cached_property
     def trend(self) -> FloatArray:
         """(X, Y, T) fitted low-frequency trend: signal minus fluctuations."""
-        return self.center_slice - self.fluctuations
+        return readonly(self.center_slice - self.fluctuations)
 
     @cached_property
     def mean_image(self) -> FloatArray:
         """(X, Y) temporal mean (FBIRN signal image)."""
-        return self.center_slice.mean(axis=-1)
+        return readonly(self.center_slice.mean(axis=-1))
 
     @cached_property
     def mip(self) -> FloatArray:
         """(X, Y) max over time — phantom-segmentation target."""
-        return self.center_slice.max(axis=-1)
+        return readonly(self.center_slice.max(axis=-1))
 
     @cached_property
     def valid_mask(self) -> BoolArray:
@@ -73,14 +74,14 @@ class QAImages:
         valid, and against `zero_value` rather than 0.0, since a stored zero
         reads back as the scan's intercept (see `edge_valid_mask`).
         """
-        return edge_valid_mask(self.mip, zero=self.zero_value)
+        return readonly(edge_valid_mask(self.mip, zero=self.zero_value))
 
     @cached_property
     def static_noise(self) -> FloatArray:
         """(X, Y) odd/even difference (FBIRN static spatial noise)."""
-        return odd_even_difference(self.center_slice)
+        return readonly(odd_even_difference(self.center_slice))
 
     @cached_property
     def fluctuation_noise(self) -> FloatArray:
         """(X, Y) temporal RMS of the fluctuations."""
-        return fluctuation_noise(self.fluctuations)
+        return readonly(fluctuation_noise(self.fluctuations))

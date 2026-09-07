@@ -1,0 +1,209 @@
+"""Validate the published artifact contract at the archive boundary.
+
+Scalar types follow the value objects; dimensional relationships and numeric
+domains are checked explicitly. NaN/Infinity measurements remain meaningful,
+but coordinates, counts, and analysis settings must be usable.
+"""
+
+import math
+from dataclasses import fields
+from types import UnionType
+from typing import Any, Literal, get_args, get_origin
+
+import numpy as np
+
+from .artifact import AnalysisSettings, Measurements, Provenance, QAArtifact, RoiBox
+
+
+def _matches(value: object, annotation: Any) -> bool:
+    origin = get_origin(annotation)
+    if origin is UnionType:
+        return any(_matches(value, choice) for choice in get_args(annotation))
+    if origin is Literal:
+        return any(type(value) is type(v) and value == v for v in get_args(annotation))
+    if origin is tuple:
+        args = get_args(annotation)
+        return (
+            isinstance(value, list | tuple)
+            and len(value) == len(args)
+            and all(_matches(v, t) for v, t in zip(value, args, strict=True))
+        )
+    if annotation is float:
+        return type(value) in (int, float)
+    return type(value) is annotation
+
+
+def _object(value: Any, name: str) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        raise ValueError(f"{name} must be a JSON object")
+    return {str(k): v for k, v in value.items()}
+
+
+def validate_document(document: dict[str, Any]) -> None:
+    """Check scalar records before constructors or coercions can conceal errors."""
+    images = _object(document["images"], "images")
+    curves = _object(document["curves"], "curves")
+    records = (
+        ("settings", document["settings"], AnalysisSettings),
+        ("provenance", document["provenance"], Provenance),
+        ("measurements", document["measurements"], Measurements),
+        ("images.roi", images["roi"], RoiBox),
+    )
+    for name, value, cls in records:
+        record = _object(value, name)
+        for field in fields(cls):
+            if not _matches(record[field.name], field.type):
+                raise ValueError(f"{name}.{field.name} has an invalid type or value")
+    if type(images["has_ghost"]) is not bool:
+        raise ValueError("images.has_ghost must be boolean")
+    psf = _object(curves["psf"], "curves.psf")
+    for name, annotation in (
+        ("labels", tuple[str, str]),
+        ("fwhm", tuple[float, float]),
+        ("xmax", float),
+    ):
+        if not _matches(psf[name], annotation):
+            raise ValueError(f"curves.psf.{name} has an invalid type or length")
+    if not _matches(curves["outlier_qthr"], float):
+        raise ValueError("curves.outlier_qthr must be numeric")
+
+
+def _require(condition: bool, message: str) -> None:
+    if not condition:
+        raise ValueError(message)
+
+
+def validate_artifact(artifact: QAArtifact) -> None:
+    """Require coherent settings, dimensions, and coordinates after composition."""
+    _validate_parameters(artifact)
+    _validate_timeseries(artifact)
+    _validate_images(artifact)
+    _validate_spatial_curves(artifact)
+
+
+def _validate_parameters(artifact: QAArtifact) -> None:
+    s, p, m = artifact.settings, artifact.provenance, artifact.measurements
+    _require(math.isfinite(s.trim_sec) and s.trim_sec >= 0, "invalid settings.trim_sec")
+    _require(s.roi_size > 0, "invalid settings.roi_size")
+    _require(s.detrend_order is None or s.detrend_order >= 0, "invalid detrend_order")
+    _require(s.pe_axis_override in (None, 0, 1), "invalid pe_axis_override")
+    _require(m.pe_axis in (None, 0, 1), "invalid measurements.pe_axis")
+    _require(p.n_frames > 0, "invalid provenance.n_frames")
+    _require(p.n_trimmed is None or p.n_trimmed >= 0, "invalid provenance.n_trimmed")
+    _require(math.isfinite(p.tr) and p.tr > 0, "invalid provenance.tr")
+    if p.voxel_mm is not None:
+        _require(
+            all(math.isfinite(v) and v > 0 for v in p.voxel_mm),
+            "invalid provenance.voxel_mm",
+        )
+    _require(0 <= m.outlier_worst_frame < p.n_frames, "invalid outlier_worst_frame")
+    _require(m.n_clipped_kept >= 0 and m.n_clipped_pre >= 0, "invalid clipping counts")
+
+
+def _validate_timeseries(artifact: QAArtifact) -> None:
+    c, p = artifact.curves, artifact.provenance
+    _require(0 < c.outlier_qthr < 1, "invalid curves.outlier_qthr")
+    for name in (
+        "time",
+        "roi_signal",
+        "roi_trend",
+        "roi_residual",
+        "outlier_fraction",
+        "shear_pct",
+    ):
+        _require(
+            getattr(c, name).shape == (p.n_frames,), f"curves.{name} shape mismatch"
+        )
+    for name in ("translation", "scale_pct", "com_deviation"):
+        _require(
+            getattr(c, name).shape == (p.n_frames, 2), f"curves.{name} shape mismatch"
+        )
+    _require(
+        bool(np.allclose(c.time, np.arange(p.n_frames) * p.tr)),
+        "curves.time disagrees with frame count/TR",
+    )
+    for name in ("spectrum_hz", "spectrum_magnitude"):
+        _require(
+            getattr(c, name).shape == (p.n_frames // 2,),
+            f"curves.{name} shape mismatch",
+        )
+    _require(
+        bool(np.allclose(c.spectrum_hz, np.fft.rfftfreq(p.n_frames, p.tr)[1:])),
+        "curves.spectrum_hz disagrees with frame count/TR",
+    )
+
+
+def _validate_images(artifact: QAArtifact) -> None:
+    images = artifact.images
+    s, p, m = artifact.settings, artifact.provenance, artifact.measurements
+    shape = images.signal.shape
+    _require(
+        len(shape) == 2 and min(shape) > 0, "images.signal must be a nonempty 2-D image"
+    )
+    if p.matrix is not None:
+        _require(p.matrix == shape, "provenance.matrix disagrees with images")
+    for name in (
+        "sfnr",
+        "fluctuation_noise",
+        "static_noise",
+        "phantom_mask",
+        "invalid_mask",
+    ):
+        _require(getattr(images, name).shape == shape, f"images.{name} shape mismatch")
+    _require(
+        (images.ghost is not None) == (m.pe_axis is not None),
+        "ghost regions disagree with pe_axis",
+    )
+    if images.ghost is not None:
+        for name in ("pe_signal", "pe_ghost", "ro_signal", "ro_ghost"):
+            _require(
+                getattr(images.ghost, name).shape == shape,
+                f"images.ghost.{name} shape mismatch",
+            )
+    roi = images.roi
+    _require(
+        0 <= roi.row0 < roi.row1 <= shape[0]
+        and 0 <= roi.col0 < roi.col1 <= shape[1]
+        and roi.size == roi.col1 - roi.col0,
+        "images.roi must be square and inside the image",
+    )
+    _require(
+        roi.size == min(s.roi_size, *shape),
+        "images.roi disagrees with settings.roi_size",
+    )
+    hull = images.phantom_hull
+    _require(
+        hull.ndim == 2 and hull.shape[1] == 2,
+        "images.phantom_hull must have shape (N, 2)",
+    )
+    _require(bool(np.isfinite(hull).all()), "images.phantom_hull must be finite")
+
+
+def _validate_spatial_curves(artifact: QAArtifact) -> None:
+    c, m, roi = artifact.curves, artifact.measurements, artifact.images.roi
+    wk = c.weisskoff
+    for name in ("roi_sizes", "cv", "cv_ideal", "rdc"):
+        _require(
+            getattr(wk, name).shape == (roi.size,),
+            f"curves.weisskoff.{name} shape mismatch",
+        )
+    _require(
+        bool(np.array_equal(wk.roi_sizes, np.arange(1, roi.size + 1))),
+        "invalid Weisskoff ROI sizes",
+    )
+    psf = c.psf
+    _require(psf.unit == m.fwhm_unit, "PSF and measurement units disagree")
+    labels = ("axis0", "axis1") if m.pe_axis is None else ("PE", "RO")
+    _require(psf.labels == labels, "PSF labels disagree with pe_axis")
+    _require(math.isfinite(psf.xmax) and psf.xmax > 0, "invalid curves.psf.xmax")
+    for x, y, name in (
+        (psf.displacement, psf.empirical, "empirical"),
+        (psf.model_x, psf.model, "model"),
+    ):
+        _require(
+            x.ndim == 2 and x.shape[0] == 2 and x.shape[1] > 0 and y.shape == x.shape,
+            f"curves.psf.{name} shape mismatch",
+        )
+        _require(
+            bool(np.isfinite(x).all()), f"curves.psf.{name} coordinates must be finite"
+        )

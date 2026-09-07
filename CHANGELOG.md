@@ -63,6 +63,19 @@ versioning when the first stable public interface is released.
 
 ### Fixed
 
+- Preserve NIfTI proxy scaling for clipping detection and nulled-edge masks.
+  Convert meter/micron voxel sizes to millimeters; unknown spatial units retain
+  the millimeter assumption with an explicit warning.
+- Validate artifact scalar types, settings, array shapes, coordinates, masks,
+  and ROI bounds on load; malformed archives raise `InvalidArtifactError`.
+- Preprocessed images own read-only arrays so the full input volume can be
+  freed and caller mutations cannot invalidate cached summaries. Published
+  artifact arrays also own read-only copies.
+- Singular, non-finite, and unconverged motion fits now warn and publish NaN
+  traces and peak metrics. `MotionResult.converged` identifies usable frames;
+  motion plots label unresolved frames. Existing artifact layouts remain readable.
+- Reject polynomial and spline detrending with no residual degrees of freedom.
+
 - **A TR stored in milliseconds was read as seconds.** The loader took pixdim
   without its unit, so a header in msec gave a TR of 2000 s: no warm-up volumes
   were trimmed and the detrend order, which follows the run duration, exceeded

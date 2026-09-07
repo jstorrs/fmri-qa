@@ -2,9 +2,9 @@
 
 nibabel ships type information, but `load` is annotated to return the
 `FileBasedImage` base class, which lacks the NIfTI accessors (`get_fdata`,
-`affine`, and a `SpatialHeader` with `get_zooms`/`get_slope_inter`) the loader
-actually calls, and its `get_zooms` is mistyped. This stub narrows `load` to a
-NIfTI image with just those accessors, typed as the pipeline expects them.
+`affine`, the scaled array proxy, and the spatial header) the loader actually
+uses, and its `get_zooms` is mistyped. This stub narrows `load` to a NIfTI image
+with just those accessors, typed as the pipeline expects them.
 """
 
 import numpy as np
@@ -14,9 +14,15 @@ class Nifti1Header:
     def get_zooms(self) -> tuple[float, ...]: ...
     def get_slope_inter(self) -> tuple[float | None, float | None]: ...
     def get_dim_info(self) -> tuple[int | None, int | None, int | None]: ...
+    def get_xyzt_units(self) -> tuple[str, str]: ...
+
+class ArrayProxy:
+    slope: float
+    inter: float
 
 class Nifti1Image:
     header: Nifti1Header
+    dataobj: ArrayProxy
     affine: npt.NDArray[np.float64]
     shape: tuple[int, ...]
     def get_fdata(self) -> npt.NDArray[np.float64]: ...

@@ -9,6 +9,7 @@ for the report header is derived here (`_pe_direction`) from the same sidecar.
 """
 
 import json
+import math
 import warnings
 from dataclasses import dataclass
 from pathlib import Path
@@ -123,8 +124,18 @@ def _scan_meta(
     the TR the report shows is the one the pipeline ran on.
     """
     zooms = img.header.get_zooms()
+    unit, _ = img.header.get_xyzt_units()
+    if unit == "unknown":
+        warnings.warn(
+            "NIfTI spatial unit is unknown; assuming millimeters for voxel sizes",
+            stacklevel=3,
+        )
+    factor = {"meter": 1000.0, "mm": 1.0, "micron": 0.001, "unknown": 1.0}[unit]
+    voxel_mm = tuple(float(z) * factor for z in zooms[:3])
+    if not all(math.isfinite(z) and z > 0 for z in voxel_mm):
+        raise InvalidScanError("voxel size", voxel_mm, "expected positive finite sizes")
     return ScanMeta(
-        voxel_mm=(float(zooms[0]), float(zooms[1]), float(zooms[2])),
+        voxel_mm=(voxel_mm[0], voxel_mm[1], voxel_mm[2]),
         matrix=(int(img.shape[0]), int(img.shape[1])),
         tr=tr,
         te=sidecar.get("EchoTime"),

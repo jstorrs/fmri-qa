@@ -4,6 +4,9 @@ Exercises `run_qa` as a caller sees it, on the synthetic phantom the `make_scan`
 fixture builds (no file I/O), so the whole functional core runs deterministically.
 """
 
+import gc
+import weakref
+
 import numpy as np
 import pytest
 
@@ -92,7 +95,13 @@ def test_run_qa_is_deterministic(make_scan: MakeScan) -> None:
 
 
 def test_preprocess_discards_the_full_volume(make_scan: MakeScan) -> None:
-    images = q.preprocess(make_scan(), trim_sec=4.0)
+    scan = make_scan()
+    data_ref = weakref.ref(scan.data)
+    images = q.preprocess(scan, trim_sec=4.0)
+    assert not np.shares_memory(images.center_slice, scan.data)
+    del scan
+    gc.collect()
+    assert data_ref() is None
     # only the center slice survives: (X, Y, T_trimmed), not the 4-D volume
     assert images.center_slice.ndim == 3
     assert images.detrend_method == "poly"

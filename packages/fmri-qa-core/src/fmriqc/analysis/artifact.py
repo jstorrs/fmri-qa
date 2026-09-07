@@ -20,6 +20,7 @@ Nothing here imports the metric, prep, or load layers: an artifact is inert data
 
 from dataclasses import dataclass
 
+from .._arrays import ArrayValue
 from ..types import (
     FBIRN_ROI_SIZE,
     BoolArray,
@@ -172,7 +173,7 @@ class Measurements:
 
 
 @dataclass(frozen=True, eq=False, slots=True)
-class WeisskoffCurve:
+class WeisskoffCurve(ArrayValue):
     """The Weisskoff/RDC curves over the sampled ROI widths.
 
     `cv` is the measured ROI-averaged coefficient of variation and `cv_ideal`
@@ -189,7 +190,7 @@ class WeisskoffCurve:
 
 
 @dataclass(frozen=True, eq=False, slots=True)
-class PsfCurves:
+class PsfCurves(ArrayValue):
     """Directional point-spread profiles of the noise field (AFNI 3dFWHMx).
 
     Two directions, phase-encode first: `labels` names them ("PE"/"RO", or
@@ -211,14 +212,17 @@ class PsfCurves:
 
 
 @dataclass(frozen=True, eq=False, slots=True)
-class Curves:
+class Curves(ArrayValue):
     """The 1-D traces: everything a stability plot draws, per analyzed frame.
 
     `time` is the shared abscissa in seconds; the ROI series, outlier fraction,
     motion, and centroid traces are all indexed by it. The residual spectrum is
     stored already DC-dropped (`spectrum_hz` starts at the first nonzero bin) so
     a plot needs no windowing knowledge. The Weisskoff and PSF curves have their
-    own abscissas and sit in their own objects.
+    own abscissas and sit in their own objects. A failed or unconverged motion
+    fit is an all-NaN frame in translation, scale, and shear; any failed frame
+    makes the run's peak motion measurements NaN. This status survives storage
+    without changing the archive layout.
     """
 
     time: FloatArray  # (T,) seconds
@@ -253,7 +257,7 @@ class RoiBox:
 
 
 @dataclass(frozen=True, eq=False, slots=True)
-class GhostRegions:
+class GhostRegions(ArrayValue):
     """The region-matched masks the ghost percentages are averaged over.
 
     One signal/ghost pair per in-plane axis: the PE pair feeds `ghost_pct`, the
@@ -268,7 +272,7 @@ class GhostRegions:
 
 
 @dataclass(frozen=True, eq=False, slots=True)
-class ArtifactImages:
+class ArtifactImages(ArrayValue):
     """The four fBIRN summary images plus the geometry drawn on top of them.
 
     `signal`, `sfnr`, `fluctuation_noise`, and `static_noise` are the fBIRN

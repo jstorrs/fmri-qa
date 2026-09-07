@@ -7,7 +7,7 @@ back equal to the one that was written.
 """
 
 import json
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from pathlib import Path
 
 import numpy as np
@@ -268,6 +268,141 @@ def test_load_rejects_unreadable_bytes(tmp_path) -> None:
     junk.write_bytes(b"not an archive")
     with pytest.raises(q.InvalidArtifactError):
         q.load_artifact(junk)
+
+
+def test_load_rejects_non_object_documents_and_plain_arrays(tmp_path) -> None:
+    for document in ([], None, 4, "text"):
+        path = tmp_path / "bad.npz"
+        np.savez(path, __document__=np.array(json.dumps(document)))
+        with pytest.raises(q.InvalidArtifactError, match="JSON object"):
+            q.load_artifact(path)
+    path = tmp_path / "plain.npy"
+    np.save(path, np.ones(3))
+    with pytest.raises(q.InvalidArtifactError):
+        q.load_artifact(path)
+
+
+def test_load_rejects_invalid_scalar_records(tmp_path, artifact) -> None:
+    edits = (
+        ("schema_version", 4.0),
+        ("settings", []),
+        ("settings.detrend", "invalid"),
+        ("settings.center", "invalid"),
+        ("settings.roi_size", True),
+        ("settings.roi_size", 0),
+        ("settings.trim_sec", float("nan")),
+        ("settings.detrend_order", -1),
+        ("settings.pe_axis_override", 2),
+        ("provenance.n_frames", 0),
+        ("provenance.n_trimmed", -1),
+        ("provenance.tr", 0),
+        ("provenance.matrix", [1, 2, 3]),
+        ("provenance.matrix", [1, 2]),
+        ("provenance.voxel_mm", [3, -1, 3]),
+        ("measurements.snr", "100"),
+        ("measurements.pe_axis", 2),
+        ("measurements.outlier_worst_frame", 999),
+        ("measurements.n_clipped_kept", -1),
+        ("images.has_ghost", "false"),
+        ("images.has_ghost", False),
+        ("images.roi.row0", -1),
+        ("images.roi.row1", 999),
+        ("curves", []),
+        ("curves.outlier_qthr", "0.001"),
+        ("curves.outlier_qthr", 0),
+        ("curves.psf.labels", []),
+        ("curves.psf.labels", ["bad", "labels"]),
+        ("curves.psf.fwhm", [1]),
+        ("curves.psf.xmax", float("inf")),
+        ("curves.psf.unit", "vox"),
+    )
+    for field, value in edits:
+        path = q.save_artifact(artifact, tmp_path / "bad.npz")
+
+        def edit(doc, field=field, value=value):
+            target = doc
+            keys = field.split(".")
+            for key in keys[:-1]:
+                target = target[key]
+            target[keys[-1]] = value
+            return doc
+
+        _rewrite_document(path, edit)
+        with pytest.raises(q.InvalidArtifactError):
+            q.load_artifact(path)
+
+
+def test_load_rejects_inconsistent_arrays(tmp_path, artifact) -> None:
+    edits = (
+        ("curves.roi_signal", np.zeros(1)),
+        ("curves.translation", np.zeros((38, 3))),
+        ("curves.time", np.zeros(38)),
+        ("curves.spectrum_hz", np.zeros(19)),
+        ("curves.spectrum_magnitude", np.zeros(1)),
+        ("curves.weisskoff.cv", np.zeros(1)),
+        ("curves.weisskoff.roi_sizes", np.zeros(9)),
+        ("curves.psf.empirical", np.zeros((1, 2))),
+        ("curves.psf.model_x", np.full((2, 100), np.nan)),
+        ("images.signal", np.ones(1)),
+        ("images.sfnr", np.ones((1, 1))),
+        ("images.phantom_mask", np.ones((1, 1), dtype=bool)),
+        ("images.phantom_mask", np.full((32, 32), 2)),
+        ("images.signal", np.full((32, 32), "1")),
+        ("images.signal", np.ones((32, 32), dtype=complex)),
+        ("images.ghost.pe_signal", np.ones((1, 1), dtype=bool)),
+        ("images.phantom_hull", np.zeros((3, 3))),
+        ("images.phantom_hull", np.full((3, 2), np.nan)),
+    )
+    for field, value in edits:
+        path = q.save_artifact(artifact, tmp_path / "bad.npz")
+        with np.load(path, allow_pickle=False) as archive:
+            payload = {key: archive[key] for key in archive.files}
+        payload[field] = value
+        np.savez(path, **payload)
+        with pytest.raises(q.InvalidArtifactError):
+            q.load_artifact(path)
+
+
+def test_artifact_arrays_own_readonly_copies(tmp_path, artifact) -> None:
+    signal = artifact.images.signal.copy()
+    images = replace(artifact.images, signal=signal)
+    signal[:] = 0
+    assert images.signal.any()
+    loaded = q.load_artifact(q.save_artifact(artifact, tmp_path / "qa.npz"))
+    for obj in (artifact, loaded):
+        for array in (
+            obj.images.signal,
+            obj.images.phantom_mask,
+            obj.curves.time,
+            obj.curves.translation,
+            obj.curves.weisskoff.cv,
+            obj.curves.psf.empirical,
+            obj.images.ghost.pe_signal,
+        ):
+            with pytest.raises(ValueError, match="read-only"):
+                array.flat[0] = 0
+
+
+def test_failed_motion_survives_the_artifact_round_trip(tmp_path, artifact) -> None:
+    n = artifact.provenance.n_frames
+    broken = replace(
+        artifact,
+        measurements=replace(
+            artifact.measurements,
+            max_translation=float("nan"),
+            max_scale_pct=float("nan"),
+            max_shear_pct=float("nan"),
+        ),
+        curves=replace(
+            artifact.curves,
+            translation=np.full((n, 2), np.nan),
+            scale_pct=np.full((n, 2), np.nan),
+            shear_pct=np.full(n, np.nan),
+        ),
+    )
+    loaded = q.load_artifact(q.save_artifact(broken, tmp_path / "failed-motion.npz"))
+    assert np.isnan(loaded.curves.translation).all()
+    assert np.isnan(loaded.measurements.max_translation)
 
 
 def test_load_rejects_an_artifact_from_a_newer_build(tmp_path, artifact) -> None:

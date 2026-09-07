@@ -8,6 +8,7 @@ fresh `Figure`. Format-agnostic — a driver embeds the figures.
 
 from collections.abc import Callable
 
+import numpy as np
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 
@@ -121,6 +122,21 @@ def _plot_motion(ax: Axes, curves: Curves, fs: int = 9) -> None:
     ax.set_xlabel("time (s)")
     ax.set_ylabel("translation (vox)")
     ax.set_title("in-plane motion", fontsize=fs)
+    valid = (
+        np.isfinite(curves.translation).all(axis=1)
+        & np.isfinite(curves.scale_pct).all(axis=1)
+        & np.isfinite(curves.shear_pct)
+    )
+    if not valid.all():
+        ax.text(
+            0.98,
+            0.02,
+            f"{int((~valid).sum())}/{t.size} frames unresolved",
+            transform=ax.transAxes,
+            ha="right",
+            va="bottom",
+            fontsize=fs - 2,
+        )
     ax2 = ax.twinx()
     ax2.plot(t, curves.scale_pct[:, 0], lw=0.7, color="tab:red", label="scale0")
     ax2.plot(t, curves.scale_pct[:, 1], lw=0.7, color="tab:orange", label="scale1")

@@ -96,7 +96,9 @@ def detect_saturation(
     statistics, while clips in the kept volumes (`n_clipped_kept`) bias them.
     A lone sample on the rail is likely a bright voxel; a pile-up is saturation.
     """
-    ceiling = float(np.max(data))
+    # A negative NIfTI slope reverses the extrema in image units; the rail is
+    # always the maximum in stored units.
+    ceiling = float(np.max(data) if slope > 0 else np.min(data))
     bits = _saturation_bits((ceiling - inter) / slope)
     if bits is None:
         return SaturationResult(

@@ -35,6 +35,7 @@ def _write_scan(
     data = np.ones((8, 8, 2, 6), dtype=np.float32)
     img = nib.Nifti1Image(data, affine=np.eye(4))
     img.header.set_zooms((3.0, 3.0, 3.0, pixdim_t))
+    img.header.set_xyzt_units(xyz="mm")
     if time_unit is not None:
         img.header.set_xyzt_units(xyz="mm", t=time_unit)
     if phase is not None:
@@ -179,3 +180,58 @@ def test_rejects_a_three_dimensional_nifti(tmp_path) -> None:
     nib.save(img, str(nifti))
     with pytest.raises(q.InvalidScanError, match="data shape"):
         q.QAScan.from_nifti(nifti)
+
+
+@pytest.mark.parametrize("compressed", [False, True])
+@pytest.mark.parametrize("slope,inter", [(1, 0), (2, 10), (-2, 10000)])
+def test_loaded_scaling_preserves_clipping_and_dead_edges(
+    tmp_path, compressed, slope, inter
+) -> None:
+    raw = np.full((8, 8, 3, 8), 100, dtype=np.int16)
+    raw[0] = 0
+    raw[4, 4, 1, 3] = 4095
+    img = nib.Nifti1Image(raw, np.eye(4))
+    img.header.set_zooms((3, 3, 3, 2))
+    img.header.set_xyzt_units("mm", "sec")
+    img.header.set_slope_inter(slope, inter)
+    path = tmp_path / ("scaled.nii.gz" if compressed else "scaled.nii")
+    nib.save(img, path)
+    (tmp_path / "scaled.json").write_text('{"PhaseEncodingDirection": "j"}')
+
+    scan = q.QAScan.from_nifti(path)
+    assert (scan.slope, scan.inter) == (slope, inter)
+    assert np.array_equal(scan.data, raw.astype(float) * slope + inter)
+    saturation = q.detect_saturation(scan.data, scan.slope, scan.inter)
+    assert saturation.n_clipped == 1 and saturation.bits == 12
+    assert saturation.ceiling == 4095 * slope + inter
+    images = q.preprocess(scan, trim_sec=0)
+    assert not images.valid_mask[0].any()
+    assert images.valid_mask[1:].all()
+
+
+@pytest.mark.parametrize("unit,zoom", [("mm", 3), ("meter", 0.003), ("micron", 3000)])
+def test_spatial_units_are_converted_to_mm(tmp_path, unit, zoom) -> None:
+    path = _write_scan(tmp_path, {})
+    img = nib.load(path)
+    img.header.set_zooms((zoom, zoom, zoom, 2))
+    img.header.set_xyzt_units(unit, "sec")
+    # Write a different file: the loaded image may still reference path's proxy.
+    target = tmp_path / "units.nii"
+    nib.save(img, target)
+    target.with_suffix(".json").write_text("{}")
+    scan = q.QAScan.from_nifti(target)
+    assert scan.meta.voxel_mm == pytest.approx((3, 3, 3))
+
+
+def test_unknown_spatial_units_warn_and_assume_mm(tmp_path) -> None:
+    path = _write_scan(tmp_path, {})
+    img = nib.load(path)
+    img.header.set_xyzt_units("unknown", "sec")
+    target = tmp_path / "unknown.nii"
+    nib.save(img, target)
+    target.with_suffix(".json").write_text("{}")
+    with pytest.warns(
+        UserWarning, match="spatial unit is unknown; assuming millimeters"
+    ):
+        scan = q.QAScan.from_nifti(target)
+    assert scan.meta.voxel_mm == (3, 3, 3)

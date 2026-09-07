@@ -5,6 +5,9 @@ text, both panel families, and the ReportLab driver's composition — plus the
 guarantees around writing the file itself.
 """
 
+from dataclasses import replace
+
+import numpy as np
 import pytest
 
 import fmriqc as q
@@ -40,6 +43,27 @@ def test_a_reloaded_artifact_renders_identically(tmp_path, artifact) -> None:
     disk_pages = report.write_report([("scan", reloaded)], tmp_path / "disk.pdf")
     assert live_pages == disk_pages == 1
     assert (tmp_path / "disk.pdf").read_bytes().startswith(b"%PDF")
+
+
+@pytest.mark.parametrize("failed", [0, 1, 38])
+def test_motion_panel_marks_unresolved_frames(artifact, failed) -> None:
+    from matplotlib.figure import Figure
+
+    from fmriqc_report.panels.timeseries import _plot_motion
+
+    translation = np.zeros_like(artifact.curves.translation)
+    translation[:failed] = np.nan
+    curves = replace(
+        artifact.curves,
+        translation=translation,
+        scale_pct=np.zeros_like(artifact.curves.scale_pct),
+        shear_pct=np.zeros_like(artifact.curves.shear_pct),
+    )
+    ax = Figure().add_subplot(111)
+    _plot_motion(ax, curves)
+    assert [t.get_text() for t in ax.texts] == (
+        [f"{failed}/38 frames unresolved"] if failed else []
+    )
 
 
 def test_write_report_honours_a_custom_theme(tmp_path, artifact) -> None:

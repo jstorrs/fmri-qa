@@ -59,7 +59,9 @@ class QAScan:
         # image so a missing NIfTI fails on the NIfTI, not on its sidecar.
         sidecar = _load_sidecar(path)
         data = img.get_fdata()
-        slope, inter = img.header.get_slope_inter()  # (None, None) when unscaled
+        # Loading consumes header scaling; the proxy retains the transform
+        # actually applied by get_fdata (including identity for unscaled files).
+        slope, inter = img.dataobj.slope, img.dataobj.inter
 
         pe_axis = _pe_axis_from_sidecar(sidecar)
         if pe_axis is None:
@@ -79,6 +81,6 @@ class QAScan:
             affine=img.affine,
             pe_axis=pe_axis,
             meta=_scan_meta(img, sidecar, pe_axis, tr),
-            slope=float(slope) if slope else 1.0,
-            inter=float(inter) if inter else 0.0,
+            slope=float(slope),
+            inter=float(inter),
         )

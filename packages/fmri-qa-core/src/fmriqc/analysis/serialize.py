@@ -28,6 +28,7 @@ from collections.abc import Callable
 from dataclasses import asdict
 from pathlib import Path
 from typing import Any
+from zipfile import BadZipFile
 
 import numpy as np
 
@@ -46,6 +47,7 @@ from .artifact import (
     RoiBox,
     WeisskoffCurve,
 )
+from .validation import validate_artifact, validate_document
 
 # An archive member: a float image/curve or a boolean mask, addressed by its
 # dotted path. The two dtypes share one alias because the archive is keyed by
@@ -111,20 +113,35 @@ def load_artifact(path: str | Path) -> QAArtifact:
             if _DOCUMENT not in names:
                 raise InvalidArtifactError(src, "not an fmriqc artifact archive")
             document = json.loads(str(archive[_DOCUMENT]))
+            if not isinstance(document, dict):
+                raise InvalidArtifactError(
+                    src, "malformed artifact: expected a JSON object"
+                )
             arrays = {name: archive[name] for name in names if name != _DOCUMENT}
     except InvalidArtifactError:
         raise
-    except (OSError, ValueError, json.JSONDecodeError) as exc:
+    except (OSError, ValueError, TypeError, EOFError, BadZipFile) as exc:
         raise InvalidArtifactError(src, str(exc)) from exc
 
     try:
         # Migration reads the stored document too, so a document that is missing
         # what its own schema carried fails here; that is malformedness, and
         # belongs under the same guard as composing the current layout.
-        return _compose(_migrated(document, src), arrays)
+        document = _migrated(document, src)
+        validate_document(document)
+        artifact = _compose(document, arrays)
+        validate_artifact(artifact)
+        return artifact
     except InvalidArtifactError:
         raise
-    except (KeyError, TypeError, ValueError) as exc:
+    except (
+        KeyError,
+        TypeError,
+        ValueError,
+        IndexError,
+        AttributeError,
+        OverflowError,
+    ) as exc:
         raise InvalidArtifactError(src, f"malformed artifact: {exc}") from exc
 
 
@@ -197,10 +214,10 @@ def _migrated(document: dict[str, Any], path: Path) -> dict[str, Any]:
     (whose layout this one cannot know) and an older version with no route from.
     """
     found = document.get("schema_version")
-    if found == ARTIFACT_SCHEMA_VERSION:
-        return document
     if not isinstance(found, int) or isinstance(found, bool):
         raise InvalidArtifactError(path, f"schema version {found!r} is not a version")
+    if found == ARTIFACT_SCHEMA_VERSION:
+        return document
     if found > ARTIFACT_SCHEMA_VERSION:
         raise InvalidArtifactError(
             path,
@@ -329,11 +346,15 @@ def _one_of[T: str](value: Any, allowed: tuple[T, ...], field: str) -> T:
 
 def _floats(arrays: dict[str, Any], key: str) -> FloatArray:
     """A required float array member."""
+    if arrays[key].dtype.kind not in "fiu":
+        raise ValueError(f"{key} must be a real numeric array")
     return np.asarray(arrays[key], dtype=np.float64)
 
 
 def _bools(arrays: dict[str, Any], key: str) -> BoolArray:
     """A required boolean mask member."""
+    if arrays[key].dtype != np.bool_:
+        raise ValueError(f"{key} must be a boolean mask")
     return np.asarray(arrays[key], dtype=np.bool_)
 
 

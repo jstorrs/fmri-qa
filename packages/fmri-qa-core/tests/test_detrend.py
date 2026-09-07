@@ -62,6 +62,20 @@ def test_detrend_fn_refuses_an_order_the_frames_cannot_determine() -> None:
         assert "TR of 2000" in str(excinfo.value)
 
 
+@pytest.mark.parametrize("method,tr", [("poly", 150.0), ("spline", 128.0)])
+def test_detrend_rejects_a_fit_with_no_residual_degrees_of_freedom(method, tr) -> None:
+    series = np.random.default_rng(1).normal(size=(4, 4, 4))
+    with pytest.raises(InvalidScanError, match="no residual degrees of freedom"):
+        detrend_fn(series, tr, method)
+
+
+@pytest.mark.parametrize("method,tr", [("poly", 100.0), ("spline", 2.0)])
+def test_detrend_keeps_a_fit_with_one_residual_degree_of_freedom(method, tr) -> None:
+    series = np.random.default_rng(1).normal(size=(4, 4, 4))
+    op, _ = detrend_fn(series, tr, method)
+    assert np.linalg.norm(op(series)) > 1
+
+
 @given(
     a=st.floats(-100, 100, allow_nan=False, allow_infinity=False),
     b=st.floats(-100, 100, allow_nan=False, allow_infinity=False),

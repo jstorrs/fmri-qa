@@ -207,7 +207,9 @@ def test_batch_warnings_name_the_scan_that_raised_them(
 
     assert rc == 0
     err = capsys.readouterr().err
-    attributed = [line for line in err.splitlines() if ": warning: " in line]
+    attributed = [
+        line for line in err.splitlines() if "not fully inside the phantom" in line
+    ]
     assert len(attributed) == 2
     assert attributed[0].startswith("first.nii.gz: warning: ")
     assert attributed[1].startswith("second.nii.gz: warning: ")
