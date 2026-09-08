@@ -71,9 +71,29 @@ def save_artifact(artifact: QAArtifact, path: str | Path) -> Path:
     read months later by something that never saw the run that wrote it, and a
     truncated `.npz` looks exactly like a complete one until it is opened — so
     an interrupted write must leave the destination untouched, not half-written.
+
+    The artifact is held to the reader's contract before anything is written:
+    a write that succeeds is one `load_artifact` will accept. Otherwise a value
+    no analysis needs — a malformed sidecar field, say — survives calculation
+    and saving and fails only when a report opens the file, and if a valid
+    archive already stood at `path` it has been replaced by then.
+
+    Raises:
+        InvalidArtifactError: If the artifact would not read back; nothing is
+            written, and an existing file at `path` is left as it was.
     """
-    document, arrays = _decompose(artifact)
     out = Path(path)
+    document, arrays = _decompose(artifact)
+    try:
+        validate_artifact(artifact)
+        # Through JSON and back, because that is what the reader will see: the
+        # in-memory document still holds numpy scalars where the file will hold
+        # plain numbers, and the type check is written against the file.
+        validate_document(json.loads(json.dumps(document)))
+    except (ValueError, TypeError, KeyError) as exc:
+        raise InvalidArtifactError(
+            out, f"refusing to write an artifact that would not read back: {exc}"
+        ) from exc
     out.parent.mkdir(parents=True, exist_ok=True)
     payload: dict[str, Member] = {_DOCUMENT: np.array(json.dumps(document)), **arrays}
     # In the destination's own directory: a move is only atomic within a single

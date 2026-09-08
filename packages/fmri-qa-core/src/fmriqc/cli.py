@@ -362,7 +362,10 @@ def _save(
     out = _artifact_path(base, path, batch)
     try:
         q.save_artifact(artifact, out)
-    except OSError as exc:  # a bad destination is a user error, not a crash
+    except (OSError, q.InvalidArtifactError) as exc:
+        # A bad destination is a user error, and an artifact the reader would
+        # refuse is a defect worth a line, not a traceback; either way the
+        # batch goes on.
         print(f"ERROR: could not write artifact {out}: {exc}", file=sys.stderr)
         return False
     print(f"# wrote {out}", file=info)

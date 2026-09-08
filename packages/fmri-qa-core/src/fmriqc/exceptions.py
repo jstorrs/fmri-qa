@@ -71,12 +71,14 @@ class IncompatibleScansError(FmriqcError, ValueError):
 
 
 class InvalidArtifactError(FmriqcError, ValueError):
-    """An analysis artifact on disk cannot be read back.
+    """An analysis artifact on disk cannot be read back — or would not be.
 
     Raised by `analysis.load_artifact` for a file that is not an artifact
     archive, is malformed, or was written under a schema version this build does
-    not understand. Also a `ValueError`, the natural stdlib type for unusable
-    input. `path` is the file that failed and `reason` states what was wrong.
+    not understand; and by `analysis.save_artifact` for an artifact that fails
+    the same contract, before anything is written. Also a `ValueError`, the
+    natural stdlib type for unusable input. `path` is the file that failed (or
+    would have been written) and `reason` states what was wrong.
     """
 
     def __init__(self, path: Path, reason: str) -> None:

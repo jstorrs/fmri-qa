@@ -101,6 +101,52 @@ def _acq_datetime(sidecar: dict[str, Any]) -> str | None:
     return " ".join(x for x in (date, time) if x) or None
 
 
+def _malformed(key: str, value: object, expected: str) -> None:
+    """Warn that a sidecar field is unusable and is being recorded as unknown.
+
+    The sidecar is optional and these fields only describe the acquisition, so
+    a malformed one is treated like an absent one — with a warning naming it,
+    because the metadata exists and is being dropped. Coercing it instead (a
+    string that happens to parse as a number) would be guessing at what the
+    converter meant. Reported at the caller of `QAScan.from_nifti`.
+    """
+    warnings.warn(
+        f"sidecar {key} {value!r} is not {expected}; recording it as unknown",
+        stacklevel=4,
+    )
+
+
+def _optional_number(sidecar: dict[str, Any], key: str) -> float | None:
+    """A finite number from the sidecar, or None if absent or malformed."""
+    value = sidecar.get(key)
+    if value is None:
+        return None
+    if isinstance(value, bool) or not isinstance(value, int | float):
+        _malformed(key, value, "a number")
+        return None
+    if not math.isfinite(value):
+        _malformed(key, value, "a finite number")
+        return None
+    return float(value)
+
+
+def _optional_text(sidecar: dict[str, Any], key: str) -> str | None:
+    """A text field from the sidecar, or None if absent or malformed.
+
+    A number is kept as its text (a serial number written unquoted is still a
+    serial number); anything structured is not a value this field can hold.
+    """
+    value = sidecar.get(key)
+    if value is None:
+        return None
+    if isinstance(value, str):
+        return value
+    if isinstance(value, int | float) and not isinstance(value, bool):
+        return str(value)
+    _malformed(key, value, "text")
+    return None
+
+
 def _pe_direction(pe_axis: int | None, sidecar: dict[str, Any]) -> str | None:
     """DICOM row/col phase-encode direction, preferring the sidecar."""
     if dicom := sidecar.get("InPlanePhaseEncodingDirectionDICOM"):
@@ -116,7 +162,11 @@ def _scan_meta(
     """Assemble `ScanMeta` from the NIfTI header and (optional) BIDS sidecar.
 
     `tr` is handed in already resolved rather than re-read from pixdim[4], so
-    the TR the report shows is the one the pipeline ran on.
+    the TR the report shows is the one the pipeline ran on. The sidecar's
+    optional fields are held to the type each one promises here, at the
+    boundary, so that a malformed value is diagnosed against the file it came
+    from rather than surfacing as an unreadable artifact months later; one
+    that fails is recorded as unknown, with a warning.
     """
     zooms = img.header.get_zooms()
     unit, _ = img.header.get_xyzt_units()
@@ -133,16 +183,16 @@ def _scan_meta(
         voxel_mm=(voxel_mm[0], voxel_mm[1], voxel_mm[2]),
         matrix=(int(img.shape[0]), int(img.shape[1])),
         tr=tr,
-        te=sidecar.get("EchoTime"),
-        flip_angle=sidecar.get("FlipAngle"),
-        slice_thickness=sidecar.get("SliceThickness"),
+        te=_optional_number(sidecar, "EchoTime"),
+        flip_angle=_optional_number(sidecar, "FlipAngle"),
+        slice_thickness=_optional_number(sidecar, "SliceThickness"),
         pe_dir=_pe_direction(pe_axis, sidecar),
-        coil=sidecar.get("ReceiveCoilName"),
-        manufacturer=sidecar.get("Manufacturer"),
-        model=sidecar.get("ManufacturersModelName"),
-        serial=sidecar.get("DeviceSerialNumber"),
-        field_strength=sidecar.get("MagneticFieldStrength"),
-        software=sidecar.get("SoftwareVersions"),
+        coil=_optional_text(sidecar, "ReceiveCoilName"),
+        manufacturer=_optional_text(sidecar, "Manufacturer"),
+        model=_optional_text(sidecar, "ManufacturersModelName"),
+        serial=_optional_text(sidecar, "DeviceSerialNumber"),
+        field_strength=_optional_number(sidecar, "MagneticFieldStrength"),
+        software=_optional_text(sidecar, "SoftwareVersions"),
         datetime=_acq_datetime(sidecar),
-        series=sidecar.get("SeriesDescription"),
+        series=_optional_text(sidecar, "SeriesDescription"),
     )

@@ -307,6 +307,30 @@ def test_save_uses_the_exact_path_given(tmp_path, artifact) -> None:
     assert q.load_artifact(path).measurements.snr == artifact.measurements.snr
 
 
+def test_save_refuses_an_artifact_the_reader_would_reject(tmp_path, artifact) -> None:
+    """What `save_artifact` writes, `load_artifact` reads: one contract, both ends.
+
+    The producer used to skip the checks the reader applies, so an artifact
+    carrying a value no analysis touches -- here a text echo time -- was written
+    without complaint and refused on the way back in.
+    """
+    broken = replace(artifact, provenance=replace(artifact.provenance, te="0.03"))
+    with pytest.raises(q.InvalidArtifactError, match=r"provenance\.te"):
+        q.save_artifact(broken, tmp_path / "qa.npz")
+    assert not (tmp_path / "qa.npz").exists()
+
+
+def test_a_refused_save_preserves_the_archive_already_there(tmp_path, artifact) -> None:
+    """A rejected write leaves the valid file it would have replaced untouched."""
+    path = q.save_artifact(artifact, tmp_path / "qa.npz")
+    before = path.read_bytes()
+    broken = replace(artifact, provenance=replace(artifact.provenance, n_frames=0))
+    with pytest.raises(q.InvalidArtifactError, match="n_frames"):
+        q.save_artifact(broken, path)
+    assert path.read_bytes() == before
+    assert not list(tmp_path.glob(".*.tmp"))  # and no temporary beside it
+
+
 def test_a_failed_save_leaves_neither_a_file_nor_a_temporary(
     tmp_path, artifact, monkeypatch
 ) -> None:

@@ -175,6 +175,32 @@ def test_main_reports_artifact_failure_without_a_traceback(
     assert "Traceback" not in captured.err
 
 
+def test_main_reports_a_refused_artifact_without_a_traceback(
+    tmp_path, write_scan, capsys, monkeypatch
+) -> None:
+    """An artifact the reader would refuse is a per-scan error, and the run says so.
+
+    Nothing the CLI computes should trip this, so the analysis is stubbed to
+    hand back an artifact with a text echo time; what is under test is that the
+    refusal is reported like any other write failure and the batch goes on.
+    """
+    real = q.analyze
+
+    def broken(*args, **kwargs):
+        artifact = real(*args, **kwargs)
+        return replace(artifact, provenance=replace(artifact.provenance, te="0.03"))
+
+    monkeypatch.setattr(q, "analyze", broken)
+    out = tmp_path / "qa.npz"
+    rc = cli.main([write_scan(tmp_path), "--roi-size", "9", "--artifact", str(out)])
+    captured = capsys.readouterr()
+    assert rc == 1
+    assert "ERROR: could not write artifact" in captured.err
+    assert "provenance.te" in captured.err
+    assert "Traceback" not in captured.err
+    assert not out.exists()
+
+
 def test_json_emits_a_parseable_document(tmp_path, write_scan, capsys) -> None:
     rc = cli.main([write_scan(tmp_path), "--roi-size", "9", "--json"])
     captured = capsys.readouterr()

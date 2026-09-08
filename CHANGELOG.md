@@ -70,6 +70,14 @@ versioning when the first stable public interface is released.
 
 ### Fixed
 
+- `save_artifact` holds an artifact to the same contract `load_artifact`
+  applies, and refuses (`InvalidArtifactError`, nothing written, an existing
+  archive untouched) one that would not read back. `fmri-qa` reports the
+  refusal as a per-scan write error and continues the batch. The optional
+  BIDS sidecar fields are now typed at the loader: a value of the wrong kind
+  (an `EchoTime` written as text, a `true` flip angle) is recorded as unknown
+  with a warning naming the field, instead of passing through calculation and
+  saving to fail when a report opened the result.
 - The phantom verdict (`phantom_mask_ok`, the table's `loc` column, the
   report's BAD PHANTOM MASK note) now applies the same test slice selection
   does: the mask must cover a plausible share of the frame *and* stand at

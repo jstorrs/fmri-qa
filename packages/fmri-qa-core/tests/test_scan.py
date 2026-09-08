@@ -151,6 +151,53 @@ def test_missing_sidecar_and_dim_info_leaves_the_axis_unresolved(tmp_path) -> No
     assert scan.pe_axis is None  # for `run_qa` to estimate on the analyzed slice
 
 
+@pytest.mark.parametrize(
+    ("key", "value", "field"),
+    [
+        ("EchoTime", "0.03", "te"),  # a number written as text
+        ("FlipAngle", True, "flip_angle"),  # JSON true is not an angle
+        ("SliceThickness", [3.0], "slice_thickness"),
+        ("MagneticFieldStrength", float("nan"), "field_strength"),
+        ("Manufacturer", {"name": "Acme"}, "manufacturer"),
+        ("SeriesDescription", ["qa"], "series"),
+    ],
+)
+def test_a_malformed_sidecar_field_is_unknown_and_named(
+    tmp_path, key: str, value: object, field: str
+) -> None:
+    """A field of the wrong type is dropped with a warning naming it, at load.
+
+    These fields only describe the acquisition, so a bad one must not stop the
+    analysis -- but it must not be copied through either: an artifact holding a
+    string where its schema promises a number saves fine and fails when the
+    report opens it, months later and far from the sidecar that caused it. The
+    value is not coerced ("0.03" may well be 30 ms, but deciding so is guessing).
+    """
+    nifti = _write_scan(tmp_path, {"PhaseEncodingDirection": "j", key: value})
+    with pytest.warns(UserWarning, match=f"sidecar {key} .* recording it as unknown"):
+        scan = q.QAScan.from_nifti(nifti)
+    assert scan.meta is not None
+    assert getattr(scan.meta, field) is None
+    # And what it produces reads back: the boundary check is what makes the
+    # producer's output the reader's input.
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        artifact = q.analyze(scan, q.AnalysisSettings(trim_sec=0, roi_size=3))
+    path = q.save_artifact(artifact, tmp_path / "qa.npz")
+    assert getattr(q.load_artifact(path).provenance, field) is None
+
+
+def test_a_numeric_serial_number_is_kept_as_text(tmp_path) -> None:
+    """A serial written unquoted is still a serial; only structure is refused."""
+    nifti = _write_scan(tmp_path, {"DeviceSerialNumber": 12345, "EchoTime": 0.03})
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")  # nothing here is malformed
+        scan = q.QAScan.from_nifti(nifti)
+    assert scan.meta is not None
+    assert scan.meta.serial == "12345"
+    assert scan.meta.te == 0.03
+
+
 def test_missing_nifti_fails_on_the_nifti_not_the_sidecar(tmp_path) -> None:
     # The sidecar warning would be noise when the image itself is not there.
     with warnings.catch_warnings():

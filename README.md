@@ -77,6 +77,11 @@ where one is present; failing that, from the NIfTI header `dim_info`; and only
 if both are missing, from estimating the axis on the analyzed slice by where the
 Nyquist ghost lands. `--pe-axis` overrides all three.
 
+The rest of the sidecar — echo time, flip angle, coil, scanner, and so on — is
+carried into the artifact for the report header. A field of the wrong type (an
+`EchoTime` written as a string, say) is recorded as unknown with a warning
+naming it, rather than guessed at.
+
 The current metrics operate on one image slice, so phase encoding must be
 in-plane (NIfTI axis `0`/`i` or `1`/`j`). Through-plane (`2`/`k`) acquisitions
 are rejected with an input error rather than being analyzed on the wrong plane.
