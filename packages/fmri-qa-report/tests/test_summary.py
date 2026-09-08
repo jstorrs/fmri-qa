@@ -15,7 +15,7 @@ def _clipped(artifact: q.QAArtifact, **changes) -> q.QAArtifact:
 
 
 def test_acquisition_line_reports_the_geometry_and_settings(artifact) -> None:
-    line = summary._acquisition_line(artifact)
+    line = summary.acquisition_line(artifact)
     assert "TR 2s" in line
     assert "flip 77°" in line
     assert "3×3mm" in line and "32×32 px" in line
@@ -27,7 +27,7 @@ def test_acquisition_line_reports_the_geometry_and_settings(artifact) -> None:
 
 def test_acquisition_line_omits_absent_sidecar_fields(bare_artifact) -> None:
     """Without a sidecar the line degrades to what the header alone supports."""
-    line = summary._acquisition_line(bare_artifact)
+    line = summary.acquisition_line(bare_artifact)
     assert "TR 2s" in line and "frames" in line
     assert "flip" not in line and "px" not in line and "mm slice" not in line
 
@@ -42,7 +42,7 @@ def test_clipping_in_the_analyzed_data_is_called_out(artifact) -> None:
         clip_ceiling=4095.0,
         clip_bits=12,
     )
-    line = summary._acquisition_line(biased)
+    line = summary.acquisition_line(biased)
     assert "CLIP 12 in analyzed data (+3 pre-SS) @ 4095 (12-bit)" in line
 
 
@@ -57,7 +57,7 @@ def test_clipping_confined_to_warm_up_is_reported_quietly(artifact) -> None:
         clip_ceiling=4095.0,
         clip_bits=12,
     )
-    line = summary._acquisition_line(warmup)
+    line = summary.acquisition_line(warmup)
     assert "clip 7 pre-SS only @ 4095 (12-bit)" in line
     assert "CLIP" not in line
 
@@ -68,8 +68,8 @@ def test_a_clean_run_carries_no_clipping_note(artifact) -> None:
 
 def test_device_and_provenance_lines_read_the_sidecar(artifact) -> None:
     prov = artifact.provenance
-    assert summary._device_line(prov) == "Acme Scanner 3T   ·   3T"
-    line = summary._provenance_line(prov)
+    assert summary.device_line(prov) == "Acme Scanner 3T   ·   3T"
+    line = summary.provenance_line(prov)
     assert "SN 12345" in line and "2026-01-02 03:04:05" in line
 
 
@@ -77,19 +77,19 @@ def test_device_and_provenance_lines_are_empty_without_metadata(
     bare_artifact,
 ) -> None:
     prov = bare_artifact.provenance
-    assert summary._device_line(prov) == ""
-    assert summary._provenance_line(prov) == ""
+    assert summary.device_line(prov) == ""
+    assert summary.provenance_line(prov) == ""
 
 
 def test_appendix_rows_name_the_computing_version(artifact) -> None:
-    ((title, detail),) = summary._appendix_rows([("run-1", artifact)])
+    ((title, detail),) = summary.appendix_rows([("run-1", artifact)])
     assert title == "run-1"
     assert "Acme Scanner 3T" in detail
     assert f"computed by fmri-qa-core {artifact.provenance.core_version}" in detail
 
 
 def test_appendix_accounts_for_a_scan_without_a_sidecar(bare_artifact) -> None:
-    ((_, detail),) = summary._appendix_rows([("bare", bare_artifact)])
+    ((_, detail),) = summary.appendix_rows([("bare", bare_artifact)])
     assert "computed by fmri-qa-core" in detail  # still accounted for
 
 
@@ -103,7 +103,7 @@ def test_a_collapsed_phantom_mask_is_called_out(artifact) -> None:
     it is what the reader is shown.
     """
     collapsed = _clipped(artifact, phantom_fraction=1.0, phantom_mask_ok=False)
-    assert "BAD PHANTOM MASK (100% of frame" in summary._acquisition_line(collapsed)
+    assert "BAD PHANTOM MASK (100% of frame" in summary.acquisition_line(collapsed)
 
 
 def test_a_bad_mask_note_shows_the_contrast_when_the_artifact_has_it(artifact) -> None:
@@ -113,9 +113,9 @@ def test_a_bad_mask_note_shows_the_contrast_when_the_artifact_has_it(artifact) -
     noisy = _clipped(
         artifact, phantom_fraction=0.54, phantom_contrast=1.7, phantom_mask_ok=False
     )
-    assert "(54% of frame, 1.7× contrast)" in summary._acquisition_line(noisy)
+    assert "(54% of frame, 1.7× contrast)" in summary.acquisition_line(noisy)
     migrated = _clipped(noisy, phantom_contrast=float("nan"))
-    assert "(54% of frame)" in summary._acquisition_line(migrated)
+    assert "(54% of frame)" in summary.acquisition_line(migrated)
 
 
 def test_acquisition_line_flags_an_analysis_of_background() -> None:
@@ -130,13 +130,13 @@ def test_acquisition_line_flags_an_analysis_of_background() -> None:
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")  # the analysis warns; the page is under test
         artifact = q.analyze(q.QAScan(data=noise, tr=2.0), settings)
-    assert "BAD PHANTOM MASK" in summary._acquisition_line(artifact)
-    assert "× contrast" in summary._acquisition_line(artifact)
+    assert "BAD PHANTOM MASK" in summary.acquisition_line(artifact)
+    assert "× contrast" in summary.acquisition_line(artifact)
 
 
 def test_an_off_phantom_roi_is_called_out(artifact) -> None:
     outside = _clipped(artifact, roi_inside_phantom=False)
-    assert "ROI NOT INSIDE PHANTOM" in summary._acquisition_line(outside)
+    assert "ROI NOT INSIDE PHANTOM" in summary.acquisition_line(outside)
 
 
 def test_a_well_localized_run_carries_no_localization_note(artifact) -> None:

@@ -16,7 +16,7 @@ from typing import Literal, get_args
 
 from fmriqc.analysis import QAArtifact
 
-from .summary import _appendix_rows, package_version
+from .summary import appendix_rows, package_version
 
 # The audience/depth tiers, ordered shallow -> deep.
 Tier = Literal["dashboard", "physics"]
@@ -106,7 +106,7 @@ def compose(
         )
     blocks.extend(ScanSection(title, artifact, parts) for title, artifact in scans)
     if appendix:
-        rows = list(_appendix_rows(scans))
+        rows = list(appendix_rows(scans))
         rows.extend(
             (name, f"omitted from this packet: {reason}") for name, reason in omitted
         )

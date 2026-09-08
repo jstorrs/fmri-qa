@@ -3,7 +3,9 @@
 `synthetic_series` builds the tiny phantom every test measures against, and
 `write_scan` writes one to disk as a NIfTI + BIDS sidecar, so the tests that need
 the real file-I/O path (`QAScan.from_nifti`, the CLI) get one without each of
-them rebuilding the phantom.
+them rebuilding the phantom. `artifact` runs the whole pipeline over that
+phantom once per test, for the artifact and CLI tests that need a finished
+analysis rather than a scan.
 """
 
 import json
@@ -95,3 +97,11 @@ def write_scan() -> WriteScan:
         return str(nifti)
 
     return factory
+
+
+@pytest.fixture
+def artifact(tmp_path, write_scan) -> q.QAArtifact:
+    """An artifact from the synthetic phantom, at a small ROI."""
+    scan = q.QAScan.from_nifti(write_scan(tmp_path))
+    settings = q.AnalysisSettings(roi_size=9)
+    return q.analyze(scan, settings, name="scan.nii.gz", source="scan.nii.gz")

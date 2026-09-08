@@ -457,6 +457,7 @@ fmriqc/
     metrics/            # the domain operations, one family per module
     pipeline.py         # aggregation: orchestrate the operations + the combined result
     analysis/           # publication: the artifact those results are published as
+    cli/                # the imperative shell: one module per command, plus its output forms
 ```
 
 Presentation is not a layer of this package at all — it is a second distribution,
@@ -535,14 +536,19 @@ fmriqc_report/
     summary.py          # format-agnostic text/tiles from an artifact
     panels/             # format-agnostic figures from an artifact
     formats/
-        reportlab.py    # one driver: composes summary + panels into a PDF
+        reportlab/      # one driver: composes summary + panels into a PDF
         # html.py, ...  # a second format reuses summary + panels unchanged
 ```
 
 Adding a format touches only `formats/`; the content modules never learn that a format exists.
 This is *simple public interfaces* and *one file, one topic* applied to output — the format is
 an implementation detail behind the content, not threaded through it. The payoff is concrete:
-a new output format is a new file in `formats/`, not an edit to every figure-building function.
+a new output format is a new entry in `formats/`, not an edit to every figure-building function.
+
+A driver that outgrows one file becomes a subpackage in `formats/`, by the same one-topic
+rule a level down — the PDF driver holds `layout` (page arithmetic), `pages` (one function
+per page), `packet` (assembling them into a file), and `svglib_patch` (the third-party
+defect embedding a figure has to work around).
 
 ## Example: Complete Pattern
 

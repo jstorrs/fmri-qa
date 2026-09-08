@@ -173,7 +173,7 @@ def image_center(shape: tuple[int, ...]) -> IntArray:
     return np.array(shape[:2]) // 2
 
 
-def _clamp_center(center: IntArray, n: int, shape: tuple[int, ...]) -> IntArray:
+def clamp_center(center: IntArray, n: int, shape: tuple[int, ...]) -> IntArray:
     """Shift `center` so an n x n ROI (per `roi_indexes`) stays within `shape`."""
     lo = (n - 1) // 2
     hi = n - lo
@@ -225,7 +225,7 @@ def fluctuation_noise(residuals: FloatArray) -> FloatArray:
     return np.std(residuals, axis=-1, mean=0)
 
 
-def _geomean(x: FloatArray) -> float:
+def geomean(x: FloatArray) -> float:
     """Geometric mean over the positive, finite entries; NaN if there are none."""
     x = np.asarray(x, dtype=float)
     x = x[np.isfinite(x) & (x > 0)]

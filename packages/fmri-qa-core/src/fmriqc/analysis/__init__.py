@@ -1,10 +1,11 @@
 """The analysis artifact: the calculation half's published, serializable output.
 
 `artifact` defines the value objects, `build` projects a computed `QAResult`
-into one (`analyze` runs the whole thing from a scan), and `serialize` moves an
-artifact to and from a single `.npz`. Everything a report, a plot, or a trend
-database needs sits in here; nothing in this subpackage reaches back into the
-metric, prep, or load layers at read time.
+into one (`analyze` runs the whole thing from a scan), `validation` holds them
+to the published contract, and `serialize` moves an artifact to and from a
+single `.npz`. Everything a report, a plot, or a trend database needs sits in
+here; nothing in this subpackage reaches back into the metric, prep, or load
+layers at read time.
 """
 
 from ..pipeline import AnalysisSettings

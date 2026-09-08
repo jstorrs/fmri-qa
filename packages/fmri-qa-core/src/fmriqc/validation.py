@@ -35,31 +35,37 @@ def validate_scan(scan: QAScan, *, minimum_frames: int = 1) -> None:
         )
 
 
-def validate_qa_run(
-    scan: QAScan, *, trim_sec: float, roi_size: int, pe_axis: int | None
-) -> None:
-    """Validate parameters required by the single-slice QA pipeline."""
-    validate_scan(scan, minimum_frames=MIN_ANALYSIS_FRAMES)
+def _validate_trim_sec(trim_sec: float) -> None:
+    """Require a warm-up trim that names a real duration."""
     if not np.isfinite(trim_sec) or trim_sec < 0:
         raise InvalidScanError(
             "trim_sec",
             trim_sec,
             "expected a finite value greater than or equal to zero",
         )
+
+
+def _frames_after_trim(scan: QAScan, trim_sec: float) -> int:
+    """How many frames a `trim_sec` warm-up trim would leave of `scan`."""
+    return int(scan.data.shape[-1]) - round(trim_sec / scan.tr)
+
+
+def validate_qa_run(
+    scan: QAScan, *, trim_sec: float, roi_size: int, pe_axis: int | None
+) -> None:
+    """Validate parameters required by the single-slice QA pipeline."""
+    validate_scan(scan, minimum_frames=MIN_ANALYSIS_FRAMES)
+    _validate_trim_sec(trim_sec)
     if roi_size <= 0:
         raise InvalidScanError("roi_size", roi_size, "expected a positive integer")
 
-    n_trim = round(trim_sec / scan.tr)
-    remaining = scan.data.shape[-1] - n_trim
+    remaining = _frames_after_trim(scan, trim_sec)
     if remaining < MIN_ANALYSIS_FRAMES:
-        reason = (
-            f"leaves {max(remaining, 0)} frames; "
-            f"at least {MIN_ANALYSIS_FRAMES} are required"
-        )
         raise InvalidScanError(
             "trim_sec",
             trim_sec,
-            reason,
+            f"leaves {max(remaining, 0)} frames; "
+            f"at least {MIN_ANALYSIS_FRAMES} are required",
         )
 
     resolved_pe = scan.pe_axis if pe_axis is None else pe_axis
@@ -77,21 +83,17 @@ def validate_hilo_run(
     """Validate parameters shared by both sides of a high/low analysis."""
     validate_scan(high, minimum_frames=MIN_ANALYSIS_FRAMES)
     validate_scan(low, minimum_frames=MIN_ANALYSIS_FRAMES)
-    if not np.isfinite(trim_sec) or trim_sec < 0:
-        raise InvalidScanError(
-            "trim_sec",
-            trim_sec,
-            "expected a finite value greater than or equal to zero",
-        )
+    _validate_trim_sec(trim_sec)
     if erode < 0:
         raise InvalidScanError(
             "erode", erode, "expected an integer greater than or equal to zero"
         )
     for label, scan in (("high", high), ("low", low)):
-        remaining = scan.data.shape[-1] - round(trim_sec / scan.tr)
+        remaining = _frames_after_trim(scan, trim_sec)
         if remaining < MIN_ANALYSIS_FRAMES:
-            reason = (
+            raise InvalidScanError(
+                "trim_sec",
+                trim_sec,
                 f"leaves {max(remaining, 0)} {label}-flip frames; "
-                f"at least {MIN_ANALYSIS_FRAMES} are required"
+                f"at least {MIN_ANALYSIS_FRAMES} are required",
             )
-            raise InvalidScanError("trim_sec", trim_sec, reason)

@@ -247,7 +247,7 @@ def _weisskoff_curve(result: QAResult) -> WeisskoffCurve:
         roi_sizes=sizes,
         cv=np.asarray(wk.cv, dtype=np.float64),
         # Anchored at the pooled single-voxel CV, so the width where the measured
-        # plateau meets this line is the reported RDC (see `_plot_weisskoff`).
+        # plateau meets this line is the reported RDC (see `plot_weisskoff`).
         cv_ideal=np.asarray(wk.cv1_pooled / sizes, dtype=np.float64),
         rdc=np.asarray(wk.rdc_curve, dtype=np.float64),
     )

@@ -24,7 +24,7 @@ Reports serve two audiences and one packaging need:
 
 The current driver conflates these. `--pdf-layout summary|detailed` mixes *depth*
 (how much content) with page count, every visual decision is a literal buried in
-`formats/reportlab.py` (Helvetica, gray `0.96` tiles, `letter`, a 40 pt margin),
+`formats/reportlab/` (Helvetica, gray `0.96` tiles, `letter`, a 40 pt margin),
 and the matplotlib panels carry a *second*, independent set of style constants —
 so there is no single place to rebrand, and the page furniture and the embedded
 figures cannot be kept visually consistent.
@@ -96,7 +96,7 @@ report/
     summary.py        keep — format-agnostic content (tiles + metadata lines)
     panels/           keep — figures, now taking a Theme so colours/fonts match the page
     formats/
-        reportlab.py  refactor — consumes a Theme, walks a block list; no literal styling
+        reportlab/    refactor — consumes a Theme, walks a block list; no literal styling
 ```
 
 Two new modules (`theme`, `document`), one new data module (`content`); the
@@ -171,7 +171,7 @@ Each phase is a self-contained, reviewable commit that keeps the gate green. The
 early phases are pure refactors: with the default `Theme`, output is unchanged.
 
 1. **[done] `Theme` for the driver.** Add `theme.py`; thread a `Theme` through
-   `formats/reportlab.py` (page size, margin, fonts, tile/header colours),
+   `formats/reportlab/` (page size, margin, fonts, tile/header colours),
    replacing the literals. Panels untouched. Default theme ⇒ identical output.
 2. **[done] `Theme` for the panels.** Add `rc_params()` and the panel colour
    fields; build the panels under `matplotlib.rc_context` in the driver so the

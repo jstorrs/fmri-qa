@@ -9,21 +9,13 @@ the acquisition data at hand.
 import argparse
 import sys
 from collections.abc import Sequence
-from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 
 from fmriqc.analysis import QAArtifact, load_artifact
 
 from . import write_report
 from .document import TIERS
-
-
-def _version() -> str:
-    """The installed `fmri-qa-report` version, or "unknown" from a source tree."""
-    try:
-        return version("fmri-qa-report")
-    except PackageNotFoundError:
-        return "unknown"
+from .summary import package_version
 
 
 def _same_file(a: Path, b: Path) -> bool:
@@ -48,12 +40,15 @@ def _title(artifact: QAArtifact, path: str) -> str:
     return artifact.provenance.scan or Path(path).name
 
 
-def main(argv: Sequence[str] | None = None) -> int:
+def _parser() -> argparse.ArgumentParser:
+    """The command line this command accepts."""
     parser = argparse.ArgumentParser(
         prog="fmri-qa-report",
         description="Render fmri-qa analysis artifacts (.npz) into a PDF report.",
     )
-    parser.add_argument("--version", action="version", version=f"%(prog)s {_version()}")
+    parser.add_argument(
+        "--version", action="version", version=f"%(prog)s {package_version()}"
+    )
     parser.add_argument(
         "artifacts", nargs="+", help="Analysis artifacts from `fmri-qa --artifact`"
     )
@@ -81,7 +76,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         action="store_true",
         help="Append a provenance page (per-scan metadata + version).",
     )
-    args = parser.parse_args(argv)
+    return parser
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    args = _parser().parse_args(argv)
 
     # Refuse before reading anything: an output that names an input is a usage
     # error, and one that must be caught while the input is still intact.

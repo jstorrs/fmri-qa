@@ -194,6 +194,23 @@ versioning when the first stable public interface is released.
 
 ### Changed
 
+- **Three files that had grown into several topics are now subpackages**, by
+  the one-file-one-topic rule in `style/architecture.md`. `fmriqc.cli` splits
+  into a module per command (`qa`, `hilo`) plus the pieces they report through
+  (`table`, `record`, `destinations`, `arguments`);
+  `fmriqc.analysis.serialize` splits at its own section banners into
+  `decompose` / `compose` / `migrate`; and `fmriqc_report.formats.reportlab`
+  into `layout` / `pages` / `packet` / `svglib_patch`. Every import path a
+  caller uses is unchanged — `fmriqc.cli:main`, `fmriqc.cli:hilo_main`,
+  `fmriqc.save_artifact`/`load_artifact`, `fmriqc_report.write_report` — and
+  no rendered output changed.
+- The report's format-agnostic content API is spelled public, since the
+  format drivers in `formats/` are documented to consume it: `panels.timeseries`
+  exports `plot_*`, `panels.images` exports `panel_figs`, and `summary` exports
+  `acquisition_line` / `device_line` / `provenance_line` / `appendix_rows`.
+  `fmriqc_report.__all__` is unchanged, so the distribution's public surface
+  is the same. Likewise `prep.imaging.clamp_center` / `geomean`, which the
+  geometry and smoothness modules already imported across module lines.
 - `run_qa` writes the settings it was called with onto `QAResult.settings`
   (with the detrend order it resolved), and `build_artifact(result)` publishes
   those; its `settings` parameter is gone. It used to fill in defaults when

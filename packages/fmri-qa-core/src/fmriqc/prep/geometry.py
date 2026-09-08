@@ -17,7 +17,7 @@ from .imaging import (
     DEGENERATE_PHANTOM_MAX,
     DEGENERATE_PHANTOM_MIN,
     MIN_PHANTOM_CONTRAST,
-    _clamp_center,
+    clamp_center,
     find_phantom_center,
     image_center,
     phantom_contrast,
@@ -145,7 +145,7 @@ def resolve_roi(
         c = geom.roi_center
     else:
         raise InvalidChoiceError("ROI center", center, ROI_CENTER_MODES)
-    return ROI(center=_clamp_center(c, n, shape), size=n)
+    return ROI(center=clamp_center(c, n, shape), size=n)
 
 
 def roi_fits(phantom_mask: BoolArray, roi: tuple[slice, slice]) -> bool:

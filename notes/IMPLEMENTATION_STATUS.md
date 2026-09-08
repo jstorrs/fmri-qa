@@ -99,7 +99,7 @@ Ranked by value for phantom QA.
    flagging.
 2. **Background/air QA** (cran `max_bg_perc`) and **`@radial_correlate`**
    structured-artifact detection — future directions.
-3. **FFT spectrum normalization.** The report's `_plot_spectrum`
+3. **FFT spectrum normalization.** The report's `plot_spectrum`
    (`fmriqc_report.panels.timeseries`) plots raw magnitude; `bxh` normalizes to
    percent-of-mean (`·100/m`) for cross-scan comparability. Cosmetic.
 

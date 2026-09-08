@@ -68,7 +68,7 @@ array rides in a JSON document under `__document__`. The file needs nothing but
 materializing the rest.
 
 `ARTIFACT_SCHEMA_VERSION` pins the layout, and a mismatch is refused by name
-rather than misread field by field. The mapping in `analysis/serialize.py` is
+rather than misread field by field. The mapping in `analysis/serialize/` is
 written out explicitly rather than reflected over the dataclasses: the layout is
 a published contract, so adding a field should be a deliberate edit to the file
 format, not a side effect of adding an attribute.

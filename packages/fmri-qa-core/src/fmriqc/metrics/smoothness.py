@@ -11,7 +11,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from ..prep.imaging import _geomean, normalize_voxel_mm
+from ..prep.imaging import geomean, normalize_voxel_mm
 from ..types import BoolArray, FloatArray, IntArray
 
 # Gaussian FWHM per standard deviation: sqrt(8 ln 2) (AFNI 3dFWHMx uses 2.35482).
@@ -118,13 +118,13 @@ class SmoothnessResult:
     @property
     def fwhm_combined_vox(self) -> float:
         """Geometric mean of the per-axis FWHM over the resolved axes (voxels)."""
-        return _geomean(np.asarray(self.fwhm_vox))
+        return geomean(np.asarray(self.fwhm_vox))
 
     @property
     def fwhm_combined_mm(self) -> float | None:
         """Geometric-mean FWHM in mm (AFNI `ccomb`); None without voxel sizes."""
         mm = self.fwhm_mm
-        return _geomean(np.asarray(mm)) if mm is not None else None
+        return geomean(np.asarray(mm)) if mm is not None else None
 
     @property
     def fwhm(self) -> float:
@@ -245,7 +245,7 @@ def estimate_smoothness(
 
     nt = scaled.shape[-1]
     per = np.array([_fwhm_1dif(scaled[..., t], work_mask) for t in range(nt)])
-    fwhm_vox = (_geomean(per[:, 0]), _geomean(per[:, 1]))
+    fwhm_vox = (geomean(per[:, 0]), geomean(per[:, 1]))
 
     lag = min(max_lag, *(d - 1 for d in work_mask.shape[:2]))
     lags = np.arange(lag + 1)

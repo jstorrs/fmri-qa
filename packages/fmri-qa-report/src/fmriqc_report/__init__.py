@@ -8,9 +8,10 @@ disk renders exactly like one just computed.
 
 Inside, the report is split again into format-agnostic *content* and a pluggable
 *format driver*: `summary` builds the header text, `content` the per-metric
-vocabulary, `panels` the matplotlib figures, and `formats` holds one driver per
-output format that composes them into a document. `write_report` /
-`add_report_pages` are the current (ReportLab PDF) entry points, re-exported here.
+vocabulary, `panels` the matplotlib figures, `document` the block/tier model a
+driver walks, and `formats` holds one driver per output format that composes
+them into a document. `write_report` / `add_report_pages` are the current
+(ReportLab PDF) entry points, re-exported here.
 """
 
 import matplotlib

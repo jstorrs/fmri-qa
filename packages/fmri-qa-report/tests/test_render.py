@@ -49,7 +49,7 @@ def test_a_reloaded_artifact_renders_identically(tmp_path, artifact) -> None:
 def test_motion_panel_marks_unresolved_frames(artifact, failed) -> None:
     from matplotlib.figure import Figure
 
-    from fmriqc_report.panels.timeseries import _plot_motion
+    from fmriqc_report.panels.timeseries import plot_motion
 
     translation = np.zeros_like(artifact.curves.translation)
     translation[:failed] = np.nan
@@ -60,7 +60,7 @@ def test_motion_panel_marks_unresolved_frames(artifact, failed) -> None:
         shear_pct=np.zeros_like(artifact.curves.shear_pct),
     )
     ax = Figure().add_subplot(111)
-    _plot_motion(ax, curves)
+    plot_motion(ax, curves)
     assert [t.get_text() for t in ax.texts] == (
         [f"{failed}/38 frames unresolved"] if failed else []
     )
@@ -86,7 +86,7 @@ def test_write_report_honours_a_custom_theme(tmp_path, artifact) -> None:
 def test_write_report_preserves_destination_on_render_failure(
     tmp_path, artifact, monkeypatch
 ) -> None:
-    from fmriqc_report.formats import reportlab as driver
+    from fmriqc_report.formats.reportlab import packet
 
     pdf = tmp_path / "existing.pdf"
     pdf.write_bytes(b"existing report")
@@ -94,7 +94,7 @@ def test_write_report_preserves_destination_on_render_failure(
     def fail_render(*args, **kwargs) -> int:
         raise RuntimeError("injected render failure")
 
-    monkeypatch.setattr(driver, "_render_block", fail_render)
+    monkeypatch.setattr(packet, "_render_block", fail_render)
     with pytest.raises(RuntimeError, match="injected"):
         report.write_report([("scan", artifact)], pdf)
     assert pdf.read_bytes() == b"existing report"

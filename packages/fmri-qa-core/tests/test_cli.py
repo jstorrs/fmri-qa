@@ -15,6 +15,8 @@ import pytest
 
 import fmriqc as q
 from fmriqc import cli
+from fmriqc.cli import table
+from fmriqc.cli.record import metric_record
 
 
 def test_main_prints_table_and_succeeds(tmp_path, write_scan, capsys) -> None:
@@ -270,7 +272,7 @@ def test_table_flags_a_localization_failure(tmp_path, write_scan, capsys) -> Non
     assert rc == 0
     assert "loc" in header
     assert "ROI" in row
-    # the transient form of the same news, now attributed (see `_print_warnings`)
+    # the transient form of the same news, now attributed (see `print_warnings`)
     assert "scan.nii.gz: warning: " in captured.err
     assert "not fully inside the phantom" in captured.err
 
@@ -299,21 +301,21 @@ def test_batch_warnings_name_the_scan_that_raised_them(
     assert attributed[0].startswith("first.nii.gz: warning: ")
     assert attributed[1].startswith("second.nii.gz: warning: ")
     assert "UserWarning" not in err  # no category, and no path into this package
-    assert "cli.py" not in err and "pipeline.py" not in err
+    assert "qa.py" not in err and "pipeline.py" not in err
 
 
 def test_localization_flag_names_every_failure(tmp_path, write_scan) -> None:
     """Both localizations can fail at once, and the cell says so."""
     scan = q.QAScan.from_nifti(write_scan(tmp_path))
     m = q.analyze(scan, q.AnalysisSettings(roi_size=9)).measurements
-    assert cli._localization_flag(m) == "ok"
-    assert cli._localization_flag(replace(m, phantom_mask_ok=False)) == "MASK"
-    assert cli._localization_flag(replace(m, roi_inside_phantom=False)) == "ROI"
+    assert table.localization_flag(m) == "ok"
+    assert table.localization_flag(replace(m, phantom_mask_ok=False)) == "MASK"
+    assert table.localization_flag(replace(m, roi_inside_phantom=False)) == "ROI"
     both = replace(m, phantom_mask_ok=False, roi_inside_phantom=False)
-    assert cli._localization_flag(both) == "MASK+ROI"
+    assert table.localization_flag(both) == "MASK+ROI"
     # an artifact migrated from a schema without the check: not a pass
     unrecorded = replace(m, phantom_mask_ok=None, roi_inside_phantom=None)
-    assert cli._localization_flag(unrecorded) == "?"
+    assert table.localization_flag(unrecorded) == "?"
 
 
 def test_json_document_is_strict_json(tmp_path, write_scan, capsys) -> None:
@@ -339,7 +341,7 @@ def test_json_record_maps_undefined_metrics_to_null(tmp_path, write_scan) -> Non
     undefined = replace(
         artifact.measurements, ghost_pct=float("nan"), sfnr=float("inf")
     )
-    record = cli._metric_record(replace(artifact, measurements=undefined))
+    record = metric_record(replace(artifact, measurements=undefined))
     assert record["ghost_pct"] is None
     assert record["sfnr"] is None
     assert record["snr"] == artifact.measurements.snr  # finite values pass through
@@ -356,7 +358,7 @@ def test_json_record_leaves_an_unnamed_direction_null(tmp_path, write_scan) -> N
     scan = q.QAScan.from_nifti(write_scan(tmp_path))
     artifact = q.analyze(scan, q.AnalysisSettings(roi_size=9))
     unnamed = replace(artifact.measurements, fwhm_pe=None, fwhm_ro=None)
-    record = cli._metric_record(replace(artifact, measurements=unnamed))
+    record = metric_record(replace(artifact, measurements=unnamed))
     assert record["fw_pe"] is None
     assert record["fw_ro"] is None
     assert record["fwhm"] == artifact.measurements.fwhm
@@ -368,7 +370,7 @@ def test_table_marks_an_unnamed_direction_unknown(tmp_path, write_scan, capsys) 
     scan = q.QAScan.from_nifti(write_scan(tmp_path))
     artifact = q.analyze(scan, q.AnalysisSettings(roi_size=9))
     unnamed = replace(artifact.measurements, fwhm_pe=None, fwhm_ro=None)
-    cli._print_row(replace(artifact, measurements=unnamed))
+    table.print_row(replace(artifact, measurements=unnamed))
     assert capsys.readouterr().out.rstrip("\n").endswith("     ?      ?")
 
 

@@ -78,7 +78,7 @@ left out for now, and the config says so in a comment.
   entry with a comment. Never blanket a whole package to dodge one line — this is the
   *practicality beats purity* exception from [zen.md](zen.md), made explicit.
 - The workspace already uses `per-file-ignores` deliberately: tests re-allow `assert`
-  (`S101`) and magic values (`PLR2004`); `cli.py`/`__main__.py` re-allow `print` (`T201`) —
+  (`S101`) and magic values (`PLR2004`); `cli.py`/`cli/`/`__main__.py` re-allow `print` (`T201`) —
   that last one is the "output belongs to the binary" rule from [logging.md](logging.md)
   turned into config.
 - Add or tighten a rule when a class of mistake recurs; the rule set is itself a living

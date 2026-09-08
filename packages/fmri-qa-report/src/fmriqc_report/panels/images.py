@@ -1,7 +1,7 @@
 """Phantom-image panels: signal, SFNR, noise, and the N/2 ghost overlay.
 
 Each builder returns a labelled matplotlib `Figure` (a square-ish `imshow` panel
-with the phantom outline and ROI drawn on top); `_panel_figs` assembles the row a
+with the phantom outline and ROI drawn on top); `panel_figs` assembles the row a
 report shows. Every image, mask, and outline comes ready-made from the artifact,
 so this module only draws. Format-agnostic — a driver embeds the returned figures.
 """
@@ -163,7 +163,7 @@ def _ghost_panel_fig(images: ArtifactImages, *, aspect: float = 1.15) -> Figure:
     return fig
 
 
-def _panel_figs(artifact: QAArtifact) -> list[Figure]:
+def panel_figs(artifact: QAArtifact) -> list[Figure]:
     """The summary image panels, in row order (last is the N/2 ghost overlay)."""
     images = artifact.images
     hull, roi = images.phantom_hull, images.roi

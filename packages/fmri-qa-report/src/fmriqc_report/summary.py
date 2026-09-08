@@ -1,8 +1,8 @@
 """Format-agnostic scan-level text: the acquisition/provenance metadata lines.
 
 The strings a report shows about a scan, derived from a `QAArtifact` with no
-dependency on any output format: the `_*_line` helpers return the acquisition /
-provenance / device strings, `_appendix_rows` the packet provenance table, and
+dependency on any output format: the `*_line` helpers return the acquisition /
+provenance / device strings, `appendix_rows` the packet provenance table, and
 `package_version` the running renderer version. The per-metric vocabulary (tile
 labels and value formatting) lives in `content`. A format driver (see `formats`)
 decides how to lay these out.
@@ -26,7 +26,7 @@ def package_version() -> str:
         return "unknown"
 
 
-def _appendix_rows(
+def appendix_rows(
     items: Iterable[tuple[str, QAArtifact]],
 ) -> list[tuple[str, str]]:
     """(scan title, provenance text) rows for the packet appendix.
@@ -38,7 +38,7 @@ def _appendix_rows(
     rows = []
     for title, artifact in items:
         prov = artifact.provenance
-        parts = [_device_line(prov), _provenance_line(prov)]
+        parts = [device_line(prov), provenance_line(prov)]
         if prov.core_version:
             parts.append(f"computed by fmri-qa-core {prov.core_version}")
         detail = _SEP.join(p for p in parts if p) or "no sidecar metadata"
@@ -46,7 +46,7 @@ def _appendix_rows(
     return rows
 
 
-def _acquisition_line(artifact: QAArtifact) -> str:
+def acquisition_line(artifact: QAArtifact) -> str:
     """The sequence/geometry metadata string. Sidecar-only fields are omitted."""
     prov, m, settings = artifact.provenance, artifact.measurements, artifact.settings
     parts = [f"TR {prov.tr:.3g}s"]
@@ -134,7 +134,7 @@ def _clipping_note(artifact: QAArtifact) -> str:
     return f"{text} @ {rail}"
 
 
-def _provenance_line(prov: Provenance) -> str:
+def provenance_line(prov: Provenance) -> str:
     """The scanner/coil/software/time string; empty without a sidecar."""
     parts = []
     if prov.serial:
@@ -148,7 +148,7 @@ def _provenance_line(prov: Provenance) -> str:
     return _SEP.join(parts)
 
 
-def _device_line(prov: Provenance) -> str:
+def device_line(prov: Provenance) -> str:
     """Manufacturer/model/field-strength for the title row; empty if unknown."""
     dev = " ".join(x for x in (prov.manufacturer, prov.model) if x)
     if prov.field_strength is not None:

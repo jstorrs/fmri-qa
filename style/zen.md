@@ -60,7 +60,7 @@ examples:
 - A blanket `except`, a `# type: ignore`, or a `# noqa` is denied by default and allowed
   only at the one site that needs it, carrying a specific rule code and a reason
   (`# noqa: E402 — re-export ordering`), never a bare blanket.
-- `print` is linted out of libraries (`T201`); `cli.py`/`main.py` re-allow it in one place
+- `print` is linted out of libraries (`T201`); `cli.py`/`cli/` re-allow it in one place
   via per-file-ignores, because talking to the terminal is their job.
 
 → [tooling.md](tooling.md), [stability.md](stability.md), [logging.md](logging.md)

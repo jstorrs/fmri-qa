@@ -15,9 +15,13 @@ subpackages (`ls` the package to find a concern):
                  `saturation`, `motion`, `center_of_mass`, `smoothness`
 * `pipeline`  -- `preprocess`, the full `run_qa` orchestration, and the
                  aggregate `QAMetrics`/`QAResult`
-* `analysis`  -- the publishable `QAArtifact`: `analyze` (scan -> artifact) and
-                 `save_artifact`/`load_artifact` (the `.npz` on-disk form)
+* `analysis`  -- the publishable `QAArtifact`: `artifact` (the value objects),
+                 `build` (`analyze`: scan -> artifact), `validation` (the
+                 contract), and `serialize` (the `.npz` on-disk form, with the
+                 per-version migrations that keep an old archive readable)
 * `hilo`      -- high/low flip-angle thermal/instability separation (its own pipeline)
+* `cli`       -- the two commands (`fmri-qa`, `fmri-qa-hilo`) and the two forms
+                 they report in: the fixed-width `table` and the JSON `record`
 * `types`     -- the shared array dtypes and option Literals
 
 This package is the *calculation* half of fmri-qa. Reports and plots live in the

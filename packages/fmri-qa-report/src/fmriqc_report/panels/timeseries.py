@@ -1,8 +1,8 @@
 """Stability plots: Weisskoff/RDC, signal, residual, spectrum, outliers, motion.
 
-Each `_plot_*` draws one stability panel onto a matplotlib `Axes` from the
+Each `plot_*` draws one stability panel onto a matplotlib `Axes` from the
 artifact's `Curves` — every trace arrives precomputed, so these functions only
-choose colors, labels, and limits. `_plot_fig` wraps a draw callback into a
+choose colors, labels, and limits. `plot_fig` wraps a draw callback into a
 fresh `Figure`. Format-agnostic — a driver embeds the figures.
 """
 
@@ -16,14 +16,14 @@ from fmriqc.analysis import Curves, PsfCurves, WeisskoffCurve
 from fmriqc.types import FloatArray
 
 
-def _plot_fig(draw: Callable[[Axes], object], figsize: tuple[float, float]) -> Figure:
+def plot_fig(draw: Callable[[Axes], object], figsize: tuple[float, float]) -> Figure:
     """Run an ax-drawing callback on a fresh constrained-layout figure."""
     fig = Figure(figsize=figsize, layout="constrained")
     draw(fig.add_subplot(111))
     return fig
 
 
-def _plot_weisskoff(ax: Axes, wk: WeisskoffCurve, rdc: float, fs: int = 9) -> None:
+def plot_weisskoff(ax: Axes, wk: WeisskoffCurve, rdc: float, fs: int = 9) -> None:
     """Measured CV vs the ideal slope=-1 line, anchored at the pooled cv1.
 
     The ideal line is anchored at `cv1_pooled` (the single-voxel CV pooled over
@@ -48,7 +48,7 @@ def _plot_weisskoff(ax: Axes, wk: WeisskoffCurve, rdc: float, fs: int = 9) -> No
     ax.legend(fontsize=fs - 2)
 
 
-def _plot_rdc(ax: Axes, wk: WeisskoffCurve, fs: int = 9) -> None:
+def plot_rdc(ax: Axes, wk: WeisskoffCurve, fs: int = 9) -> None:
     """RDC vs ROI size: pooled single-voxel CV / ROI-averaged CV, vs identity."""
     r, rdc = wk.roi_sizes, wk.rdc
     # Match the Weisskoff plot: measured is C0/"o-" on top and first in the
@@ -63,7 +63,7 @@ def _plot_rdc(ax: Axes, wk: WeisskoffCurve, fs: int = 9) -> None:
     ax.legend(fontsize=fs - 2, loc="upper left")
 
 
-def _plot_signal(ax: Axes, curves: Curves, fs: int = 9) -> None:
+def plot_signal(ax: Axes, curves: Curves, fs: int = 9) -> None:
     ax.plot(curves.time, curves.roi_signal, lw=0.5, label="ROI signal")
     ax.plot(curves.time, curves.roi_trend, "r", lw=1.2, label="trend")
     ax.set_xlabel("time (s)")
@@ -72,7 +72,7 @@ def _plot_signal(ax: Axes, curves: Curves, fs: int = 9) -> None:
     ax.legend(fontsize=fs - 2)
 
 
-def _plot_residual(
+def plot_residual(
     ax: Axes, curves: Curves, fs: int = 9, tc_outlier: float | None = None
 ) -> None:
     """ROI-mean detrended residual; the title carries the cran `tc_outlier` score.
@@ -91,7 +91,7 @@ def _plot_residual(
     ax.set_title(title, fontsize=fs)
 
 
-def _plot_outliers(ax: Axes, curves: Curves, fs: int = 9) -> None:
+def plot_outliers(ax: Axes, curves: Curves, fs: int = 9) -> None:
     """Per-TR outlier-voxel fraction (3dToutcount) with the chance-level line.
 
     A clean run hovers near `outlier_qthr` (the per-voxel chance fraction,
@@ -107,7 +107,7 @@ def _plot_outliers(ax: Axes, curves: Curves, fs: int = 9) -> None:
     ax.legend(fontsize=fs - 2)
 
 
-def _plot_motion(ax: Axes, curves: Curves, fs: int = 9) -> None:
+def plot_motion(ax: Axes, curves: Curves, fs: int = 9) -> None:
     """Per-volume in-plane phantom motion: translation (voxels) + strain (%).
 
     3dvolreg-style registration to the temporal mean with the rotation dropped
@@ -147,7 +147,7 @@ def _plot_motion(ax: Axes, curves: Curves, fs: int = 9) -> None:
     ax.legend(h1 + h2, l1 + l2, fontsize=fs - 4, ncol=2, loc="upper left")
 
 
-def _plot_com(ax: Axes, curves: Curves, fs: int = 9) -> None:
+def plot_com(ax: Axes, curves: Curves, fs: int = 9) -> None:
     """Per-volume phantom center-of-mass shift from the temporal mean (voxels).
 
     Circular intensity centroid (bxh volmeasures) along each in-plane axis,
@@ -166,7 +166,7 @@ def _plot_com(ax: Axes, curves: Curves, fs: int = 9) -> None:
     ax.legend(fontsize=fs - 2, ncol=2, loc="upper left")
 
 
-def _plot_spectrum(
+def plot_spectrum(
     ax: Axes, curves: Curves, fs: int = 9, spec_outlier: float | None = None
 ) -> None:
     """Residual FFT magnitude (DC dropped); title carries cran `spec_outlier`.
@@ -184,7 +184,7 @@ def _plot_spectrum(
     ax.set_title(title, fontsize=fs)
 
 
-def _plot_psf(ax: Axes, psf: PsfCurves, fs: int = 9) -> None:
+def plot_psf(ax: Axes, psf: PsfCurves, fs: int = 9) -> None:
     """Directional point-spread profiles (PE, RO) of the noise field (3dFWHMx).
 
     Markers are the empirical PSF (the squared spatial autocorrelation of the

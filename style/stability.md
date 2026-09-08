@@ -109,7 +109,7 @@ as `schema_version`, and the mapping between the dataclasses and the archive mem
 spelled out field by field rather than derived by reflection — so adding a field is a
 deliberate edit to the format, not a silent one.
 
-Always provide a migration when changing the schema. `analysis/serialize.py` keeps one step
+Always provide a migration when changing the schema. `analysis/serialize/migrate.py` keeps one step
 per version, so a file two versions old is walked forward one step at a time:
 
 ```python
