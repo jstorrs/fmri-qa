@@ -12,12 +12,12 @@ reuses `report.panels` and `report.summary` and only re-implements composition.
 import io
 import os
 import tempfile
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Sequence
 from functools import cache
 from importlib.metadata import version
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Any, cast
+from typing import Any, Literal, cast
 
 import matplotlib
 from matplotlib.figure import Figure
@@ -108,7 +108,20 @@ def _page_chunks[T](
     return chunks
 
 
-def _cover_chunks(cover: Cover, theme: Theme) -> list[tuple[str, ...]]:
+# One line of the cover inventory: what kind of line it is, and its text.
+_CoverRow = tuple[Literal["scan", "heading", "omitted"], str]
+
+
+def _cover_rows(cover: Cover) -> tuple[_CoverRow, ...]:
+    """The cover's lines in order: the scans, then any omitted scans under a heading."""
+    rows: list[_CoverRow] = [("scan", name) for name in cover.scans]
+    if cover.omitted:
+        rows.append(("heading", f"Omitted ({len(cover.omitted)})"))
+        rows.extend(("omitted", f"{name} — {reason}") for name, reason in cover.omitted)
+    return tuple(rows)
+
+
+def _cover_chunks(cover: Cover, theme: Theme) -> list[tuple[_CoverRow, ...]]:
     """Paginate a cover inventory for the active page geometry."""
     y = theme.page_size[1] * 0.70
     if theme.logo is not None and theme.logo.is_file():
@@ -120,7 +133,7 @@ def _cover_chunks(cover: Cover, theme: Theme) -> list[tuple[str, ...]]:
     first = int((y - floor) // _COVER_ROW_H) + 1
     continuation_y = theme.page_size[1] - 34 - 22 - 16 - 16
     following = int((continuation_y - floor) // _COVER_ROW_H) + 1
-    return _page_chunks(cover.scans, first, following)
+    return _page_chunks(_cover_rows(cover), first, following)
 
 
 def _appendix_chunks(
@@ -553,19 +566,25 @@ def add_report_pages(
     return _render_section(c, ScanSection(title, artifact, parts_for(tier)), theme)
 
 
-def _draw_footer(c: canvas.Canvas, theme: Theme, page_no: int, total: int) -> None:
-    """Draw the running footer: brand text at the left, page number at the right.
+def _draw_footer(
+    c: canvas.Canvas, theme: Theme, page_no: int, total: int, note: str = ""
+) -> None:
+    """Draw the running footer: brand text left, `note` centred, page number right.
 
-    Suppressed on a single-page report with no footer text, so a lone dashboard
-    page stays clean; the page number appears only once a packet spans pages.
+    Suppressed on a single-page report with no footer text and no note, so a
+    lone dashboard page stays clean; the page number appears only once a packet
+    spans pages. `note` is the packet-level flag (an incomplete packet) that
+    must be visible on every page a reader might be handed alone.
     """
-    if total <= 1 and not theme.footer:
+    if total <= 1 and not theme.footer and not note:
         return
     y = theme.margin - 22
     c.setFont(theme.font_body, 7.5)
     c.setFillGray(theme.text_muted_gray)
     if theme.footer:
         c.drawString(theme.margin, y, theme.footer)
+    if note:
+        c.drawCentredString(theme.page_size[0] / 2, y, note)
     if total > 1:
         c.drawRightString(theme.page_size[0] - theme.margin, y, f"{page_no} / {total}")
     c.setFillGray(theme.text_primary_gray)
@@ -574,12 +593,17 @@ def _draw_footer(c: canvas.Canvas, theme: Theme, page_no: int, total: int) -> No
 def _cover_page(
     c: canvas.Canvas,
     cover: Cover,
-    scans: tuple[str, ...],
+    rows: tuple[_CoverRow, ...],
     theme: Theme,
     *,
     continuation: bool,
 ) -> None:
-    """Draw the branded cover: logo, title, optional subtitle, scan inventory."""
+    """Draw the branded cover: logo, title, optional subtitle, scan inventory.
+
+    The inventory heading counts the scans against those requested when any
+    were omitted ("Scans (3 of 5)"), and the omitted ones follow the list under
+    their own heading with the reason each was left out.
+    """
     page_w, page_h = theme.page_size
     cx = page_w / 2
     y = page_h - 34 if continuation else page_h * 0.70
@@ -607,13 +631,23 @@ def _cover_page(
 
     c.setFillGray(theme.text_primary_gray)
     c.setFont(theme.font_title, 11)
-    c.drawString(theme.margin, y, f"Scans ({len(cover.scans)})")
+    count = str(len(cover.scans))
+    if cover.omitted:
+        count += f" of {len(cover.scans) + len(cover.omitted)}"
+    c.drawString(theme.margin, y, f"Scans ({count})")
     y -= 16
-    c.setFont(theme.font_body, 10)
-    c.setFillGray(theme.text_muted_gray)
-    for name in scans:
-        line = _fit_text(f"·  {name}", theme.font_body, 10, theme.content_width - 10)
-        c.drawString(theme.margin + 10, y, line)
+    for kind, text in rows:
+        if kind == "heading":
+            c.setFont(theme.font_title, 11)
+            c.setFillGray(theme.text_primary_gray)
+            c.drawString(theme.margin, y, text)
+        else:
+            c.setFont(theme.font_body, 10)
+            c.setFillGray(theme.text_muted_gray)
+            line = _fit_text(
+                f"·  {text}", theme.font_body, 10, theme.content_width - 10
+            )
+            c.drawString(theme.margin + 10, y, line)
         y -= _COVER_ROW_H
     c.setFillGray(theme.text_primary_gray)
 
@@ -667,31 +701,36 @@ def _block_pages(block: Block, theme: Theme) -> int:
 
 
 def _render_block(
-    c: canvas.Canvas, block: Block, theme: Theme, page_no: int, total: int
+    c: canvas.Canvas,
+    block: Block,
+    theme: Theme,
+    page_no: int,
+    total: int,
+    note: str = "",
 ) -> int:
     """Draw one block; return the running page number after it.
 
-    The cover carries no footer (it reads as a title page); every other page
-    gets the running footer.
+    The cover carries no footer (it reads as a title page, and lists any
+    omission itself); every other page gets the running footer with `note`.
     """
     if isinstance(block, Cover):
-        for index, scans in enumerate(_cover_chunks(block, theme)):
-            _cover_page(c, block, scans, theme, continuation=index > 0)
+        for index, rows in enumerate(_cover_chunks(block, theme)):
+            _cover_page(c, block, rows, theme, continuation=index > 0)
             c.showPage()
             page_no += 1
         return page_no
     if isinstance(block, Appendix):
-        for index, rows in enumerate(_appendix_chunks(block, theme)):
+        for index, entries in enumerate(_appendix_chunks(block, theme)):
             page_no += 1
-            _appendix_page(c, block, rows, theme, continuation=index > 0)
-            _draw_footer(c, theme, page_no, total)
+            _appendix_page(c, block, entries, theme, continuation=index > 0)
+            _draw_footer(c, theme, page_no, total, note)
             c.showPage()
         return page_no
     with matplotlib.rc_context(cast("Any", theme.rc_params())):
         for part in block.parts:
             page_no += 1
             _PART_RENDERERS[part](c, block.artifact, block.title, theme)
-            _draw_footer(c, theme, page_no, total)
+            _draw_footer(c, theme, page_no, total, note)
             c.showPage()
     return page_no
 
@@ -704,18 +743,32 @@ def write_report(
     *,
     cover: bool = False,
     appendix: bool = False,
+    omitted: Sequence[tuple[str, str]] = (),
 ) -> int:
     """Write a combined PDF packet: optional cover, the scans, optional appendix.
 
     `items` is an iterable of `(title, QAArtifact)`, or a single `QAArtifact`.
     `cover` prepends a branded cover with the scan inventory; `appendix` appends
     a provenance page. Multi-page packets carry a running footer with the theme's
-    brand text and page numbers. Returns the total number of pages written.
+    brand text and page numbers. `omitted` names requested scans that are not in
+    the packet (file name, reason): they are listed on the cover and in the
+    appendix, the PDF's subject metadata counts them, and every scan page's
+    footer says the packet is incomplete -- a page handed on alone must not
+    read as the whole. Returns the total number of pages written.
     """
     if isinstance(items, QAArtifact):
         items = [("", items)]
-    blocks = compose(items, tier, cover=cover, appendix=appendix)
+    blocks = compose(items, tier, cover=cover, appendix=appendix, omitted=omitted)
     total = sum(_block_pages(b, theme) for b in blocks)
+    n_scans = sum(isinstance(b, ScanSection) for b in blocks)
+    note = ""
+    subject = f"fMRI QA packet: {n_scans} scan(s)"
+    if omitted:
+        n_requested = n_scans + len(omitted)
+        note = f"INCOMPLETE PACKET: {len(omitted)} of {n_requested} scans omitted"
+        subject = (
+            f"fMRI QA packet: {n_scans} of {n_requested} scans; {len(omitted)} omitted"
+        )
     target = Path(pdf_path)
     # Match `save_artifact`: create the destination directory rather than fail
     # on the temporary file, whose name is an implementation detail of the
@@ -728,9 +781,11 @@ def write_report(
     temporary = Path(temporary_name)
     try:
         c = canvas.Canvas(str(temporary), pagesize=theme.page_size)
+        c.setTitle(theme.cover_title)
+        c.setSubject(subject)
         page_no = 0
         for block in blocks:
-            page_no = _render_block(c, block, theme, page_no, total)
+            page_no = _render_block(c, block, theme, page_no, total, note)
         c.save()
         temporary.replace(target)
     finally:

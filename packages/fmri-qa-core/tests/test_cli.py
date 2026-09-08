@@ -206,7 +206,7 @@ def test_json_emits_a_parseable_document(tmp_path, write_scan, capsys) -> None:
     captured = capsys.readouterr()
     assert rc == 0
     doc = json.loads(captured.out)  # stdout is pure JSON, nothing else
-    assert doc["schema_version"] == 4
+    assert doc["schema_version"] == 5
     assert doc["config"]["detrend"] == "poly"
     assert "version" in doc["config"]
     assert len(doc["scans"]) == 1
@@ -388,14 +388,29 @@ def test_json_stdout_stays_pure_with_an_artifact(tmp_path, write_scan, capsys) -
     assert out.is_file()
 
 
-def test_json_excludes_failed_scans(tmp_path, write_scan, capsys) -> None:
+def test_json_lists_failed_scans_in_an_error_inventory(
+    tmp_path, write_scan, capsys
+) -> None:
+    """A document must account for every input it was asked about.
+
+    `scans` holds only the analyses that ran; a consumer holding nothing but
+    the JSON could not otherwise tell a scan that failed from one that was
+    never requested. So the document also carries what was requested and,
+    per failure, which input and why -- and the terminal gets a one-line tally.
+    """
+    missing = str(tmp_path / "missing.nii.gz")
     good = write_scan(tmp_path, name="good")
-    rc = cli.main([str(tmp_path / "missing.nii.gz"), good, "--roi-size", "9", "--json"])
+    rc = cli.main([missing, good, "--roi-size", "9", "--json"])
     captured = capsys.readouterr()
     assert rc == 1
     doc = json.loads(captured.out)
     assert [s["scan"] for s in doc["scans"]] == ["good.nii.gz"]  # only the one that ran
+    assert doc["requested"] == [missing, good]
+    (error,) = doc["errors"]
+    assert error["scan"] == "missing.nii.gz" and error["source"] == missing
+    assert error["error"]  # the message the terminal was shown
     assert "ERROR" in captured.err
+    assert "1 of 2 scan(s) failed: missing.nii.gz" in captured.err
 
 
 def test_version_flag_prints_and_exits(capsys) -> None:

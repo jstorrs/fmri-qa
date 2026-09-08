@@ -45,6 +45,10 @@ def test_main_skips_an_unreadable_artifact_but_renders_the_rest(
     assert rc == 1  # a failure makes the run exit non-zero
     assert "ERROR" in captured.err and "Traceback" not in captured.err
     assert pdf.read_bytes().startswith(b"%PDF")  # the readable one still rendered
+    # ...and the packet says it is missing one, in its own metadata: a PDF is
+    # handed on without this terminal.
+    assert "1 of 2 artifact(s) could not be read" in captured.err
+    assert b"1 of 2 scans; 1 omitted" in pdf.read_bytes()
 
 
 def test_main_refuses_a_pdf_that_would_overwrite_an_artifact(

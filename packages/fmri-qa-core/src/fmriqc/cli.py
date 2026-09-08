@@ -20,7 +20,7 @@ from typing import TextIO
 import fmriqc as q
 from fmriqc.load.paths import nifti_stem, same_file, sidecar_path
 
-_JSON_SCHEMA_VERSION = 4
+_JSON_SCHEMA_VERSION = 5
 # Suffix for a saved artifact, so a batch's files are recognizable at a glance.
 _ARTIFACT_SUFFIX = ".qa.npz"
 
@@ -318,7 +318,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     if not args.json:
         _print_header()
 
-    failed = False
+    # Every per-scan failure, kept as well as printed: the JSON document lists
+    # them beside the scans that ran, so a consumer holding only the output can
+    # tell an omitted scan from one that was never requested.
+    errors: list[dict[str, str]] = []
     records = []
     for path in args.paths:
         name = Path(path).name
@@ -329,7 +332,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 scan = q.QAScan.from_nifti(path)
                 artifact = q.analyze(scan, settings, name=name, source=str(path))
             except Exception as exc:  # noqa: BLE001 - report and continue the batch
-                failed = True
+                errors.append({"scan": name, "source": str(path), "error": str(exc)})
                 print(f"{name:40s} ERROR: {exc}", file=sys.stderr)
         # After the attempt either way: a scan that failed may well have warned
         # on the way down, and that warning is part of the diagnosis.
@@ -340,25 +343,35 @@ def main(argv: Sequence[str] | None = None) -> int:
             records.append(_metric_record(artifact))
         else:
             _print_row(artifact)
-        if args.artifact and not _save(artifact, args.artifact, path, batch, info):
-            failed = True
+        if args.artifact:
+            problem = _save(artifact, args.artifact, path, batch, info)
+            if problem:
+                errors.append({"scan": name, "source": str(path), "error": problem})
 
     if args.json:
         document = {
             "schema_version": _JSON_SCHEMA_VERSION,
             "config": _config(args),
+            "requested": list(args.paths),
             "scans": records,
+            "errors": errors,
         }
         json.dump(document, sys.stdout, indent=2, allow_nan=False)
         print()
+    if errors:
+        names = ", ".join(sorted({e["scan"] for e in errors}))
+        print(
+            f"# {len(errors)} of {len(args.paths)} scan(s) failed: {names}",
+            file=sys.stderr,
+        )
 
-    return 1 if failed else 0
+    return 1 if errors else 0
 
 
 def _save(
     artifact: q.QAArtifact, base: str, path: str, batch: bool, info: TextIO
-) -> bool:
-    """Write one artifact, reporting a failure cleanly. True if it was written."""
+) -> str | None:
+    """Write one artifact. Returns None if written, else the error as reported."""
     out = _artifact_path(base, path, batch)
     try:
         q.save_artifact(artifact, out)
@@ -366,10 +379,11 @@ def _save(
         # A bad destination is a user error, and an artifact the reader would
         # refuse is a defect worth a line, not a traceback; either way the
         # batch goes on.
-        print(f"ERROR: could not write artifact {out}: {exc}", file=sys.stderr)
-        return False
+        problem = f"could not write artifact {out}: {exc}"
+        print(f"ERROR: {problem}", file=sys.stderr)
+        return problem
     print(f"# wrote {out}", file=info)
-    return True
+    return None
 
 
 def _config(args: argparse.Namespace) -> dict[str, object]:

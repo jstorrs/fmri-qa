@@ -14,7 +14,16 @@ versioning when the first stable public interface is released.
   schema version 5; an older archive reads them back as unknown. The report's
   acquisition line shows the slice, and its BAD PHANTOM MASK note names the
   contrast so a reader can see which test the mask failed. `fmri-qa --json`
-  records carry `slice_index` and `phantom_contrast`; JSON schema version 4.
+  records carry `slice_index` and `phantom_contrast`.
+- Batch failures travel with the output. The `fmri-qa --json` document lists
+  `requested` inputs and an `errors` inventory (`scan`, `source`, `error`) for
+  every input that failed to load, analyze, or save, beside the `scans` that
+  ran; JSON schema version 5. Both commands print a one-line tally of failures
+  on stderr. An `fmri-qa-report` packet missing an unreadable artifact says
+  so in the PDF itself: the cover counts scans against those requested and
+  lists the omitted with the reason, the appendix carries a row for each,
+  every scan page's footer reads INCOMPLETE PACKET, and the subject metadata
+  counts them (`write_report(..., omitted=...)`).
 - **The whole Nyquist-ghost family from one set of masks.** `estimate_ghost`
   builds the region-matched signal/ghost masks once per in-plane axis and
   returns a `GhostResult` carrying the masks and every ratio measured on them;

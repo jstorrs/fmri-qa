@@ -94,14 +94,17 @@ def main(argv: Sequence[str] | None = None) -> int:
             )
         return 1
 
-    failed = False
     items = []
+    # The artifacts that could not be read, by file name and reason: rendered
+    # into the packet itself, since whoever receives the PDF may never see this
+    # terminal and must be able to tell an omitted scan from an absent one.
+    omitted: list[tuple[str, str]] = []
     for path in args.artifacts:
         try:
             artifact = load_artifact(path)
         except Exception as exc:  # noqa: BLE001 - report and continue the batch
-            failed = True
             print(f"ERROR: {exc}", file=sys.stderr)
+            omitted.append((Path(path).name, str(getattr(exc, "reason", exc))))
             continue
         items.append((_title(artifact, path), artifact))
 
@@ -116,12 +119,19 @@ def main(argv: Sequence[str] | None = None) -> int:
             tier=args.tier,
             cover=args.cover,
             appendix=args.appendix,
+            omitted=omitted,
         )
     except Exception as exc:  # noqa: BLE001 - CLI boundary reports cleanly
         print(f"ERROR: could not write PDF {args.pdf}: {exc}", file=sys.stderr)
         return 1
     print(f"# wrote {args.pdf} ({len(items)} scan(s), {pages} pages)")
-    return 1 if failed else 0
+    if omitted:
+        print(
+            f"# {len(omitted)} of {len(args.artifacts)} artifact(s) could not be "
+            f"read; the packet is marked incomplete and lists them as omitted",
+            file=sys.stderr,
+        )
+    return 1 if omitted else 0
 
 
 if __name__ == "__main__":

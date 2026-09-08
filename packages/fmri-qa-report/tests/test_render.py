@@ -113,6 +113,29 @@ def test_write_report_builds_a_cover_and_appendix_packet(tmp_path, artifact) -> 
     assert pdf.read_bytes().startswith(b"%PDF")
 
 
+def test_write_report_marks_an_incomplete_packet(tmp_path, artifact) -> None:
+    """A packet missing a requested scan says so where a reader will look.
+
+    The subject metadata is the part of the file this test can read back
+    without a PDF parser; the cover, appendix row, and every page footer carry
+    the same fact and are rendered here without error.
+    """
+    pdf = tmp_path / "partial.pdf"
+    pages = report.write_report(
+        [("run-1", artifact)],
+        pdf,
+        cover=True,
+        appendix=True,
+        omitted=[("run-2.qa.npz", "unreadable")],
+    )
+    assert pages == 3  # cover + one dashboard page + appendix
+    assert b"1 of 2 scans; 1 omitted" in pdf.read_bytes()
+
+    whole = tmp_path / "whole.pdf"
+    report.write_report([("run-1", artifact)], whole)
+    assert b"omitted" not in whole.read_bytes()
+
+
 def test_cover_renders_a_theme_logo(tmp_path, artifact) -> None:
     from PIL import Image
 

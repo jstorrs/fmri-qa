@@ -10,7 +10,7 @@ own -- so the two tiers cannot drift out of agreement.
 See `notes/report_redesign.md` for the design.
 """
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from typing import Literal, get_args
 
@@ -38,11 +38,14 @@ class Cover:
     """The packet's branded cover: the scan inventory and an optional subtitle.
 
     The title, logo, and footer come from the `Theme` at render time; the block
-    carries only the content -- which scans the packet contains, in order.
+    carries only the content -- which scans the packet contains, in order, and
+    which requested scans it does *not* (`omitted`: file name and reason), so a
+    reader holding only the PDF can tell an omission from an absence.
     """
 
     scans: tuple[str, ...]
     subtitle: str = ""
+    omitted: tuple[tuple[str, str], ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -84,20 +87,28 @@ def compose(
     *,
     cover: bool = False,
     appendix: bool = False,
+    omitted: Sequence[tuple[str, str]] = (),
 ) -> list[Block]:
     """Build the block list for a packet.
 
     One `ScanSection` per scan at `tier`, optionally wrapped in a `Cover` (the
     scan inventory) and an `Appendix` (per-scan provenance + the package version).
+    `omitted` names the requested scans that are *not* in the packet, with the
+    reason each was left out; the cover lists them and the appendix carries a
+    row for each, so the omission travels with the document.
     """
     scans = list(items)
     parts = parts_for(tier)
     blocks: list[Block] = []
     if cover:
-        blocks.append(Cover(scans=tuple(title for title, _ in scans)))
+        blocks.append(
+            Cover(scans=tuple(title for title, _ in scans), omitted=tuple(omitted))
+        )
     blocks.extend(ScanSection(title, artifact, parts) for title, artifact in scans)
     if appendix:
-        blocks.append(
-            Appendix(rows=tuple(_appendix_rows(scans)), version=package_version())
+        rows = list(_appendix_rows(scans))
+        rows.extend(
+            (name, f"omitted from this packet: {reason}") for name, reason in omitted
         )
+        blocks.append(Appendix(rows=tuple(rows), version=package_version()))
     return blocks

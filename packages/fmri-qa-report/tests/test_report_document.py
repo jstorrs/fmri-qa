@@ -10,6 +10,7 @@ from fmriqc_report.formats.reportlab import (
     DEFAULT_THEME,
     _appendix_chunks,
     _cover_chunks,
+    _cover_rows,
     _ensure_svglib_patch,
     _fit_text,
     _svglib_truncates_image_geometry,
@@ -43,12 +44,35 @@ def test_cover_and_appendix_paginate_without_losing_rows() -> None:
     scans = tuple(f"scan-{i:03d}" for i in range(100))
     cover_chunks = _cover_chunks(report.Cover(scans), theme)
     assert len(cover_chunks) > 1
-    assert tuple(name for chunk in cover_chunks for name in chunk) == scans
+    assert tuple(name for chunk in cover_chunks for _, name in chunk) == scans
 
     rows = tuple((name, f"details for {name}") for name in scans)
     appendix_chunks = _appendix_chunks(report.Appendix(rows, "0.1.0"), theme)
     assert len(appendix_chunks) > 1
     assert tuple(row for chunk in appendix_chunks for row in chunk) == rows
+
+
+def test_compose_carries_omitted_scans_onto_the_cover_and_appendix(artifact) -> None:
+    """A scan left out of the packet is named in it, with the reason.
+
+    Whoever receives the PDF may never see the terminal that printed the error,
+    and a packet of three scans reads as complete unless it says otherwise.
+    """
+    omitted = [("run-2.qa.npz", "not an fmriqc artifact archive")]
+    blocks = report.compose(
+        [("run-1", artifact)], "dashboard", cover=True, appendix=True, omitted=omitted
+    )
+    cover, _, appendix = blocks
+    assert isinstance(cover, report.Cover) and isinstance(appendix, report.Appendix)
+    assert cover.scans == ("run-1",)
+    assert cover.omitted == (("run-2.qa.npz", "not an fmriqc artifact archive"),)
+    assert appendix.rows[-1] == (
+        "run-2.qa.npz",
+        "omitted from this packet: not an fmriqc artifact archive",
+    )
+    # The cover lists them after the scans, under their own heading.
+    kinds = [kind for kind, _ in _cover_rows(cover)]
+    assert kinds == ["scan", "heading", "omitted"]
 
 
 def test_catalog_prose_wraps_within_the_content_width() -> None:

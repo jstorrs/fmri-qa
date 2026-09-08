@@ -307,7 +307,8 @@ names one of the run's own inputs (the scan, its sidecar, or, for
 replacing it would destroy the data the output describes.
 
 With `--json`, stdout carries a single versioned JSON document —
-`{"schema_version": 4, "config": {...}, "scans": [...]}`, one record per scan
+`{"schema_version": 5, "config": {...}, "requested": [...], "scans": [...],
+"errors": [...]}`, one record per scan
 with the table's columns as raw numbers. A metric that cannot be computed for a
 scan is JSON `null` (for example, a ghost ratio with no clear ghost region),
 never a non-standard `NaN` or `Infinity` token. Each record leads with
@@ -323,9 +324,11 @@ a trend database outlives the terminal it was printed to: `source` and
 `datetime` key and date it, `tr`, `n_frames` and `n_trimmed` say what series the
 numbers describe, and `outlier_worst_frame` names the worst outlier volume —
 counted from the analyzed series, so adding `n_trimmed` gives the acquired
-volume number. The banner, any
-errors, and any save notices go to stderr, so
-`fmri-qa --json scan.nii.gz | jq` stays clean:
+volume number. `requested` lists every input path given, and `errors` one entry
+(`scan`, `source`, `error`) per input that failed to load, analyze, or save, so
+a consumer holding only the document can tell a scan that failed from one that
+was never asked for. The banner, any errors, and any save notices go to stderr,
+so `fmri-qa --json scan.nii.gz | jq` stays clean:
 
 ```bash
 uv run fmri-qa --json data/*_fMRI_*.nii.gz > qa.json
@@ -346,6 +349,13 @@ uv run fmri-qa-report artifacts/*.qa.npz --pdf qa.pdf
 | `--tier` | `dashboard` | `dashboard` (condensed overview) or `physics` (adds stability, characterization, and methods pages) per scan |
 | `--cover` | — | prepend a cover page listing the scans in the packet |
 | `--appendix` | — | append a provenance page (per-scan metadata + version) |
+
+An artifact that cannot be read is reported on stderr, skipped, and the run
+exits non-zero — but the packet is still written, and it says what it is
+missing: the cover counts the scans against those requested and lists the
+omitted ones with the reason, the appendix carries a row for each, every scan
+page's footer reads INCOMPLETE PACKET, and the PDF's subject metadata counts
+them. A page handed on alone must not read as the whole.
 
 Each page carries the metadata and metrics, the four summary images (signal,
 SFNR, fluctuation noise, static spatial noise) with the phantom mask and ROI
