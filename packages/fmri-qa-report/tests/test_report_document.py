@@ -10,6 +10,7 @@ from fmriqc_report.formats.reportlab import (
     DEFAULT_THEME,
     _appendix_chunks,
     _cover_chunks,
+    _ensure_svglib_patch,
     _fit_text,
     _svglib_truncates_image_geometry,
     _wrap_text,
@@ -73,6 +74,13 @@ def test_report_text_is_truncated_to_the_available_width() -> None:
 
 
 def test_svglib_converter_preserves_fractional_image_geometry() -> None:
+    """Once the alignment fix is installed, the converter keeps fractional geometry.
+
+    The fix is installed on the first render, not at import, so the test
+    installs it explicitly: without that it passed only when a render test had
+    already run in the same session, and failed alone.
+    """
+    _ensure_svglib_patch()
     converter = _svglib.Svg2RlgShapeConverter.convertImage
     assert not _svglib_truncates_image_geometry(converter)
 
