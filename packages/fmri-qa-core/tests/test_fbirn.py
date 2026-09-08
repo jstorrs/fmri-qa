@@ -131,6 +131,33 @@ def test_sfnr_is_the_roi_mean_of_signal_over_fluctuation_noise() -> None:
     assert np.isclose(sfnr(images, _full_roi(4)), 50.0)
 
 
+def test_sfnr_averages_voxelwise_ratios_rather_than_measuring_the_roi_mean() -> None:
+    """With unequal voxel noise the two textbook forms of SFNR disagree.
+
+    Averaging the ROI first lets independent noise cancel spatially, so the
+    ratio of the ROI-mean series is not the mean of the voxelwise ratios. The
+    implementation is the latter (Glover 2006), and the report's methods text
+    says so; this pins the number the text describes. Two voxels with
+    orthogonal, zero-mean fluctuations: SDs 1 and 10 over a signal of 100 give
+    voxelwise ratios 100 and 10, whose mean is 55; the ROI-mean series has SD
+    sqrt((1 + 100) / 4), for a ratio near 19.9.
+    """
+    a = np.array([1.0, -1.0, 1.0, -1.0])
+    b = 10.0 * np.array([1.0, 1.0, -1.0, -1.0])
+    fluct = np.stack([a, b])[:, None, :]  # (2, 1, 4): two voxels, one column
+    images = _images(np.full((2, 1, 4), 100.0) + fluct, fluct)
+    roi = ROI(center=np.array([0, 0]), size=2)  # rows 0:2 of the one column
+    roi_index = (slice(0, 2), slice(0, 1))
+    assert roi.index[0] == roi_index[0]  # the ROI is the two voxels built above
+
+    roi_mean_series = fluct[:, 0, :].mean(axis=0)
+    of_the_roi_mean = 100.0 / np.std(roi_mean_series, mean=0)
+
+    assert np.isclose(sfnr(images, roi), 55.0)
+    assert np.isclose(of_the_roi_mean, 100.0 / np.sqrt(101.0 / 4))
+    assert not np.isclose(sfnr(images, roi), of_the_roi_mean)
+
+
 def test_drift_percent_is_peak_to_peak_of_the_fitted_trend() -> None:
     # trend = center_slice - fluctuations. A centered ramp t-3.5 over 8 frames has
     # peak-to-peak 7 and temporal mean 0, so the mean image stays 100 and the

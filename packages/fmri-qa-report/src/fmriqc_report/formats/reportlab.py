@@ -22,6 +22,7 @@ from typing import Any, cast
 import matplotlib
 from matplotlib.figure import Figure
 from reportlab.graphics.shapes import Group, Image
+from reportlab.lib.utils import simpleSplit
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfgen import canvas
 from svglib import svglib as _svglib
@@ -82,6 +83,15 @@ def _fit_text(text: str, font: str, size: float, width: float) -> str:
     while end > 0 and pdfmetrics.stringWidth(text[:end], font, size) > available:
         end -= 1
     return text[:end].rstrip() + ellipsis
+
+
+def _wrap_text(text: str, font: str, size: float, width: float) -> list[str]:
+    """Break report prose into lines no wider than `width` (points).
+
+    For the catalog's definitions and methods, which say what a number is and
+    must not be cut short the way a one-line label (`_fit_text`) can be.
+    """
+    return simpleSplit(text, font, size, width) or [""]
 
 
 def _page_chunks[T](
@@ -459,6 +469,8 @@ def _characterization_page(
     y = _page_title(c, title, "characterization", theme)
     value_x = theme.margin + 90
     accept_x = theme.page_size[0] - theme.margin
+    prose_x = theme.margin + 8
+    prose_width = theme.content_width - 8
     for doc, value in characterization_rows(artifact.measurements):
         c.setFont(theme.font_title, 9)
         c.setFillGray(theme.text_primary_gray)
@@ -470,9 +482,11 @@ def _characterization_page(
         c.drawRightString(accept_x, y, "accept --")
         y -= 11
         c.setFont(theme.font_body, 8)
-        c.drawString(theme.margin + 8, y, doc.definition)
+        for line in _wrap_text(doc.definition, theme.font_body, 8, prose_width):
+            c.drawString(prose_x, y, line)
+            y -= 10
         c.setFillGray(theme.text_primary_gray)
-        y -= 17
+        y -= 7
 
 
 def _methods_page(
@@ -480,6 +494,8 @@ def _methods_page(
 ) -> None:
     """Physics: the per-metric methods/provenance narrative."""
     y = _page_title(c, title, "methods", theme)
+    prose_x = theme.margin + 8
+    prose_width = theme.content_width - 8
     for doc in METRIC_DOCS:
         c.setFont(theme.font_title, 9)
         c.setFillGray(theme.text_primary_gray)
@@ -487,9 +503,11 @@ def _methods_page(
         y -= 11
         c.setFont(theme.font_body, 8)
         c.setFillGray(theme.text_muted_gray)
-        c.drawString(theme.margin + 8, y, doc.method)
+        for line in _wrap_text(doc.method, theme.font_body, 8, prose_width):
+            c.drawString(prose_x, y, line)
+            y -= 10
         c.setFillGray(theme.text_primary_gray)
-        y -= 17
+        y -= 7
 
 
 # One renderer per page `Part` (see `report.document`). Each draws its content

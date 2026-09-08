@@ -70,6 +70,12 @@ versioning when the first stable public interface is released.
 
 ### Fixed
 
+- The report's metric catalog (the physics tier's characterization and methods
+  pages) describes the calculations as implemented. SFNR is the ROI average
+  of voxelwise temporal-mean over detrended-SD ratios, not the ratio of the
+  ROI-mean series (which is what `fluct` uses, and now says); the ghost
+  denominator is the matched signal region, not the whole phantom; ACRg is
+  the absolute difference; RDC is read at the full ROI.
 - `save_artifact` holds an artifact to the same contract `load_artifact`
   applies, and refuses (`InvalidArtifactError`, nothing written, an existing
   archive untouched) one that would not read back. `fmri-qa` reports the

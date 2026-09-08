@@ -5,11 +5,14 @@ from reportlab.pdfbase import pdfmetrics
 from svglib import svglib as _svglib
 
 import fmriqc_report as report
+from fmriqc_report import content
 from fmriqc_report.formats.reportlab import (
+    DEFAULT_THEME,
     _appendix_chunks,
     _cover_chunks,
     _fit_text,
     _svglib_truncates_image_geometry,
+    _wrap_text,
 )
 
 
@@ -45,6 +48,22 @@ def test_cover_and_appendix_paginate_without_losing_rows() -> None:
     appendix_chunks = _appendix_chunks(report.Appendix(rows, "0.1.0"), theme)
     assert len(appendix_chunks) > 1
     assert tuple(row for chunk in appendix_chunks for row in chunk) == rows
+
+
+def test_catalog_prose_wraps_within_the_content_width() -> None:
+    """A definition or method is wrapped, never truncated, and never overruns.
+
+    The catalog's sentences grew when they were made to describe the code
+    exactly; the pages that draw them have no right margin to spill into.
+    """
+    width = DEFAULT_THEME.content_width - 8
+    font = DEFAULT_THEME.font_body
+    for doc in content.METRIC_DOCS:
+        for text in (doc.definition, doc.method):
+            lines = _wrap_text(text, font, 8, width)
+            assert " ".join(lines) == text  # every word survives
+            for line in lines:
+                assert pdfmetrics.stringWidth(line, font, 8) <= width
 
 
 def test_report_text_is_truncated_to_the_available_width() -> None:

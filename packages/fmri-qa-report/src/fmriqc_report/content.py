@@ -9,7 +9,10 @@ header tiles (`metric_tiles`) and the physics characterization/methods pages
 name and formatting can't drift between the dashboard and the physics report.
 
 The prose is condensed from `notes/` and the metric modules; see those for the
-full derivations.
+full derivations. Each `method` names the order of operations the code actually
+performs — where two textbook forms differ (SFNR averaged over voxelwise ratios
+versus measured on the ROI-mean series, say), the text follows the code, and a
+test on the calculation side pins the difference.
 """
 
 from collections.abc import Callable
@@ -44,20 +47,24 @@ METRIC_DOCS: tuple[MetricDoc, ...] = (
     ),
     MetricDoc(
         "SFNR",
-        "Signal-to-fluctuation-noise: temporal stability of the ROI mean.",
-        "fBIRN/Glover: ROI mean over the SD of the detrended time series.",
+        "Signal-to-fluctuation-noise: ROI average of the voxelwise temporal SNR.",
+        "fBIRN/Glover: per voxel, temporal mean / detrended temporal SD; then the "
+        "ROI mean of those ratios (not the ratio of the ROI-mean series).",
         lambda m: f"{m.sfnr:.1f}",
     ),
     MetricDoc(
         "RDC",
-        "Radius of decorrelation: ROI width where averaging stops reducing CV.",
-        "Weisskoff: measured CV vs ROI width against the ideal 1/width line.",
+        "Radius of decorrelation: single-voxel CV over the full-ROI CV "
+        "(ideal = ROI width).",
+        "Weisskoff: measured CV vs ROI width against the ideal 1/width line; "
+        "RDC = pooled single-voxel CV / ROI-mean CV at the full ROI.",
         lambda m: f"{m.rdc:.2f}",
     ),
     MetricDoc(
         "ghost",
         "Nyquist (N/2) ghost along the phase-encode axis, region mean.",
-        "Signal rolled half the FOV along PE; ghost-region mean over phantom mean.",
+        "Phantom rolled half the FOV along PE; ghost-region mean over the mean of "
+        "the matched signal region it was rolled from.",
         lambda m: f"{m.ghost_pct:.2f}%",
     ),
     MetricDoc(
@@ -74,8 +81,8 @@ METRIC_DOCS: tuple[MetricDoc, ...] = (
     ),
     MetricDoc(
         "ACRg",
-        "ACR ghosting ratio: PE ghost above the readout baseline.",
-        "ghost - RO, the ACR phantom-QA ghosting figure.",
+        "ACR ghosting ratio: PE ghost against the readout baseline.",
+        "|ghost - RO|, the ACR phantom-QA ghosting figure in region-matched form.",
         lambda m: f"{m.acr_ghost_pct:.2f}%",
     ),
     MetricDoc(
@@ -86,8 +93,9 @@ METRIC_DOCS: tuple[MetricDoc, ...] = (
     ),
     MetricDoc(
         "fluct",
-        "Percent temporal fluctuation of the ROI mean.",
-        "fBIRN/Glover: residual SD over the mean signal.",
+        "Percent temporal fluctuation of the ROI-mean time course.",
+        "fBIRN/Glover: SD of the detrended ROI-mean series over the ROI mean "
+        "signal (the ROI-mean form SFNR does not use).",
         lambda m: f"{m.percent_fluctuation:.3f}%",
     ),
     MetricDoc(
