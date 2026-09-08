@@ -308,8 +308,10 @@ scan is JSON `null` (for example, a ghost ratio with no clear ghost region),
 never a non-standard `NaN` or `Infinity` token. Each record leads with
 `phantom_fraction`, `phantom_mask_ok`, and `roi_inside_phantom` — the table's
 `loc` column — which say whether the phantom mask and the summary ROI landed
-where they must; when either failed, every mask-based number in that record was
-measured on background.
+where they must (a mask passes when it covers a plausible share of the frame
+*and* stands clear of the background it was cut from, so a segmentation of
+noise fails even at an ordinary size); when either failed, every mask-based
+number in that record was measured on background.
 
 A record also carries a little the table has no room for, because a row filed in
 a trend database outlives the terminal it was printed to: `source` and

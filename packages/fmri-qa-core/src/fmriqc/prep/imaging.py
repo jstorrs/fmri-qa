@@ -7,6 +7,7 @@ primitives, and a couple of numeric helpers. Everything here is a pure
 types, so it can be shared without import cycles.
 """
 
+import math
 import warnings
 
 import numpy as np
@@ -63,27 +64,53 @@ def segment_phantom(image: FloatArray) -> BoolArray:
     return np.asarray(segmentation.watershed(edges, labels) == 2)
 
 
-def phantom_area(image: FloatArray) -> int:
-    """Segmented phantom area (voxels), or 0 for an image holding no phantom.
+def phantom_contrast(image: FloatArray, mask: BoolArray) -> float:
+    """How far the mask's interior stands above the background it was cut from.
+
+    The ratio of the mean intensity inside `mask` to the mean outside it. An
+    exactly-zero background (a background-suppressed reconstruction) makes the
+    ratio infinite: any signal at all is then contrast enough. A mask that
+    partitions nothing — empty, or the whole frame — has no background to stand
+    above and scores 0.
+    """
+    if not mask.any() or mask.all():
+        return 0.0
+    inside = float(image[mask].mean())
+    background = float(image[~mask].mean())
+    if background <= 0:
+        return math.inf if inside > 0 else 0.0
+    return inside / background
+
+
+def phantom_plausible(fraction: float, contrast: float) -> bool:
+    """Whether a segmentation with this frame share and contrast is a phantom.
 
     `segment_phantom` always returns *some* mask: given a frame of pure air it
     seeds one quantile of the noise against the other and labels about half of
-    it. Area alone therefore cannot rank slices — an air slice (~45% of the
-    frame) out-votes a real cross-section (~20%) — so the mask must first be
-    shown to *be* a phantom. Two cheap tests do it: the mask covers a plausible
-    share of the frame, and what it selected stands `MIN_PHANTOM_CONTRAST` above
-    the background it was separated from, which a partition of noise never does.
+    it. So a mask must be shown to *be* a phantom, by two cheap tests: it covers
+    a plausible share of the frame (a collapse covers none or all of it), and
+    what it selected stands `MIN_PHANTOM_CONTRAST` above the background it was
+    separated from, which a partition of noise never does. This is the single
+    definition of "this segmentation held" — slice selection ranks slices by it
+    and the phantom verdict the artifact records is it.
+    """
+    return (
+        DEGENERATE_PHANTOM_MIN < fraction < DEGENERATE_PHANTOM_MAX
+        and contrast >= MIN_PHANTOM_CONTRAST
+    )
+
+
+def phantom_area(image: FloatArray) -> int:
+    """Segmented phantom area (voxels), or 0 for an image holding no phantom.
+
+    Area alone cannot rank slices — an air slice segments to ~45% of the frame
+    and out-votes a real cross-section at ~20% — so a mask that is not
+    `phantom_plausible` scores 0.
     """
     mask = segment_phantom(image)
-    if not DEGENERATE_PHANTOM_MIN < mask.mean() < DEGENERATE_PHANTOM_MAX:
+    if not phantom_plausible(float(mask.mean()), phantom_contrast(image, mask)):
         return 0
-    inside = float(image[mask].mean())
-    background = float(image[~mask].mean())
-    # An exactly-zero background (a background-suppressed reconstruction) makes
-    # the ratio infinite; any signal at all is then contrast enough.
-    if background <= 0:
-        return int(mask.sum()) if inside > 0 else 0
-    return int(mask.sum()) if inside / background >= MIN_PHANTOM_CONTRAST else 0
+    return int(mask.sum())
 
 
 def extract_center_slice(data: FloatArray, center: RoiCenter = "image") -> FloatArray:

@@ -16,9 +16,12 @@ from .images import QAImages
 from .imaging import (
     DEGENERATE_PHANTOM_MAX,
     DEGENERATE_PHANTOM_MIN,
+    MIN_PHANTOM_CONTRAST,
     _clamp_center,
     find_phantom_center,
     image_center,
+    phantom_contrast,
+    phantom_plausible,
     roi_indexes,
     segment_phantom,
 )
@@ -30,6 +33,7 @@ class PhantomGeometry:
 
     phantom_mask: BoolArray  # (X, Y) bool
     roi_center: IntArray  # (row, col) in array-index order — detected phantom center
+    contrast: float  # mean inside the mask over mean outside it (inf: zero air)
 
     @property
     def fraction(self) -> float:
@@ -45,14 +49,16 @@ class PhantomGeometry:
 
     @property
     def plausible(self) -> bool:
-        """Whether `fraction` is one a real phantom mask can take.
+        """Whether this mask is one a real phantom can produce.
 
-        The single definition of "this segmentation held": `detect_phantom`
-        warns on it, and `build` records it in the artifact so a reader —
-        including one in another distribution, which cannot import this layer —
-        gets the verdict rather than the bounds to re-apply.
+        `phantom_plausible` over `fraction` and `contrast` — the same test slice
+        selection ranks slices by, so a run cannot say "no slice holds a
+        phantom" and then record the phantom it segmented anyway as good.
+        `detect_phantom` warns on it, and `build` records it in the artifact so
+        a reader — including one in another distribution, which cannot import
+        this layer — gets the verdict rather than the bounds to re-apply.
         """
-        return DEGENERATE_PHANTOM_MIN < self.fraction < DEGENERATE_PHANTOM_MAX
+        return phantom_plausible(self.fraction, self.contrast)
 
 
 @dataclass(frozen=True, eq=False)
@@ -75,28 +81,44 @@ class ROI:
 def detect_phantom(images: QAImages) -> PhantomGeometry:
     """Locate the phantom from the preprocessed images: mask and detected center.
 
-    Warns when the resulting mask is degenerate — empty, or covering essentially
-    the whole frame. Either means the watershed did not separate phantom from
-    background, and every statistic measured through the mask is then unusable:
-    a whole-frame mask in particular passes `roi_fits` vacuously and erodes the
-    N/2 ghost region to nothing, so nothing further would flag it. The geometry
-    is still returned (the caller records `fraction` in the artifact and the
-    affected metrics resolve to NaN on their own) rather than raised on, so a
-    batch reports the bad scan and keeps going.
+    Warns when the resulting mask is not a plausible phantom: degenerate —
+    empty, or covering essentially the whole frame — or a partition of noise
+    that stands no higher than the background it was cut from. Either way the
+    watershed did not find a phantom, and every statistic measured through the
+    mask is then unusable: a whole-frame mask in particular passes `roi_fits`
+    vacuously and erodes the N/2 ghost region to nothing, and a noise partition
+    covers a perfectly ordinary share of the frame, so nothing further would
+    flag either. The geometry is still returned (the caller records the verdict
+    in the artifact and the affected metrics resolve to NaN on their own)
+    rather than raised on, so a batch reports the bad scan and keeps going.
     """
     phantom_mask = segment_phantom(images.mip)
     geom = PhantomGeometry(
         phantom_mask=phantom_mask,
         roi_center=find_phantom_center(phantom_mask),
+        contrast=phantom_contrast(images.mip, phantom_mask),
     )
     if not geom.plausible:
         warnings.warn(
-            f"phantom segmentation covers {100 * geom.fraction:.1f}% of the frame; "
-            f"the mask did not separate phantom from background, so the "
-            f"mask-based metrics (SFNR, ghost, outliers, smoothness) are unusable.",
+            f"{_implausibility(geom)}, so the mask-based metrics (SFNR, ghost, "
+            f"outliers, smoothness) are unusable.",
             stacklevel=2,
         )
     return geom
+
+
+def _implausibility(geom: PhantomGeometry) -> str:
+    """Which plausibility test the segmentation failed, for the warning."""
+    if not DEGENERATE_PHANTOM_MIN < geom.fraction < DEGENERATE_PHANTOM_MAX:
+        return (
+            f"phantom segmentation covers {100 * geom.fraction:.1f}% of the frame; "
+            f"the mask did not separate phantom from background"
+        )
+    return (
+        f"phantom segmentation stands only {geom.contrast:.1f}x above the "
+        f"background it was separated from (a phantom stands at least "
+        f"{MIN_PHANTOM_CONTRAST:g}x); the frame holds no recognizable phantom"
+    )
 
 
 def resolve_roi(

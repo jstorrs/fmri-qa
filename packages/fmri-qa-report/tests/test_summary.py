@@ -1,6 +1,9 @@
 """The scan-level metadata lines built from an artifact's provenance."""
 
+import warnings
 from dataclasses import replace
+
+import numpy as np
 
 import fmriqc as q
 from fmriqc_report import summary
@@ -100,6 +103,21 @@ def test_a_collapsed_phantom_mask_is_called_out(artifact) -> None:
     """
     collapsed = _clipped(artifact, phantom_fraction=1.0, phantom_mask_ok=False)
     assert "BAD PHANTOM MASK (100% of frame)" in summary._acquisition_line(collapsed)
+
+
+def test_acquisition_line_flags_an_analysis_of_background() -> None:
+    """A noise-only scan's failed verdict reaches the page as the analysis made it.
+
+    End to end rather than by overriding the field: the calculation half once
+    warned that no slice held a phantom and then recorded the mask as good, and
+    this is the page that would have shown ordinary-looking numbers for it.
+    """
+    noise = np.abs(np.random.default_rng(0).normal(size=(32, 32, 1, 40)))
+    settings = q.AnalysisSettings(trim_sec=0, center="phantom", roi_size=3)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")  # the analysis warns; the page is under test
+        artifact = q.analyze(q.QAScan(data=noise, tr=2.0), settings)
+    assert "BAD PHANTOM MASK" in summary._acquisition_line(artifact)
 
 
 def test_an_off_phantom_roi_is_called_out(artifact) -> None:

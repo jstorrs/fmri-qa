@@ -14,6 +14,8 @@ from fmriqc.prep.imaging import (
     image_center,
     odd_even_difference,
     phantom_area,
+    phantom_contrast,
+    phantom_plausible,
     roi_indexes,
     segment_phantom,
     trim_initial,
@@ -141,6 +143,58 @@ def test_detect_phantom_is_quiet_on_a_separable_phantom() -> None:
         warnings.simplefilter("error")  # any warning here fails the test
         geom = q.detect_phantom(images)
     assert 0.0 < geom.fraction < 0.95
+
+
+def test_detect_phantom_rejects_a_partition_of_noise() -> None:
+    """A frame of air segments to a middling share of the frame, and still fails.
+
+    The fraction test alone passed it: the watershed labels roughly half of the
+    noise, which is a share a real phantom could cover. What gives it away is
+    contrast -- the labelled half stands barely above the rest -- and the
+    verdict has to apply the same test slice selection does, or a run warns
+    that no slice holds a phantom and then records the one it segmented as good.
+    """
+    series = _air((32, 32, 8))
+    images = q.QAImages(center_slice=series, fluctuations=np.zeros_like(series), tr=2.0)
+    with pytest.warns(UserWarning, match="no recognizable phantom"):
+        geom = q.detect_phantom(images)
+    assert 0.0 < geom.fraction < 0.95  # the share alone would have passed
+    assert geom.contrast < 4.0
+    assert geom.plausible is False
+
+
+def test_detect_phantom_accepts_a_phantom_over_an_exactly_zero_background() -> None:
+    """A background-suppressed reconstruction has infinite contrast, not none."""
+    disk = _disk()
+    series = np.where(disk, 1000.0, 0.0)[:, :, None] * np.ones((1, 1, 8))
+    images = q.QAImages(center_slice=series, fluctuations=np.zeros_like(series), tr=2.0)
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        geom = q.detect_phantom(images)
+    assert geom.contrast == np.inf
+    assert geom.plausible is True
+
+
+def test_phantom_contrast_of_a_mask_that_partitions_nothing_is_zero() -> None:
+    image = np.full((8, 8), 5.0)
+    assert phantom_contrast(image, np.zeros((8, 8), dtype=bool)) == 0.0
+    assert phantom_contrast(image, np.ones((8, 8), dtype=bool)) == 0.0
+
+
+@pytest.mark.parametrize(
+    ("fraction", "contrast", "plausible"),
+    [
+        (0.2, 160.0, True),
+        (0.2, 4.0, True),  # the contrast floor is inclusive
+        (0.2, 1.7, False),  # air: a partition of noise
+        (0.0, 160.0, False),  # collapsed to nothing
+        (1.0, 160.0, False),  # collapsed to the whole frame
+    ],
+)
+def test_phantom_plausible_needs_both_share_and_contrast(
+    fraction: float, contrast: float, plausible: bool
+) -> None:
+    assert phantom_plausible(fraction, contrast) is plausible
 
 
 def test_phantom_area_scores_a_frame_of_air_as_no_phantom() -> None:

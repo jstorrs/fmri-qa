@@ -63,6 +63,14 @@ versioning when the first stable public interface is released.
 
 ### Fixed
 
+- The phantom verdict (`phantom_mask_ok`, the table's `loc` column, the
+  report's BAD PHANTOM MASK note) now applies the same test slice selection
+  does: the mask must cover a plausible share of the frame *and* stand at
+  least 4x above the background it was cut from. A scan holding no phantom
+  segments to roughly half the frame, so the share test alone passed it, and
+  a run could warn that no slice held a phantom and then save an artifact
+  recording the mask as good. `PhantomGeometry` carries the measured
+  `contrast`, and the warning names which test failed.
 - `fmri-qa --artifact` and `fmri-qa-report --pdf` refuse an output path that
   names one of the run's inputs — the scan, its sidecar, or an artifact — and
   exit 1 before reading anything. Both writers move a finished file over the

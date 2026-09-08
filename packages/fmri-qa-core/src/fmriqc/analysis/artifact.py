@@ -120,9 +120,11 @@ class Measurements:
     yields an average. Recording them here means a reader of a stored artifact
     can tell "the estimator declined" (a NaN with good localization) from "the
     analysis was measuring background" — a distinction the metric values alone
-    do not carry. `phantom_mask_ok` is the verdict on `phantom_fraction`, settled
-    here so that every consumer agrees on it: the bounds live with the
-    segmentation, which a reader in another distribution cannot import.
+    do not carry. `phantom_mask_ok` is the verdict on the segmentation — that
+    `phantom_fraction` is a share a phantom can cover *and* that the mask stands
+    clear of the background it was cut from, which a partition of noise never
+    does — settled here so that every consumer agrees on it: the bounds live
+    with the segmentation, which a reader in another distribution cannot import.
 
     Both verdicts are `None` — and `phantom_fraction` NaN — in an artifact
     migrated from a schema that predates the check (see `serialize`). `analyze`
@@ -168,7 +170,7 @@ class Measurements:
     fwhm_unit: LengthUnit  # "mm" when the voxel size is known, else "vox"
     # localization sanity (see the class docstring); None = not recorded
     phantom_fraction: float  # share of the frame the phantom mask covers, [0, 1]
-    phantom_mask_ok: bool | None  # that share is one a real phantom mask can take
+    phantom_mask_ok: bool | None  # a phantom: plausible share, real contrast
     roi_inside_phantom: bool | None  # the ROI lies wholly within the phantom
 
 

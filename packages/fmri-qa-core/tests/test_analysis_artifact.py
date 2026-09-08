@@ -85,6 +85,25 @@ def test_measurements_record_the_localization_diagnostics(artifact) -> None:
     assert m.roi_inside_phantom is True
 
 
+def test_a_noise_only_scan_keeps_its_failed_mask_verdict(tmp_path) -> None:
+    """Analyzing background must not save a passing localization.
+
+    Slice selection says no slice holds a phantom, but that warning is gone once
+    the run ends; the artifact's verdict is what a report and a trend database
+    read. The noise segments to a middling share of the frame, so the verdict
+    has to fail on contrast, as the slice test did, and stay failed through the
+    archive.
+    """
+    noise = np.abs(np.random.default_rng(0).normal(size=(32, 32, 1, 40)))
+    settings = q.AnalysisSettings(trim_sec=0, center="phantom", roi_size=3)
+    with pytest.warns(UserWarning, match="no slice holds a recognizable phantom"):
+        artifact = q.analyze(q.QAScan(data=noise, tr=2.0), settings)
+    loaded = q.load_artifact(q.save_artifact(artifact, tmp_path / "noise.qa.npz"))
+    m = loaded.measurements
+    assert 0.0 < m.phantom_fraction < 0.95  # the share alone would have passed
+    assert m.phantom_mask_ok is False
+
+
 def test_an_oversized_roi_is_recorded_as_outside_the_phantom(
     tmp_path, write_scan
 ) -> None:
