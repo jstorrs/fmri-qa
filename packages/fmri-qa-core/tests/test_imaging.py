@@ -18,6 +18,7 @@ from fmriqc.prep.imaging import (
     phantom_plausible,
     roi_indexes,
     segment_phantom,
+    select_slice,
     trim_initial,
 )
 
@@ -231,6 +232,7 @@ def test_extract_center_slice_prefers_the_phantom_over_a_larger_air_mask() -> No
 
     chosen = extract_center_slice(data, center="phantom")
 
+    assert select_slice(data, center="phantom") == 1
     assert np.array_equal(chosen, data[:, :, 1, :])
 
 

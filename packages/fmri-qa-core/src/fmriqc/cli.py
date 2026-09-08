@@ -20,7 +20,7 @@ from typing import TextIO
 import fmriqc as q
 from fmriqc.load.paths import nifti_stem, same_file, sidecar_path
 
-_JSON_SCHEMA_VERSION = 3
+_JSON_SCHEMA_VERSION = 4
 # Suffix for a saved artifact, so a batch's files are recognizable at a glance.
 _ARTIFACT_SUFFIX = ".qa.npz"
 
@@ -144,7 +144,7 @@ def _metric_record(artifact: q.QAArtifact) -> dict[str, object]:
     formatting), so downstream tools can consume `--json` directly. The table's
     one `loc` cell is three fields here: a consumer that files these away —
     the trend database this output exists for — needs the measured fraction and
-    both verdicts, not the abbreviation an operator reads.
+    contrast and both verdicts, not the abbreviation an operator reads.
 
     A directional FWHM the run could not name (no phase-encode axis) is `null`,
     with the combined `fwhm` and its `fwhm_unit` alongside so the numbers that
@@ -168,11 +168,13 @@ def _metric_record(artifact: q.QAArtifact) -> dict[str, object]:
         "tr": prov.tr,
         "n_frames": prov.n_frames,  # frames analyzed, after the warm-up trim
         "n_trimmed": prov.n_trimmed,  # warm-up volumes dropped; null = unrecorded
+        "slice_index": prov.slice_index,  # plane analyzed, 0-based; null = unrecorded
         "pe": m.pe_label,
         "pe_axis": m.pe_axis,
         # Localization first: these say whether the rest of the row means
         # anything (see `_localization_flag`).
         "phantom_fraction": m.phantom_fraction,
+        "phantom_contrast": m.phantom_contrast,  # null when infinite (zero background)
         "phantom_mask_ok": m.phantom_mask_ok,
         "roi_inside_phantom": m.roi_inside_phantom,
         "snr": m.snr,

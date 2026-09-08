@@ -302,7 +302,7 @@ names one of the run's own inputs (the scan, its sidecar, or, for
 replacing it would destroy the data the output describes.
 
 With `--json`, stdout carries a single versioned JSON document —
-`{"schema_version": 3, "config": {...}, "scans": [...]}`, one record per scan
+`{"schema_version": 4, "config": {...}, "scans": [...]}`, one record per scan
 with the table's columns as raw numbers. A metric that cannot be computed for a
 scan is JSON `null` (for example, a ghost ratio with no clear ghost region),
 never a non-standard `NaN` or `Infinity` token. Each record leads with
@@ -389,8 +389,9 @@ properties. The full multi-slice volume can be discarded once `QAImages` exists.
 invalidate these cached summaries. Artifact arrays likewise own read-only
 copies; make an explicit array copy when writable working data is needed.
 `run_qa` gathers the metrics into a `QAResult` — the pipeline's working output,
-with the images still attached — and `build_artifact` projects that into the
-`QAArtifact` everything downstream reads. The artifact has five sections
+with the images still attached and the settings it was asked for written on it
+— and `build_artifact` projects that into the `QAArtifact` everything
+downstream reads. The artifact has five sections
 (`settings`, `provenance`, `measurements`, `curves`, `images`) and is fully
 resolved: a consumer never recomputes a metric.
 

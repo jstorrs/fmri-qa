@@ -36,6 +36,59 @@ def test_analyze_records_the_requested_and_resolved_settings(artifact) -> None:
     assert settings.detrend_order is not None
 
 
+def test_build_artifact_publishes_the_settings_the_result_was_computed_with(
+    make_scan,
+) -> None:
+    """A result built from `run_qa` carries its own request; nothing is filled in.
+
+    `build_artifact` used to accept settings separately and default them when
+    omitted, so a result computed with no trim, phantom centering, and a forced
+    PE axis was published as a 5 s trim, image centering, and no override --
+    while `n_trimmed` in the same file said 0.
+    """
+    result = q.run_qa(make_scan(), trim_sec=0, center="phantom", roi_size=9, pe_axis=0)
+    artifact = q.build_artifact(result)
+    s = artifact.settings
+    assert (s.trim_sec, s.center, s.roi_size) == (0, "phantom", 9)
+    assert s.pe_axis_override == 0
+    assert s.detrend_order == result.images.detrend_order  # the resolved value
+    assert artifact.provenance.n_trimmed == 0
+    assert artifact.measurements.pe_label == "row"  # the override, not the sidecar
+
+
+def test_settings_keep_the_requested_roi_size_and_the_images_the_resolved_one(
+    make_scan,
+) -> None:
+    """The request and what it clamped to are two different facts."""
+    with pytest.warns(UserWarning, match="not fully inside the phantom"):
+        artifact = q.build_artifact(q.run_qa(make_scan(), roi_size=99))
+    assert artifact.settings.roi_size == 99
+    assert artifact.images.roi.size == 32  # clamped to the 32x32 image
+
+
+def test_provenance_records_the_plane_analyzed(make_scan) -> None:
+    """Which slice of the volume the numbers describe survives into the artifact.
+
+    Under `center="image"` it is the middle plane, under `center="phantom"`
+    the largest cross-section; the fixture's disk is the same in every slice,
+    so the two modes name the same plane and the count is what tells them apart
+    from a single-slice acquisition.
+    """
+    scan = make_scan(z=5)
+    by_image = q.build_artifact(q.run_qa(scan, roi_size=9)).provenance
+    by_phantom = q.build_artifact(q.run_qa(scan, roi_size=9, center="phantom"))
+    assert (by_image.slice_index, by_image.n_slices) == (2, 5)
+    assert by_phantom.provenance.n_slices == 5
+    assert 0 <= by_phantom.provenance.slice_index < 5
+
+
+def test_measurements_record_the_phantom_contrast(artifact) -> None:
+    """The second half of the mask verdict is stored beside the first."""
+    m = artifact.measurements
+    assert m.phantom_contrast >= 4.0  # the fixture's disk stands well clear of air
+    assert m.phantom_mask_ok is True
+
+
 def test_analyze_records_provenance_from_the_sidecar(artifact) -> None:
     prov = artifact.provenance
     assert prov.scan == "scan.nii.gz"
@@ -512,6 +565,29 @@ def test_load_migrating_a_schema_3_artifact_leaves_the_trim_unrecorded(
     assert loaded.measurements.phantom_mask_ok is True
 
 
+def test_load_migrating_a_schema_4_artifact_leaves_slice_and_contrast_unrecorded(
+    tmp_path, artifact
+) -> None:
+    """Schema 4 chose a slice and judged a mask without writing either down.
+
+    Neither is re-derived: the slice depends on a volume the artifact does not
+    carry, and a contrast recomputed from the stored images would be this
+    build's definition passed off as the writing build's measurement. The
+    verdict schema 4 did record is kept as it was made.
+    """
+    path = q.save_artifact(artifact, tmp_path / "qa.npz")
+    _rewrite_document(path, _as_schema(4))
+
+    with pytest.warns(UserWarning, match="schema 4, migrated"):
+        loaded = q.load_artifact(path)
+
+    assert loaded.provenance.slice_index is None
+    assert loaded.provenance.n_slices is None
+    assert np.isnan(loaded.measurements.phantom_contrast)
+    assert loaded.measurements.phantom_mask_ok is True
+    assert loaded.settings.roi_size == artifact.settings.roi_size
+
+
 # Fields each schema version introduced, per document section, so a current
 # document can be rewritten as the older one it grew out of (the reverse of
 # `serialize._MIGRATIONS`).
@@ -519,6 +595,10 @@ _ADDED_IN = {
     2: {"measurements": ("phantom_fraction", "roi_inside_phantom")},
     3: {"measurements": ("phantom_mask_ok",)},
     4: {"provenance": ("n_trimmed",)},
+    5: {
+        "provenance": ("slice_index", "n_slices"),
+        "measurements": ("phantom_contrast",),
+    },
 }
 
 

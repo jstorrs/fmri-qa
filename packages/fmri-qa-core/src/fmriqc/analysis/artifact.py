@@ -9,6 +9,8 @@ seam is small, self-describing, and serializable (see `serialize`).
 Five sections, in the order a reader consumes them:
 
 * `AnalysisSettings` -- the knobs the run was asked for, plus what they resolved to
+  (the pipeline's own record, `pipeline.AnalysisSettings`, since `run_qa` is what
+  writes it; the one thing here that is not defined here)
 * `Provenance`       -- where the data came from and what produced this artifact
 * `Measurements`     -- the settled scalars (the numbers a table or a threshold reads)
 * `Curves`           -- the 1-D traces a stability plot draws
@@ -21,41 +23,17 @@ Nothing here imports the metric, prep, or load layers: an artifact is inert data
 from dataclasses import dataclass
 
 from .._arrays import ArrayValue
-from ..types import (
-    FBIRN_ROI_SIZE,
-    BoolArray,
-    DetrendMethod,
-    FloatArray,
-    LengthUnit,
-    PeLabel,
-    RoiCenter,
-)
+from ..pipeline import AnalysisSettings
+from ..types import BoolArray, FloatArray, LengthUnit, PeLabel
 
 # Bumped whenever the on-disk layout changes incompatibly (see `serialize`).
 # 2: added the `phantom_fraction` / `roi_inside_phantom` localization diagnostics.
 # 3: added `phantom_mask_ok`, the verdict on `phantom_fraction`.
 # 4: added `Provenance.n_trimmed`, the warm-up volumes dropped before analysis.
-ARTIFACT_SCHEMA_VERSION = 4
-
-
-@dataclass(frozen=True, slots=True)
-class AnalysisSettings:
-    """The analysis knobs: what the run was asked for, and what that resolved to.
-
-    The first five fields are the request — exactly the parameters `analyze`
-    accepts, so re-running with these settings reproduces the artifact.
-    `detrend_order` is the *resolved* value (the polynomial degree or the spline
-    interior-knot count the detrender chose for this series length), recorded
-    because it is a run parameter a reader must be able to report but only the
-    pipeline knows.
-    """
-
-    trim_sec: float = 5.0
-    detrend: DetrendMethod = "poly"
-    center: RoiCenter = "image"
-    roi_size: int = FBIRN_ROI_SIZE
-    pe_axis_override: int | None = None
-    detrend_order: int | None = None
+# 5: added `Provenance.slice_index`/`n_slices` (the plane analyzed) and
+#    `Measurements.phantom_contrast` (the second half of the mask verdict);
+#    `AnalysisSettings.roi_size` is the side requested, no longer the clamped one.
+ARTIFACT_SCHEMA_VERSION = 5
 
 
 @dataclass(frozen=True, slots=True)
@@ -69,11 +47,15 @@ class Provenance:
     duration without the data, and `n_trimmed` is how many volumes that trim
     dropped: every frame index in the artifact (`Measurements.outlier_worst_frame`,
     `Curves.time`) counts from the trimmed series, and this is what maps one back
-    to an acquired volume number. `None` means *not recorded* — an artifact
-    migrated from a schema that predates the field, where the trim happened but
-    nothing wrote down how large it was. The rest is acquisition metadata copied
-    from the BIDS sidecar and NIfTI header; every field is optional because a
-    scan without a sidecar still analyzes.
+    to an acquired volume number. `slice_index` (0-based) and `n_slices` say
+    which plane of the volume the images and every metric describe — the
+    middle one under `center="image"`, the largest phantom cross-section under
+    `center="phantom"` — without which two artifacts of one series cannot be
+    told apart. `None` on any of these means *not recorded* — an artifact
+    migrated from a schema that predates the field, where the trim or the slice
+    choice happened but nothing wrote it down. The rest is acquisition metadata
+    copied from the BIDS sidecar and NIfTI header; every field is optional
+    because a scan without a sidecar still analyzes.
     """
 
     scan: str = ""
@@ -83,6 +65,8 @@ class Provenance:
     tr: float = 0.0
     n_frames: int = 0
     n_trimmed: int | None = None  # warm-up volumes dropped; None = not recorded
+    slice_index: int | None = None  # plane analyzed, 0-based; None = not recorded
+    n_slices: int | None = None  # planes in the volume; None = not recorded
     voxel_mm: tuple[float, float, float] | None = None
     matrix: tuple[int, int] | None = None
     te: float | None = None  # s
@@ -121,16 +105,18 @@ class Measurements:
     can tell "the estimator declined" (a NaN with good localization) from "the
     analysis was measuring background" — a distinction the metric values alone
     do not carry. `phantom_mask_ok` is the verdict on the segmentation — that
-    `phantom_fraction` is a share a phantom can cover *and* that the mask stands
-    clear of the background it was cut from, which a partition of noise never
-    does — settled here so that every consumer agrees on it: the bounds live
-    with the segmentation, which a reader in another distribution cannot import.
+    `phantom_fraction` is a share a phantom can cover *and* that
+    `phantom_contrast` (mean inside the mask over mean outside it; infinite
+    over an exactly-zero background) stands clear of noise — settled here so
+    that every consumer agrees on it: the bounds live with the segmentation,
+    which a reader in another distribution cannot import. The two numbers are
+    kept beside the verdict so a report can say *which* test a bad mask failed.
 
-    Both verdicts are `None` — and `phantom_fraction` NaN — in an artifact
-    migrated from a schema that predates the check (see `serialize`). `analyze`
-    never produces that; it means "not recorded", which is neither a pass nor a
-    failure, and a reader that treats it as either is drawing a conclusion the
-    data does not support.
+    Both verdicts are `None` — and the fraction and contrast NaN — in an
+    artifact migrated from a schema that predates them (see `serialize`).
+    `analyze` never produces that; it means "not recorded", which is neither a
+    pass nor a failure, and a reader that treats it as either is drawing a
+    conclusion the data does not support.
     """
 
     # fBIRN ROI stability
@@ -170,6 +156,7 @@ class Measurements:
     fwhm_unit: LengthUnit  # "mm" when the voxel size is known, else "vox"
     # localization sanity (see the class docstring); None = not recorded
     phantom_fraction: float  # share of the frame the phantom mask covers, [0, 1]
+    phantom_contrast: float  # mask interior over background; inf = zero background
     phantom_mask_ok: bool | None  # a phantom: plausible share, real contrast
     roi_inside_phantom: bool | None  # the ROI lies wholly within the phantom
 

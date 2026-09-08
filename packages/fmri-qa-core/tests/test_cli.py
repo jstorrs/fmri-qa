@@ -180,7 +180,7 @@ def test_json_emits_a_parseable_document(tmp_path, write_scan, capsys) -> None:
     captured = capsys.readouterr()
     assert rc == 0
     doc = json.loads(captured.out)  # stdout is pure JSON, nothing else
-    assert doc["schema_version"] == 3
+    assert doc["schema_version"] == 4
     assert doc["config"]["detrend"] == "poly"
     assert "version" in doc["config"]
     assert len(doc["scans"]) == 1
@@ -207,6 +207,8 @@ def test_json_record_says_what_series_the_numbers_describe(
     assert scan["tr"] == 2.0
     assert scan["n_frames"] == 38  # 40 volumes, 5 s of warm-up dropped at TR 2 s
     assert scan["n_trimmed"] == 2
+    assert scan["slice_index"] == 1  # the middle of the fixture's three planes
+    assert scan["phantom_contrast"] > 4.0  # beside the verdict it was reached from
     assert 0 <= scan["outlier_worst_frame"] < scan["n_frames"]
     assert scan["datetime"] is None  # the sidecar carries no acquisition time
 

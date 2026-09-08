@@ -8,6 +8,7 @@ labels and value formatting) lives in `content`. A format driver (see `formats`)
 decides how to lay these out.
 """
 
+import math
 from collections.abc import Iterable
 from importlib.metadata import PackageNotFoundError, version
 
@@ -60,6 +61,11 @@ def _acquisition_line(artifact: QAArtifact) -> str:
         parts.append(f"{thk:g}mm slice")
     if prov.matrix is not None:
         parts.append(f"{prov.matrix[0]}×{prov.matrix[1]} px")
+    if prov.slice_index is not None:
+        # The stored index, 0-based, so it names the same plane the artifact and
+        # the JSON record do; the count says how far into the stack it sits.
+        total = f"/{prov.n_slices}" if prov.n_slices is not None else ""
+        parts.append(f"slice index {prov.slice_index}{total}")
     parts.append(f"{prov.n_frames} frames")
     parts.append(f"PE {m.pe_label}")
     detrend = f"detrend {settings.detrend}"
@@ -93,7 +99,13 @@ def _localization_note(artifact: QAArtifact) -> str:
     m = artifact.measurements
     notes = []
     if m.phantom_mask_ok is False:
-        notes.append(f"BAD PHANTOM MASK ({100 * m.phantom_fraction:.0f}% of frame)")
+        # Both numbers the verdict was reached from, so the reader sees which
+        # failed: a collapse shows in the share, a segmentation of noise in the
+        # contrast. The contrast is absent from an artifact that predates it.
+        why = f"{100 * m.phantom_fraction:.0f}% of frame"
+        if not math.isnan(m.phantom_contrast):
+            why += f", {m.phantom_contrast:.3g}× contrast"
+        notes.append(f"BAD PHANTOM MASK ({why})")
     if m.roi_inside_phantom is False:
         notes.append("ROI NOT INSIDE PHANTOM")
     if not notes and None in (m.phantom_mask_ok, m.roi_inside_phantom):

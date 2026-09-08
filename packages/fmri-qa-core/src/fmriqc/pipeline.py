@@ -5,11 +5,12 @@
 motion/centroid, the FBIRN ROI metrics, ghost ratios, and smoothness — into one
 `QAResult`. The heavy lifting lives in the operation modules; this is the glue,
 so it is also the natural home for the aggregate `QAMetrics`/`QAResult` value
-objects that gather every metric's output.
+objects that gather every metric's output, and for `AnalysisSettings`, the
+record of what a run was asked for that `run_qa` writes into its result.
 """
 
 import warnings
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from .load.metadata import ScanMeta
 from .load.scan import QAScan
@@ -41,9 +42,35 @@ from .prep.geometry import (
     roi_fits,
 )
 from .prep.images import QAImages
-from .prep.imaging import extract_center_slice, trim_count, trim_initial
+from .prep.imaging import select_slice, trim_count, trim_initial
 from .types import FBIRN_ROI_SIZE, DetrendMethod, RoiCenter
 from .validation import validate_qa_run
+
+
+@dataclass(frozen=True, slots=True)
+class AnalysisSettings:
+    """The analysis knobs: what the run was asked for, and what that resolved to.
+
+    The first five fields are the request — exactly the parameters `run_qa` and
+    `analyze` accept, so re-running with these settings reproduces the result.
+    `roi_size` is the side *asked for*; the side actually analyzed (the same,
+    unless the image is smaller) is the ROI the result carries. `detrend_order`
+    is the one *resolved* value (the polynomial degree or the spline
+    interior-knot count the detrender chose for this series length), recorded
+    because it is a run parameter a reader must be able to report but only the
+    pipeline knows.
+
+    `run_qa` writes this record onto its `QAResult`, so an artifact built from
+    a result publishes the settings that result was computed with — never a
+    default filled in afterwards.
+    """
+
+    trim_sec: float = 5.0
+    detrend: DetrendMethod = "poly"
+    center: RoiCenter = "image"
+    roi_size: int = FBIRN_ROI_SIZE
+    pe_axis_override: int | None = None
+    detrend_order: int | None = None
 
 
 @dataclass(frozen=True)
@@ -73,14 +100,17 @@ class QAResult:
     """Full QA output: the intermediate objects plus the scalar metrics.
 
     Returned by `run_qa`. `metrics` holds the scalars; `images`/`geom`/`roi` are
-    retained so a report can render the images, curves, and time series; `meta`
-    carries the acquisition metadata (from the scan) for the report header.
+    retained so a report can render the images, curves, and time series;
+    `settings` is the request the run answered, with the detrend order it
+    resolved; `meta` carries the acquisition metadata (from the scan) for the
+    report header.
     """
 
     images: QAImages
     geom: PhantomGeometry
     roi: ROI
     metrics: QAMetrics
+    settings: AnalysisSettings
     meta: ScanMeta | None = None
 
 
@@ -98,7 +128,8 @@ def preprocess(
     the middle slice (Glover), "phantom" for the largest phantom cross-section.
     """
     data = trim_initial(scan.data, scan.tr, trim_sec)
-    center_slice = extract_center_slice(data, center)
+    z = select_slice(data, center)
+    center_slice = data[:, :, z, :]
     detrend_op, detrend_order = detrend_fn(center_slice, scan.tr, detrend)
     fluctuations = detrend_op(center_slice)
     return QAImages(
@@ -115,6 +146,10 @@ def preprocess(
         pe_axis=scan.pe_axis,
         detrend_method=detrend,
         detrend_order=detrend_order,
+        # Which plane this is, for the same reason as the trim: once the volume
+        # is dropped nothing else can say.
+        slice_index=z,
+        n_slices=int(data.shape[2]),
     )
 
 
@@ -139,6 +174,15 @@ def run_qa(
     `roi_size` is the fixed summary/Weisskoff ROI side (default 21, fBIRN).
     """
     validate_qa_run(scan, trim_sec=trim_sec, roi_size=roi_size, pe_axis=pe_axis)
+    # The request, written down before anything is resolved -- `pe_axis` in
+    # particular is rebound below to the axis the ghost masks used.
+    requested = AnalysisSettings(
+        trim_sec=trim_sec,
+        detrend=detrend,
+        center=center,
+        roi_size=roi_size,
+        pe_axis_override=pe_axis,
+    )
 
     # Saturation is checked on the full untrimmed series: clipping is worst in
     # the high-signal warm-up volumes that preprocessing drops. The count is
@@ -230,4 +274,11 @@ def run_qa(
         center_of_mass=com,
         smoothness=smoothness,
     )
-    return QAResult(images=images, geom=geom, roi=roi, metrics=metrics, meta=scan.meta)
+    return QAResult(
+        images=images,
+        geom=geom,
+        roi=roi,
+        metrics=metrics,
+        settings=replace(requested, detrend_order=images.detrend_order),
+        meta=scan.meta,
+    )

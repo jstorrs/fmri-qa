@@ -37,8 +37,8 @@ half accepts.
 
 | Section | What it holds |
 |---|---|
-| `AnalysisSettings` | the knobs the run was asked for, plus the resolved detrend order |
-| `Provenance` | scan name, source, timestamp, computing version, TR, the frame count and the warm-up volumes dropped before it, and the sidecar acquisition metadata |
+| `AnalysisSettings` | the knobs the run was asked for (written by `run_qa` onto its result, so the artifact cannot publish a default the run did not use), plus the resolved detrend order |
+| `Provenance` | scan name, source, timestamp, computing version, TR, the frame count and the warm-up volumes dropped before it, the plane of the volume analyzed, and the sidecar acquisition metadata |
 | `Measurements` | every reported scalar, flat — no metric result object survives |
 | `Curves` | the 1-D traces: ROI signal/trend/residual, outliers, spectrum, motion, COM, Weisskoff, PSF |
 | `ArtifactImages` | the four fBIRN images (signal, SFNR, fluctuation noise, static noise) plus phantom mask, convex hull, invalid edge, ROI box, ghost regions |

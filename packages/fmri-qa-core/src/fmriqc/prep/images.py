@@ -39,7 +39,9 @@ class QAImages(ArrayValue):
     `n_trimmed` is how many warm-up volumes `preprocess` dropped. Every frame
     index and time here counts from the *trimmed* series, so it is the only
     thing that maps one back to an acquired volume number, and the trim is
-    otherwise unrecoverable once `scan.data` is discarded.
+    otherwise unrecoverable once `scan.data` is discarded. `slice_index` and
+    `n_slices` say which plane of the volume this is, for the same reason: they
+    are `None` only for images that were not cut from a volume by `preprocess`.
     """
 
     center_slice: FloatArray  # (X, Y, T) trimmed center slice (raw signal)
@@ -50,6 +52,8 @@ class QAImages(ArrayValue):
     pe_axis: int | None = None
     detrend_method: DetrendMethod = "poly"
     detrend_order: int | None = None  # poly degree / spline interior-knot count
+    slice_index: int | None = None  # which plane of the volume this is (0-based)
+    n_slices: int | None = None  # how many planes the volume had
 
     @cached_property
     def trend(self) -> FloatArray:

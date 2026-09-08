@@ -12,7 +12,8 @@ from typing import Any, Literal, get_args, get_origin
 
 import numpy as np
 
-from .artifact import AnalysisSettings, Measurements, Provenance, QAArtifact, RoiBox
+from ..pipeline import AnalysisSettings
+from .artifact import Measurements, Provenance, QAArtifact, RoiBox
 
 
 def _matches(value: object, annotation: Any) -> bool:
@@ -90,6 +91,16 @@ def _validate_parameters(artifact: QAArtifact) -> None:
     _require(m.pe_axis in (None, 0, 1), "invalid measurements.pe_axis")
     _require(p.n_frames > 0, "invalid provenance.n_frames")
     _require(p.n_trimmed is None or p.n_trimmed >= 0, "invalid provenance.n_trimmed")
+    _require(p.n_slices is None or p.n_slices > 0, "invalid provenance.n_slices")
+    _require(
+        p.slice_index is None
+        or (p.slice_index >= 0 and (p.n_slices is None or p.slice_index < p.n_slices)),
+        "invalid provenance.slice_index",
+    )
+    _require(
+        math.isnan(m.phantom_contrast) or m.phantom_contrast >= 0,
+        "invalid measurements.phantom_contrast",
+    )
     _require(math.isfinite(p.tr) and p.tr > 0, "invalid provenance.tr")
     if p.voxel_mm is not None:
         _require(

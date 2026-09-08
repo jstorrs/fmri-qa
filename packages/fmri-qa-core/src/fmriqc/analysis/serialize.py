@@ -33,10 +33,10 @@ from zipfile import BadZipFile
 import numpy as np
 
 from ..exceptions import InvalidArtifactError
+from ..pipeline import AnalysisSettings
 from ..types import LENGTH_UNITS, PE_LABELS, BoolArray, FloatArray
 from .artifact import (
     ARTIFACT_SCHEMA_VERSION,
-    AnalysisSettings,
     ArtifactImages,
     Curves,
     GhostRegions,
@@ -190,6 +190,21 @@ def _v3_to_v4(document: dict[str, Any]) -> dict[str, Any]:
     return document
 
 
+def _v4_to_v5(document: dict[str, Any]) -> dict[str, Any]:
+    """Schema 4 recorded neither the plane analyzed nor the mask's contrast.
+
+    Both are measurements the writing build made and did not write down, so
+    they come back unknown: the slice cannot be re-derived (it depends on the
+    volume, which the artifact does not carry) and the contrast could only be
+    recomputed from the stored images with this build's definition. Schema 4
+    also stored `settings.roi_size` already clamped to the image; that value is
+    still a request that reproduces the run, so it is left as it is.
+    """
+    document["provenance"] |= {"slice_index": None, "n_slices": None}
+    document["measurements"]["phantom_contrast"] = float("nan")
+    return document
+
+
 # One step per version: `_MIGRATIONS[n]` takes a document at schema `n` and
 # returns it at `n + 1`. Applied in sequence, so a v1 file reaches the current
 # schema through every intermediate step and each migration only has to know
@@ -198,6 +213,7 @@ _MIGRATIONS: dict[int, Callable[[dict[str, Any]], dict[str, Any]]] = {
     1: _v1_to_v2,
     2: _v2_to_v3,
     3: _v3_to_v4,
+    4: _v4_to_v5,
 }
 
 

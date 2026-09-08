@@ -8,6 +8,13 @@ versioning when the first stable public interface is released.
 
 ### Added
 
+- `Provenance.slice_index` / `n_slices` record which plane of the volume the
+  artifact describes, and `Measurements.phantom_contrast` the mask's
+  interior-over-background ratio beside the verdict reached from it. Artifact
+  schema version 5; an older archive reads them back as unknown. The report's
+  acquisition line shows the slice, and its BAD PHANTOM MASK note names the
+  contrast so a reader can see which test the mask failed. `fmri-qa --json`
+  records carry `slice_index` and `phantom_contrast`; JSON schema version 4.
 - **The whole Nyquist-ghost family from one set of masks.** `estimate_ghost`
   builds the region-matched signal/ghost masks once per in-plane axis and
   returns a `GhostResult` carrying the masks and every ratio measured on them;
@@ -164,6 +171,14 @@ versioning when the first stable public interface is released.
 
 ### Changed
 
+- `run_qa` writes the settings it was called with onto `QAResult.settings`
+  (with the detrend order it resolved), and `build_artifact(result)` publishes
+  those; its `settings` parameter is gone. It used to fill in defaults when
+  none were passed, so a result computed with no trim, phantom centering, or
+  a forced PE axis could be published as the default run. `AnalysisSettings`
+  lives in `fmriqc.pipeline` (still exported from `fmriqc`), and its
+  `roi_size` is now the side *requested*; the side analyzed is
+  `images.roi.size`, as it always was.
 - The phase-encode axis is estimated from the Nyquist ghost in one place, the
   pipeline. `QAScan.from_nifti` no longer estimates it (its `estimate_pe`
   parameter is gone) and only reports what the sidecar and header say, so the

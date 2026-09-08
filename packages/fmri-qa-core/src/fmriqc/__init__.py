@@ -119,6 +119,7 @@ from .prep.imaging import (
     phantom_plausible,
     roi_indexes,
     segment_phantom,
+    select_slice,
     trim_count,
     trim_initial,
 )
@@ -212,6 +213,7 @@ __all__ = [
     "run_qa",
     "save_artifact",
     "segment_phantom",
+    "select_slice",
     "separate_noise",
     "sfnr",
     "snr",

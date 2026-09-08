@@ -21,11 +21,10 @@ from ..load.metadata import ScanMeta
 from ..load.pe_axis import PE_ROWCOL
 from ..load.scan import QAScan
 from ..metrics.smoothness import SmoothnessResult
-from ..pipeline import QAResult, run_qa
+from ..pipeline import AnalysisSettings, QAResult, run_qa
 from ..prep.geometry import ROI, roi_fits
 from ..types import BoolArray, FloatArray, LengthUnit, PeLabel
 from .artifact import (
-    AnalysisSettings,
     ArtifactImages,
     Curves,
     GhostRegions,
@@ -72,37 +71,22 @@ def analyze(
         center=settings.center,
         roi_size=settings.roi_size,
     )
-    return build_artifact(result, settings, name=name, source=source)
+    return build_artifact(result, name=name, source=source)
 
 
-def build_artifact(
-    result: QAResult,
-    settings: AnalysisSettings | None = None,
-    *,
-    name: str = "",
-    source: str = "",
-) -> QAArtifact:
+def build_artifact(result: QAResult, *, name: str = "", source: str = "") -> QAArtifact:
     """Project a computed `QAResult` into a `QAArtifact`.
 
     Separate from `analyze` so an existing result — one already in hand from
     `run_qa`, with its images still live — can be published without recomputing.
+    The settings published are the ones the result carries, which `run_qa`
+    wrote from its own arguments: there is nothing to pass and nothing to
+    disagree with it.
     """
-    settings = settings or AnalysisSettings()
-    images = result.images
-    # The detrend order is only known after preprocessing, so the recorded
-    # settings are the requested knobs with that one resolved value filled in.
-    resolved = AnalysisSettings(
-        trim_sec=settings.trim_sec,
-        detrend=images.detrend_method,
-        center=settings.center,
-        roi_size=result.roi.size,
-        pe_axis_override=settings.pe_axis_override,
-        detrend_order=images.detrend_order,
-    )
     return QAArtifact(
-        settings=resolved,
+        settings=result.settings,
         provenance=_provenance(result, name=name, source=source),
-        measurements=_measurements(result, resolved),
+        measurements=_measurements(result, result.settings),
         curves=_curves(result),
         images=_images(result),
     )
@@ -119,6 +103,8 @@ def _provenance(result: QAResult, *, name: str, source: str) -> Provenance:
         tr=float(result.images.tr),
         n_frames=int(result.images.center_slice.shape[-1]),
         n_trimmed=int(result.images.n_trimmed),
+        slice_index=result.images.slice_index,
+        n_slices=result.images.n_slices,
     )
     if meta is None:
         return base
@@ -133,6 +119,8 @@ def _provenance(result: QAResult, *, name: str, source: str) -> Provenance:
         tr=base.tr,
         n_frames=base.n_frames,
         n_trimmed=base.n_trimmed,
+        slice_index=base.slice_index,
+        n_slices=base.n_slices,
         voxel_mm=meta.voxel_mm,
         matrix=meta.matrix,
         te=meta.te,
@@ -212,6 +200,7 @@ def _measurements(result: QAResult, settings: AnalysisSettings) -> Measurements:
         fwhm_ro=sm.fwhm_ro,
         fwhm_unit="mm" if sm.voxel_mm is not None else "vox",
         phantom_fraction=result.geom.fraction,
+        phantom_contrast=result.geom.contrast,
         phantom_mask_ok=result.geom.plausible,
         roi_inside_phantom=roi_fits(result.geom.phantom_mask, result.roi.index),
     )

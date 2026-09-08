@@ -113,8 +113,8 @@ def phantom_area(image: FloatArray) -> int:
     return int(mask.sum())
 
 
-def extract_center_slice(data: FloatArray, center: RoiCenter = "image") -> FloatArray:
-    """Select the QA slice from a volume.
+def select_slice(data: FloatArray, center: RoiCenter = "image") -> int:
+    """The index of the QA slice in an (X, Y, Z, T) volume.
 
     "image": the geometric middle slice (Glover/fBIRN convention).
     "phantom": the slice with the largest phantom cross-section, measured by
@@ -127,23 +127,30 @@ def extract_center_slice(data: FloatArray, center: RoiCenter = "image") -> Float
         InvalidChoiceError: If `center` is not one of `ROI_CENTER_MODES`.
     """
     if center == "image":
-        z = data.shape[2] // 2
-    elif center == "phantom":
-        mip = data.max(axis=-1)
-        areas = [phantom_area(s) for s in np.moveaxis(mip, -1, 0)]
-        if any(areas):
-            z = int(np.argmax(areas))
-        else:
-            z = data.shape[2] // 2
-            warnings.warn(
-                "no slice holds a recognizable phantom (every segmentation was "
-                "degenerate or indistinguishable from background); using the "
-                f"middle slice {z} as center='image' would.",
-                stacklevel=2,
-            )
-    else:
+        return int(data.shape[2] // 2)
+    if center != "phantom":
         raise InvalidChoiceError("center", center, ROI_CENTER_MODES)
-    return data[:, :, z, :]
+    mip = data.max(axis=-1)
+    areas = [phantom_area(s) for s in np.moveaxis(mip, -1, 0)]
+    if any(areas):
+        return int(np.argmax(areas))
+    z = int(data.shape[2] // 2)
+    warnings.warn(
+        "no slice holds a recognizable phantom (every segmentation was "
+        "degenerate or indistinguishable from background); using the "
+        f"middle slice {z} as center='image' would.",
+        stacklevel=3,  # report at the caller of `extract_center_slice`/`preprocess`
+    )
+    return z
+
+
+def extract_center_slice(data: FloatArray, center: RoiCenter = "image") -> FloatArray:
+    """The QA slice of a volume, as (X, Y, T): `data` at `select_slice`.
+
+    Raises:
+        InvalidChoiceError: If `center` is not one of `ROI_CENTER_MODES`.
+    """
+    return data[:, :, select_slice(data, center), :]
 
 
 def find_phantom_center(phantom_mask: BoolArray) -> IntArray:

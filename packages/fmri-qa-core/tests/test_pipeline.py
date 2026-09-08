@@ -110,6 +110,24 @@ def test_preprocess_discards_the_full_volume(make_scan: MakeScan) -> None:
     assert images.n_trimmed + images.center_slice.shape[-1] == 40
 
 
+def test_run_qa_records_the_request_it_answered(make_scan: MakeScan) -> None:
+    """The result carries its own settings, so a later projection cannot guess.
+
+    `pe_axis_override` is the argument as given, not the axis the run resolved:
+    the two differ exactly when the override was left to the metadata.
+    """
+    result = q.run_qa(make_scan(), trim_sec=0, center="phantom", roi_size=9)
+    s = result.settings
+    assert (s.trim_sec, s.center, s.roi_size) == (0, "phantom", 9)
+    assert s.pe_axis_override is None and result.metrics.pe_axis == 1
+    assert s.detrend_order == result.images.detrend_order
+
+
+def test_preprocess_records_which_plane_it_cut(make_scan: MakeScan) -> None:
+    images = q.preprocess(make_scan(z=5))
+    assert (images.slice_index, images.n_slices) == (2, 5)  # the middle of five
+
+
 def test_weisskoff_rdc_matches_the_metric(make_scan: MakeScan) -> None:
     result = q.run_qa(make_scan(), roi_size=9)
     assert result.metrics.rdc == result.metrics.weisskoff.rdc

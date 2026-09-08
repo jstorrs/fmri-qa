@@ -20,6 +20,7 @@ def test_acquisition_line_reports_the_geometry_and_settings(artifact) -> None:
     assert "flip 77°" in line
     assert "3×3mm" in line and "32×32 px" in line
     assert f"{artifact.provenance.n_frames} frames" in line
+    assert "slice index 1/3" in line  # the plane analyzed, as the artifact stores it
     assert "PE col" in line
     assert "detrend poly (deg" in line  # the resolved order is shown
 
@@ -102,7 +103,19 @@ def test_a_collapsed_phantom_mask_is_called_out(artifact) -> None:
     it is what the reader is shown.
     """
     collapsed = _clipped(artifact, phantom_fraction=1.0, phantom_mask_ok=False)
-    assert "BAD PHANTOM MASK (100% of frame)" in summary._acquisition_line(collapsed)
+    assert "BAD PHANTOM MASK (100% of frame" in summary._acquisition_line(collapsed)
+
+
+def test_a_bad_mask_note_shows_the_contrast_when_the_artifact_has_it(artifact) -> None:
+    """Which test the mask failed is visible: a collapse in the share, noise in
+    the contrast. An artifact migrated from before the contrast was recorded
+    shows the share alone rather than a NaN."""
+    noisy = _clipped(
+        artifact, phantom_fraction=0.54, phantom_contrast=1.7, phantom_mask_ok=False
+    )
+    assert "(54% of frame, 1.7× contrast)" in summary._acquisition_line(noisy)
+    migrated = _clipped(noisy, phantom_contrast=float("nan"))
+    assert "(54% of frame)" in summary._acquisition_line(migrated)
 
 
 def test_acquisition_line_flags_an_analysis_of_background() -> None:
@@ -118,6 +131,7 @@ def test_acquisition_line_flags_an_analysis_of_background() -> None:
         warnings.simplefilter("ignore")  # the analysis warns; the page is under test
         artifact = q.analyze(q.QAScan(data=noise, tr=2.0), settings)
     assert "BAD PHANTOM MASK" in summary._acquisition_line(artifact)
+    assert "× contrast" in summary._acquisition_line(artifact)
 
 
 def test_an_off_phantom_roi_is_called_out(artifact) -> None:
