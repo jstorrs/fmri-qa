@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import TextIO
 
 import fmriqc as q
+from fmriqc.load.paths import nifti_stem, same_file, sidecar_path
 
 _JSON_SCHEMA_VERSION = 3
 # Suffix for a saved artifact, so a batch's files are recognizable at a glance.
@@ -49,15 +50,6 @@ def _nonnegative_int(value: str) -> int:
     return parsed
 
 
-def _scan_stem(path: str) -> str:
-    """The scan's base name with any NIfTI extension removed."""
-    name = Path(path).name
-    for ext in (".nii.gz", ".nii"):
-        if name.endswith(ext):
-            return name[: -len(ext)]
-    return Path(name).stem
-
-
 def _artifact_path(base: str, path: str, batch: bool) -> Path:
     """Where one scan's artifact is written under `--artifact BASE`.
 
@@ -66,7 +58,23 @@ def _artifact_path(base: str, path: str, batch: bool) -> Path:
     """
     if not batch:
         return Path(base)
-    return Path(base) / f"{_scan_stem(path)}{_ARTIFACT_SUFFIX}"
+    return Path(base) / f"{nifti_stem(path)}{_ARTIFACT_SUFFIX}"
+
+
+def _overwritten_inputs(base: str, paths: Sequence[str]) -> list[tuple[Path, str]]:
+    """`(destination, input)` pairs where an artifact would replace an input.
+
+    An artifact is written by moving a finished file over its destination, and
+    the scans (and their sidecars) are read before any is written — so an
+    output that names an input succeeds, and leaves an archive where the data
+    was. Every destination is checked against every input file, not only its
+    own scan's: in a batch, one scan's artifact can land on another's file.
+    """
+    destinations = [_artifact_path(base, path, batch=len(paths) > 1) for path in paths]
+    inputs = [str(f) for path in paths for f in (path, sidecar_path(path))]
+    return [
+        (dest, src) for dest in destinations for src in inputs if same_file(dest, src)
+    ]
 
 
 def _artifact_collisions(base: str, paths: Sequence[str]) -> dict[Path, list[str]]:
@@ -263,7 +271,17 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     batch = len(args.paths) > 1
     # Refuse before analyzing anything: a collision would silently discard a
-    # completed analysis, so it is a usage error, not a per-scan failure.
+    # completed analysis or the data it came from, so it is a usage error, not a
+    # per-scan failure.
+    if args.artifact:
+        overwritten = _overwritten_inputs(args.artifact, args.paths)
+        if overwritten:
+            for dest, src in overwritten:
+                print(
+                    f"ERROR: --artifact {dest} would overwrite the input {src}",
+                    file=sys.stderr,
+                )
+            return 1
     if args.artifact and batch:
         collisions = _artifact_collisions(args.artifact, args.paths)
         if collisions:

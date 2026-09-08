@@ -63,6 +63,12 @@ versioning when the first stable public interface is released.
 
 ### Fixed
 
+- `fmri-qa --artifact` and `fmri-qa-report --pdf` refuse an output path that
+  names one of the run's inputs — the scan, its sidecar, or an artifact — and
+  exit 1 before reading anything. Both writers move a finished file over the
+  destination, so an output aliasing an input used to succeed and leave an
+  archive where the NIfTI was, or a PDF where the archive was. Relative
+  spellings, symlinks, and hard links of the same file are all caught.
 - Preserve NIfTI proxy scaling for clipping detection and nulled-edge masks.
   Convert meter/micron voxel sizes to millimeters; unknown spatial units retain
   the millimeter assumption with an explicit warning.

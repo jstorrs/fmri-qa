@@ -26,6 +26,23 @@ def _version() -> str:
         return "unknown"
 
 
+def _same_file(a: Path, b: Path) -> bool:
+    """Whether two paths name one file — through relative forms and links alike.
+
+    The PDF is written by moving a finished file over its destination, and the
+    artifacts are read first, so `--pdf` naming one of them would succeed and
+    leave a PDF where the archive was. Existing files are compared by identity;
+    a path that does not exist yet can only be compared by where it would go.
+    (The calculation half's command line keeps the same rule for its own
+    outputs; the report deliberately imports nothing from that side but the
+    artifact.)
+    """
+    try:
+        return a.samefile(b)
+    except OSError:
+        return a.resolve() == b.resolve()
+
+
 def _title(artifact: QAArtifact, path: str) -> str:
     """The section title for one artifact: its recorded scan name, else the file."""
     return artifact.provenance.scan or Path(path).name
@@ -65,6 +82,17 @@ def main(argv: Sequence[str] | None = None) -> int:
         help="Append a provenance page (per-scan metadata + version).",
     )
     args = parser.parse_args(argv)
+
+    # Refuse before reading anything: an output that names an input is a usage
+    # error, and one that must be caught while the input is still intact.
+    overwritten = [a for a in args.artifacts if _same_file(Path(args.pdf), Path(a))]
+    if overwritten:
+        for path in overwritten:
+            print(
+                f"ERROR: --pdf {args.pdf} would overwrite the input {path}",
+                file=sys.stderr,
+            )
+        return 1
 
     failed = False
     items = []

@@ -9,6 +9,7 @@ a PDF is `fmri-qa-report`'s job and is tested there.
 
 import json
 from dataclasses import replace
+from pathlib import Path
 
 import pytest
 
@@ -82,6 +83,62 @@ def test_main_refuses_a_batch_whose_artifacts_would_collide(
     err = capsys.readouterr().err
     assert "would both be saved as" in err
     assert not out.exists()  # refused before analyzing, so nothing was written
+
+
+def test_main_refuses_an_artifact_that_would_overwrite_the_scan(
+    tmp_path, write_scan, capsys, monkeypatch
+) -> None:
+    """`--artifact` naming the input must fail before anything is read or written.
+
+    The scan is loaded first and the archive is moved over its destination last,
+    so without the guard the run succeeds and leaves an `.npz` where the NIfTI
+    was. The relative spelling is the one a shell produces, and it must not
+    slip past a comparison of the literal strings.
+    """
+    scan = Path(write_scan(tmp_path))
+    before = scan.read_bytes()
+    monkeypatch.chdir(tmp_path)
+
+    rc = cli.main([str(scan), "--roi-size", "9", "--artifact", f"./{scan.name}"])
+
+    assert rc == 1
+    captured = capsys.readouterr()
+    assert "would overwrite the input" in captured.err
+    assert "scan" not in captured.out  # refused before the table was printed
+    assert scan.read_bytes() == before
+
+
+def test_main_refuses_an_artifact_that_would_overwrite_the_sidecar(
+    tmp_path, write_scan, capsys
+) -> None:
+    """The sidecar is read too, so it is an input the output must not replace."""
+    scan = write_scan(tmp_path)
+    sidecar = tmp_path / "scan.json"
+    before = sidecar.read_bytes()
+    rc = cli.main([scan, "--roi-size", "9", "--artifact", str(sidecar)])
+    assert rc == 1
+    assert "would overwrite the input" in capsys.readouterr().err
+    assert sidecar.read_bytes() == before
+
+
+def test_main_refuses_a_batch_destination_that_is_another_input(
+    tmp_path, write_scan, capsys
+) -> None:
+    """Every destination is checked against every input, not only its own scan.
+
+    A batch names `a.nii.gz`'s artifact `BASE/a.qa.npz`; if that file is itself
+    one of the inputs, analyzing `a.nii.gz` would replace it. The whole run is
+    refused, so the other input is never analyzed either.
+    """
+    scan = write_scan(tmp_path, name="a")
+    other = tmp_path / "a.qa.npz"  # named like the batch's output for `a`
+    other.write_bytes(b"not a scan, but an input all the same")
+
+    rc = cli.main([scan, str(other), "--roi-size", "9", "--artifact", str(tmp_path)])
+
+    assert rc == 1
+    assert "would overwrite the input" in capsys.readouterr().err
+    assert other.read_bytes() == b"not a scan, but an input all the same"
 
 
 def test_main_allows_a_batch_of_distinctly_named_scans(

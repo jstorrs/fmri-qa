@@ -1,5 +1,7 @@
 """The `fmri-qa-report` command line: artifacts on disk in, a PDF out."""
 
+from pathlib import Path
+
 import pytest
 
 import fmriqc as q
@@ -43,6 +45,24 @@ def test_main_skips_an_unreadable_artifact_but_renders_the_rest(
     assert rc == 1  # a failure makes the run exit non-zero
     assert "ERROR" in captured.err and "Traceback" not in captured.err
     assert pdf.read_bytes().startswith(b"%PDF")  # the readable one still rendered
+
+
+def test_main_refuses_a_pdf_that_would_overwrite_an_artifact(
+    tmp_path, saved, capsys, monkeypatch
+) -> None:
+    """`--pdf` naming an input must fail before the artifact is read or replaced.
+
+    The artifacts are loaded first and the PDF is moved over its destination
+    last, so without the guard the run succeeds and leaves a PDF where the
+    archive was. The relative spelling is the one a shell produces.
+    """
+    archive = Path(saved)
+    before = archive.read_bytes()
+    monkeypatch.chdir(tmp_path)
+    rc = cli.main([saved, "--pdf", f"./{archive.name}"])
+    assert rc == 1
+    assert "would overwrite the input" in capsys.readouterr().err
+    assert archive.read_bytes() == before
 
 
 def test_main_fails_when_no_artifact_can_be_read(tmp_path, capsys) -> None:

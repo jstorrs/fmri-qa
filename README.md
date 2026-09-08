@@ -296,6 +296,11 @@ schema did not carry comes back as "not recorded" rather than as a value nothing
 measured. Only an artifact from a *newer* build than the one reading it is
 refused, since its layout cannot be known.
 
+An existing file at the destination is replaced, atomically. An output that
+names one of the run's own inputs (the scan, its sidecar, or, for
+`fmri-qa-report --pdf`, an artifact) is refused before anything is read, since
+replacing it would destroy the data the output describes.
+
 With `--json`, stdout carries a single versioned JSON document —
 `{"schema_version": 3, "config": {...}, "scans": [...]}`, one record per scan
 with the table's columns as raw numbers. A metric that cannot be computed for a

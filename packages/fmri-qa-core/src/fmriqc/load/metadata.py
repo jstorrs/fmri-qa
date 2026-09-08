@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Any
 
 from ..exceptions import InvalidScanError
+from .paths import sidecar_path
 from .pe_axis import PE_ROWCOL
 
 
@@ -62,13 +63,7 @@ def _load_sidecar(path: str | Path) -> dict[str, Any]:
     Raises:
         InvalidScanError: If the sidecar is not parseable as a JSON object.
     """
-    p = Path(path)
-    name = p.name
-    for ext in (".nii.gz", ".nii"):
-        if name.endswith(ext):
-            name = name[: -len(ext)]
-            break
-    sidecar = p.with_name(name + ".json")
+    sidecar = sidecar_path(path)
     if not sidecar.is_file():
         warnings.warn(
             f"{path}: no BIDS JSON sidecar found beside the NIfTI; the "
