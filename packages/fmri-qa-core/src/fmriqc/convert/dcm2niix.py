@@ -67,10 +67,15 @@ def find_dcm2niix(explicit: str | Path | None = None) -> Path:
     """The dcm2niix to run: the one named, else the bundled one, else PATH.
 
     The `dcm2niix` PyPI package ships the compiled binary and exposes its path,
-    which is why `fmri-qa-core[dicom]` is enough to make an import work with no
-    system install. A site that already has its own dcm2niix — a newer build, or
-    one with vendor patches — keeps it: name it with `--dcm2niix`, or leave the
-    extra uninstalled and let PATH answer.
+    and it is a dependency of `fmri-qa-core`, so the bundled branch is the one
+    that answers on a working install and an import needs nothing from the
+    system. A site that already has its own dcm2niix — a newer build, or one
+    with vendor patches — names it with `--dcm2niix`; the bundled binary is
+    preferred over PATH, so having one installed is not enough to select it.
+
+    The PATH branch and the error below are what is left for an install that
+    cannot import the bundled binary at all: a platform with no wheel that
+    fell back to the sdist and failed to build it, or a pruned environment.
 
     Raises:
         ConversionError: If no dcm2niix can be found, or the named one is not
@@ -92,8 +97,9 @@ def find_dcm2niix(explicit: str | Path | None = None) -> Path:
     if found is None:
         raise ConversionError(
             "dcm2niix",
-            "not found — install the bundled binary with `pip install "
-            "'fmri-qa-core[dicom]'`, put dcm2niix on PATH, or name one "
+            "not found — the bundled dcm2niix ships as a dependency of "
+            "fmri-qa-core, so this environment is missing one it should have: "
+            "reinstall fmri-qa-core, put dcm2niix on PATH, or name one "
             "with --dcm2niix",
         )
     return Path(found)

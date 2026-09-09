@@ -752,26 +752,21 @@ name = "fmri-qa-core"
 version = "0.1.0"
 source = { editable = "packages/fmri-qa-core" }
 dependencies = [
+    { name = "dcm2niix" },
     { name = "nibabel" },
     { name = "numpy" },
     { name = "scikit-image" },
     { name = "scipy" },
 ]
 
-[package.optional-dependencies]
-dicom = [
-    { name = "dcm2niix" },
-]
-
 [package.metadata]
 requires-dist = [
-    { name = "dcm2niix", marker = "extra == 'dicom'", specifier = ">=1.0.20250506" },
+    { name = "dcm2niix", specifier = ">=1.0.20250506" },
     { name = "nibabel", specifier = ">=5.3.2" },
     { name = "numpy", specifier = ">=2.3.4" },
     { name = "scikit-image", specifier = ">=0.25.2" },
     { name = "scipy", specifier = ">=1.16.2" },
 ]
-provides-extras = ["dicom"]
 
 [[package]]
 name = "fmri-qa-report"

@@ -263,15 +263,14 @@ pip install fmri-qa-core      # metrics and artifacts only
 pip install fmri-qa-report    # + plots and PDF packets
 ```
 
-`fmri-qa-import` needs a dcm2niix. The `dicom` extra carries a bundled one, so
-nothing else has to be installed:
+`fmri-qa-import` needs a dcm2niix, and `fmri-qa-core` depends on one: the
+install above carries a bundled binary, so the importer runs with nothing else
+set up. To run a different build — a newer dcm2niix, or one with vendor patches
+— name it, because the bundled binary is preferred over whatever is on `PATH`:
 
 ```bash
-pip install 'fmri-qa-core[dicom]'
+fmri-qa-import STUDY_DIR --dcm2niix /opt/vendor/bin/dcm2niix
 ```
-
-Skip the extra if the machine already has dcm2niix on `PATH` — the command finds
-it there, and `--dcm2niix` names a third.
 
 Published work using the package should cite the software metadata in
 [`CITATION.cff`](CITATION.cff). User-facing changes are recorded in
@@ -384,7 +383,7 @@ Options:
 | `--anonymize` | `pii` | `pii` strips the patient and keeps the dates, `all` strips the dates too, `none` keeps everything |
 | `--no-compress` | — | write `.nii` instead of `.nii.gz` |
 | `--depth` | `5` | sub-directory levels of the source to search |
-| `--dcm2niix` | bundled, else `PATH` | which dcm2niix to run |
+| `--dcm2niix` | bundled, else `PATH` | which dcm2niix to run (name your own build; bundled wins over `PATH`) |
 | `--dcm2niix-arg` | — | extra argument, repeatable, passed last so it wins |
 | `--force` | — | overwrite files already in the output directory |
 | `--log` | — | print everything dcm2niix said |

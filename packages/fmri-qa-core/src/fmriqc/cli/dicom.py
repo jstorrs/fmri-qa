@@ -103,8 +103,8 @@ def _parser() -> argparse.ArgumentParser:
         "--dcm2niix",
         metavar="PATH",
         default=None,
-        help="dcm2niix to run (default: the bundled binary from the 'dicom' "
-        "extra, else the first on PATH).",
+        help="dcm2niix to run (default: the bundled binary, else the first on "
+        "PATH). Name your own build here; the bundled one wins over PATH.",
     )
     parser.add_argument(
         "--dcm2niix-arg",

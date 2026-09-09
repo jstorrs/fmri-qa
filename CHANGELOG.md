@@ -8,6 +8,20 @@ versioning when the first stable public interface is released.
 
 ### Changed
 
+- **dcm2niix is now a dependency of `fmri-qa-core`, not the `dicom` extra.**
+  The extra spared a ~3 MB compiled binary to people who only analyze NIfTI,
+  and cost more than it saved: `fmri-qa-import` was the one command that could
+  be installed and still not run, and the way it broke was ordinary — a `uv
+  sync` without `--all-extras` removes an extra it had installed earlier, so a
+  working importer became `dcm2niix: not found` with nothing in the command
+  history to explain it. Installing `fmri-qa-core` now brings a converter.
+  `pip install 'fmri-qa-core[dicom]'` still installs (pip warns that the extra
+  is unknown and proceeds); drop the `[dicom]` when convenient. A site running
+  its own dcm2niix names it with `fmri-qa-import --dcm2niix` — note that the
+  bundled binary is preferred over `PATH`, so an install that previously picked
+  up a vendor build from `PATH` will now use the bundled one unless it is
+  named. The "not found" message no longer points at the removed extra.
+
 - **The row/col direction and the phase-encode axis can no longer disagree.**
   `ScanMeta.pe_dir` (published as `Provenance.pe_dir`) took the sidecar's
   `InPlanePhaseEncodingDirectionDICOM` wording when it was present, while the

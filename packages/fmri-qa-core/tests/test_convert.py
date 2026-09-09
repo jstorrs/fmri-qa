@@ -233,9 +233,11 @@ def test_the_version_is_read_out_of_dcm2niix_s_own_banner() -> None:
 
 
 def test_the_bundled_binary_is_what_an_unconfigured_import_runs() -> None:
-    """The `dicom` extra exists so that `fmri-qa-import DIR` needs nothing else."""
-    pytest.importorskip("dcm2niix", reason="the 'dicom' extra is not installed")
+    """dcm2niix is a dependency, so `fmri-qa-import DIR` needs nothing else.
 
+    Not skipped when the binary is absent: that it is always there is the point
+    of depending on it, so an environment without one is a failure to report.
+    """
     assert find_dcm2niix().name.startswith("dcm2niix")
 
 
@@ -248,7 +250,7 @@ def test_having_no_dcm2niix_at_all_says_how_to_get_one(monkeypatch) -> None:
         find_dcm2niix()
 
     message = str(excinfo.value)
-    assert "fmri-qa-core[dicom]" in message
+    assert "reinstall fmri-qa-core" in message
     assert "PATH" in message
     assert "--dcm2niix" in message
 
@@ -403,17 +405,6 @@ def test_a_source_that_is_not_a_directory_is_refused_before_anything_runs(
 # --------------------------------------------------------------------------
 
 
-def _real_dcm2niix() -> Path | None:
-    """The bundled or installed dcm2niix, or None if this build has neither."""
-    try:
-        return find_dcm2niix()
-    except q.ConversionError:
-        return None
-
-
-@pytest.mark.skipif(
-    _real_dcm2niix() is None, reason="dcm2niix not installed (the 'dicom' extra)"
-)
 def test_a_real_study_converts_to_the_integer_nifti_the_metrics_need(
     tmp_path,
 ) -> None:
@@ -432,7 +423,7 @@ def test_a_real_study_converts_to_the_integer_nifti_the_metrics_need(
     nibabel = pytest.importorskip("nibabel")
     out = tmp_path / "nifti"
 
-    result = import_dicom(FIXTURE_STUDY, out, binary=_real_dcm2niix())
+    result = import_dicom(FIXTURE_STUDY, out, binary=find_dcm2niix())
 
     assert [entry.path.name for entry in result.series] == [
         "20260909_143012_s002_QA_EPI_ISO.nii.gz",
@@ -445,9 +436,6 @@ def test_a_real_study_converts_to_the_integer_nifti_the_metrics_need(
         assert q.QAScan.from_nifti(entry.path).stored_integer
 
 
-@pytest.mark.skipif(
-    _real_dcm2niix() is None, reason="dcm2niix not installed (the 'dicom' extra)"
-)
 def test_the_real_study_is_named_by_its_own_series_times_not_the_study_s(
     tmp_path,
 ) -> None:
@@ -459,9 +447,9 @@ def test_the_real_study_is_named_by_its_own_series_times_not_the_study_s(
     `convert.naming` exists, so it is checked against the real converter.
     """
     templated = import_dicom(
-        FIXTURE_STUDY, tmp_path / "raw", binary=_real_dcm2niix(), names="dcm2niix"
+        FIXTURE_STUDY, tmp_path / "raw", binary=find_dcm2niix(), names="dcm2niix"
     )
-    named = import_dicom(FIXTURE_STUDY, tmp_path / "qa", binary=_real_dcm2niix())
+    named = import_dicom(FIXTURE_STUDY, tmp_path / "qa", binary=find_dcm2niix())
 
     study_times = {name.split("_")[0] for name in _stems(templated)}
     series_times = {stem.split("_")[1] for stem in _stems(named)}
