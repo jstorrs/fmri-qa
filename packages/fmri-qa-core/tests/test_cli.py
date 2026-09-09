@@ -474,3 +474,19 @@ def test_hilo_main_rejects_invalid_numeric_options(args: list[str], capsys) -> N
         cli.hilo_main([*args, "high.nii.gz", "low.nii.gz"])
     assert info.value.code == 2
     assert "error:" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize(
+    "entry", [cli.main, cli.hilo_main, cli.import_main], ids=["qa", "hilo", "import"]
+)
+def test_help_renders(entry, capsys) -> None:
+    """`-h` on every command.
+
+    argparse %-formats each help string only when it renders one, so a stray
+    format code in a default sits there until someone asks for help; the rest
+    of the suite never asks.
+    """
+    with pytest.raises(SystemExit) as info:
+        entry(["-h"])
+    assert info.value.code == 0
+    assert "usage:" in capsys.readouterr().out

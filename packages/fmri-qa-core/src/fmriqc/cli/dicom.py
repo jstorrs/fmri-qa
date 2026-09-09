@@ -69,11 +69,14 @@ def _parser() -> argparse.ArgumentParser:
         "chronologically and pads the series number. 'dcm2niix': whatever "
         "--filename produced. Default: qa.",
     )
+    # argparse %-formats every help string, and the template is all %-codes,
+    # so it has to reach the help already escaped.
+    shown_template = DEFAULT_TEMPLATE.replace("%", "%%")
     parser.add_argument(
         "--filename",
         metavar="TEMPLATE",
         default=DEFAULT_TEMPLATE,
-        help=f"dcm2niix -f template (default: {DEFAULT_TEMPLATE}). With "
+        help=f"dcm2niix -f template (default: {shown_template}). With "
         "--names qa this is only the fallback for a series whose sidecar "
         "cannot name it; with --names dcm2niix it is the name.",
     )

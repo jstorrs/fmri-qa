@@ -125,3 +125,11 @@ def test_pdf_is_required(capsys) -> None:
         cli.main(["scan.qa.npz"])
     assert info.value.code == 2
     assert "error:" in capsys.readouterr().err
+
+
+def test_help_renders(capsys) -> None:
+    """`-h`, which argparse %-formats; see the core suite's twin."""
+    with pytest.raises(SystemExit) as info:
+        cli.main(["-h"])
+    assert info.value.code == 0
+    assert "usage:" in capsys.readouterr().out
