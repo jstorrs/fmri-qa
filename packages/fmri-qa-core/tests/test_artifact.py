@@ -192,6 +192,25 @@ def test_pe_label_follows_an_axis_override(tmp_path, write_scan) -> None:
     assert artifact.measurements.pe_label == "row"
 
 
+def test_the_direction_and_the_label_are_the_same_axis(tmp_path, write_scan) -> None:
+    """`provenance.pe_dir` and `measurements.pe_label` cannot name two axes.
+
+    They answer different questions -- what the metadata resolved, and what the
+    run measured on -- so an override may legitimately separate them, and that
+    is the *only* thing that may. Both are now derived from an axis rather than
+    one of them from a sidecar word, so a reader comparing the acquisition block
+    against the measurements block sees one story.
+    """
+    scan = q.QAScan.from_nifti(write_scan(tmp_path))
+
+    agreed = q.analyze(scan, q.AnalysisSettings(roi_size=9))
+    assert agreed.provenance.pe_dir == agreed.measurements.pe_label == "col"
+
+    overridden = q.analyze(scan, q.AnalysisSettings(roi_size=9, pe_axis_override=0))
+    assert overridden.provenance.pe_dir == "col"  # what the sidecar resolved
+    assert overridden.measurements.pe_label == "row"  # what the run measured
+
+
 def test_curves_share_the_frame_count(artifact) -> None:
     curves = artifact.curves
     n = artifact.provenance.n_frames

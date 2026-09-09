@@ -124,26 +124,23 @@ def _provenance(result: QAResult, *, name: str, source: str) -> Provenance:
     )
 
 
-# The two direction words, narrowed to the set the artifact publishes. The
-# sidecar's DICOM direction is whatever the converter wrote -- a plain `str`,
-# and a sidecar may carry any string at all -- so looking the word up here is
-# what makes a label taken from it true of its type. The *axis* needs no such
-# guard: `PE_ROWCOL` is keyed by `PeAxis` and is total, so an axis indexes
-# straight into a `PeLabel`.
-_SIDECAR_PE_LABELS: dict[str, PeLabel] = {"row": "row", "col": "col"}
-
-
-def _pe_label(result: QAResult, settings: AnalysisSettings) -> PeLabel:
+def _pe_label(result: QAResult) -> PeLabel:
     """The phase-encode direction to display: "row", "col", or "?".
 
-    The sidecar's DICOM direction is authoritative, but only when the run took
-    the axis from metadata; an explicit `--pe-axis` override wins, so the label
-    always names the axis the ghost masks actually used. A direction that is
-    neither word — a sidecar can carry any string — is "?", the same answer as
-    no axis at all.
+    One rule, and the axis is the whole of it: the label names the axis the
+    ghost masks were built on, whatever settled it -- the sidecar, the header,
+    an explicit `--pe-axis`, or the Nyquist-ghost estimate. "?" is the answer
+    when nothing did.
+
+    This used to consult `meta.pe_dir` first, back when that carried the
+    sidecar's own DICOM row/col wording and could therefore name a *different*
+    axis than the run used; the special case, and the `--pe-axis` exception
+    carved out of it, existed to manage that disagreement. `load.metadata.
+    _pe_direction` now derives `pe_dir` from the resolved axis, so the two
+    branches had become the same answer and only one is left. `PE_ROWCOL` is
+    keyed by `PeAxis` and total, so an axis indexes straight into a `PeLabel`
+    with no lookup default standing in for a case that cannot arise.
     """
-    if settings.pe_axis_override is None and result.meta and result.meta.pe_dir:
-        return _SIDECAR_PE_LABELS.get(result.meta.pe_dir, "?")
     axis = result.metrics.pe_axis
     return "?" if axis is None else PE_ROWCOL[axis]
 
@@ -167,7 +164,7 @@ def _measurements(result: QAResult, settings: AnalysisSettings) -> Measurements:
         ro_ghost_pct=ghost.ro_ghost_pct if ghost is not None else undefined,
         acr_ghost_pct=ghost.acr_ghost_pct if ghost is not None else undefined,
         pe_axis=m.pe_axis,
-        pe_label=_pe_label(result, settings),
+        pe_label=_pe_label(result),
         outlier_max_pct=100.0 * m.outliers.max_fraction,
         outlier_worst_frame=m.outliers.worst_volume,
         tc_outlier=m.spikes.tc_outlier,

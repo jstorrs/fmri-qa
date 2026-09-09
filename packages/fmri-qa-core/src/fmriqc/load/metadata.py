@@ -4,8 +4,8 @@ dcm2niix writes a `.json` sidecar beside every NIfTI it converts; these helpers
 read the acquisition metadata out of it. The sidecar is optional — a NIfTI
 exported straight off the scanner never had one — so its absence leaves fields
 empty rather than failing. Phase-encode *axis* resolution lives in `pe_axis`
-and TR resolution in `repetition_time`; the DICOM row/col *direction* string
-for the report header is derived here (`_pe_direction`) from the same sidecar.
+and TR resolution in `repetition_time`; the row/col *direction* word the report
+header shows is derived here (`_pe_direction`) from that resolved axis.
 """
 
 import json
@@ -30,7 +30,8 @@ class ScanMeta:
     BIDS JSON sidecar written alongside the NIfTI (dcm2niix) and is `None` when
     no sidecar is found. `voxel_mm` is (row, col, slice-spacing) from the header
     zooms; `slice_thickness` is the excited slab from the sidecar (the zoom is
-    spacing, which includes any gap). `pe_dir` is the DICOM row/col direction.
+    spacing, which includes any gap). `pe_dir` is the row/col word for the
+    phase-encode axis this scan resolved, and is None when it resolved none.
     """
 
     voxel_mm: tuple[float, float, float]
@@ -147,19 +148,23 @@ def _optional_text(sidecar: dict[str, Any], key: str) -> str | None:
     return None
 
 
-def _pe_direction(pe_axis: int | None, sidecar: dict[str, Any]) -> str | None:
-    """DICOM row/col phase-encode direction, preferring the sidecar's own wording.
+def _pe_direction(pe_axis: int | None) -> str | None:
+    """The row/col word for the axis the loader resolved, or None if it did not.
 
-    `InPlanePhaseEncodingDirectionDICOM` (ROW/COL) is checked first because it
-    already speaks in row/col terms. Otherwise `pe_axis` is used directly rather
-    than re-deriving a row/col label from `PhaseEncodingDirection` here: by the
-    time this runs, `QAScan.from_nifti` has already resolved `pe_axis` from that
-    same sidecar field via `_pe_axis_from_sidecar` (`pe_axis.py`'s single source
-    of truth for the BIDS i/j -> array-axis mapping), so re-consuming it would
-    only recompute the answer `pe_axis` already carries.
+    Derived from `pe_axis` alone, and deliberately *not* from the sidecar's own
+    `InPlanePhaseEncodingDirectionDICOM` wording. Reading that word here made
+    this a second, independent answer to a question `pe_axis` had already
+    settled, and the two could disagree: `_pe_axis_from_sidecar` prefers
+    dcm2niix's BIDS fields, so a sidecar whose DICOM tag contradicted them
+    produced an axis from one source and a direction from the other. The report
+    then showed a direction that was not the axis the ghost masks used.
+
+    A word is not worth more for having come from the file. It is worth more for
+    naming the axis the analysis ran on, which is what this now does by
+    construction -- and None when there is no such axis, so a caller that has to
+    say something falls back to what the run actually used rather than to a
+    label for a different axis (see `analysis.build._pe_label`).
     """
-    if dicom := sidecar.get("InPlanePhaseEncodingDirectionDICOM"):
-        return str(dicom).lower()
     axis = in_plane(pe_axis)
     return None if axis is None else PE_ROWCOL[axis]
 
@@ -194,7 +199,7 @@ def _scan_meta(
         te=_optional_number(sidecar, "EchoTime"),
         flip_angle=_optional_number(sidecar, "FlipAngle"),
         slice_thickness=_optional_number(sidecar, "SliceThickness"),
-        pe_dir=_pe_direction(pe_axis, sidecar),
+        pe_dir=_pe_direction(pe_axis),
         coil=_optional_text(sidecar, "ReceiveCoilName"),
         manufacturer=_optional_text(sidecar, "Manufacturer"),
         model=_optional_text(sidecar, "ManufacturersModelName"),

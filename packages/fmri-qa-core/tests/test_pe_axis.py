@@ -137,10 +137,9 @@ def test_meta_pe_dir_from_sidecar_phase_encoding_direction(tmp_path) -> None:
     """`pe_dir` for a `PhaseEncodingDirection` sidecar, with no header fallback.
 
     `PhaseEncodingDirection` carries no row/col wording of its own, so `pe_dir`
-    must come from the resolved `pe_axis` (`_pe_axis_from_sidecar` already
-    turned "j" into axis 1) rather than a second, direct re-derivation from the
-    sidecar in `_pe_direction` -- pinning the row/col label this sidecar shape
-    produces now that that re-derivation is gone.
+    can only come from the resolved `pe_axis` -- `_pe_axis_from_sidecar` already
+    turned "j" into axis 1, and `_pe_direction` names that axis rather than
+    re-deriving anything from the sidecar.
     """
     nifti = _write_scan(tmp_path, {"PhaseEncodingDirection": "j"}, phase=None)
     scan = q.QAScan.from_nifti(nifti)
@@ -179,3 +178,45 @@ def test_from_nifti_leaves_an_unnamed_axis_to_the_pipeline(tmp_path) -> None:
     with pytest.warns(UserWarning, match="estimate it from the Nyquist ghost"):
         scan = q.QAScan.from_nifti(nifti)
     assert scan.pe_axis is None
+
+
+def test_pe_dir_names_the_axis_that_was_resolved_not_the_dicom_word(
+    tmp_path,
+) -> None:
+    """A contradicting DICOM tag no longer overrides the direction word.
+
+    `_pe_axis_from_sidecar` prefers dcm2niix's `PhaseEncodingAxis` (axis 0) over
+    `InPlanePhaseEncodingDirectionDICOM` (col, axis 1). `_pe_direction` used to
+    read that tag's wording directly, so the scan came back naming axis 0 and
+    calling it "col" -- and the report showed a direction that was not the axis
+    the ghost masks were built on. The word follows the axis now.
+    """
+    nifti = _write_scan(
+        tmp_path,
+        {"PhaseEncodingAxis": "i", "InPlanePhaseEncodingDirectionDICOM": "COL"},
+    )
+    scan = q.QAScan.from_nifti(nifti)
+
+    assert scan.pe_axis == 0
+    assert scan.meta is not None
+    assert scan.meta.pe_dir == "row"
+
+
+def test_a_through_plane_axis_leaves_the_direction_unnamed(tmp_path) -> None:
+    """`k` is a well-formed answer to a question this pipeline does not ask.
+
+    The single-slice pipeline cannot measure on the through-plane axis, so
+    `run_qa` estimates one from the ghost instead -- and a row/col word taken
+    from the sidecar's DICOM tag here would name neither the sidecar's axis nor
+    the estimated one. None lets the label fall through to the axis actually
+    used (see `analysis.build._pe_label`).
+    """
+    nifti = _write_scan(
+        tmp_path,
+        {"PhaseEncodingDirection": "k", "InPlanePhaseEncodingDirectionDICOM": "ROW"},
+    )
+    scan = q.QAScan.from_nifti(nifti)
+
+    assert scan.pe_axis == 2
+    assert scan.meta is not None
+    assert scan.meta.pe_dir is None

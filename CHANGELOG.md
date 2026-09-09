@@ -8,6 +8,21 @@ versioning when the first stable public interface is released.
 
 ### Changed
 
+- **The row/col direction and the phase-encode axis can no longer disagree.**
+  `ScanMeta.pe_dir` (published as `Provenance.pe_dir`) took the sidecar's
+  `InPlanePhaseEncodingDirectionDICOM` wording when it was present, while the
+  *axis* came from whichever source ranked highest — so a sidecar whose DICOM
+  tag contradicted its BIDS fields produced an artifact naming one axis and
+  labelling it as the other, and the report showed a direction the ghost masks
+  were not built on. `pe_dir` is now the word for the axis the loader resolved,
+  and is `None` when it resolved none (including a through-plane `k`, where the
+  run estimates an axis from the ghost instead). `Measurements.pe_label`
+  follows the same rule and names the axis the run measured on, whatever
+  settled it; an explicit `--pe-axis` is still the one thing that may separate
+  the two, since they answer different questions. No schema change: no field is
+  added, removed or retyped, and an existing artifact keeps the value its build
+  measured. Unaffected unless a sidecar contradicted itself.
+
 - **The phase-encode axis now reads dcm2niix's `PhaseEncodingAxis`**, between
   `PhaseEncodingDirection` and the raw `InPlanePhaseEncodingDirectionDICOM` tag.
   It is what dcm2niix writes when it resolved the axis but could not determine
