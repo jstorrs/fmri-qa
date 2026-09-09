@@ -434,7 +434,9 @@ the batch continues; the process exits non-zero if any file failed.
 `--artifact PATH` writes the complete analysis result — settings, provenance,
 every measurement and curve, and the summary images — as a compressed `.npz`.
 With a single scan `PATH` is the output file; with several it is a directory
-taking one `<scan>.qa.npz` per scan:
+taking one `<scan>.qa.npz` per scan. A `PATH` that is already a directory is
+filed into either way, so `mkdir results` and `--artifact results` does what it
+looks like:
 
 ```bash
 uv run fmri-qa data/*_fMRI_*.nii.gz --artifact artifacts/

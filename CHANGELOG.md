@@ -8,6 +8,18 @@ versioning when the first stable public interface is released.
 
 ### Changed
 
+- **`--artifact` files into a directory that already exists**, instead of
+  failing after the analysis. With one scan `PATH` was taken literally, so the
+  natural `mkdir results` followed by `--artifact results` ran the whole
+  analysis and then failed moving the finished file onto the directory --
+  `[WinError 5] Access is denied` on Windows, `IsADirectoryError` elsewhere,
+  neither naming the actual mistake, and the metrics table printed just above
+  it made the run look like it had worked. An existing directory now takes
+  `<scan>.qa.npz` the same way a batch does. A `PATH` that is not an existing
+  directory is still the output file name, so nothing that worked changes: a
+  file and a directory cannot share a name, and the old behavior in this case
+  was an error, never a written artifact.
+
 - **dcm2niix is now a dependency of `fmri-qa-core`, not the `dicom` extra.**
   The extra spared a ~3 MB compiled binary to people who only analyze NIfTI,
   and cost more than it saved: `fmri-qa-import` was the one command that could

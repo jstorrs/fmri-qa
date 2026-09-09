@@ -99,9 +99,10 @@ def _parser() -> argparse.ArgumentParser:
         metavar="PATH",
         default=None,
         help="Save the full analysis artifact (settings, provenance, curves, "
-        "images) for later reporting. With one scan PATH is the output file; "
-        f"with several it is a directory taking one <scan>{ARTIFACT_SUFFIX} "
-        "per scan. Render one with `fmri-qa-report`.",
+        "images) for later reporting. With one scan PATH is the output file, "
+        "unless it is a directory that already exists; with several, or into "
+        f"an existing directory, it takes one <scan>{ARTIFACT_SUFFIX} per "
+        "scan. Render one with `fmri-qa-report`.",
     )
     return parser
 

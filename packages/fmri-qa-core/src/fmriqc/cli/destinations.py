@@ -26,12 +26,22 @@ ARTIFACT_SUFFIX = ".qa.npz"
 def artifact_path(base: str, path: str, batch: bool) -> Path:
     """Where one scan's artifact is written under `--artifact BASE`.
 
-    A single-scan run writes exactly `BASE`. A batch cannot share one file, so
-    `BASE` is a directory and each scan gets `<scan stem>.qa.npz` inside it.
+    A batch cannot share one file, so `BASE` is a directory and each scan gets
+    `<scan stem>.qa.npz` inside it. A single-scan run writes exactly `BASE` --
+    unless `BASE` is a directory that already exists, which is filed into the
+    same way a batch would be.
+
+    That last rule is what `cp` does, and it is here because the alternative is
+    unrecoverable in a way a user cannot read: `mkdir results` then `--artifact
+    results` is the obvious way to ask for this, and taking `BASE` literally
+    made the run analyze the scan and then fail moving the finished file onto a
+    directory -- `[WinError 5] Access is denied` on Windows, `IsADirectoryError`
+    elsewhere, neither of which names the actual mistake. A file and a directory
+    cannot share a name, so preferring the directory is never ambiguous.
     """
-    if not batch:
-        return Path(base)
-    return Path(base) / f"{nifti_stem(path)}{ARTIFACT_SUFFIX}"
+    if batch or Path(base).is_dir():
+        return Path(base) / f"{nifti_stem(path)}{ARTIFACT_SUFFIX}"
+    return Path(base)
 
 
 def overwritten_inputs(base: str, paths: Sequence[str]) -> list[tuple[Path, str]]:

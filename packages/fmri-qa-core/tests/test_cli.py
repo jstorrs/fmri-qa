@@ -51,6 +51,35 @@ def test_main_saves_a_loadable_artifact(tmp_path, write_scan, capsys) -> None:
     assert artifact.measurements.snr > 0
 
 
+def test_main_files_one_scan_into_an_existing_artifact_directory(
+    tmp_path, write_scan, capsys
+) -> None:
+    """`mkdir results` then `--artifact results` files the scan, not fails.
+
+    Taking the base literally made the run finish the analysis and then fail
+    renaming the finished file onto the directory, which reports as a bare
+    permission error on Windows and names nothing the user did wrong.
+    """
+    out = tmp_path / "results"
+    out.mkdir()
+    rc = cli.main([write_scan(tmp_path), "--roi-size", "9", "--artifact", str(out)])
+    assert rc == 0
+    written = out / "scan.qa.npz"
+    assert f"# wrote {written}" in capsys.readouterr().out
+    assert q.load_artifact(written).provenance.scan == "scan.nii.gz"
+
+
+def test_main_still_writes_one_scan_to_a_plain_path(
+    tmp_path, write_scan, capsys
+) -> None:
+    """A base that is not an existing directory is still the file name itself."""
+    out = tmp_path / "results"  # deliberately not created
+    rc = cli.main([write_scan(tmp_path), "--roi-size", "9", "--artifact", str(out)])
+    assert rc == 0
+    assert out.is_file()
+    assert q.load_artifact(out).provenance.scan == "scan.nii.gz"
+
+
 def test_main_saves_one_artifact_per_scan_in_a_batch(
     tmp_path, write_scan, capsys
 ) -> None:
