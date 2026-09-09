@@ -22,7 +22,7 @@ SIGMA_TO_FWHM = float(np.sqrt(8.0 * np.log(2.0)))
 SMOOTHNESS_MAX_LAG = 10
 
 
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True, eq=False, slots=True)
 class SmoothnessResult(ArrayValue):
     """Directional spatial smoothness of the noise field (AFNI 3dFWHMx + PSF).
 

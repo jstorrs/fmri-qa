@@ -28,7 +28,7 @@ from .imaging import (
 )
 
 
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True, eq=False, slots=True)
 class PhantomGeometry(ArrayValue):
     """Phantom location, computed by `detect_phantom` from `QAImages`."""
 
@@ -62,7 +62,7 @@ class PhantomGeometry(ArrayValue):
         return phantom_plausible(self.fraction, self.contrast)
 
 
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True, eq=False, slots=True)
 class ROI(ArrayValue):
     """A resolved square ROI: center (row, col, array order) and side length.
 

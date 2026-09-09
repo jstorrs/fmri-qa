@@ -75,7 +75,7 @@ class AnalysisSettings:
     detrend_order: int | None = None
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class QAMetrics:
     """Settled scalar QA metrics for one scan."""
 
@@ -110,7 +110,7 @@ class QAMetrics:
         return None if self.ghost is None else self.ghost.pe_axis
 
 
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True, eq=False, slots=True)
 class QAResult:
     """Full QA output: the intermediate objects plus the scalar metrics.
 

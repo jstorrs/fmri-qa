@@ -22,7 +22,7 @@ from .pe_axis import _pe_axis_from_header, _pe_axis_from_sidecar
 from .repetition_time import _repetition_time
 
 
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True, eq=False, slots=True)
 class QAScan:
     """A raw QA acquisition plus the header metadata the pipeline needs.
 

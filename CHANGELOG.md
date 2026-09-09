@@ -194,6 +194,16 @@ versioning when the first stable public interface is released.
 
 ### Changed
 
+- Every frozen value object in `fmriqc` now declares `slots=True`, as the
+  artifact-side ones already did — an attribute a typo invents is rejected
+  rather than silently created. `QAImages` is the one exception and now says so
+  at its decorator: its summary images are `cached_property`, which needs a real
+  instance `__dict__` to cache into.
+- `analysis.build._provenance` no longer re-lists the nine identifying
+  `Provenance` fields to add the sidecar block to them; `dataclasses.replace`
+  carries them. Every sidecar field is still spelled out, since the artifact's
+  acquisition block is a published contract.
+
 - **The detrender is a value object, not an anonymous `(callable, int)` pair.**
   `prep.detrend.Detrender` carries the `method` and the `order` it resolved to
   and *is* the operator: `Detrender.for_series(center_slice, tr, method)`

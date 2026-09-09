@@ -17,7 +17,7 @@ from ..prep.imaging import roi_indexes
 from ..types import FloatArray, IntArray
 
 
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True, eq=False, slots=True)
 class WeisskoffResult(ArrayValue):
     """Weisskoff/RDC analysis over a range of ROI sizes.
 

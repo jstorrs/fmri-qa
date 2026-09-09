@@ -10,7 +10,7 @@ from dataclasses import dataclass, replace
 import numpy as np
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class HiLoResult:
     """Thermal vs. instability noise separation from a high/low flip-angle pair.
 

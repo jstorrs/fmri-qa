@@ -20,6 +20,9 @@ from .imaging import (
 )
 
 
+# The one value object here without `slots=True`: the summary images below are
+# `cached_property`, which needs a real instance `__dict__` to cache into, and
+# `pipeline._prime_phantom_mask_cache` writes one entry of that cache directly.
 @dataclass(frozen=True, eq=False)
 class QAImages(ArrayValue):
     """The center slice and its detrended fluctuations, plus derived FBIRN images.

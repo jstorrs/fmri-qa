@@ -20,7 +20,7 @@ from .paths import sidecar_path
 from .pe_axis import PE_ROWCOL, in_plane
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ScanMeta:
     """Human-readable acquisition metadata for the report header.
 

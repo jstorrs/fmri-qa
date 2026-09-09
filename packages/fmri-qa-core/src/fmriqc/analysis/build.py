@@ -11,6 +11,7 @@ re-derive analysis quantities from raw arrays, and none of them needs the
 `analyze` is the one-call front door: series in, artifact out.
 """
 
+from dataclasses import replace
 from datetime import UTC, datetime
 
 import numpy as np
@@ -99,19 +100,13 @@ def _provenance(result: QAResult, *, name: str, source: str) -> Provenance:
     )
     if meta is None:
         return base
-    # `dataclasses.replace` would be shorter but hides which sidecar fields are
-    # carried; the artifact's acquisition block is a published contract, so spell
-    # it out and let a new sidecar field be a deliberate addition here.
-    return Provenance(
-        scan=base.scan,
-        source=base.source,
-        created=base.created,
-        core_version=base.core_version,
-        tr=base.tr,
-        n_frames=base.n_frames,
-        n_trimmed=base.n_trimmed,
-        slice_index=base.slice_index,
-        n_slices=base.n_slices,
+    # Every sidecar field is spelled out, because the artifact's acquisition
+    # block is a published contract and a new field should be a deliberate
+    # addition here -- but the nine identifying fields above are not repeated to
+    # say so. `replace` carries them, which is the one reading of this code that
+    # cannot drift from `base`: re-listing them was nine chances to drop one.
+    return replace(
+        base,
         voxel_mm=meta.voxel_mm,
         matrix=meta.matrix,
         te=meta.te,

@@ -96,7 +96,7 @@ def _top_ratio(
     return float(brightest.mean() / mean_image[signal_mask].mean())
 
 
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True, eq=False, slots=True)
 class GhostResult(ArrayValue):
     """The whole Nyquist-ghost family, measured on one pair of axes at once.
 

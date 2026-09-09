@@ -17,7 +17,7 @@ from ..prep.scale import UNKNOWN_VOXEL_SIZE, VoxelSize
 from ..types import BoolArray, FloatArray
 
 
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True, eq=False, slots=True)
 class CenterOfMassResult(ArrayValue):
     """Per-volume intensity-weighted center of mass of the phantom (bxh volmeasures).
 

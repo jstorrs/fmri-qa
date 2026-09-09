@@ -24,7 +24,7 @@ MAD_SCALE = 1.4826
 OUTLIER_QTHR = 0.001
 
 
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True, eq=False, slots=True)
 class OutlierResult(ArrayValue):
     """Per-TR outlier-voxel fraction (AFNI 3dToutcount) over the phantom mask.
 
@@ -54,7 +54,7 @@ class OutlierResult(ArrayValue):
         return int(np.argmax(self.fraction))
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class SpikeResult:
     """MAD-normalized temporal / spectral spike scores (cran-fmriqa).
 
