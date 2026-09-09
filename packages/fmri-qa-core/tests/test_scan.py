@@ -31,8 +31,14 @@ def _write_scan(
     time_unit: str | None = None,
     phase: int | None = 1,
 ) -> Path:
-    """Write a minimal 4-D NIfTI; write a sidecar only when one is given."""
-    data = np.ones((8, 8, 2, 6), dtype=np.float32)
+    """Write a minimal 4-D NIfTI; write a sidecar only when one is given.
+
+    Integer-stored, like the shared `write_scan` fixture and like a properly
+    converted acquisition: these tests are about TR and sidecar parsing, and a
+    float image would add the unrelated "storage cannot support the saturation
+    check" warning to every one of them.
+    """
+    data = np.ones((8, 8, 2, 6), dtype=np.uint16)
     img = nib.Nifti1Image(data, affine=np.eye(4))
     img.header.set_zooms((3.0, 3.0, 3.0, pixdim_t))
     img.header.set_xyzt_units(xyz="mm")
@@ -282,3 +288,34 @@ def test_unknown_spatial_units_warn_and_assume_mm(tmp_path) -> None:
     ):
         scan = q.QAScan.from_nifti(target)
     assert scan.meta.voxel_mm == (3, 3, 3)
+
+
+def test_float_storage_warns_and_is_recorded_on_the_scan(tmp_path) -> None:
+    """A float NIfTI loads, but says the ADC samples are gone.
+
+    The saturation check asks whether the acquisition piled up on a hardware
+    rail, which only integer samples can answer. A converter that rescaled into
+    floats has thrown that away, and the warning names the fix -- reconvert
+    preserving the datatype -- because the alternative is a receiver-gain
+    problem that never gets reported.
+    """
+    data = np.ones((8, 8, 2, 6), dtype=np.float32)
+    img = nib.Nifti1Image(data, affine=np.eye(4))
+    img.header.set_zooms((3.0, 3.0, 3.0, 2.0))
+    img.header.set_xyzt_units(xyz="mm", t="sec")
+    img.header.set_dim_info(freq=None, phase=1, slice=None)
+    nifti = tmp_path / "scan.nii.gz"
+    nib.save(img, str(nifti))
+    (tmp_path / "scan.json").write_text(json.dumps({"PhaseEncodingDirection": "j"}))
+
+    with pytest.warns(UserWarning, match="not an integer type"):
+        scan = q.QAScan.from_nifti(nifti)
+    assert scan.stored_integer is False
+
+
+def test_integer_storage_is_recorded_without_a_warning(tmp_path) -> None:
+    nifti = _write_scan(tmp_path, {"PhaseEncodingDirection": "j"})
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        scan = q.QAScan.from_nifti(nifti)
+    assert scan.stored_integer is True

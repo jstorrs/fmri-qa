@@ -172,12 +172,15 @@ def _measurements(result: QAResult, settings: AnalysisSettings) -> Measurements:
         outlier_worst_frame=m.outliers.worst_volume,
         tc_outlier=m.spikes.tc_outlier,
         spec_outlier=m.spikes.spec_outlier,
-        clip_ceiling=sat.ceiling,
-        clip_bits=sat.bits,
-        n_clipped_kept=sat.n_clipped_kept,
-        n_clipped_pre=sat.n_clipped_pre,
-        clipped_kept=sat.clipped_kept,
-        clipped_any=sat.clipped,
+        # The clipping block stands or falls together: with no integer samples
+        # there was no rail to seek, and every one of these is None -- "not
+        # determinable", which is not the same answer as "nothing clipped".
+        clip_ceiling=sat.ceiling if sat is not None else None,
+        clip_bits=sat.bits if sat is not None else None,
+        n_clipped_kept=sat.n_clipped_kept if sat is not None else None,
+        n_clipped_pre=sat.n_clipped_pre if sat is not None else None,
+        clipped_kept=sat.clipped_kept if sat is not None else None,
+        clipped_any=sat.clipped if sat is not None else None,
         max_translation=m.motion.max_translation,
         max_scale_pct=m.motion.max_scale_pct,
         max_shear_pct=m.motion.max_shear_pct,

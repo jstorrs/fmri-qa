@@ -102,6 +102,25 @@ deliberately acquire through the approach to steady state. A lone sample on the
 rail is likely just a bright voxel; a pile-up across a volume is real
 saturation.
 
+Saturation is a hint about the **acquisition**, not the reconstruction: it says
+the receiver gain (or another knob on the scanner side) wants adjusting before
+the next run.
+
+### This check needs the scanner's integers
+
+A rail is an artifact of the receiver's ADC, so the check can only run on a
+series that still carries the integers the scanner stored. Some converters write
+float NIfTI and rescale as they go; that throws the rail away, and a saturated
+run then looks exactly like a clean one.
+
+So `fmri-qa` is opinionated about conversion: **give it integer-stored NIfTI**
+(`dcm2niix` does this by default — check with `fslhd` or
+`nib.load(f).header.get_data_dtype()`). On a float-stored series the loader
+warns, and the clipping fields report *not determinable* — `?` in the table,
+`null` in the JSON, `None` in the artifact — rather than the "no clipping found"
+that would quietly hide the runs this check exists to catch. Every other metric
+is unaffected and still computed.
+
 ## Outliers
 
 The `outl %` metric is a per-frame temporal-stability check, following AFNI's

@@ -36,6 +36,15 @@ class QAScan:
     `meta` holds the human-readable acquisition metadata for the report; the
     BIDS JSON sidecar it comes from is optional, and its fields are `None` when
     no sidecar sits beside the NIfTI.
+
+    `stored_integer` says whether the file held the scanner's integer samples,
+    which is the precondition for the ADC-saturation check: that test asks
+    whether the acquisition piled up on a `2**n - 1` hardware rail, and a
+    converter that wrote floats -- rescaling as it went -- has destroyed the
+    only evidence of where that rail was. `from_nifti` reads it from the NIfTI
+    datatype. It defaults to True for a `QAScan` built directly from an array,
+    because such a caller is handing over the samples themselves; only a file
+    can have lost them on the way in.
     """
 
     data: FloatArray  # (X, Y, Z, T)
@@ -47,6 +56,7 @@ class QAScan:
     # `data` (in scaled image units). Default identity: `data` is already stored.
     slope: float = 1.0
     inter: float = 0.0
+    stored_integer: bool = True  # the file kept the scanner's integer samples
 
     @classmethod
     def from_nifti(cls, path: str | Path) -> "QAScan":
@@ -62,6 +72,18 @@ class QAScan:
         # Loading consumes header scaling; the proxy retains the transform
         # actually applied by get_fdata (including identity for unscaled files).
         slope, inter = img.dataobj.slope, img.dataobj.inter
+        # The on-disk datatype, before `get_fdata` widened everything to float64.
+        stored_integer = img.header.get_data_dtype().kind in "iu"
+        if not stored_integer:
+            warnings.warn(
+                f"{path}: stored as {img.header.get_data_dtype()}, not an integer "
+                "type, so the scanner's ADC samples are gone and clipping cannot "
+                "be detected -- the saturation check will report 'not "
+                "determinable' rather than clean. Convert with a tool that "
+                "preserves the stored integer datatype (dcm2niix does by "
+                "default) if you need the receiver-gain check.",
+                stacklevel=2,
+            )
 
         pe_axis = _pe_axis_from_sidecar(sidecar)
         if pe_axis is None:
@@ -83,4 +105,5 @@ class QAScan:
             meta=_scan_meta(img, sidecar, pe_axis, tr),
             slope=float(slope),
             inter=float(inter),
+            stored_integer=stored_integer,
         )

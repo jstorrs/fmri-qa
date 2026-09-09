@@ -147,7 +147,19 @@ def _validate_parameters(artifact: QAArtifact) -> None:
         "measurements.displacement_unit is mm but provenance.voxel_mm is unknown",
     )
     _require(0 <= m.outlier_worst_frame < p.n_frames, "invalid outlier_worst_frame")
-    _require(m.n_clipped_kept >= 0 and m.n_clipped_pre >= 0, "invalid clipping counts")
+    # The clipping block is answered as a unit or not at all, so a document
+    # carrying some of it and not the rest is malformed however plausible each
+    # field looks alone.
+    counts = (m.n_clipped_kept, m.n_clipped_pre)
+    clipping = (*counts, m.clipped_any, m.clipped_kept)
+    _require(
+        len({value is None for value in clipping}) == 1,
+        "clipping fields disagree about whether the check ran",
+    )
+    _require(
+        all(count is None or count >= 0 for count in counts),
+        "invalid clipping counts",
+    )
 
 
 def _validate_timeseries(artifact: QAArtifact) -> None:

@@ -386,6 +386,32 @@ def test_load_migrating_a_schema_5_artifact_reports_displacement_in_voxels(
     )
 
 
+def test_load_migrating_a_schema_6_artifact_keeps_its_clipping_answers(
+    tmp_path, artifact
+) -> None:
+    """Schema 6 always answered the clipping question, and its answers stand.
+
+    Schema 7 lets the block be None -- "the series did not arrive as integers,
+    so the rail test could not run" -- but no schema 6 document needs that: the
+    build that wrote it ran the test unconditionally and recorded a bool either
+    way. Rewriting them to unknown would condemn every genuinely clean scan
+    along with the ones that were never checkable, and the artifact does not
+    record the storage datatype to tell them apart. So the step carries them
+    through untouched, which is what this pins.
+    """
+    path = q.save_artifact(artifact, tmp_path / "qa.npz")
+    _rewrite_document(path, _as_schema(6))
+
+    with pytest.warns(UserWarning, match="schema 6, migrated"):
+        loaded = q.load_artifact(path)
+
+    before, after = artifact.measurements, loaded.measurements
+    assert after.clipped_any == before.clipped_any is not None
+    assert after.clipped_kept == before.clipped_kept is not None
+    assert after.n_clipped_kept == before.n_clipped_kept
+    assert after.n_clipped_pre == before.n_clipped_pre
+
+
 # Fields each schema version introduced, per document section, so a current
 # document can be rewritten as the older one it grew out of (the reverse of
 # `serialize.migrate._MIGRATIONS`). Division of labour with
@@ -402,6 +428,9 @@ _ADDED_IN = {
         "measurements": ("phantom_contrast",),
     },
     6: {"measurements": ("displacement_unit",)},
+    # 7 added no field: it widened four existing clipping fields to allow None,
+    # so a schema 6 document has exactly the same keys a current one does.
+    7: {},
 }
 
 

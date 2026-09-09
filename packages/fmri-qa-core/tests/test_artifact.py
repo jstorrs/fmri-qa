@@ -7,7 +7,8 @@ properties into plain fields, curves extracted, masks and outlines materialized
 carries it to disk is `test_artifact_archive.py`.
 """
 
-from dataclasses import asdict
+import warnings
+from dataclasses import asdict, replace
 
 import numpy as np
 import pytest
@@ -288,3 +289,37 @@ def test_an_unresolved_pe_axis_is_published_as_unknown() -> None:
 def test_the_default_roi_size_is_the_shared_fbirn_constant() -> None:
     """The ROI side has one definition, spoken by prep and by the artifact."""
     assert q.AnalysisSettings().roi_size == q.FBIRN_ROI_SIZE
+
+
+def test_undeterminable_clipping_survives_the_archive(tmp_path, make_scan) -> None:
+    """ "Not determinable" is a third answer, and it round-trips as one.
+
+    A scan whose storage cannot support the rail test publishes the whole
+    clipping block as None -- not as zero counts and a False verdict, which
+    would report a scanner verified against a check that never ran. The
+    distinction is only worth having if it survives to the reader, so it is
+    pinned through `save_artifact`/`load_artifact` rather than in memory alone.
+    """
+    scan = replace(make_scan(), stored_integer=False)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        artifact = q.analyze(scan, q.AnalysisSettings(roi_size=9))
+
+    for name in ("clipped_any", "clipped_kept", "n_clipped_kept", "n_clipped_pre"):
+        assert getattr(artifact.measurements, name) is None, name
+    assert artifact.measurements.clip_ceiling is None
+
+    loaded = q.load_artifact(q.save_artifact(artifact, tmp_path / "undet.qa.npz"))
+    assert loaded.measurements.clipped_any is None
+    assert loaded.measurements.n_clipped_kept is None
+
+
+def test_integer_storage_still_answers_the_clipping_question(make_scan) -> None:
+    """The same phantom, stored as integers, gets a real verdict."""
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        artifact = q.analyze(make_scan(), q.AnalysisSettings(roi_size=9))
+
+    m = artifact.measurements
+    assert m.clipped_any is False  # answered, and the answer is "no rail found"
+    assert m.n_clipped_kept == 0 and m.n_clipped_pre == 0

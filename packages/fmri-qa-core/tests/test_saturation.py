@@ -22,6 +22,7 @@ def test_saturation_bits_rejects_off_rail_and_out_of_range() -> None:
 def test_detect_saturation_clean_series_reports_nothing() -> None:
     data = np.linspace(0, 3000, 4 * 4 * 1 * 8).reshape(4, 4, 1, 8)
     result = detect_saturation(data)
+    assert result is not None
     assert not result.suspected
     assert not result.clipped
     assert result.bits is None
@@ -32,6 +33,7 @@ def test_detect_saturation_counts_and_splits_at_trim() -> None:
     data[0, 0, 0, 1] = 4095.0  # clip in a dropped warm-up volume
     data[1, 1, 0, 3] = 4095.0  # clip in an analyzed volume
     result = detect_saturation(data, trim=2)
+    assert result is not None
     assert result.suspected and result.bits == 12
     assert result.ceiling == 4095.0
     assert result.n_clipped_pre == 1
@@ -45,7 +47,26 @@ def test_detect_saturation_recovers_stored_integer_with_slope() -> None:
     data = np.zeros((2, 2, 1, 3))
     data[0, 0, 0, 2] = 8190.0
     result = detect_saturation(data, slope=2.0, inter=0.0)
+    assert result is not None
     assert result.bits == 12
+
+
+def test_non_integer_storage_is_not_determinable_rather_than_clean() -> None:
+    """Floats cannot answer the question, and "clean" is the wrong answer to give.
+
+    The rail is an integer artifact of the receiver's ADC. A converter that
+    wrote floats -- rescaling as it went -- destroyed the evidence of where it
+    was, so a genuinely saturated acquisition and a clean one look alike here.
+    Returning a result saying "no clipping" would hide exactly the runs this
+    check exists to catch, so there is no result at all.
+    """
+    saturated = np.zeros((2, 2, 1, 4))
+    saturated[0, 0, 0, 1] = 4095.0  # would be found, on integer storage
+
+    assert detect_saturation(saturated, stored_integer=False) is None
+    # ...and the same series, stored as the scanner's integers, is found.
+    found = detect_saturation(saturated, stored_integer=True)
+    assert found is not None and found.suspected
 
 
 @pytest.mark.parametrize("slope", [0.0, float("nan"), float("inf")])

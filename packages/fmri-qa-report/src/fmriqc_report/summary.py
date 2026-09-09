@@ -119,8 +119,15 @@ def _clipping_note(artifact: QAArtifact) -> str:
     Clipping inside the analyzed data biases every metric and is called out in
     capitals; clipping confined to the dropped warm-up volumes is expected on
     some scanners and is reported quietly, apart from the biasing kind.
+
+    A `clipped_any` of None is neither: the series did not arrive as integer
+    samples, so the rail test could not run. That is worth a line of its own --
+    silence would read as "no clipping found", which is the one thing this
+    artifact cannot say.
     """
     m = artifact.measurements
+    if m.clipped_any is None:
+        return "clip not determinable (non-integer storage)"
     if not m.clipped_any or m.clip_ceiling is None:
         return ""
     rail = f"{m.clip_ceiling:.0f}"

@@ -113,6 +113,27 @@ def _v5_to_v6(document: dict[str, Any]) -> dict[str, Any]:
     return document
 
 
+def _v6_to_v7(document: dict[str, Any]) -> dict[str, Any]:
+    """Schema 6 always answered the clipping question, so its answers stand.
+
+    Schema 7 lets the clipping block be None -- "the series did not arrive as
+    integers, so the rail test could not run". No schema 6 document can need
+    that value: the build that wrote it ran the test unconditionally and
+    recorded a bool either way, so every stored `clipped_any` is an answer that
+    build actually reached. They carry forward untouched, and this step edits
+    nothing.
+
+    What it cannot do is *audit* them. A schema 6 artifact built from a
+    float-converted NIfTI carries `clipped_any` False, which that build believed
+    and which this one would call not determinable -- but the artifact does not
+    record the storage datatype, so there is no way to tell those apart from
+    here. Rewriting them to None would condemn every genuinely clean scan along
+    with them; leaving them is the same "never reconstruct" rule the steps above
+    follow, and `Measurements` says what a schema <= 6 False is worth.
+    """
+    return document
+
+
 # One step per version: `_MIGRATIONS[n]` takes a document at schema `n` and
 # returns it at `n + 1`. Applied in sequence, so a v1 file reaches the current
 # schema through every intermediate step and each migration only has to know
@@ -123,6 +144,7 @@ _MIGRATIONS: dict[int, Callable[[dict[str, Any]], dict[str, Any]]] = {
     3: _v3_to_v4,
     4: _v4_to_v5,
     5: _v5_to_v6,
+    6: _v6_to_v7,
 }
 
 

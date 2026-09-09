@@ -50,6 +50,8 @@ _SECTION_OF = {
     "roi_inside_phantom": "measurements",
     "phantom_mask_ok": "measurements",
     "phantom_contrast": "measurements",
+    "clipped_any": "measurements",
+    "n_clipped_kept": "measurements",
     "n_trimmed": "provenance",
     "slice_index": "provenance",
     "n_slices": "provenance",
@@ -74,6 +76,11 @@ _UNKNOWN_AT: dict[int, tuple[str, ...]] = {
     3: ("phantom_contrast", "n_trimmed", "slice_index", "n_slices"),
     4: ("phantom_contrast", "slice_index", "n_slices"),
     5: (),
+    # Schema 6 recorded every field above. The clipping block it *also* always
+    # answered is deliberately not listed: schema 7 lets it be unknown, but a
+    # schema 6 document carries a real bool, which migrates forward as the
+    # measurement that build made (see `serialize.migrate._v6_to_v7`).
+    6: (),
 }
 
 # What each fixture's own writer *did* measure on the shared synthetic
@@ -114,6 +121,22 @@ _KNOWN_AT: dict[int, dict[str, object]] = {
         "slice_index": 1,
         "n_slices": 3,
         "phantom_contrast": 52.71573552713314,
+    },
+    6: {
+        "snr": 154.8005119160131,
+        "sfnr": 149.84960132655735,
+        "phantom_fraction": 0.1884765625,
+        "roi_inside_phantom": True,
+        "phantom_mask_ok": True,
+        "n_trimmed": 2,
+        "slice_index": 1,
+        "n_slices": 3,
+        "phantom_contrast": 52.71573552713314,
+        # Schema 6 ran the rail test unconditionally and found no pile-up on
+        # this phantom. Under schema 7 that False still means "no rail found",
+        # not "the storage was checked" -- it is the value that build reached.
+        "clipped_any": False,
+        "n_clipped_kept": 0,
     },
 }
 
@@ -179,10 +202,13 @@ def test_a_real_archive_from_an_older_build_still_loads(version: int) -> None:
     assert loaded.images.phantom_mask.sum() == 193
     assert loaded.curves.time[:3].tolist() == [0.0, 2.0, 4.0]
 
-    # Not "unknown" on any migrated artifact -- schema <= 5 always measured
-    # peak motion in voxels (see `serialize.migrate._v5_to_v6`), so "vox" is
-    # a recorded historical fact, not a placeholder.
-    assert loaded.measurements.displacement_unit == "vox"
+    # Schema <= 5 always measured peak motion in voxels regardless of the known
+    # voxel size (see `serialize.migrate._v5_to_v6`), so "vox" there is a
+    # recorded historical fact rather than a placeholder. Schema 6 onward
+    # records the unit it actually used, which on this phantom -- 3 mm isotropic
+    # in the header -- is mm.
+    expected_unit = "vox" if version <= 5 else "mm"
+    assert loaded.measurements.displacement_unit == expected_unit
 
     for name in _UNKNOWN_AT[version]:
         section = getattr(loaded, _SECTION_OF[name])

@@ -88,7 +88,9 @@ class QAMetrics:
     drift_pct: float
     percent_fluctuation: float
     weisskoff: WeisskoffResult
-    saturation: SaturationResult
+    # None when the scan did not arrive as integers, so no rail could be sought
+    # (see `metrics.saturation`); distinct from a result saying nothing clipped.
+    saturation: SaturationResult | None
     outliers: OutlierResult
     spikes: SpikeResult
     motion: MotionResult
@@ -279,16 +281,26 @@ def run_qa(
     )
 
 
-def _detect_full_series_saturation(scan: QAScan, trim_sec: float) -> SaturationResult:
+def _detect_full_series_saturation(
+    scan: QAScan, trim_sec: float
+) -> SaturationResult | None:
     """Saturation (clipped voxels), checked on the *untrimmed* acquired series.
 
     Clipping is worst in the high-signal warm-up volumes that preprocessing
     drops. The count is split at the same trim boundary so clips outside the
     analyzed data (which don't bias the metrics) are reported apart from clips
     that do.
+
+    None when the scan did not arrive as the scanner's integers: the rail is an
+    integer artifact of the ADC, so there is nothing to look for and no verdict
+    to give (see `metrics.saturation`). `QAScan.from_nifti` has already warned.
     """
     return detect_saturation(
-        scan.data, scan.slope, scan.inter, trim=trim_count(scan.tr, trim_sec)
+        scan.data,
+        scan.slope,
+        scan.inter,
+        trim=trim_count(scan.tr, trim_sec),
+        stored_integer=scan.stored_integer,
     )
 
 

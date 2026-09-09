@@ -8,6 +8,21 @@ versioning when the first stable public interface is released.
 
 ### Added
 
+- **The saturation check now says when it cannot answer.** An ADC rail is an
+  integer artifact of the receiver, so the check requires a series that still
+  carries the scanner's integers. `QAScan.from_nifti` reads the NIfTI datatype,
+  records it as `QAScan.stored_integer`, and warns on a float-stored file naming
+  the fix; `detect_saturation` returns `None` there, and the artifact publishes
+  the whole clipping block (`clipped_any`, `clipped_kept`, `n_clipped_kept`,
+  `n_clipped_pre`) as `None` — *not determinable*, which is a third answer
+  distinct from "no clipping found". Shown as `?` in the `clip`/`clipPre`
+  columns, `null` in `fmri-qa --json`, and a `clip not determinable` note in the
+  PDF. Artifact schema version 7; an artifact from schema ≤ 6 keeps its stored
+  bool, which that build did measure. Previously a float-converted NIfTI of a
+  genuinely saturated acquisition reported clean, silently. Every other metric
+  is unaffected. See the README's *Saturation* section for the conversion
+  policy this makes explicit.
+
 - `Provenance.slice_index` / `n_slices` record which plane of the volume the
   artifact describes, and `Measurements.phantom_contrast` the mask's
   interior-over-background ratio beside the verdict reached from it. Artifact

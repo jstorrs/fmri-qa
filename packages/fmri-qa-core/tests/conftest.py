@@ -73,6 +73,15 @@ def write_scan() -> WriteScan:
     does. That matters: on an *exactly* constant background the intensity
     quantiles that seed `segment_phantom` degenerate, so a zero-background
     fixture would exercise a failure path instead of the segmentation.
+
+    Stored as `uint16`, as a properly converted acquisition is: the ADC rail the
+    saturation check looks for is an integer artifact, so a float image is one
+    the check declines to answer for (see `metrics.saturation`). Writing the
+    shared phantom as floats would put every file-based test on that declined
+    path and attach a storage warning to each. `PHANTOM_SIGNAL` is 1000, well
+    inside `uint16`, so nibabel stores these values directly rather than
+    rescaling them onto the type's own maximum -- which would be a `2**16 - 1`
+    rail, and would have the fixture report clipping it does not have.
     """
 
     def factory(
@@ -86,7 +95,7 @@ def write_scan() -> WriteScan:
     ) -> str:
         data = synthetic_series(n=n, z=z, t=t, seed=seed)
 
-        img = nib.Nifti1Image(data, affine=np.eye(4))
+        img = nib.Nifti1Image(data.astype(np.uint16), affine=np.eye(4))
         img.header.set_zooms((3.0, 3.0, 3.0, 2.0))
         img.header.set_xyzt_units("mm", "sec")
         nifti = directory / f"{name}.nii.gz"

@@ -4,6 +4,16 @@ A clipped magnitude image piles up on a hardware `2**n - 1` rail. The ceiling is
 sequence-dependent and unrecorded, so it is inferred from the series maximum,
 and the pile-up is counted — split at the trim boundary so clips in the dropped
 warm-up volumes are reported apart from clips that bias the analyzed metrics.
+
+The whole test rests on one precondition: the samples must still be the
+scanner's integers. A rail is an *integer* artifact of the receiver's ADC, and a
+converter that wrote floats — rescaling as it went — has destroyed the evidence
+of where it was. On such a series `detect_saturation` answers `None`: not
+determinable, which is a third answer distinct from "no clipping". Reporting
+clean there would be the wrong verdict rather than a safe default, the same
+reasoning the zero-slope guard already applies (see `detect_saturation`), and it
+would hide exactly the acquisitions this check exists to catch — a saturated run
+whose receiver gain wants turning down.
 """
 
 from dataclasses import dataclass
@@ -107,9 +117,19 @@ def _saturation_bits(stored_max: float) -> int | None:
 
 
 def detect_saturation(
-    data: FloatArray, slope: float = 1.0, inter: float = 0.0, trim: int = 0
-) -> SaturationResult:
+    data: FloatArray,
+    slope: float = 1.0,
+    inter: float = 0.0,
+    trim: int = 0,
+    *,
+    stored_integer: bool = True,
+) -> SaturationResult | None:
     """Detect ADC saturation (signal clipped at a `2**n - 1` rail) in a 4-D series.
+
+    Returns `None` when `stored_integer` is False -- the series did not reach us
+    as the scanner's integer samples, so there is no rail to find and no honest
+    verdict to give. See the module docstring; `QAScan.stored_integer` carries
+    this from the NIfTI datatype and warns at load.
 
     The clip ceiling is sequence-dependent and unrecorded, so it is inferred
     from the data: reconstructed magnitude images are stored as unsigned
@@ -124,7 +144,10 @@ def detect_saturation(
     the count is split at `trim` (the number of initial volumes the analysis
     drops): clips in the first `trim` volumes (`n_clipped_pre`) don't reach the
     statistics, while clips in the kept volumes (`n_clipped_kept`) bias them.
-    A lone sample on the rail is likely a bright voxel; a pile-up is saturation.
+    NOTE: with the ceiling inferred from the series maximum, at least one sample
+    always sits on it, so `clipped` is True for any detected rail -- including a
+    lone bright voxel that happens to land there, which the reasoning above says
+    is not saturation. Judge severity by the counts, not the flag.
 
     Raises:
         InvalidScanError: If `slope` is zero, infinite, or NaN. The rail test
@@ -133,6 +156,8 @@ def detect_saturation(
             which is what a caller silently getting `suspected=False` back
             would read this as. Refusing is safer than a wrong "clean" verdict.
     """
+    if not stored_integer:
+        return None
     if not np.isfinite(slope) or slope == 0.0:
         raise InvalidScanError(
             "slope", slope, "expected a finite, nonzero scaling to recover stored units"

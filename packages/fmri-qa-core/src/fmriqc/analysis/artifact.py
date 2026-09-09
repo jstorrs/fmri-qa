@@ -36,7 +36,10 @@ from ..types import BoolArray, FloatArray, LengthUnit, PeAxis, PeLabel
 # 6: added `Measurements.displacement_unit`; `max_translation` and
 #    `max_com_displacement` are now mm when the voxel size is known (previously
 #    always voxels), the same convention `fwhm`/`fwhm_unit` already used.
-ARTIFACT_SCHEMA_VERSION = 6
+# 7: the whole clipping block is now optional -- `n_clipped_kept`,
+#    `n_clipped_pre`, `clipped_kept` and `clipped_any` are None together when
+#    the series did not arrive as integers and the rail test could not be run.
+ARTIFACT_SCHEMA_VERSION = 7
 
 
 @dataclass(frozen=True, slots=True)
@@ -121,6 +124,18 @@ class Measurements:
     pass nor a failure, and a reader that treats it as either is drawing a
     conclusion the data does not support.
 
+    The clipping block answers three ways, not two. `clipped_any` False means
+    the rail test ran and found no pile-up; `clipped_any` **None** means it could
+    not run at all, because the series did not reach the analysis as the
+    scanner's integer samples and an ADC rail is an integer artifact (see
+    `metrics.saturation`). The other three clipping fields are None with it, and
+    `clip_ceiling`/`clip_bits` are None in that case too -- though they are also
+    None on a determinable series with no rail, so `clipped_any` is the field to
+    test first. A reader that treats None as "clean" is reporting a scanner
+    verified against a check that never happened. An artifact from schema <= 6
+    always answers True or False here, because the build that wrote it always
+    answered; that False means "found no rail", not "the storage was checked".
+
     `displacement_unit` governs both `max_translation` and
     `max_com_displacement`: one field, not two, because both estimators are
     handed the same in-plane `voxel_mm` by `run_qa` and so are always in the
@@ -150,13 +165,13 @@ class Measurements:
     outlier_worst_frame: int
     tc_outlier: float
     spec_outlier: float
-    # ADC saturation / clipping
+    # ADC saturation / clipping; all None together = the check could not be run
     clip_ceiling: float | None
     clip_bits: int | None
-    n_clipped_kept: int
-    n_clipped_pre: int
-    clipped_kept: bool  # clipping reached the analyzed data (biases the metrics)
-    clipped_any: bool  # clipping anywhere, including the dropped warm-up volumes
+    n_clipped_kept: int | None
+    n_clipped_pre: int | None
+    clipped_kept: bool | None  # clipping reached the analyzed data (biases metrics)
+    clipped_any: bool | None  # clipping anywhere, incl. the dropped warm-up volumes
     # phantom stability
     max_translation: float  # in `displacement_unit`
     max_scale_pct: float

@@ -45,6 +45,16 @@ def fwhm_cell(value: float | None) -> str:
     return "?" if value is None else f"{value:.2f}"
 
 
+def clip_cell(count: int | None, *, flag: bool = False) -> str:
+    """One clipping count as a table cell: the number, or `?` if undeterminable.
+
+    None means the rail test never ran, because the series did not reach the
+    analysis as integer samples. Printing 0 there would report a clean scanner
+    on the strength of a check that did not happen.
+    """
+    return "?" if count is None else f"{count}{'!' if flag else ''}"
+
+
 def print_header() -> None:
     """Print the fixed-width table header and its rule."""
     header = (
@@ -71,7 +81,11 @@ def print_row(artifact: q.QAArtifact) -> None:
     # clip: samples clipped in the analyzed data (they bias the metrics); a
     # trailing "!" flags any. clipPre: samples clipped only in the dropped
     # warm-up volumes -- reported apart because they don't reach the stats.
-    clip = f"{m.n_clipped_kept}{'!' if m.clipped_kept else ''}"
+    # "?" in both: the series did not arrive as the scanner's integers, so the
+    # rail test could not run -- which is not the same as finding no clipping,
+    # and is why it is not shown as 0 (see `Measurements`).
+    clip = clip_cell(m.n_clipped_kept, flag=bool(m.clipped_kept))
+    clip_pre = clip_cell(m.n_clipped_pre)
     # outl%: worst single-frame outlier-voxel fraction (3dToutcount); a clean
     # run sits near the per-voxel chance level (qthr, ~0.1%).
     # motn/scl%/shr%: peak per-volume in-plane phantom motion vs the temporal
@@ -99,7 +113,7 @@ def print_row(artifact: q.QAArtifact) -> None:
         f"{m.drift_pct:>8.3f} {m.ghost_pct:>8.3f} {m.ghost_top_pct:>8.3f} "
         f"{m.ro_ghost_pct:>8.3f} {m.acr_ghost_pct:>8.3f} {m.outlier_max_pct:>7.3f} "
         f"{m.tc_outlier:>7.2f} {m.spec_outlier:>7.2f} "
-        f"{clip:>6s} {m.n_clipped_pre:>8d} "
+        f"{clip:>6s} {clip_pre:>8s} "
         f"{m.max_translation:>7.3f} "
         f"{m.max_scale_pct:>7.3f} {m.max_shear_pct:>7.3f} "
         f"{m.max_com_displacement:>6.3f} "
