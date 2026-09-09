@@ -23,7 +23,6 @@ from .imaging import (
     phantom_contrast,
     phantom_plausible,
     roi_indexes,
-    segment_phantom,
 )
 
 
@@ -92,7 +91,7 @@ def detect_phantom(images: QAImages) -> PhantomGeometry:
     in the artifact and the affected metrics resolve to NaN on their own)
     rather than raised on, so a batch reports the bad scan and keeps going.
     """
-    phantom_mask = segment_phantom(images.mip)
+    phantom_mask = images.phantom_mask
     geom = PhantomGeometry(
         phantom_mask=phantom_mask,
         roi_center=find_phantom_center(phantom_mask),

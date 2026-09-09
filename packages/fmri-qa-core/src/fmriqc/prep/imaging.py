@@ -100,6 +100,23 @@ def phantom_plausible(fraction: float, contrast: float) -> bool:
     )
 
 
+def _segment_and_score(image: FloatArray) -> tuple[BoolArray, int]:
+    """Segment `image` once, returning both the mask and its `phantom_area`.
+
+    `phantom_area` and `select_slice`'s slice ranking both start from "segment
+    this candidate, then judge it" — computing them separately would watershed
+    the same image twice. This is the one place the pair is produced, so
+    `select_slice` can hand its winning slice's *mask* on to `preprocess`
+    (which threads it to `detect_phantom`) without anyone re-segmenting the MIP
+    that was just ranked.
+    """
+    mask = segment_phantom(image)
+    area = 0
+    if phantom_plausible(float(mask.mean()), phantom_contrast(image, mask)):
+        area = int(mask.sum())
+    return mask, area
+
+
 def phantom_area(image: FloatArray) -> int:
     """Segmented phantom area (voxels), or 0 for an image holding no phantom.
 
@@ -107,33 +124,38 @@ def phantom_area(image: FloatArray) -> int:
     and out-votes a real cross-section at ~20% — so a mask that is not
     `phantom_plausible` scores 0.
     """
-    mask = segment_phantom(image)
-    if not phantom_plausible(float(mask.mean()), phantom_contrast(image, mask)):
-        return 0
-    return int(mask.sum())
+    return _segment_and_score(image)[1]
 
 
-def select_slice(data: FloatArray, center: RoiCenter = "image") -> int:
-    """The index of the QA slice in an (X, Y, Z, T) volume.
+def select_slice(
+    data: FloatArray, center: RoiCenter = "image"
+) -> tuple[int, BoolArray | None]:
+    """The index of the QA slice in an (X, Y, Z, T) volume, and its phantom mask.
 
-    "image": the geometric middle slice (Glover/fBIRN convention).
+    "image": the geometric middle slice (Glover/fBIRN convention); the mask is
+    None because no segmentation is needed to find it, so none is done.
     "phantom": the slice with the largest phantom cross-section, measured by
     `phantom_area` — which scores a slice holding no phantom as 0, so a
     prescription that runs off the end of the phantom cannot win on the strength
     of a segmentation of its own air. If no slice holds a recognizable phantom,
-    the middle slice is used and a warning says so.
+    the middle slice is used and a warning says so. Either way the mask
+    returned is the one `_segment_and_score` already built to rank that slice —
+    the same watershed `detect_phantom` would otherwise repeat on the identical
+    MIP once `preprocess` hands it the winner (see `QAImages.phantom_mask`).
 
     Raises:
         InvalidChoiceError: If `center` is not one of `ROI_CENTER_MODES`.
     """
     if center == "image":
-        return int(data.shape[2] // 2)
+        return int(data.shape[2] // 2), None
     if center != "phantom":
         raise InvalidChoiceError("center", center, ROI_CENTER_MODES)
     mip = data.max(axis=-1)
-    areas = [phantom_area(s) for s in np.moveaxis(mip, -1, 0)]
+    scored = [_segment_and_score(s) for s in np.moveaxis(mip, -1, 0)]
+    areas = [area for _, area in scored]
     if any(areas):
-        return int(np.argmax(areas))
+        z = int(np.argmax(areas))
+        return z, scored[z][0]
     z = int(data.shape[2] // 2)
     warnings.warn(
         "no slice holds a recognizable phantom (every segmentation was "
@@ -141,7 +163,7 @@ def select_slice(data: FloatArray, center: RoiCenter = "image") -> int:
         f"middle slice {z} as center='image' would.",
         stacklevel=3,  # report at the caller of `extract_center_slice`/`preprocess`
     )
-    return z
+    return z, scored[z][0]
 
 
 def extract_center_slice(data: FloatArray, center: RoiCenter = "image") -> FloatArray:
@@ -150,7 +172,8 @@ def extract_center_slice(data: FloatArray, center: RoiCenter = "image") -> Float
     Raises:
         InvalidChoiceError: If `center` is not one of `ROI_CENTER_MODES`.
     """
-    return data[:, :, select_slice(data, center), :]
+    z, _ = select_slice(data, center)
+    return data[:, :, z, :]
 
 
 def find_phantom_center(phantom_mask: BoolArray) -> IntArray:

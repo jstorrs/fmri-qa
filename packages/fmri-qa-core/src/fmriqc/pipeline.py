@@ -12,6 +12,7 @@ record of what a run was asked for that `run_qa` writes into its result.
 import warnings
 from dataclasses import dataclass, replace
 
+from ._arrays import readonly
 from .load.metadata import ScanMeta
 from .load.scan import QAScan
 from .metrics.artifacts import (
@@ -43,7 +44,7 @@ from .prep.geometry import (
 )
 from .prep.images import QAImages
 from .prep.imaging import select_slice, trim_count, trim_initial
-from .types import FBIRN_ROI_SIZE, DetrendMethod, RoiCenter
+from .types import FBIRN_ROI_SIZE, BoolArray, DetrendMethod, RoiCenter
 from .validation import validate_qa_run
 
 
@@ -128,11 +129,11 @@ def preprocess(
     the middle slice (Glover), "phantom" for the largest phantom cross-section.
     """
     data = trim_initial(scan.data, scan.tr, trim_sec)
-    z = select_slice(data, center)
+    z, phantom_mask = select_slice(data, center)
     center_slice = data[:, :, z, :]
     detrend_op, detrend_order = detrend_fn(center_slice, scan.tr, detrend)
     fluctuations = detrend_op(center_slice)
-    return QAImages(
+    images = QAImages(
         center_slice=center_slice,
         fluctuations=fluctuations,
         tr=float(scan.tr),
@@ -151,6 +152,31 @@ def preprocess(
         slice_index=z,
         n_slices=int(data.shape[2]),
     )
+    if phantom_mask is not None:
+        _prime_phantom_mask_cache(images, phantom_mask)
+    return images
+
+
+def _prime_phantom_mask_cache(images: QAImages, mask: BoolArray) -> None:
+    """Seed `images.phantom_mask` with the mask `select_slice` already segmented.
+
+    `QAImages.phantom_mask` is a `cached_property` defined as
+    `segment_phantom(self.mip)` — its one definition, so `detect_phantom` never
+    reads a mask that could disagree with `images.mip`. `select_slice`
+    (`center="phantom"`) has already run that exact watershed, on that exact
+    array — the winning slice's time-MIP, which is what `mip` reduces to for
+    this `QAImages` — to rank slices before this object existed. Writing that
+    value directly into the property's backing `__dict__` entry is not a
+    second definition or injected state, because it is the value the property
+    would compute anyway; it just spares the second, identical watershed that
+    accessing `.phantom_mask` would otherwise trigger. This is exactly what
+    `cached_property.__get__` itself does after computing on first access —
+    `QAImages` is a frozen dataclass without `__slots__` for that reason: an
+    instance `__dict__` exists for `cached_property` to cache into, and normal
+    attribute assignment (blocked by `frozen=True`) is not how it does so
+    either.
+    """
+    images.__dict__["phantom_mask"] = readonly(mask)
 
 
 def run_qa(
@@ -184,71 +210,21 @@ def run_qa(
         pe_axis_override=pe_axis,
     )
 
-    # Saturation is checked on the full untrimmed series: clipping is worst in
-    # the high-signal warm-up volumes that preprocessing drops. The count is
-    # split at the same trim boundary so clips outside the analyzed data (which
-    # don't bias the metrics) are reported apart from clips that do.
-    saturation = detect_saturation(
-        scan.data, scan.slope, scan.inter, trim=trim_count(scan.tr, trim_sec)
-    )
+    saturation = _detect_full_series_saturation(scan, trim_sec)
 
     images = preprocess(scan, trim_sec=trim_sec, detrend=detrend, center=center)
     geom = detect_phantom(images)
 
-    # 3dvolreg-style per-volume registration of the phantom to its temporal mean,
-    # under a rotation-free (translation + scale + shear) model -- a diagnostic
-    # of gradient-heating deformation. The analyzed series is NOT resampled from
-    # this fit, so the FBIRN metrics stay measured on the acquired data.
     voxel_mm = scan.meta.voxel_mm[:2] if scan.meta else None
-    motion = estimate_motion(images.center_slice, geom.phantom_mask, voxel_mm=voxel_mm)
-    # Per-volume intensity centroid (bxh volmeasures), circular so a phantom
-    # against a wrapped edge does not alias and -- crucially -- so a uniform
-    # background and the 180-degree Nyquist ghost self-cancel; no phantom mask is
-    # used (it would break that cancellation). The valid mask only heals missing
-    # data (a Siemens zeroed edge). A cheap first-moment trace alongside `motion`.
-    com = estimate_center_of_mass(
-        images.center_slice, images.valid_mask, voxel_mm=voxel_mm
-    )
+    motion = _estimate_phantom_motion(images, geom, voxel_mm)
+    com = _estimate_intensity_centroid(images, voxel_mm)
 
     roi = resolve_roi(images, geom, roi_size, center)
-    if not roi_fits(geom.phantom_mask, roi.index):
-        # Name the mode the run did *not* use: the two localizations disagree
-        # only on an off-center phantom, which is exactly when one of them can
-        # rescue an ROI the other cannot fit.
-        other: RoiCenter = "phantom" if center == "image" else "image"
-        warnings.warn(
-            f"{roi.size}x{roi.size} ROI ({center} center) is not fully inside the "
-            f"phantom; reduce roi_size or try center={other!r}.",
-            stacklevel=2,
-        )
+    _warn_if_roi_does_not_fit(geom, roi, center)
 
     wk = weisskoff(images, roi)
-    mean_image = images.mean_image
-    valid_mask = images.valid_mask
-    if pe_axis is None:
-        pe_axis = images.pe_axis
-    if pe_axis is None:
-        pe_axis = estimate_pe_axis(mean_image, geom.phantom_mask, valid_mask=valid_mask)
-    # Every ghost statistic is defined *relative to an axis*, so with none
-    # resolved there is nothing to measure and no result to carry. Saying so is
-    # the point: the alternative is naming an axis nothing measured and
-    # publishing four numbers sampled from wherever it happened to point.
-    ghost: GhostResult | None = None
-    if pe_axis is None:
-        warnings.warn(
-            "no phase-encode axis: absent from the header and the Nyquist ghost "
-            "resolves neither in-plane axis, so the ghost metrics are undefined. "
-            "Pass pe_axis explicitly if the acquisition's direction is known.",
-            stacklevel=2,
-        )
-    else:
-        # The whole family -- PE and readout percent ghost, the localized top-10%
-        # companion, and the ACR-equivalent difference -- off one build of the
-        # region-matched masks, which the result carries so the artifact can
-        # publish the regions the numbers were sampled on.
-        ghost = estimate_ghost(
-            mean_image, geom.phantom_mask, pe_axis, valid_mask=valid_mask
-        )
+    pe_axis = _resolve_pe_axis(pe_axis, images, geom)
+    ghost = _build_ghost_family(pe_axis, images, geom)
 
     # Directional spatial smoothness (AFNI 3dFWHMx): the Gaussian FWHM of the
     # detrended noise field along PE and RO, plus the point-spread curves -- the
@@ -281,4 +257,107 @@ def run_qa(
         metrics=metrics,
         settings=replace(requested, detrend_order=images.detrend_order),
         meta=scan.meta,
+    )
+
+
+def _detect_full_series_saturation(scan: QAScan, trim_sec: float) -> SaturationResult:
+    """Saturation (clipped voxels), checked on the *untrimmed* acquired series.
+
+    Clipping is worst in the high-signal warm-up volumes that preprocessing
+    drops. The count is split at the same trim boundary so clips outside the
+    analyzed data (which don't bias the metrics) are reported apart from clips
+    that do.
+    """
+    return detect_saturation(
+        scan.data, scan.slope, scan.inter, trim=trim_count(scan.tr, trim_sec)
+    )
+
+
+def _estimate_phantom_motion(
+    images: QAImages, geom: PhantomGeometry, voxel_mm: tuple[float, float] | None
+) -> MotionResult:
+    """3dvolreg-style per-volume registration of the phantom to its temporal mean.
+
+    A rotation-free (translation + scale + shear) model -- a diagnostic of
+    gradient-heating deformation. The analyzed series is NOT resampled from
+    this fit, so the FBIRN metrics stay measured on the acquired data.
+    """
+    return estimate_motion(images.center_slice, geom.phantom_mask, voxel_mm=voxel_mm)
+
+
+def _estimate_intensity_centroid(
+    images: QAImages, voxel_mm: tuple[float, float] | None
+) -> CenterOfMassResult:
+    """Per-volume intensity centroid (bxh volmeasures), a cheap first-moment trace.
+
+    Circular so a phantom against a wrapped edge does not alias and --
+    crucially -- so a uniform background and the 180-degree Nyquist ghost
+    self-cancel; no phantom mask is used (it would break that cancellation).
+    The valid mask only heals missing data (a Siemens zeroed edge).
+    """
+    return estimate_center_of_mass(
+        images.center_slice, images.valid_mask, voxel_mm=voxel_mm
+    )
+
+
+def _warn_if_roi_does_not_fit(
+    geom: PhantomGeometry, roi: ROI, center: RoiCenter
+) -> None:
+    """Warn when the resolved ROI is not fully inside the phantom mask.
+
+    Names the mode the run did *not* use: the two localizations disagree only
+    on an off-center phantom, which is exactly when one of them can rescue an
+    ROI the other cannot fit.
+    """
+    if roi_fits(geom.phantom_mask, roi.index):
+        return
+    other: RoiCenter = "phantom" if center == "image" else "image"
+    warnings.warn(
+        f"{roi.size}x{roi.size} ROI ({center} center) is not fully inside the "
+        f"phantom; reduce roi_size or try center={other!r}.",
+        stacklevel=3,  # one frame in from `run_qa`: report at run_qa's caller
+    )
+
+
+def _resolve_pe_axis(
+    pe_axis: int | None, images: QAImages, geom: PhantomGeometry
+) -> int | None:
+    """Resolve the phase-encode axis: explicit override -> scan metadata -> ghost.
+
+    `pe_axis=None` takes the axis from the scan's metadata, and failing that
+    estimates it from the ghost regions of the analyzed slice -- the one place
+    that estimate is made.
+    """
+    if pe_axis is not None:
+        return pe_axis
+    if images.pe_axis is not None:
+        return images.pe_axis
+    return estimate_pe_axis(
+        images.mean_image, geom.phantom_mask, valid_mask=images.valid_mask
+    )
+
+
+def _build_ghost_family(
+    pe_axis: int | None, images: QAImages, geom: PhantomGeometry
+) -> GhostResult | None:
+    """PE/readout percent ghost, the top-10% companion, and the ACR difference.
+
+    Every ghost statistic is defined *relative to an axis*, so with none
+    resolved there is nothing to measure and no result to carry -- None, not a
+    default axis. Saying so is the point: the alternative is naming an axis
+    nothing measured and publishing four numbers sampled from wherever it
+    happened to point. When an axis is resolved, the whole family comes off one
+    build of the region-matched masks, which the result carries so the artifact
+    can publish the regions the numbers were sampled on.
+    """
+    if pe_axis is None:
+        warnings.warn(
+            "no phase-encode axis: absent from the header and the Nyquist ghost "
+            "resolves neither in-plane axis, so the ghost metrics are undefined. "
+            "Pass pe_axis explicitly if the acquisition's direction is known.",
+            stacklevel=3,  # one frame in from `run_qa`: report at run_qa's caller
+        )
+        return None
+    return estimate_ghost(
+        images.mean_image, geom.phantom_mask, pe_axis, valid_mask=images.valid_mask
     )

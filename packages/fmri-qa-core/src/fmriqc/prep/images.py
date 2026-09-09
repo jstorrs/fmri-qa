@@ -12,7 +12,12 @@ from functools import cached_property
 
 from .._arrays import ArrayValue, readonly
 from ..types import BoolArray, DetrendMethod, FloatArray
-from .imaging import edge_valid_mask, fluctuation_noise, odd_even_difference
+from .imaging import (
+    edge_valid_mask,
+    fluctuation_noise,
+    odd_even_difference,
+    segment_phantom,
+)
 
 
 @dataclass(frozen=True, eq=False)
@@ -69,6 +74,24 @@ class QAImages(ArrayValue):
     def mip(self) -> FloatArray:
         """(X, Y) max over time — phantom-segmentation target."""
         return readonly(self.center_slice.max(axis=-1))
+
+    @cached_property
+    def phantom_mask(self) -> BoolArray:
+        """(X, Y) watershed phantom mask, segmented from `mip`.
+
+        The one definition `detect_phantom` reads — not a constructor field, so
+        no `QAImages` can be built whose mask disagrees with
+        `segment_phantom(self.mip)`. That still leaves the redundant watershed
+        `center="phantom"` would otherwise pay for: `select_slice` segments
+        this exact array (the winning slice's time-MIP, before this `QAImages`
+        even exists) to rank slices, so `preprocess` primes this cache with
+        that value — see `pipeline._prime_phantom_mask_cache` — instead of
+        letting a second, identical segmentation run on first access. Every
+        other caller (`center="image"`, and every test that builds a
+        `QAImages` directly) gets it computed fresh here, same as any other
+        summary image on this class.
+        """
+        return readonly(segment_phantom(self.mip))
 
     @cached_property
     def valid_mask(self) -> BoolArray:

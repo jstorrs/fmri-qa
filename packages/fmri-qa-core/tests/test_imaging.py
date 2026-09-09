@@ -232,7 +232,11 @@ def test_extract_center_slice_prefers_the_phantom_over_a_larger_air_mask() -> No
 
     chosen = extract_center_slice(data, center="phantom")
 
-    assert select_slice(data, center="phantom") == 1
+    z, mask = select_slice(data, center="phantom")
+    assert z == 1
+    # The mask returned alongside the index is the one that won the ranking --
+    # not a fresh segmentation -- so it should agree with the phantom itself.
+    assert np.array_equal(mask, disk)
     assert np.array_equal(chosen, data[:, :, 1, :])
 
 
