@@ -1,9 +1,11 @@
 """Value-object behavior: the derived properties on the result dataclasses."""
 
+from dataclasses import fields
+
 import numpy as np
 import pytest
 
-from fmriqc import ROI, MotionResult, QAImages, SaturationResult
+from fmriqc import ROI, ClipRail, MotionResult, QAImages, SaturationResult
 from fmriqc.prep.imaging import roi_indexes
 from fmriqc.prep.scale import VoxelSize
 
@@ -15,35 +17,50 @@ def test_roi_index_matches_roi_indexes() -> None:
 
 def test_saturation_result_derived_flags() -> None:
     hit = SaturationResult(
-        ceiling=4095.0,
-        bits=12,
+        rail=ClipRail(ceiling=4095.0, bits=12, worst_volume=5, worst_count=4),
         n_clipped_pre=3,
         n_clipped_kept=2,
-        worst_volume=5,
-        worst_count=4,
     )
     assert hit.n_clipped == 5
     assert hit.suspected and hit.clipped and hit.clipped_kept
 
     clean = SaturationResult(
-        ceiling=None,
-        bits=None,
+        rail=None,
         n_clipped_pre=0,
         n_clipped_kept=0,
-        worst_volume=None,
-        worst_count=0,
     )
     assert not clean.suspected and not clean.clipped and not clean.clipped_kept
 
 
+def test_saturation_ceiling_and_bits_are_present_or_absent_together() -> None:
+    """The rail's level and its bit depth are one detection, not two fields.
+
+    A `ceiling` set beside a `bits` of None -- or the reverse -- was a state the
+    dataclass allowed and only `detect_saturation`, which always set both or
+    neither, kept from arising. Behind one optional `rail` the pair cannot come
+    apart, and the same holds for the worst-clipped volume, which has no meaning
+    without a rail either. The two convenience properties read off it, so the
+    artifact's flat `clip_ceiling`/`clip_bits` contract is unchanged.
+    """
+    names = {f.name for f in fields(SaturationResult)}
+    assert names == {"rail", "n_clipped_pre", "n_clipped_kept"}
+
+    clean = SaturationResult(rail=None, n_clipped_pre=0, n_clipped_kept=0)
+    assert clean.ceiling is None and clean.bits is None
+
+    hit = SaturationResult(
+        rail=ClipRail(ceiling=4095.0, bits=12, worst_volume=5, worst_count=4),
+        n_clipped_pre=0,
+        n_clipped_kept=4,
+    )
+    assert hit.ceiling == 4095.0 and hit.bits == 12
+
+
 def test_saturation_clipped_but_not_kept_when_only_warmup_clips() -> None:
     warmup_only = SaturationResult(
-        ceiling=4095.0,
-        bits=12,
+        rail=ClipRail(ceiling=4095.0, bits=12, worst_volume=0, worst_count=7),
         n_clipped_pre=7,
         n_clipped_kept=0,
-        worst_volume=0,
-        worst_count=7,
     )
     assert warmup_only.clipped and not warmup_only.clipped_kept
 

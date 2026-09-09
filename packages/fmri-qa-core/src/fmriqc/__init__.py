@@ -113,7 +113,7 @@ if TYPE_CHECKING:
         ghost_ratios,
     )
     from .metrics.motion import MotionResult, estimate_motion
-    from .metrics.saturation import SaturationResult, detect_saturation
+    from .metrics.saturation import ClipRail, SaturationResult, detect_saturation
     from .metrics.smoothness import SmoothnessResult, estimate_smoothness
     from .pipeline import QAMetrics, QAResult, preprocess, run_qa
     from .prep.detrend import (
@@ -176,6 +176,7 @@ __all__ = [
     "AnalysisSettings",
     "ArtifactImages",
     "CenterOfMassResult",
+    "ClipRail",
     "Curves",
     "DetrendMethod",
     "FmriqcError",
@@ -323,7 +324,7 @@ _EXPORTS: dict[str, tuple[str, ...]] = {
         "ghost_ratios",
     ),
     ".metrics.motion": ("MotionResult", "estimate_motion"),
-    ".metrics.saturation": ("SaturationResult", "detect_saturation"),
+    ".metrics.saturation": ("ClipRail", "SaturationResult", "detect_saturation"),
     ".metrics.smoothness": ("SmoothnessResult", "estimate_smoothness"),
     ".pipeline": ("QAMetrics", "QAResult", "preprocess", "run_qa"),
     ".prep.detrend": (

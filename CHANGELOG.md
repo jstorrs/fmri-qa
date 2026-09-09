@@ -194,6 +194,17 @@ versioning when the first stable public interface is released.
 
 ### Changed
 
+- **A detected clip rail is one object, so its fields cannot come apart.**
+  `SaturationResult` carried `ceiling`, `bits`, `worst_volume` and
+  `worst_count` as four independently-optional fields that `detect_saturation`
+  always set together or not at all; they now sit behind a single
+  `rail: ClipRail | None`. `ceiling` and `bits` remain readable as properties,
+  so the artifact's flat `clip_ceiling`/`clip_bits` fields are unchanged, as are
+  `suspected`, `clipped`, `clipped_kept` and the two trim-split counts --
+  those stay on the result because zero is a true answer for them, where
+  "which volume was worst" has none without a rail. `ClipRail` is exported
+  from `fmriqc`.
+
 - **The in-plane voxel size is a value object that carries its own unit.**
   `prep.scale.VoxelSize` holds the in-plane mm/voxel pair (or None when the
   header did not say) and answers the three questions the length-reporting

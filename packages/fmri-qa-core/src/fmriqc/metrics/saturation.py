@@ -18,22 +18,51 @@ from ..types import FloatArray
 SATURATION_BITS = range(8, 17)  # 255 .. 65535
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
+class ClipRail:
+    """The hardware rail a clipped series piled up on, and where it hit hardest.
+
+    Every field here is undefined without a rail, which is why they sit together
+    behind one `SaturationResult.rail` that is either present or `None`: there is
+    no ceiling without a detected rail, and no "worst volume" either -- the
+    question does not arise for a series that never touched one.
+
+    The two trim-split counts stay outside, on the result, because *zero* is a
+    true answer for them: a clean series clipped no samples before the trim and
+    none after. "Which volume was worst" has no such answer, and an `int | None`
+    beside a rail that might independently be `None` is two ways to say one
+    thing, kept in step by hand.
+    """
+
+    ceiling: float  # clip level (image units)
+    bits: int  # n such that the stored ceiling is 2**n - 1
+    worst_volume: int  # volume index (full series) with the most clipped samples
+    worst_count: int  # clipped samples in that worst volume
+
+
+@dataclass(frozen=True, slots=True)
 class SaturationResult:
     """ADC-saturation (signal-clipping) check for one scan.
 
     The clip ceiling is sequence-dependent and not recorded, so it is inferred:
-    a clipped magnitude image piles up on a hardware `2**n - 1` rail. `ceiling`
-    is that rail (in image units) when the series maximum sits on one, else
-    `None` -- a maximum that is not a `2**n - 1` value means no clipping.
+    a clipped magnitude image piles up on a hardware `2**n - 1` rail. `rail`
+    describes that rail when the series maximum sits on one, and is `None` when
+    it does not -- a maximum that is not a `2**n - 1` value means no clipping.
     """
 
-    ceiling: float | None  # clip level (image units); None if max is not a 2**n-1 rail
-    bits: int | None  # n such that the stored ceiling is 2**n - 1
+    rail: ClipRail | None
     n_clipped_pre: int  # clipped samples in the dropped warm-up volumes
     n_clipped_kept: int  # clipped samples in the analyzed volumes (bias the metrics)
-    worst_volume: int | None  # volume index (full series) with the most clipped samples
-    worst_count: int  # clipped samples in that worst volume
+
+    @property
+    def ceiling(self) -> float | None:
+        """The clip level in image units, or None if no rail was detected."""
+        return None if self.rail is None else self.rail.ceiling
+
+    @property
+    def bits(self) -> int | None:
+        """`n` such that the stored ceiling is `2**n - 1`, or None without a rail."""
+        return None if self.rail is None else self.rail.bits
 
     @property
     def n_clipped(self) -> int:
@@ -43,7 +72,7 @@ class SaturationResult:
     @property
     def suspected(self) -> bool:
         """True if the series maximum sits exactly on a 2**n-1 hardware rail."""
-        return self.ceiling is not None
+        return self.rail is not None
 
     @property
     def clipped(self) -> bool:
@@ -113,21 +142,16 @@ def detect_saturation(
     ceiling = float(np.max(data) if slope > 0 else np.min(data))
     bits = _saturation_bits((ceiling - inter) / slope)
     if bits is None:
-        return SaturationResult(
-            ceiling=None,
-            bits=None,
-            n_clipped_pre=0,
-            n_clipped_kept=0,
-            worst_volume=None,
-            worst_count=0,
-        )
+        return SaturationResult(rail=None, n_clipped_pre=0, n_clipped_kept=0)
     per_volume = (data == ceiling).reshape(-1, data.shape[-1]).sum(axis=0)
     worst = int(np.argmax(per_volume))
     return SaturationResult(
-        ceiling=ceiling,
-        bits=bits,
+        rail=ClipRail(
+            ceiling=ceiling,
+            bits=bits,
+            worst_volume=worst,
+            worst_count=int(per_volume[worst]),
+        ),
         n_clipped_pre=int(per_volume[:trim].sum()),
         n_clipped_kept=int(per_volume[trim:].sum()),
-        worst_volume=worst,
-        worst_count=int(per_volume[worst]),
     )
