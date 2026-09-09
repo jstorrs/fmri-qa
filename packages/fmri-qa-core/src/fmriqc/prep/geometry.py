@@ -10,6 +10,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
+from .._arrays import ArrayValue
 from ..exceptions import InvalidChoiceError
 from ..types import FBIRN_ROI_SIZE, ROI_CENTER_MODES, BoolArray, IntArray, RoiCenter
 from .images import QAImages
@@ -27,7 +28,7 @@ from .imaging import (
 
 
 @dataclass(frozen=True, eq=False)
-class PhantomGeometry:
+class PhantomGeometry(ArrayValue):
     """Phantom location, computed by `detect_phantom` from `QAImages`."""
 
     phantom_mask: BoolArray  # (X, Y) bool
@@ -61,7 +62,7 @@ class PhantomGeometry:
 
 
 @dataclass(frozen=True, eq=False)
-class ROI:
+class ROI(ArrayValue):
     """A resolved square ROI: center (row, col, array order) and side length.
 
     Produced once by `resolve_roi` and threaded into the ROI-based statistics so

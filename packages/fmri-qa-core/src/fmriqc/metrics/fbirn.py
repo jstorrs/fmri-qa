@@ -10,6 +10,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
+from .._arrays import ArrayValue
 from ..prep.geometry import ROI
 from ..prep.images import QAImages
 from ..prep.imaging import roi_indexes
@@ -17,7 +18,7 @@ from ..types import FloatArray, IntArray
 
 
 @dataclass(frozen=True, eq=False)
-class WeisskoffResult:
+class WeisskoffResult(ArrayValue):
     """Weisskoff/RDC analysis over a range of ROI sizes.
 
     `cv` is the ROI-averaged CV and `cv1` the single-voxel CV pooled within each

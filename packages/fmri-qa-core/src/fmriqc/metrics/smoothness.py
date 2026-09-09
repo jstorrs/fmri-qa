@@ -11,6 +11,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
+from .._arrays import ArrayValue
 from ..prep.imaging import geomean, normalize_voxel_mm
 from ..types import BoolArray, FloatArray, IntArray
 
@@ -20,8 +21,8 @@ SIGMA_TO_FWHM = float(np.sqrt(8.0 * np.log(2.0)))
 SMOOTHNESS_MAX_LAG = 10
 
 
-@dataclass(frozen=True)
-class SmoothnessResult:
+@dataclass(frozen=True, eq=False)
+class SmoothnessResult(ArrayValue):
     """Directional spatial smoothness of the noise field (AFNI 3dFWHMx + PSF).
 
     The Gaussian FWHM of the detrended fluctuation (noise) field, estimated per

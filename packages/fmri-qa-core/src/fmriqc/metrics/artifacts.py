@@ -10,6 +10,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
+from .._arrays import ArrayValue
 from ..prep.geometry import ROI
 from ..prep.images import QAImages
 from ..types import BoolArray, FloatArray
@@ -23,8 +24,8 @@ MAD_SCALE = 1.4826
 OUTLIER_QTHR = 0.001
 
 
-@dataclass(frozen=True)
-class OutlierResult:
+@dataclass(frozen=True, eq=False)
+class OutlierResult(ArrayValue):
     """Per-TR outlier-voxel fraction (AFNI 3dToutcount) over the phantom mask.
 
     `fraction[t]` is the share of masked voxels whose detrended residual is a

@@ -16,6 +16,7 @@ from dataclasses import dataclass
 import numpy as np
 from skimage.morphology import isotropic_dilation, isotropic_erosion
 
+from .._arrays import ArrayValue
 from ..types import BoolArray, FloatArray
 
 # Fraction of the brightest ghost-region voxels averaged for the localized-ghost
@@ -96,7 +97,7 @@ def _top_ratio(
 
 
 @dataclass(frozen=True, eq=False)
-class GhostResult:
+class GhostResult(ArrayValue):
     """The whole Nyquist-ghost family, measured on one pair of axes at once.
 
     Built by `estimate_ghost` from the masks it carries: `pe_signal`/`pe_ghost`

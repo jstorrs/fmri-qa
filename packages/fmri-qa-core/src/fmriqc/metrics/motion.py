@@ -23,7 +23,7 @@ MOTION_MAX_ITER = 12
 MOTION_TOL = 1e-4
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, eq=False)
 class MotionResult(ArrayValue):
     """Per-volume in-plane deformation of the phantom (thermal-drift model).
 

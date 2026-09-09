@@ -11,12 +11,13 @@ from dataclasses import dataclass
 
 import numpy as np
 
+from .._arrays import ArrayValue
 from ..prep.imaging import edge_valid_mask, normalize_voxel_mm
 from ..types import BoolArray, FloatArray
 
 
-@dataclass(frozen=True)
-class CenterOfMassResult:
+@dataclass(frozen=True, eq=False)
+class CenterOfMassResult(ArrayValue):
     """Per-volume intensity-weighted center of mass of the phantom (bxh volmeasures).
 
     `com` is (n_t, 2): each frame's intensity centroid along in-plane axes 0/1, in
