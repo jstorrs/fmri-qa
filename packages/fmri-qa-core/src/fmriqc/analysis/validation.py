@@ -128,6 +128,14 @@ def _validate_parameters(artifact: QAArtifact) -> None:
             all(math.isfinite(v) and v > 0 for v in p.voxel_mm),
             "invalid provenance.voxel_mm",
         )
+    # The converse does not hold: a migrated (schema <= 5) artifact can carry a
+    # known voxel size with `displacement_unit` still "vox", because the old
+    # peaks were always voxels regardless (see `serialize.migrate`). "mm"
+    # without a known voxel size to have produced it, though, is never valid.
+    _require(
+        m.displacement_unit != "mm" or p.voxel_mm is not None,
+        "measurements.displacement_unit is mm but provenance.voxel_mm is unknown",
+    )
     _require(0 <= m.outlier_worst_frame < p.n_frames, "invalid outlier_worst_frame")
     _require(m.n_clipped_kept >= 0 and m.n_clipped_pre >= 0, "invalid clipping counts")
 

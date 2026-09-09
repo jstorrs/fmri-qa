@@ -84,8 +84,14 @@ class MotionResult(ArrayValue):
 
     @property
     def max_translation(self) -> float:
-        """Peak per-volume translation magnitude (voxels)."""
-        return float(np.max(np.hypot(self.params[:, 0], self.params[:, 1])))
+        """Peak per-volume translation magnitude (mm if known, else voxels).
+
+        The peak of `displacement`, so it shares that property's unit. Uses
+        `np.max`, not `nanmax`: a failed frame is all-NaN (see `converged`), and
+        any failed frame must make the run's peak NaN rather than publish a peak
+        measured over an incomplete series.
+        """
+        return float(np.max(self.displacement))
 
     @property
     def max_scale_pct(self) -> float:

@@ -36,6 +36,16 @@ def _fwhm_label(m: Measurements) -> str:
     return f"{m.fwhm:.2f}{m.fwhm_unit}"
 
 
+def _motn_label(m: Measurements) -> str:
+    """Peak motion tile text: mm when the voxel size is known, else voxels."""
+    return f"{m.max_translation:.2f}{m.displacement_unit}"
+
+
+def _com_label(m: Measurements) -> str:
+    """Peak COM-shift tile text: mm when the voxel size is known, else voxels."""
+    return f"{m.max_com_displacement:.2f}{m.displacement_unit}"
+
+
 # The reported metrics, in display order. The tile label and value formatter here
 # are the ones the header tiles use, so the tiles and the physics tables agree.
 METRIC_DOCS: tuple[MetricDoc, ...] = (
@@ -118,15 +128,15 @@ METRIC_DOCS: tuple[MetricDoc, ...] = (
     ),
     MetricDoc(
         "motn",
-        "Peak in-plane phantom translation vs the temporal mean (voxels).",
+        "Peak in-plane phantom translation vs the temporal mean.",
         "3dvolreg-style registration with rotation dropped (a rigid phantom).",
-        lambda m: f"{m.max_translation:.2f}",
+        _motn_label,
     ),
     MetricDoc(
         "com",
-        "Peak whole-slice center-of-mass shift (voxels).",
+        "Peak whole-slice center-of-mass shift.",
         "Circular intensity centroid (bxh volmeasures); first-moment instability.",
-        lambda m: f"{m.max_com_displacement:.2f}",
+        _com_label,
     ),
     MetricDoc(
         "fwhm",

@@ -69,17 +69,18 @@ def print_row(artifact: q.QAArtifact) -> None:
     # outl%: worst single-frame outlier-voxel fraction (3dToutcount); a clean
     # run sits near the per-voxel chance level (qthr, ~0.1%).
     # motn/scl%/shr%: peak per-volume in-plane phantom motion vs the temporal
-    # mean (3dvolreg-style, rotation dropped) -- translation (voxels), and the
+    # mean (3dvolreg-style, rotation dropped) -- translation (mm when the voxel
+    # size is known, else voxels; same convention as fwPE/fwRO), and the
     # gradient-heating scale/shear strain (percent).
     # tcOut/spcOut: cran MAD-normalized spike scores of the ROI-mean residual
     # -- peak / robust spread in the time domain (a transient volume) and on
     # its DC-dropped FFT magnitude (a dominant periodic artifact). Unitless; a
     # clean phantom sits low (a few), a spike stands well above.
     # com: peak per-volume shift of the whole-slice intensity centroid from
-    # its temporal mean (circular COM, bxh volmeasures), in voxels -- the
-    # circular mean cancels uniform background and the N/2 ghost, so no phantom
-    # mask is used (only a Siemens zeroed edge is healed); a cheap first-moment
-    # jump/drift trace complementing motn.
+    # its temporal mean (circular COM, bxh volmeasures), in mm when the voxel
+    # size is known, else voxels -- the circular mean cancels uniform background
+    # and the N/2 ghost, so no phantom mask is used (only a Siemens zeroed edge
+    # is healed); a cheap first-moment jump/drift trace complementing motn.
     # fwPE/fwRO: spatial smoothness of the noise field along the phase-encode
     # and readout axes (AFNI 3dFWHMx), in mm when the voxel size is known --
     # the RDC smoothness confound; PE/RO asymmetry is anisotropic smoothing.

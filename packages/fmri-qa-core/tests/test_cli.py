@@ -8,6 +8,7 @@ a PDF is `fmri-qa-report`'s job and is tested there.
 """
 
 import json
+import math
 from dataclasses import replace
 from pathlib import Path
 
@@ -208,7 +209,7 @@ def test_json_emits_a_parseable_document(tmp_path, write_scan, capsys) -> None:
     captured = capsys.readouterr()
     assert rc == 0
     doc = json.loads(captured.out)  # stdout is pure JSON, nothing else
-    assert doc["schema_version"] == 5
+    assert doc["schema_version"] == 6
     assert doc["config"]["detrend"] == "poly"
     assert "version" in doc["config"]
     assert len(doc["scans"]) == 1
@@ -363,6 +364,26 @@ def test_json_record_leaves_an_unnamed_direction_null(tmp_path, write_scan) -> N
     assert record["fw_ro"] is None
     assert record["fwhm"] == artifact.measurements.fwhm
     assert record["fwhm_unit"] == "mm"
+
+
+def test_json_record_carries_the_displacement_unit(tmp_path, write_scan) -> None:
+    """`motn`/`com` carry their unit the same way `fwhm`/`fwhm_unit` do.
+
+    `motn` is left loose against NaN-as-null (see
+    `test_json_record_maps_undefined_metrics_to_null`): on this fixture the
+    motion fit does not converge for every frame, so `max_translation` is
+    itself NaN and the record maps it to `null` rather than the raw float.
+    """
+    scan = q.QAScan.from_nifti(write_scan(tmp_path))
+    artifact = q.analyze(scan, q.AnalysisSettings(roi_size=9))
+    m = artifact.measurements
+    record = metric_record(artifact)
+    assert record["motn"] == (
+        None if math.isnan(m.max_translation) else m.max_translation
+    )
+    assert record["com"] == m.max_com_displacement
+    assert record["displacement_unit"] == "mm"  # the fixture's voxel size is known
+    assert record["displacement_unit"] == "mm"  # the fixture's voxel size is known
 
 
 def test_table_marks_an_unnamed_direction_unknown(tmp_path, write_scan, capsys) -> None:

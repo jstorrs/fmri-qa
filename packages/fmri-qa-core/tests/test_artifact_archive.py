@@ -356,6 +356,36 @@ def test_load_migrating_a_schema_4_artifact_leaves_slice_and_contrast_unrecorded
     assert loaded.settings.roi_size == artifact.settings.roi_size
 
 
+def test_load_migrating_a_schema_5_artifact_reports_displacement_in_voxels(
+    tmp_path, artifact
+) -> None:
+    """Schema 5 always measured peak motion/COM displacement in voxels.
+
+    Unlike the other migrated fields, this is not "unknown": schema <= 5 never
+    converted these two peaks to mm even when the voxel size was known, so
+    "vox" is a fact about the old format, not a guess -- even though this
+    fixture's own `fwhm_unit` is "mm" (voxel size known), showing the two units
+    can disagree on a migrated artifact in a way they never do on a fresh one.
+    """
+    path = q.save_artifact(artifact, tmp_path / "qa.npz")
+    _rewrite_document(path, _as_schema(5))
+
+    with pytest.warns(UserWarning, match="schema 5, migrated"):
+        loaded = q.load_artifact(path)
+
+    assert loaded.measurements.displacement_unit == "vox"
+    assert loaded.measurements.fwhm_unit == "mm"  # this fixture's voxel size is known
+    # The stored numbers themselves are untouched by the migration -- NaN on this
+    # fixture, whose motion fit does not converge for every frame (see
+    # `_both_nan`: NaN != NaN, so a direct `==` would fail on a faithful copy).
+    assert _both_nan(
+        loaded.measurements.max_translation, artifact.measurements.max_translation
+    )
+    assert loaded.measurements.max_com_displacement == (
+        artifact.measurements.max_com_displacement
+    )
+
+
 # Fields each schema version introduced, per document section, so a current
 # document can be rewritten as the older one it grew out of (the reverse of
 # `serialize.migrate._MIGRATIONS`).
@@ -367,6 +397,7 @@ _ADDED_IN = {
         "provenance": ("slice_index", "n_slices"),
         "measurements": ("phantom_contrast",),
     },
+    6: {"measurements": ("displacement_unit",)},
 }
 
 
@@ -405,13 +436,15 @@ def test_load_rejects_a_closed_set_value_from_outside_the_set(
 ) -> None:
     """A stored string must be held to the set its field promises.
 
-    `fwhm_unit`, `pe_label` and the PSF unit are closed sets a reader switches
-    on, and JSON carries none of that. Without the check a hand-edited or
-    foreign document hands the reader a value its own type says cannot exist,
-    and the mistake surfaces wherever that reader happens to branch.
+    `fwhm_unit`, `displacement_unit`, `pe_label` and the PSF unit are closed
+    sets a reader switches on, and JSON carries none of that. Without the check
+    a hand-edited or foreign document hands the reader a value its own type
+    says cannot exist, and the mistake surfaces wherever that reader happens to
+    branch.
     """
     for field, edit in (
         ("fwhm_unit", _with_measurement("fwhm_unit", "cm")),
+        ("displacement_unit", _with_measurement("displacement_unit", "cm")),
         ("pe_label", _with_measurement("pe_label", "diagonal")),
         ("psf.unit", _with_psf_unit("cm")),
     ):

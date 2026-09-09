@@ -52,10 +52,18 @@ def test_motion_result_derived_views() -> None:
     params[1] = [1.0, 0.0, 0.02, 0.0, 0.0]  # 1 voxel translation, 2% scale on axis 0
     motion = MotionResult(params=params, voxel_mm=(2.0, 2.0))
     assert np.allclose(motion.translation, params[:, 0:2])
-    assert np.isclose(motion.max_translation, 1.0)
     assert np.isclose(motion.max_scale_pct, 2.0)
     # displacement uses voxel_mm: a 1-voxel move at 2 mm/voxel is 2 mm
     assert np.isclose(motion.displacement[1], 2.0)
+    # max_translation is the peak of displacement, so it shares its unit
+    assert np.isclose(motion.max_translation, 2.0)
+
+
+def test_motion_result_max_translation_is_voxels_without_a_known_voxel_size() -> None:
+    params = np.zeros((3, 5))
+    params[1] = [1.0, 0.0, 0.0, 0.0, 0.0]  # 1 voxel translation
+    motion = MotionResult(params=params)
+    assert np.isclose(motion.max_translation, 1.0)
 
 
 def test_qaimages_derived_images_are_consistent() -> None:

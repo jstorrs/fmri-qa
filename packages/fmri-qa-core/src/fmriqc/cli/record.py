@@ -11,7 +11,7 @@ import math
 
 import fmriqc as q
 
-JSON_SCHEMA_VERSION = 5
+JSON_SCHEMA_VERSION = 6
 
 
 def metric_record(artifact: q.QAArtifact) -> dict[str, object]:
@@ -25,7 +25,11 @@ def metric_record(artifact: q.QAArtifact) -> dict[str, object]:
 
     A directional FWHM the run could not name (no phase-encode axis) is `null`,
     with the combined `fwhm` and its `fwhm_unit` alongside so the numbers that
-    *were* measured stay interpretable.
+    *were* measured stay interpretable. `motn` and `com` carry their own unit
+    the same way, in `displacement_unit` -- "mm" when the header's voxel size
+    is known, else "vox" (an artifact migrated from schema <= 5 always reads
+    "vox" here, since those schemas published both peaks in voxels regardless
+    of the voxel size; see `analysis.serialize.migrate`).
 
     The record carries a little more than the table does, because a stored row
     outlives the terminal it was printed to: the source path and acquisition
@@ -75,6 +79,7 @@ def metric_record(artifact: q.QAArtifact) -> dict[str, object]:
         "scl_pct": m.max_scale_pct,
         "shr_pct": m.max_shear_pct,
         "com": m.max_com_displacement,
+        "displacement_unit": m.displacement_unit,  # "mm", or "vox" if unknown
         "fw_pe": m.fwhm_pe,
         "fw_ro": m.fwhm_ro,
         "fwhm": m.fwhm,  # combined (AFNI ccomb), defined on either axis or none

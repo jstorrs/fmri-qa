@@ -33,7 +33,10 @@ from ..types import BoolArray, FloatArray, LengthUnit, PeLabel
 # 5: added `Provenance.slice_index`/`n_slices` (the plane analyzed) and
 #    `Measurements.phantom_contrast` (the second half of the mask verdict);
 #    `AnalysisSettings.roi_size` is the side requested, no longer the clamped one.
-ARTIFACT_SCHEMA_VERSION = 5
+# 6: added `Measurements.displacement_unit`; `max_translation` and
+#    `max_com_displacement` are now mm when the voxel size is known (previously
+#    always voxels), the same convention `fwhm`/`fwhm_unit` already used.
+ARTIFACT_SCHEMA_VERSION = 6
 
 
 @dataclass(frozen=True, slots=True)
@@ -117,6 +120,16 @@ class Measurements:
     `analyze` never produces that; it means "not recorded", which is neither a
     pass nor a failure, and a reader that treats it as either is drawing a
     conclusion the data does not support.
+
+    `displacement_unit` governs both `max_translation` and
+    `max_com_displacement`: one field, not two, because both estimators are
+    handed the same in-plane `voxel_mm` by `run_qa` and so are always in the
+    same unit for any artifact this build produces — a second field could only
+    ever agree with the first, or drift from it by a bug. A migrated artifact
+    is the one place they can legitimately differ from `fwhm_unit`: schema <= 5
+    always published these two peaks in voxels regardless of whether the voxel
+    size was known, so a migrated artifact's `displacement_unit` is "vox" even
+    when its `fwhm_unit` is "mm" (see `serialize.migrate`).
     """
 
     # fBIRN ROI stability
@@ -145,10 +158,11 @@ class Measurements:
     clipped_kept: bool  # clipping reached the analyzed data (biases the metrics)
     clipped_any: bool  # clipping anywhere, including the dropped warm-up volumes
     # phantom stability
-    max_translation: float
+    max_translation: float  # in `displacement_unit`
     max_scale_pct: float
     max_shear_pct: float
-    max_com_displacement: float
+    max_com_displacement: float  # in `displacement_unit`
+    displacement_unit: LengthUnit  # "mm" when the voxel size is known, else "vox"
     # spatial smoothness
     fwhm: float  # combined (AFNI ccomb), in `fwhm_unit`
     fwhm_pe: float | None

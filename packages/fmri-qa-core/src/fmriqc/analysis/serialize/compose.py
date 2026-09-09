@@ -67,6 +67,9 @@ def compose(document: dict[str, Any], arrays: dict[str, Any]) -> QAArtifact:
     measurements["fwhm_unit"] = _one_of(
         measurements["fwhm_unit"], LENGTH_UNITS, "fwhm_unit"
     )
+    measurements["displacement_unit"] = _one_of(
+        measurements["displacement_unit"], LENGTH_UNITS, "displacement_unit"
+    )
     measurements["pe_label"] = _one_of(measurements["pe_label"], PE_LABELS, "pe_label")
     return QAArtifact(
         schema_version=document["schema_version"],

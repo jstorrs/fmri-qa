@@ -109,6 +109,7 @@ def test_measurements_are_flat_scalars(artifact) -> None:
     assert m.pe_axis == 1
     assert m.pe_label == "col"  # from the sidecar's PhaseEncodingDirection
     assert m.fwhm_unit == "mm"  # the voxel size is known
+    assert m.displacement_unit == "mm"  # the voxel size is known
     assert isinstance(m.clipped_kept, bool)
     for value in asdict(m).values():
         assert isinstance(value, float | int | str | bool | type(None))
@@ -126,6 +127,26 @@ def test_measurements_record_the_localization_diagnostics(artifact) -> None:
     assert 0.0 < m.phantom_fraction < 0.95
     assert m.phantom_mask_ok is True
     assert m.roi_inside_phantom is True
+
+
+def test_displacement_reports_mm_with_a_known_voxel_size_else_voxels(
+    artifact, make_scan
+) -> None:
+    """Motion/COM peak displacement follows the header's voxel size, like FWHM.
+
+    `artifact` is built from a NIfTI with a 3 mm header, so both peaks -- and
+    the combined FWHM -- report in mm. `make_scan` builds a scan with no header
+    metadata at all, so the same numbers fall back to voxels; `displacement_unit`
+    says which happened rather than leaving a reader to guess from the value
+    alone.
+    """
+    known = artifact.measurements
+    assert known.displacement_unit == "mm"
+    assert known.fwhm_unit == "mm"
+
+    unmetered = q.build_artifact(q.run_qa(make_scan(), roi_size=9)).measurements
+    assert unmetered.displacement_unit == "vox"
+    assert unmetered.fwhm_unit == "vox"
 
 
 def test_a_noise_only_scan_keeps_its_failed_mask_verdict(tmp_path) -> None:

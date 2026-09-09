@@ -33,3 +33,22 @@ def test_every_metric_doc_is_documented(artifact) -> None:
     for doc in content.METRIC_DOCS:
         assert doc.label and doc.definition and doc.method
         assert doc.fmt(m)  # the formatter returns a non-empty string
+
+
+def test_motn_and_com_tiles_carry_the_displacement_unit(
+    artifact, bare_artifact
+) -> None:
+    """`motn`/`com` render their unit exactly as `fwhm` already does.
+
+    `artifact` has a known voxel size and reports mm; `bare_artifact` has no
+    sidecar metadata at all and falls back to voxels -- the same "mm when known,
+    else voxels" rule `_fwhm_label` applies, read off `displacement_unit`.
+    """
+    by_label = {doc.label: doc for doc in content.METRIC_DOCS}
+    m = artifact.measurements
+    assert by_label["motn"].fmt(m) == f"{m.max_translation:.2f}mm"
+    assert by_label["com"].fmt(m) == f"{m.max_com_displacement:.2f}mm"
+
+    bare = bare_artifact.measurements
+    assert by_label["motn"].fmt(bare) == f"{bare.max_translation:.2f}vox"
+    assert by_label["com"].fmt(bare) == f"{bare.max_com_displacement:.2f}vox"

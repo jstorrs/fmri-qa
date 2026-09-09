@@ -49,6 +49,19 @@ def test_estimate_motion_recovers_a_known_translation() -> None:
     assert static.max() < 0.05  # every other frame stays put
 
 
+def test_estimate_motion_reports_max_translation_in_mm_when_voxel_size_is_known() -> (
+    None
+):
+    blob = _blob()
+    series = np.repeat(blob[:, :, None], 20, axis=2)
+    dr, dc = 0.7, -0.4
+    series[:, :, 10] = ndi_shift(blob, [dr, dc], order=1, mode="nearest")
+
+    res = estimate_motion(series, blob > 0.1, voxel_mm=(2.0, 2.0))
+    assert res.converged.all()
+    assert np.isclose(res.max_translation, 2.0 * np.hypot(dr, dc), atol=0.2)
+
+
 @pytest.mark.parametrize("strain", [(0.02, -0.01, 0), (0, 0, 0.015)])
 def test_motion_recovers_known_scale_and_shear(strain) -> None:
     blob = _blob(48)

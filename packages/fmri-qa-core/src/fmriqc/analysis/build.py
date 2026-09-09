@@ -195,6 +195,7 @@ def _measurements(result: QAResult, settings: AnalysisSettings) -> Measurements:
         max_scale_pct=m.motion.max_scale_pct,
         max_shear_pct=m.motion.max_shear_pct,
         max_com_displacement=m.center_of_mass.max_displacement,
+        displacement_unit="mm" if m.motion.voxel_mm is not None else "vox",
         fwhm=sm.fwhm,
         fwhm_pe=sm.fwhm_pe,
         fwhm_ro=sm.fwhm_ro,

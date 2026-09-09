@@ -74,8 +74,15 @@ class CenterOfMassResult:
 
     @property
     def max_displacement(self) -> float:
-        """Peak per-volume centroid displacement (voxels); NaN if never resolved."""
-        d = np.hypot(self.deviation[:, 0], self.deviation[:, 1])
+        """Peak per-volume centroid displacement (mm if `voxel_mm` known, else voxels).
+
+        The peak of `displacement`, so it shares that property's unit. Uses
+        `nanmax`, not `max`: unlike `MotionResult` (a registration that either
+        converges or fails as a whole frame), a blank frame here only means "no
+        above-floor signal that frame" -- it says nothing about the frames that
+        did resolve, so it is NaN only when *no* frame ever produced a centroid.
+        """
+        d = self.displacement
         return float(np.nanmax(d)) if np.isfinite(d).any() else float("nan")
 
 

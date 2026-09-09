@@ -78,6 +78,33 @@ def _v4_to_v5(document: dict[str, Any]) -> dict[str, Any]:
     return document
 
 
+def _v5_to_v6(document: dict[str, Any]) -> dict[str, Any]:
+    """Schema 5 reported `max_translation`/`max_com_displacement` in voxels, always.
+
+    This migration does not follow the "unknown, never reconstructed" pattern
+    the others do, because there is nothing to reconstruct: before this build,
+    `MotionResult.max_translation` and `CenterOfMassResult.max_displacement`
+    computed a voxel `np.hypot` unconditionally, whether or not the header's
+    voxel size was known, so every schema <= 5 artifact's stored numbers *are*
+    voxels -- a documented fact about the old format, not a value only this
+    build could derive. `displacement_unit` is recorded as "vox" outright, not
+    left unknown; unlike, say, `phantom_contrast`, `LengthUnit` has no unknown
+    state to fall back on ("mm"/"vox" is all `fwhm_unit` has ever offered).
+
+    This can leave a migrated artifact with `displacement_unit` disagreeing
+    with `fwhm_unit` -- e.g. "vox" beside a `fwhm_unit` of "mm", when the
+    voxel size was known but schema 5 never used it for these two peaks. That
+    is real history, not a bug: only an artifact this build produces itself is
+    guaranteed to have both fields agree (see `Measurements.displacement_unit`).
+    The stored `max_translation`/`max_com_displacement` values themselves are
+    left untouched -- converting them to mm now, using `Provenance.voxel_mm`,
+    would publish this build's convention as if it were the measurement the
+    writing build made.
+    """
+    document["measurements"]["displacement_unit"] = "vox"
+    return document
+
+
 # One step per version: `_MIGRATIONS[n]` takes a document at schema `n` and
 # returns it at `n + 1`. Applied in sequence, so a v1 file reaches the current
 # schema through every intermediate step and each migration only has to know
@@ -87,6 +114,7 @@ _MIGRATIONS: dict[int, Callable[[dict[str, Any]], dict[str, Any]]] = {
     2: _v2_to_v3,
     3: _v3_to_v4,
     4: _v4_to_v5,
+    5: _v5_to_v6,
 }
 
 
