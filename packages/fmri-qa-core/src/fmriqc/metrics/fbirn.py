@@ -45,19 +45,34 @@ def _roi_cv(
     ROI-averaging the per-voxel `fluctuations` equals detrending the ROI-mean
     timeseries (detrending commutes with the spatial mean), and the temporal
     mean of that timeseries is the ROI mean of `mean_image`.
+
+    NaN if the ROI mean signal is exactly zero -- background or a suppressed
+    reconstruction -- rather than the `RuntimeWarning`-raising division numpy
+    would otherwise perform: the estimator could not resolve the quantity, the
+    same as its siblings, not an accident of the ROI landing on nothing.
     """
     roi = roi_indexes(roi_center, k)
     roi_fluct = fluctuations[*roi].mean(axis=(0, 1))
-    return float(np.std(roi_fluct, mean=0) / mean_image[*roi].mean())
+    roi_signal = mean_image[*roi].mean()
+    if roi_signal == 0.0:
+        return float("nan")
+    return float(np.std(roi_fluct, mean=0) / roi_signal)
 
 
 def _roi_cv1(
     fluctuation_noise: FloatArray, mean_image: FloatArray, roi_center: IntArray, k: int
 ) -> float:
-    """Single-voxel CV pooled over a k x k ROI: RMS(noise) / ROI mean signal."""
+    """Single-voxel CV pooled over a k x k ROI: RMS(noise) / ROI mean signal.
+
+    NaN on a zero ROI mean signal, for the same reason as `_roi_cv`: the
+    estimator could not resolve the quantity, not a warning-worthy accident.
+    """
     roi = roi_indexes(roi_center, k)
     s = fluctuation_noise[*roi]
-    return float(np.sqrt(np.mean(s**2)) / mean_image[*roi].mean())
+    roi_signal = mean_image[*roi].mean()
+    if roi_signal == 0.0:
+        return float("nan")
+    return float(np.sqrt(np.mean(s**2)) / roi_signal)
 
 
 def weisskoff(images: QAImages, roi: ROI) -> WeisskoffResult:
@@ -77,10 +92,11 @@ def weisskoff(images: QAImages, roi: ROI) -> WeisskoffResult:
         [_roi_cv(fluctuations, mean_image, roi.center, int(k)) for k in roi_sizes]
     )
     cv1 = np.array([_roi_cv1(noise, mean_image, roi.center, int(k)) for k in roi_sizes])
-
-    idx = roi.index
-    s = noise[*idx]
-    cv1_pooled = float(np.sqrt(np.mean(s**2)) / mean_image[*idx].mean())
+    # cv1[-1] is _roi_cv1 at k = roi.size, which is exactly the pooled CV over
+    # the full ROI: reuse it rather than recomputing the same ratio inline,
+    # which would bypass the helper's zero-signal guard and re-open the warning
+    # this function exists to avoid.
+    cv1_pooled = float(cv1[-1])
 
     return WeisskoffResult(
         roi_sizes=roi_sizes,
@@ -146,16 +162,30 @@ def sfnr(images: QAImages, roi: ROI) -> float:
 
 
 def drift_percent(images: QAImages, roi: ROI) -> float:
-    """Peak-to-peak of the ROI-mean fitted trend, as % of the ROI mean signal."""
+    """Peak-to-peak of the ROI-mean fitted trend, as % of the ROI mean signal.
+
+    NaN if the ROI mean signal is exactly zero (background, or a suppressed
+    reconstruction): a percentage of nothing is undefined, and the estimator
+    could not resolve the quantity, rather than the divide-by-zero numpy would
+    otherwise warn about.
+    """
     idx = roi.index
     trend_roi = images.trend[*idx].mean(axis=(0, 1))
     signal = images.mean_image[*idx].mean()
+    if signal == 0.0:
+        return float("nan")
     return float(100.0 * (trend_roi.max() - trend_roi.min()) / signal)
 
 
 def percent_fluctuation(images: QAImages, roi: ROI) -> float:
-    """SD of the ROI-mean residual, as % of the ROI mean signal (fBIRN)."""
+    """SD of the ROI-mean residual, as % of the ROI mean signal (fBIRN).
+
+    NaN on a zero ROI mean signal, for the same reason as `drift_percent`: the
+    estimator could not resolve the quantity, not a warning-worthy accident.
+    """
     idx = roi.index
     resid_roi = images.fluctuations[*idx].mean(axis=(0, 1))
     signal = images.mean_image[*idx].mean()
+    if signal == 0.0:
+        return float("nan")
     return float(100.0 * np.std(resid_roi, mean=0) / signal)

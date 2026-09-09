@@ -10,6 +10,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
+from ..exceptions import InvalidScanError
 from ..types import FloatArray
 
 # Plausible ADC saturation rails. A clipped magnitude image piles up at a
@@ -95,7 +96,18 @@ def detect_saturation(
     drops): clips in the first `trim` volumes (`n_clipped_pre`) don't reach the
     statistics, while clips in the kept volumes (`n_clipped_kept`) bias them.
     A lone sample on the rail is likely a bright voxel; a pile-up is saturation.
+
+    Raises:
+        InvalidScanError: If `slope` is zero, infinite, or NaN. The rail test
+            below divides by `slope` to undo the scaling, so a non-finite or
+            zero value makes it meaningless -- not a series with no clipping,
+            which is what a caller silently getting `suspected=False` back
+            would read this as. Refusing is safer than a wrong "clean" verdict.
     """
+    if not np.isfinite(slope) or slope == 0.0:
+        raise InvalidScanError(
+            "slope", slope, "expected a finite, nonzero scaling to recover stored units"
+        )
     # A negative NIfTI slope reverses the extrema in image units; the rail is
     # always the maximum in stored units.
     ceiling = float(np.max(data) if slope > 0 else np.min(data))

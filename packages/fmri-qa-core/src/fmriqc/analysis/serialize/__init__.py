@@ -94,6 +94,15 @@ def save_artifact(artifact: QAArtifact, path: str | Path) -> Path:
             # splat could in principle carry that name. Our keys are dotted paths,
             # never it.
             np.savez_compressed(fh, **payload)  # type: ignore[arg-type]
+            # The rename below is only as durable as the bytes it renames: without
+            # this, both the file data and the directory's rename record can still
+            # be sitting in a page cache that a power loss or crash never flushes,
+            # and the survivor is a zero-length or truncated file wearing the final
+            # name -- exactly the half-written archive atomicity was meant to rule
+            # out, just moved from "mid-write" to "mid-write, then a clean-looking
+            # rename over it."
+            fh.flush()
+            os.fsync(fh.fileno())
         tmp.replace(out)
     finally:
         # A no-op once the move succeeded; the cleanup that matters is the one

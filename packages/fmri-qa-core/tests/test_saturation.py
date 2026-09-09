@@ -1,7 +1,9 @@
 """ADC-saturation detection: rail inference and pile-up counting."""
 
 import numpy as np
+import pytest
 
+from fmriqc.exceptions import InvalidScanError
 from fmriqc.metrics.saturation import _saturation_bits, detect_saturation
 
 
@@ -44,3 +46,15 @@ def test_detect_saturation_recovers_stored_integer_with_slope() -> None:
     data[0, 0, 0, 2] = 8190.0
     result = detect_saturation(data, slope=2.0, inter=0.0)
     assert result.bits == 12
+
+
+@pytest.mark.parametrize("slope", [0.0, float("nan"), float("inf")])
+def test_detect_saturation_refuses_an_unusable_slope(slope) -> None:
+    """A zero or non-finite slope can't recover stored units, so the rail test
+    is meaningless -- reporting a clean series would be a wrong answer, not a
+    safe default, so this must raise rather than silently return `suspected=False`.
+    """
+    data = np.zeros((2, 2, 1, 3))
+    with pytest.raises(InvalidScanError) as excinfo:
+        detect_saturation(data, slope=slope)
+    assert excinfo.value.field == "slope"

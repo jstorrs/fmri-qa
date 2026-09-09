@@ -7,8 +7,9 @@ but coordinates, counts, and analysis settings must be usable.
 
 import math
 from dataclasses import fields
+from functools import cache
 from types import UnionType
-from typing import Any, Literal, get_args, get_origin
+from typing import Any, Literal, get_args, get_origin, get_type_hints
 
 import numpy as np
 
@@ -34,6 +35,25 @@ def _matches(value: object, annotation: Any) -> bool:
     return type(value) is annotation
 
 
+@cache
+def _resolved_annotations(cls: type) -> dict[str, Any]:
+    """Field annotations for `cls`, resolved rather than read off `field.type`.
+
+    `dataclasses.fields(cls).type` is whatever sits in `__annotations__` --
+    the live type object today, since none of these four modules use `from
+    __future__ import annotations` (PEP 563). But nothing enforces that: the
+    day one of them adopts it as a stylistic change, every annotation on that
+    class becomes a plain *string*, and `_matches` would compare `value`
+    against the string `"float"` and reject every field -- loudly, but for a
+    reason nobody would guess from the call site. `get_type_hints` evaluates
+    annotations in the class's own defining module regardless of how they're
+    stored, so the validator is correct either way. The four record classes
+    below are fixed, and this resolution runs on every artifact load and
+    save, so it's cached rather than repeated.
+    """
+    return get_type_hints(cls)
+
+
 def _object(value: Any, name: str) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise ValueError(f"{name} must be a JSON object")
@@ -52,8 +72,9 @@ def validate_document(document: dict[str, Any]) -> None:
     )
     for name, value, cls in records:
         record = _object(value, name)
+        annotations = _resolved_annotations(cls)
         for field in fields(cls):
-            if not _matches(record[field.name], field.type):
+            if not _matches(record[field.name], annotations[field.name]):
                 raise ValueError(f"{name}.{field.name} has an invalid type or value")
     if type(images["has_ghost"]) is not bool:
         raise ValueError("images.has_ghost must be boolean")

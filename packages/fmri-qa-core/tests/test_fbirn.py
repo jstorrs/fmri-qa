@@ -7,6 +7,8 @@ definitions and a regression in the formula (a wrong normalization, mean-vs-sum,
 or axis) changes the number.
 """
 
+import warnings
+
 import numpy as np
 
 from fmriqc.metrics.fbirn import (
@@ -179,6 +181,51 @@ def test_percent_fluctuation_is_residual_sd_over_signal() -> None:
     images = _images(m[:, :, None] + fluct, fluct)
 
     assert np.isclose(percent_fluctuation(images, _full_roi(4)), 3.0)
+
+
+def test_drift_and_fluctuation_are_undefined_on_a_zero_signal_roi() -> None:
+    """A zero-signal ROI (background, or suppressed reconstruction) is NaN.
+
+    And silently so: the divide-by-zero is a decision these estimators make,
+    not an accident numpy should warn about (see the same guard on `_roi_cv`/
+    `_roi_cv1` below). A batch run reprints every warning raised while
+    analyzing a scan, attributed to it, so a flood of uninformative numpy
+    warnings would bury the one warning that actually matters (a phantom
+    localization failure).
+    """
+    zeros = np.zeros((3, 3, 8))
+    images = _images(zeros, zeros)
+    roi = _full_roi(3)
+
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        drift = drift_percent(images, roi)
+        fluctuation = percent_fluctuation(images, roi)
+
+    assert np.isnan(drift)
+    assert np.isnan(fluctuation)
+    assert caught == []
+
+
+def test_weisskoff_is_undefined_on_a_zero_signal_roi_without_warning() -> None:
+    """The same zero-signal guard applies to `_roi_cv`/`_roi_cv1` via `weisskoff`.
+
+    Every entry comes back NaN -- the estimator could not resolve a CV against
+    no signal -- and none of the divisions across every ROI size (`cv`, `cv1`,
+    and the pooled CV they feed) emits a warning.
+    """
+    zeros = np.zeros((3, 3, 8))
+    images = _images(zeros, zeros)
+
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        wk = weisskoff(images, _full_roi(3))
+
+    assert np.all(np.isnan(wk.cv))
+    assert np.all(np.isnan(wk.cv1))
+    assert np.isnan(wk.cv1_pooled)
+    assert np.isnan(wk.rdc)
+    assert caught == []
 
 
 def test_rdc_is_one_when_every_voxel_shares_the_same_fluctuation() -> None:
