@@ -305,6 +305,22 @@ This runs [dcm2niix](https://github.com/rordenlab/dcm2niix) and adds the two
 things that are easy to get wrong: the flags that keep a series *checkable*, and
 names that read and sort.
 
+### Why convert rather than read DICOM
+
+`fmri-qa` analyzes NIfTI, and its DICOM support is this command. That is a
+deliberate boundary, not a missing feature. Reading DICOM directly would mean
+owning the vendor complexity of turning it into a series — Siemens mosaics and
+CSA headers, GE private tags, Philips' two rescale conventions, enhanced
+multi-frame against classic, and the grouping of frames into volumes across
+echoes, coils and dynamics. dcm2niix does that for every vendor and keeps doing
+it as scanners change; duplicating it here would be a permanent second job.
+
+The phase-encode direction shows how far that already goes. `fmri-qa` reads
+`PhaseEncodingDirection` from the sidecar — which is not a DICOM tag. No tag
+carries the BIDS axis-and-polarity answer; dcm2niix derives it from vendor
+private data. So the loader already runs on dcm2niix's conclusions, and reading
+DICOM here would not drop a dependency, only reimplement one.
+
 ### The flags it pins
 
 dcm2niix has some thirty options and most are matters of taste. Four are not —
