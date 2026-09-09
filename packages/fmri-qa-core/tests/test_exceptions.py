@@ -11,7 +11,7 @@ from fmriqc.exceptions import (
     IncompatibleScansError,
     InvalidChoiceError,
 )
-from fmriqc.hilo import _require_compatible_scans
+from fmriqc.hilo.compatibility import require_compatible_scans
 from fmriqc.prep.detrend import detrend_fn
 from fmriqc.prep.geometry import resolve_roi
 from fmriqc.prep.imaging import extract_center_slice
@@ -73,7 +73,7 @@ def test_hilo_rejects_mismatched_acquisition(field: str) -> None:
         low = replace(low, meta=replace(meta, te=0.04))
 
     with pytest.raises(IncompatibleScansError) as info:
-        _require_compatible_scans(high, low)
+        require_compatible_scans(high, low)
     assert info.value.field == field
     assert repr(info.value.high_value) != repr(info.value.low_value)
 
@@ -83,7 +83,7 @@ def test_hilo_accepts_small_affine_roundoff() -> None:
     affine = np.eye(4)
     affine[0, 3] = 1e-6
     low = replace(high, affine=affine)
-    _require_compatible_scans(high, low)
+    require_compatible_scans(high, low)
 
 
 @pytest.mark.parametrize("kwargs", [{"erode": -1}, {"trim_sec": 1_000.0}])

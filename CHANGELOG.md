@@ -204,6 +204,16 @@ versioning when the first stable public interface is released.
   caller uses is unchanged — `fmriqc.cli:main`, `fmriqc.cli:hilo_main`,
   `fmriqc.save_artifact`/`load_artifact`, `fmriqc_report.write_report` — and
   no rendered output changed.
+- `fmriqc.hilo` (307 lines) is now a subpackage by the same rule: `result`
+  holds `HiLoResult` and the pure `separate_noise` algebra that fills it,
+  `mask` holds `phantom_core_mask` and its `HILO_ERODE` tuning constant,
+  `stats` holds the per-scan mean/SD reduction, and `compatibility` holds the
+  geometry/acquisition checks; `__init__` keeps the `run_hilo` orchestration.
+  `fmriqc.hilo`, `run_hilo`, `HiLoResult`, `separate_noise`, `phantom_core_mask`,
+  and `HILO_ERODE` all still import from `fmriqc` exactly as before, and
+  `fmriqc.__all__` is unchanged. The two helpers `run_hilo` calls across the
+  new module boundary are now public (`hilo_stats`, `require_compatible_scans`)
+  rather than underscore-prefixed, for the same reason as below.
 - The report's format-agnostic content API is spelled public, since the
   format drivers in `formats/` are documented to consume it: `panels.timeseries`
   exports `plot_*`, `panels.images` exports `panel_figs`, and `summary` exports
