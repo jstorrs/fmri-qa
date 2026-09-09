@@ -7,7 +7,9 @@ subpackages (`ls` the package to find a concern):
                  (`ScanMeta`), `pe_axis` (phase-encode resolution),
                  `repetition_time` (TR resolution)
 * `prep`      -- preprocessing infrastructure: `imaging` (raw-array ops),
-                 `detrend`, `geometry` (phantom/ROI), `images` (`QAImages`)
+                 `detrend`, `geometry` (phantom/ROI), `images` (`QAImages`),
+                 `scale` (`VoxelSize`: the in-plane voxel size, and the unit
+                 every length measured against it carries)
 * `metrics`   -- the physics tests, one module per family: `fbirn`
                  (SNR/SFNR/RDC/drift), `artifacts` (spikes/outliers), `ghost`
                  (`estimate_ghost`: the whole Nyquist-ghost family off one build
@@ -145,6 +147,7 @@ if TYPE_CHECKING:
         trim_count,
         trim_initial,
     )
+    from .prep.scale import VoxelSize
     from .types import (
         DETREND_METHODS,
         FBIRN_ROI_SIZE,
@@ -201,6 +204,7 @@ __all__ = [
     "ScanMeta",
     "SmoothnessResult",
     "SpikeResult",
+    "VoxelSize",
     "WeisskoffCurve",
     "WeisskoffResult",
     "analyze",
@@ -353,6 +357,7 @@ _EXPORTS: dict[str, tuple[str, ...]] = {
         "trim_count",
         "trim_initial",
     ),
+    ".prep.scale": ("VoxelSize",),
     ".version": ("core_version",),
     ".types": (
         "DETREND_METHODS",

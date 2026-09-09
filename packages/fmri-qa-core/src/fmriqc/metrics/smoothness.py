@@ -12,7 +12,8 @@ from dataclasses import dataclass
 import numpy as np
 
 from .._arrays import ArrayValue
-from ..prep.imaging import geomean, normalize_voxel_mm
+from ..prep.imaging import geomean
+from ..prep.scale import UNKNOWN_VOXEL_SIZE, VoxelSize
 from ..types import BoolArray, FloatArray, IntArray, PeAxis, readout_axis
 
 # Gaussian FWHM per standard deviation: sqrt(8 ln 2) (AFNI 3dFWHMx uses 2.35482).
@@ -44,30 +45,26 @@ class SmoothnessResult(ArrayValue):
     Gaussian `psf_model` from the measured FWHM give the directional point-spread
     profile -- PE/RO asymmetry is anisotropic reconstruction smoothing.
 
-    `fwhm_vox` is (axis 0, axis 1) in voxels; `voxel_mm` carries the in-plane
-    voxel size so lengths can be reported in mm. A NaN FWHM means the estimator
-    could not resolve smoothness on that axis (too little correlation, or too few
-    in-mask pairs).
+    `fwhm_vox` is (axis 0, axis 1) in voxels; `voxel` carries the in-plane voxel
+    size and so decides the unit the reported lengths carry. A NaN FWHM means
+    the estimator could not resolve smoothness on that axis (too little
+    correlation, or too few in-mask pairs).
     """
 
     fwhm_vox: tuple[float, float]
     lags: IntArray  # (n_lag,) integer voxel lags 0..L
     acf: FloatArray  # (2, n_lag): per-axis autocorrelation
-    voxel_mm: tuple[float, float] | None = None
+    voxel: VoxelSize = UNKNOWN_VOXEL_SIZE  # mm/voxel, and the unit it implies
     pe_axis: PeAxis | None = None  # array axis of the phase-encode direction
 
     # -- per-axis helpers ---------------------------------------------------- #
-    def _mm_per(self, axis: PeAxis) -> float:
-        """mm per voxel along `axis` (1.0 when the voxel size is unknown)."""
-        return self.voxel_mm[axis] if self.voxel_mm is not None else 1.0
-
     def fwhm_axis(self, axis: PeAxis) -> float:
-        """FWHM along an array `axis`, in mm if the voxel size is known, else voxels."""
-        return self.fwhm_vox[axis] * self._mm_per(axis)
+        """FWHM along an array `axis`, in `voxel.unit`."""
+        return self.fwhm_vox[axis] * self.voxel.per_axis(axis)
 
     def displacement(self, axis: PeAxis) -> FloatArray:
-        """Lag axis for `axis` as a length (mm if voxel size is known, else voxels)."""
-        return np.asarray(self.lags * self._mm_per(axis), dtype=np.float64)
+        """Lag axis for `axis` as a length, in `voxel.unit`."""
+        return np.asarray(self.lags * self.voxel.per_axis(axis), dtype=np.float64)
 
     def psf_empirical(self, axis: PeAxis) -> FloatArray:
         """Empirical PSF profile along `axis`: the squared noise autocorrelation.
@@ -108,13 +105,16 @@ class SmoothnessResult(ArrayValue):
     # -- combined (AFNI ccomb) ---------------------------------------------- #
     @property
     def fwhm_mm(self) -> tuple[float, float] | None:
-        """(axis 0, axis 1) FWHM in mm, or None if voxel sizes are unknown."""
-        if self.voxel_mm is None:
+        """(axis 0, axis 1) FWHM in mm, or None if voxel sizes are unknown.
+
+        Unlike `fwhm_axis`, this one answers None rather than falling back to
+        voxels: it promises millimetres in its name, so an unknown voxel size
+        has no answer to give.
+        """
+        mm = self.voxel.mm
+        if mm is None:
             return None
-        return (
-            self.fwhm_vox[0] * self.voxel_mm[0],
-            self.fwhm_vox[1] * self.voxel_mm[1],
-        )
+        return (self.fwhm_vox[0] * mm[0], self.fwhm_vox[1] * mm[1])
 
     @property
     def fwhm_combined_vox(self) -> float:
@@ -129,7 +129,7 @@ class SmoothnessResult(ArrayValue):
 
     @property
     def fwhm(self) -> float:
-        """Combined FWHM in mm if the voxel size is known, else in voxels."""
+        """Combined FWHM, in `voxel.unit`."""
         mm = self.fwhm_combined_mm
         return mm if mm is not None else self.fwhm_combined_vox
 
@@ -252,7 +252,10 @@ def estimate_smoothness(
     lags = np.arange(lag + 1)
     acf = _directional_acf(scaled, work_mask, lag)
 
-    vm = normalize_voxel_mm(voxel_mm)
     return SmoothnessResult(
-        fwhm_vox=fwhm_vox, lags=lags, acf=acf, voxel_mm=vm, pe_axis=pe_axis
+        fwhm_vox=fwhm_vox,
+        lags=lags,
+        acf=acf,
+        voxel=VoxelSize(voxel_mm),
+        pe_axis=pe_axis,
     )

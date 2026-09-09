@@ -12,7 +12,8 @@ from dataclasses import dataclass
 import numpy as np
 
 from .._arrays import ArrayValue
-from ..prep.imaging import edge_valid_mask, normalize_voxel_mm
+from ..prep.imaging import edge_valid_mask
+from ..prep.scale import UNKNOWN_VOXEL_SIZE, VoxelSize
 from ..types import BoolArray, FloatArray
 
 
@@ -38,7 +39,7 @@ class CenterOfMassResult(ArrayValue):
 
     com: FloatArray  # (n_t, 2) per-frame circular COM (voxels, [0, N))
     shape: tuple[int, int]  # in-plane (N0, N1): the axis wrap periods
-    voxel_mm: tuple[float, float] | None = None
+    voxel: VoxelSize = UNKNOWN_VOXEL_SIZE  # mm/voxel, and the unit it implies
 
     @property
     def reference(self) -> FloatArray:
@@ -67,15 +68,12 @@ class CenterOfMassResult(ArrayValue):
 
     @property
     def displacement(self) -> FloatArray:
-        """(n_t,) centroid displacement per volume (mm if known, else voxels)."""
-        d = self.deviation
-        if self.voxel_mm is not None:
-            d = d * np.asarray(self.voxel_mm)
-        return np.hypot(d[:, 0], d[:, 1])
+        """(n_t,) centroid displacement per volume, in `voxel.unit`."""
+        return self.voxel.magnitude(self.deviation)
 
     @property
     def max_displacement(self) -> float:
-        """Peak per-volume centroid displacement (mm if `voxel_mm` known, else voxels).
+        """Peak per-volume centroid displacement, in `voxel.unit`.
 
         The peak of `displacement`, so it shares that property's unit. Uses
         `nanmax`, not `max`: unlike `MotionResult` (a registration that either
@@ -162,5 +160,4 @@ def estimate_center_of_mass(
         ang = np.arctan2(np.sin(theta) @ W, np.cos(theta) @ W)
         com[good, axis] = (ang[good] % (2.0 * np.pi)) * shape[axis] / (2.0 * np.pi)
 
-    vm = normalize_voxel_mm(voxel_mm)
-    return CenterOfMassResult(com=com, shape=shape, voxel_mm=vm)
+    return CenterOfMassResult(com=com, shape=shape, voxel=VoxelSize(voxel_mm))

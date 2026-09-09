@@ -13,7 +13,7 @@ import numpy as np
 from scipy import ndimage
 
 from .._arrays import ArrayValue
-from ..prep.imaging import normalize_voxel_mm
+from ..prep.scale import UNKNOWN_VOXEL_SIZE, VoxelSize
 from ..types import BoolArray, FloatArray
 
 # Per-volume registration budget (in-plane phantom motion). Phantom drift is
@@ -44,7 +44,7 @@ class MotionResult(ArrayValue):
     """
 
     params: FloatArray  # (n_t, 5): dr, dc, sr, sc, shear
-    voxel_mm: tuple[float, float] | None = None  # in-plane (axis0, axis1) mm/voxel
+    voxel: VoxelSize = UNKNOWN_VOXEL_SIZE  # mm/voxel, and the unit it implies
 
     @property
     def converged(self) -> BoolArray:
@@ -73,18 +73,16 @@ class MotionResult(ArrayValue):
 
     @property
     def displacement(self) -> FloatArray:
-        """(n_t,) translation magnitude per volume, in mm if `voxel_mm` is known.
+        """(n_t,) translation magnitude per volume, in `voxel.unit`.
 
-        Falls back to voxels when the in-plane voxel size is unavailable.
+        Millimetres when the in-plane voxel size is known, voxels when it is
+        not; `VoxelSize.magnitude` is the one place that choice is made.
         """
-        d = self.params[:, 0:2]
-        if self.voxel_mm is not None:
-            d = d * np.asarray(self.voxel_mm)
-        return np.hypot(d[:, 0], d[:, 1])
+        return self.voxel.magnitude(self.params[:, 0:2])
 
     @property
     def max_translation(self) -> float:
-        """Peak per-volume translation magnitude (mm if known, else voxels).
+        """Peak per-volume translation magnitude, in `voxel.unit`.
 
         The peak of `displacement`, so it shares that property's unit. Uses
         `np.max`, not `nanmax`: a failed frame is all-NaN (see `converged`), and
@@ -190,7 +188,7 @@ def estimate_motion(
         params[t] = _register_norotate(
             center_slice[..., t], reference, rr, cc, center, mask, max_iter, tol
         )
-    result = MotionResult(params=params, voxel_mm=normalize_voxel_mm(voxel_mm))
+    result = MotionResult(params=params, voxel=VoxelSize(voxel_mm))
     failed = int((~result.converged).sum())
     if failed:
         warnings.warn(

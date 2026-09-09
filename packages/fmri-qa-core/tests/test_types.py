@@ -5,6 +5,7 @@ import pytest
 
 from fmriqc import ROI, MotionResult, QAImages, SaturationResult
 from fmriqc.prep.imaging import roi_indexes
+from fmriqc.prep.scale import VoxelSize
 
 
 def test_roi_index_matches_roi_indexes() -> None:
@@ -50,10 +51,10 @@ def test_saturation_clipped_but_not_kept_when_only_warmup_clips() -> None:
 def test_motion_result_derived_views() -> None:
     params = np.zeros((3, 5))
     params[1] = [1.0, 0.0, 0.02, 0.0, 0.0]  # 1 voxel translation, 2% scale on axis 0
-    motion = MotionResult(params=params, voxel_mm=(2.0, 2.0))
+    motion = MotionResult(params=params, voxel=VoxelSize((2.0, 2.0)))
     assert np.allclose(motion.translation, params[:, 0:2])
     assert np.isclose(motion.max_scale_pct, 2.0)
-    # displacement uses voxel_mm: a 1-voxel move at 2 mm/voxel is 2 mm
+    # displacement scales by `voxel`: a 1-voxel move at 2 mm/voxel is 2 mm
     assert np.isclose(motion.displacement[1], 2.0)
     # max_translation is the peak of displacement, so it shares its unit
     assert np.isclose(motion.max_translation, 2.0)

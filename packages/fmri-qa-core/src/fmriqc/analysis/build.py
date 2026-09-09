@@ -21,7 +21,7 @@ from ..load.scan import QAScan
 from ..metrics.smoothness import SmoothnessResult
 from ..pipeline import AnalysisSettings, QAResult, run_qa
 from ..prep.geometry import ROI, roi_fits
-from ..types import BoolArray, FloatArray, LengthUnit, PeAxis, PeLabel, readout_axis
+from ..types import BoolArray, FloatArray, PeAxis, PeLabel, readout_axis
 from ..version import core_version
 from .artifact import (
     ArtifactImages,
@@ -187,11 +187,11 @@ def _measurements(result: QAResult, settings: AnalysisSettings) -> Measurements:
         max_scale_pct=m.motion.max_scale_pct,
         max_shear_pct=m.motion.max_shear_pct,
         max_com_displacement=m.center_of_mass.max_displacement,
-        displacement_unit="mm" if m.motion.voxel_mm is not None else "vox",
+        displacement_unit=m.motion.voxel.unit,
         fwhm=sm.fwhm,
         fwhm_pe=sm.fwhm_pe,
         fwhm_ro=sm.fwhm_ro,
-        fwhm_unit="mm" if sm.voxel_mm is not None else "vox",
+        fwhm_unit=sm.voxel.unit,
         phantom_fraction=result.geom.fraction,
         phantom_contrast=result.geom.contrast,
         phantom_mask_ok=result.geom.plausible,
@@ -258,8 +258,7 @@ def _psf_curves(s: SmoothnessResult) -> PsfCurves:
         dirs = (("PE", s.pe_axis), ("RO", readout_axis(s.pe_axis)))
     else:  # no PE axis resolved -- fall back to raw array axes
         dirs = (("axis0", 0), ("axis1", 1))
-    unit: LengthUnit = "mm" if s.voxel_mm is not None else "vox"
-    mm_per = [s.voxel_mm[a] if s.voxel_mm is not None else 1.0 for _, a in dirs]
+    mm_per = [s.voxel.per_axis(a) for _, a in dirs]
     fwhm = [s.fwhm_axis(a) for _, a in dirs]
     # An unresolvable axis yields a NaN FWHM; fall back to the voxel-scale floor
     # so the range stays finite and the empirical points remain plottable.
@@ -272,7 +271,7 @@ def _psf_curves(s: SmoothnessResult) -> PsfCurves:
     return PsfCurves(
         labels=(dirs[0][0], dirs[1][0]),
         fwhm=(fwhm[0], fwhm[1]),
-        unit=unit,
+        unit=s.voxel.unit,
         displacement=np.stack([s.displacement(a) for _, a in dirs]),
         empirical=np.stack([s.psf_empirical(a) for _, a in dirs]),
         model_x=model_x,

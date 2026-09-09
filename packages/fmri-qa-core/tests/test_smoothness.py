@@ -12,6 +12,7 @@ import numpy as np
 from scipy.ndimage import gaussian_filter1d
 
 from fmriqc.metrics.smoothness import SmoothnessResult, estimate_smoothness
+from fmriqc.prep.scale import VoxelSize
 
 
 def test_smoothness_result_converts_voxels_to_mm_and_labels_axes() -> None:
@@ -19,7 +20,7 @@ def test_smoothness_result_converts_voxels_to_mm_and_labels_axes() -> None:
         fwhm_vox=(2.0, 4.0),
         lags=np.arange(3),
         acf=np.array([[1.0, 0.5, 0.25], [1.0, 0.8, 0.64]]),
-        voxel_mm=(1.5, 1.5),
+        voxel=VoxelSize((1.5, 1.5)),
         pe_axis=1,
     )
     assert np.isclose(res.fwhm_axis(0), 3.0)  # 2.0 vox * 1.5 mm
@@ -41,7 +42,7 @@ def test_smoothness_result_without_voxel_size_reports_voxels_and_no_direction() 
         fwhm_vox=(2.0, 4.0),
         lags=np.arange(3),
         acf=np.full((2, 3), np.nan),
-        voxel_mm=None,
+        voxel=VoxelSize(),
         pe_axis=None,
     )
     assert np.isclose(res.fwhm_axis(1), 4.0)  # voxels, no mm scaling

@@ -194,6 +194,23 @@ versioning when the first stable public interface is released.
 
 ### Changed
 
+- **The in-plane voxel size is a value object that carries its own unit.**
+  `prep.scale.VoxelSize` holds the in-plane mm/voxel pair (or None when the
+  header did not say) and answers the three questions the length-reporting
+  metrics each used to answer for themselves: `unit` ("mm" when the size is
+  known, else "vox"), `per_axis` (the scale factor, 1.0 when it is not), and
+  `magnitude` (per-axis displacements to a length). `MotionResult`,
+  `CenterOfMassResult` and `SmoothnessResult` now carry a `voxel: VoxelSize`
+  in place of `voxel_mm: tuple[float, float] | None`, and their estimator
+  functions still take a plain `voxel_mm=` tuple, so call sites are unchanged.
+  This removes two byte-identical `displacement` implementations, a third
+  per-axis scaling helper, and the three separate spellings of
+  `"mm" if voxel_mm is not None else "vox"` in the artifact builder;
+  `prep.imaging.normalize_voxel_mm` is superseded by the constructor, which
+  coerces the header's numpy scalars to plain floats. No metric value, unit, or
+  artifact field changed. `Provenance.voxel_mm` and `ScanMeta.voxel_mm` are a
+  different thing (the full three-axis header zooms) and are untouched.
+
 - **The phase-encode axis is a closed type, not a bare `int`.** `PeAxis`
   (`Literal[0, 1]`) and its derived `PE_AXES` tuple join the option `Literal`s
   already in `fmriqc.types`, and everything from `preprocess` inward is
