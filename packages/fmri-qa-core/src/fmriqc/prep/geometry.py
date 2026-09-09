@@ -7,6 +7,7 @@ detected center (`PhantomGeometry`), and the fixed-size, on-image summary `ROI`.
 
 import warnings
 from dataclasses import dataclass
+from typing import assert_never
 
 import numpy as np
 
@@ -137,14 +138,21 @@ def resolve_roi(
     Raises:
         InvalidChoiceError: If `center` is not one of `ROI_CENTER_MODES`.
     """
+    # Guarded up front so an untyped caller still gets the named error, then
+    # matched exhaustively: `assert_never` is unreachable for a `RoiCenter`, so
+    # adding a mode to that Literal makes this a type error rather than a
+    # silent fall-through at runtime.
+    if center not in ROI_CENTER_MODES:
+        raise InvalidChoiceError("ROI center", center, ROI_CENTER_MODES)
     shape = images.center_slice.shape[:2]
     n = min(roi_size, *shape)
-    if center == "image":
-        c = image_center(shape)
-    elif center == "phantom":
-        c = geom.roi_center
-    else:
-        raise InvalidChoiceError("ROI center", center, ROI_CENTER_MODES)
+    match center:
+        case "image":
+            c = image_center(shape)
+        case "phantom":
+            c = geom.roi_center
+        case _:
+            assert_never(center)
     return ROI(center=clamp_center(c, n, shape), size=n)
 
 

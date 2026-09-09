@@ -9,6 +9,7 @@ types, so it can be shared without import cycles.
 
 import math
 import warnings
+from typing import assert_never
 
 import numpy as np
 from scipy import ndimage
@@ -146,10 +147,28 @@ def select_slice(
     Raises:
         InvalidChoiceError: If `center` is not one of `ROI_CENTER_MODES`.
     """
-    if center == "image":
-        return int(data.shape[2] // 2), None
-    if center != "phantom":
+    # Guarded up front so an untyped caller still gets the named error, then
+    # matched exhaustively: `assert_never` is unreachable for a `RoiCenter`, so
+    # adding a mode to that Literal makes this a type error rather than a
+    # silent fall-through at runtime.
+    if center not in ROI_CENTER_MODES:
         raise InvalidChoiceError("center", center, ROI_CENTER_MODES)
+    match center:
+        case "image":
+            return int(data.shape[2] // 2), None
+        case "phantom":
+            return _largest_phantom_slice(data)
+        case _:
+            assert_never(center)
+
+
+def _largest_phantom_slice(data: FloatArray) -> tuple[int, BoolArray]:
+    """The slice with the largest phantom cross-section, and the mask that ranked it.
+
+    Falls back to the middle slice, with a warning, when no slice holds a
+    recognizable phantom -- `phantom_area` scores those 0, so there is no
+    winner to pick and `center="image"`'s answer is the honest one.
+    """
     mip = data.max(axis=-1)
     scored = [_segment_and_score(s) for s in np.moveaxis(mip, -1, 0)]
     areas = [area for _, area in scored]
@@ -161,7 +180,7 @@ def select_slice(
         "no slice holds a recognizable phantom (every segmentation was "
         "degenerate or indistinguishable from background); using the "
         f"middle slice {z} as center='image' would.",
-        stacklevel=3,  # report at the caller of `extract_center_slice`/`preprocess`
+        stacklevel=4,  # through `select_slice` to its caller (`preprocess`)
     )
     return z, scored[z][0]
 

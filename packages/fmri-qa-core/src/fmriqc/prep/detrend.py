@@ -7,6 +7,7 @@ the run length and TR; `detrend_fn` packages a chosen method as a reusable
 """
 
 from collections.abc import Callable
+from typing import assert_never
 
 import numpy as np
 from scipy.interpolate import make_lsq_spline
@@ -108,32 +109,55 @@ def detrend_fn(
         InvalidScanError: If the fit has at least as many coefficients as frames,
             leaving no residual degrees of freedom for noise estimation.
     """
+    # Guarded up front so an untyped caller still gets the named error, then
+    # matched exhaustively: `assert_never` is unreachable for a `DetrendMethod`,
+    # so adding a method to that Literal makes this a type error rather than a
+    # silent fall-through at runtime.
+    if method not in DETREND_METHODS:
+        raise InvalidChoiceError("detrend method", method, DETREND_METHODS)
+    match method:
+        case "poly":
+            return _poly_detrender(center_slice, tr)
+        case "spline":
+            return _spline_detrender(center_slice, tr)
+        case _:
+            assert_never(method)
+
+
+def _poly_detrender(
+    center_slice: FloatArray, tr: float
+) -> tuple[Callable[[FloatArray], FloatArray], int]:
+    """The Legendre detrender for this series length, and its degree."""
     n_frames = center_slice.shape[-1]
-    if method == "poly":
-        degree = poly_degree(center_slice, tr)
-        if degree + 1 >= n_frames:
-            raise InvalidScanError(
-                "detrend order",
-                degree,
-                f"a Legendre fit of degree {degree} leaves no residual degrees "
-                f"of freedom in the {n_frames} analyzed frames, so it would "
-                f"absorb the signal it is meant to detrend; the order follows "
-                f"from the run duration, so check that the TR of {tr:g} is in "
-                f"seconds",
-            )
-        return (lambda y: poly_residuals(y, degree)), degree
-    if method == "spline":
-        n_nodes = spline_nodes(center_slice, tr)
-        n_coefficients = n_nodes + SPLINE_DEGREE + 1
-        if n_coefficients >= n_frames:
-            raise InvalidScanError(
-                "detrend order",
-                n_nodes,
-                f"{n_nodes} interior knots make {n_coefficients} spline "
-                f"coefficients, leaving no residual degrees of freedom in the "
-                f"{n_frames} analyzed frames; the knot count follows from the "
-                f"run duration, so "
-                f"check that the TR of {tr:g} is in seconds",
-            )
-        return (lambda y: spline_residuals(y, n_nodes)), n_nodes
-    raise InvalidChoiceError("detrend method", method, DETREND_METHODS)
+    degree = poly_degree(center_slice, tr)
+    if degree + 1 >= n_frames:
+        raise InvalidScanError(
+            "detrend order",
+            degree,
+            f"a Legendre fit of degree {degree} leaves no residual degrees "
+            f"of freedom in the {n_frames} analyzed frames, so it would "
+            f"absorb the signal it is meant to detrend; the order follows "
+            f"from the run duration, so check that the TR of {tr:g} is in "
+            f"seconds",
+        )
+    return (lambda y: poly_residuals(y, degree)), degree
+
+
+def _spline_detrender(
+    center_slice: FloatArray, tr: float
+) -> tuple[Callable[[FloatArray], FloatArray], int]:
+    """The B-spline detrender for this series length, and its interior-knot count."""
+    n_frames = center_slice.shape[-1]
+    n_nodes = spline_nodes(center_slice, tr)
+    n_coefficients = n_nodes + SPLINE_DEGREE + 1
+    if n_coefficients >= n_frames:
+        raise InvalidScanError(
+            "detrend order",
+            n_nodes,
+            f"{n_nodes} interior knots make {n_coefficients} spline "
+            f"coefficients, leaving no residual degrees of freedom in the "
+            f"{n_frames} analyzed frames; the knot count follows from the "
+            f"run duration, so "
+            f"check that the TR of {tr:g} is in seconds",
+        )
+    return (lambda y: spline_residuals(y, n_nodes)), n_nodes

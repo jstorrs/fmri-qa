@@ -194,6 +194,20 @@ versioning when the first stable public interface is released.
 
 ### Changed
 
+- **Adding an option to a closed set is now a type error at every place that
+  dispatches on it.** The three functions that switch on an option `Literal`
+  -- `detrend_fn` (`DetrendMethod`), `resolve_roi` and `select_slice`
+  (`RoiCenter`) -- ended in a fall-through `raise InvalidChoiceError`, so a new
+  method or localization mode type-checked clean everywhere and failed only at
+  runtime, on the scan that first used it. Each now guards the runtime contract
+  up front and then matches exhaustively, ending in `typing.assert_never`:
+  the guard keeps the same `InvalidChoiceError` and message for an untyped
+  caller, while the match makes an unhandled member fail `mypy` and `pyright`.
+  `detrend_fn`'s two branches move into `_poly_detrender`/`_spline_detrender`
+  and `select_slice`'s phantom search into `_largest_phantom_slice`, so the
+  dispatch reads as dispatch. No behaviour changed, warning attribution
+  included.
+
 - **A detected clip rail is one object, so its fields cannot come apart.**
   `SaturationResult` carried `ceiling`, `bits`, `worst_volume` and
   `worst_count` as four independently-optional fields that `detect_saturation`
