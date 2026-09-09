@@ -17,7 +17,7 @@ import numpy as np
 from skimage.morphology import isotropic_dilation, isotropic_erosion
 
 from .._arrays import ArrayValue
-from ..types import BoolArray, FloatArray
+from ..types import PE_AXES, BoolArray, FloatArray, PeAxis, readout_axis
 
 # Fraction of the brightest ghost-region voxels averaged for the localized-ghost
 # statistic (Greve / bxh fmriqa_ghostiness "top-10%"): catches a concentrated
@@ -32,7 +32,7 @@ GHOST_RADIUS = 3
 
 def ghost_masks(
     phantom_mask: BoolArray,
-    pe_axis: int,
+    pe_axis: PeAxis,
     radius: int = GHOST_RADIUS,
     valid_mask: BoolArray | None = None,
 ) -> tuple[BoolArray, BoolArray]:
@@ -102,7 +102,7 @@ class GhostResult(ArrayValue):
 
     Built by `estimate_ghost` from the masks it carries: `pe_signal`/`pe_ghost`
     are the region-matched pair along the resolved phase-encode axis, and
-    `ro_signal`/`ro_ghost` the same pair along the readout axis (`1 - pe_axis`),
+    `ro_signal`/`ro_ghost` the same pair along the readout axis (`readout_axis`),
     which is a background-relative baseline because no N/2 ghost lands there.
     Every ratio below was averaged over exactly these masks, so a report drawing
     them is drawing what was measured.
@@ -114,7 +114,7 @@ class GhostResult(ArrayValue):
     axis, or the segmentation collapsed.
     """
 
-    pe_axis: int
+    pe_axis: PeAxis
     radius: int
     pe_signal: BoolArray
     pe_ghost: BoolArray
@@ -167,7 +167,7 @@ class GhostResult(ArrayValue):
 def estimate_ghost(
     mean_image: FloatArray,
     phantom_mask: BoolArray,
-    pe_axis: int,
+    pe_axis: PeAxis,
     *,
     valid_mask: BoolArray,
     radius: int = GHOST_RADIUS,
@@ -184,7 +184,8 @@ def estimate_ghost(
     excludes zeroed image edges (see `edge_valid_mask`).
     """
     pe_signal, pe_ghost = ghost_masks(phantom_mask, pe_axis, radius, valid_mask)
-    ro_signal, ro_ghost = ghost_masks(phantom_mask, 1 - pe_axis, radius, valid_mask)
+    ro_axis = readout_axis(pe_axis)
+    ro_signal, ro_ghost = ghost_masks(phantom_mask, ro_axis, radius, valid_mask)
     return GhostResult(
         pe_axis=pe_axis,
         radius=radius,
@@ -201,7 +202,7 @@ def estimate_ghost(
 def ghost_ratio(
     mean_image: FloatArray,
     phantom_mask: BoolArray,
-    pe_axis: int = 0,
+    pe_axis: PeAxis = 0,
     radius: int = GHOST_RADIUS,
     *,
     valid_mask: BoolArray,
@@ -228,7 +229,7 @@ def ghost_ratios(
     radius: int = GHOST_RADIUS,
     *,
     valid_mask: BoolArray,
-) -> dict[int, float]:
+) -> dict[PeAxis, float]:
     """`ghost_ratio` for both in-plane axes, keyed by axis index.
 
     Rolling the phantom along the *true* PE axis lines the ghost region up with
@@ -242,7 +243,7 @@ def ghost_ratios(
         axis: ghost_ratio(
             mean_image, phantom_mask, pe_axis=axis, radius=radius, valid_mask=valid_mask
         )
-        for axis in (0, 1)
+        for axis in PE_AXES
     }
 
 
@@ -252,7 +253,7 @@ def estimate_pe_axis(
     radius: int = GHOST_RADIUS,
     *,
     valid_mask: BoolArray,
-) -> int | None:
+) -> PeAxis | None:
     """Guess the phase-encode axis from where the Nyquist ghost actually lands.
 
     The axis with the larger `ghost_ratios` ratio wins, but only among axes the
@@ -267,5 +268,11 @@ def estimate_pe_axis(
     trusting it.
     """
     ratios = ghost_ratios(mean_image, phantom_mask, radius, valid_mask=valid_mask)
-    measurable = [axis for axis, ratio in ratios.items() if np.isfinite(ratio)]
-    return max(measurable, key=ratios.__getitem__) if measurable else None
+    # Annotated: inferring the element type from the comprehension widens the
+    # axes back to `int`, and the `ratios` lookup below only accepts a `PeAxis`.
+    measurable: list[PeAxis] = [
+        axis for axis, ratio in ratios.items() if np.isfinite(ratio)
+    ]
+    if not measurable:
+        return None
+    return max(measurable, key=ratios.__getitem__)

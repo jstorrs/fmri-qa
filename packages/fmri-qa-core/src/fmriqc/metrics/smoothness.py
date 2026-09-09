@@ -13,7 +13,7 @@ import numpy as np
 
 from .._arrays import ArrayValue
 from ..prep.imaging import geomean, normalize_voxel_mm
-from ..types import BoolArray, FloatArray, IntArray
+from ..types import BoolArray, FloatArray, IntArray, PeAxis, readout_axis
 
 # Gaussian FWHM per standard deviation: sqrt(8 ln 2) (AFNI 3dFWHMx uses 2.35482).
 SIGMA_TO_FWHM = float(np.sqrt(8.0 * np.log(2.0)))
@@ -54,22 +54,22 @@ class SmoothnessResult(ArrayValue):
     lags: IntArray  # (n_lag,) integer voxel lags 0..L
     acf: FloatArray  # (2, n_lag): per-axis autocorrelation
     voxel_mm: tuple[float, float] | None = None
-    pe_axis: int | None = None  # array axis of the phase-encode direction
+    pe_axis: PeAxis | None = None  # array axis of the phase-encode direction
 
     # -- per-axis helpers ---------------------------------------------------- #
-    def _mm_per(self, axis: int) -> float:
+    def _mm_per(self, axis: PeAxis) -> float:
         """mm per voxel along `axis` (1.0 when the voxel size is unknown)."""
         return self.voxel_mm[axis] if self.voxel_mm is not None else 1.0
 
-    def fwhm_axis(self, axis: int) -> float:
+    def fwhm_axis(self, axis: PeAxis) -> float:
         """FWHM along an array `axis`, in mm if the voxel size is known, else voxels."""
         return self.fwhm_vox[axis] * self._mm_per(axis)
 
-    def displacement(self, axis: int) -> FloatArray:
+    def displacement(self, axis: PeAxis) -> FloatArray:
         """Lag axis for `axis` as a length (mm if voxel size is known, else voxels)."""
         return np.asarray(self.lags * self._mm_per(axis), dtype=np.float64)
 
-    def psf_empirical(self, axis: int) -> FloatArray:
+    def psf_empirical(self, axis: PeAxis) -> FloatArray:
         """Empirical PSF profile along `axis`: the squared noise autocorrelation.
 
         For white noise convolved with a PSF, the normalized spatial
@@ -79,7 +79,7 @@ class SmoothnessResult(ArrayValue):
         """
         return np.asarray(self.acf[axis] ** 2, dtype=np.float64)
 
-    def psf_model(self, x: FloatArray, axis: int) -> FloatArray:
+    def psf_model(self, x: FloatArray, axis: PeAxis) -> FloatArray:
         """Gaussian PSF profile along `axis` at displacement `x` (same units as `x`).
 
         The Gaussian whose FWHM is `fwhm_axis(axis)`; pass `x` from `displacement`
@@ -90,9 +90,9 @@ class SmoothnessResult(ArrayValue):
 
     # -- directional (PE / RO) ---------------------------------------------- #
     @property
-    def ro_axis(self) -> int | None:
+    def ro_axis(self) -> PeAxis | None:
         """Readout array axis (the in-plane axis that is not the PE axis)."""
-        return None if self.pe_axis is None else 1 - self.pe_axis
+        return None if self.pe_axis is None else readout_axis(self.pe_axis)
 
     @property
     def fwhm_pe(self) -> float | None:
@@ -220,7 +220,7 @@ def estimate_smoothness(
     fluctuations: FloatArray,
     mask: BoolArray,
     voxel_mm: tuple[float, float] | None = None,
-    pe_axis: int | None = None,
+    pe_axis: PeAxis | None = None,
     max_lag: int = SMOOTHNESS_MAX_LAG,
 ) -> SmoothnessResult:
     """Directional spatial smoothness of the detrended noise field (AFNI 3dFWHMx).

@@ -63,7 +63,7 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--pe-axis",
         type=int,
-        choices=(0, 1),
+        choices=q.PE_AXES,
         default=None,
         help="Override the in-plane phase-encode axis (default: read from the header).",
     )

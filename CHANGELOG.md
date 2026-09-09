@@ -194,6 +194,30 @@ versioning when the first stable public interface is released.
 
 ### Changed
 
+- **The phase-encode axis is a closed type, not a bare `int`.** `PeAxis`
+  (`Literal[0, 1]`) and its derived `PE_AXES` tuple join the option `Literal`s
+  already in `fmriqc.types`, and everything from `preprocess` inward is
+  annotated with it: the ghost family, the smoothness result, the pipeline's
+  resolution, and the artifact's `settings.pe_axis_override` /
+  `measurements.pe_axis`. The loader still reads a plain `int | None`, because
+  a BIDS sidecar may legitimately name the through-plane axis; the single
+  narrowing point between the two is the new `load.pe_axis.in_plane`. Three
+  runtime domain checks fall out as a result — `SUPPORTED_PE_AXES` (now
+  `PE_AXES`) and the two `pe_axis in (None, 0, 1)` assertions in the artifact
+  validator, which the field annotations now carry on both save and load.
+  `PE_ROWCOL` is keyed by `PeAxis` and so is total, retiring the two-step
+  lookup the artifact builder used to reach a `PeLabel` through. The readout
+  axis has one definition, `types.readout_axis`, in place of three inline
+  `1 - pe_axis` spellings. `fmri-qa --pe-axis` takes the same `{0,1}` it always
+  did, and no metric value changed.
+- `QAMetrics.pe_axis` is now a property reading `ghost.pe_axis` rather than a
+  field beside it. The axis and the ghost family are one fact — there is no
+  ghost result without an axis, and `estimate_ghost` already records the axis
+  it measured on — so a second copy could only agree or be a bug, and
+  "resolved an axis but measured no ghost" was a state the type allowed. Reading
+  `metrics.pe_axis` is unchanged; constructing a `QAMetrics` no longer takes
+  (or accepts) a `pe_axis=` argument.
+
 - **Three files that had grown into several topics are now subpackages**, by
   the one-file-one-topic rule in `style/architecture.md`. `fmriqc.cli` splits
   into a module per command (`qa`, `hilo`) plus the pieces they report through

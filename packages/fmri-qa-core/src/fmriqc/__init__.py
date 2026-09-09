@@ -148,8 +148,10 @@ if TYPE_CHECKING:
     from .types import (
         DETREND_METHODS,
         FBIRN_ROI_SIZE,
+        PE_AXES,
         ROI_CENTER_MODES,
         DetrendMethod,
+        PeAxis,
         RoiCenter,
     )
     from .version import core_version
@@ -164,6 +166,7 @@ __all__ = [
     "GHOST_RADIUS",
     "GHOST_TOP_FRACTION",
     "HILO_ERODE",
+    "PE_AXES",
     "PE_ROWCOL",
     "ROI",
     "ROI_CENTER_MODES",
@@ -183,6 +186,7 @@ __all__ = [
     "Measurements",
     "MotionResult",
     "OutlierResult",
+    "PeAxis",
     "PhantomGeometry",
     "Provenance",
     "PsfCurves",
@@ -353,8 +357,10 @@ _EXPORTS: dict[str, tuple[str, ...]] = {
     ".types": (
         "DETREND_METHODS",
         "FBIRN_ROI_SIZE",
+        "PE_AXES",
         "ROI_CENTER_MODES",
         "DetrendMethod",
+        "PeAxis",
         "RoiCenter",
     ),
 }

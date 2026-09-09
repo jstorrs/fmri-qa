@@ -6,6 +6,7 @@ fixture builds (no file I/O), so the whole functional core runs deterministicall
 
 import gc
 import weakref
+from dataclasses import fields
 
 import numpy as np
 import pytest
@@ -196,3 +197,23 @@ def test_an_unresolvable_pe_axis_leaves_the_ghost_metrics_undefined() -> None:
 
     assert m.pe_axis is None
     assert m.ghost is None
+
+
+def test_metrics_pe_axis_is_read_off_the_ghost_it_was_measured_with(
+    make_scan: MakeScan,
+) -> None:
+    """The axis and the ghost family are one fact, so they cannot disagree.
+
+    `QAMetrics.pe_axis` is a property over `ghost`, not a field beside it: there
+    is no ghost result without an axis, and `estimate_ghost` already records the
+    axis it built its masks on. A stored second copy could only ever agree or be
+    a bug -- and "resolved an axis but measured no ghost" would be a state the
+    dataclass allowed and nothing forbade. Pinned here because the guarantee is
+    structural, and a later edit re-adding the field would pass every other test
+    in this module.
+    """
+    assert "pe_axis" not in {f.name for f in fields(q.QAMetrics)}
+
+    m = q.run_qa(make_scan(), roi_size=9).metrics
+    assert m.ghost is not None
+    assert m.pe_axis == m.ghost.pe_axis

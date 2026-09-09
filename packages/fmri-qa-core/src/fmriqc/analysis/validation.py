@@ -9,17 +9,24 @@ import math
 from dataclasses import fields
 from functools import cache
 from types import UnionType
-from typing import Any, Literal, get_args, get_origin, get_type_hints
+from typing import Any, Literal, Union, get_args, get_origin, get_type_hints
 
 import numpy as np
 
 from ..pipeline import AnalysisSettings
 from .artifact import Measurements, Provenance, QAArtifact, RoiBox
 
+# The two spellings an optional field's annotation can arrive in. `int | None`
+# evaluates to a `types.UnionType`, but `Literal[0, 1] | None` -- a `typing`
+# special form on the left -- evaluates to `typing.Optional[...]`, whose origin
+# is `typing.Union`. They mean the same thing and this validator must accept
+# both, or the field it cannot read is silently rejected for every value.
+_UNIONS = (UnionType, Union)
+
 
 def _matches(value: object, annotation: Any) -> bool:
     origin = get_origin(annotation)
-    if origin is UnionType:
+    if origin in _UNIONS:
         return any(_matches(value, choice) for choice in get_args(annotation))
     if origin is Literal:
         return any(type(value) is type(v) and value == v for v in get_args(annotation))
@@ -108,8 +115,11 @@ def _validate_parameters(artifact: QAArtifact) -> None:
     _require(math.isfinite(s.trim_sec) and s.trim_sec >= 0, "invalid settings.trim_sec")
     _require(s.roi_size > 0, "invalid settings.roi_size")
     _require(s.detrend_order is None or s.detrend_order >= 0, "invalid detrend_order")
-    _require(s.pe_axis_override in (None, 0, 1), "invalid pe_axis_override")
-    _require(m.pe_axis in (None, 0, 1), "invalid measurements.pe_axis")
+    # `settings.pe_axis_override` and `measurements.pe_axis` are not checked
+    # here: both are `PeAxis | None`, so `validate_document` -- which reads the
+    # field annotations -- already refuses any other axis, on save and on load
+    # alike. Repeating the domain as a literal `(None, 0, 1)` would be a second
+    # place to update the day a pipeline measures a third axis.
     _require(p.n_frames > 0, "invalid provenance.n_frames")
     _require(p.n_trimmed is None or p.n_trimmed >= 0, "invalid provenance.n_trimmed")
     _require(p.n_slices is None or p.n_slices > 0, "invalid provenance.n_slices")

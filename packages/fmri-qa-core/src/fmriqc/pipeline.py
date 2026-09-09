@@ -14,6 +14,7 @@ from dataclasses import dataclass, replace
 
 from ._arrays import readonly
 from .load.metadata import ScanMeta
+from .load.pe_axis import in_plane
 from .load.scan import QAScan
 from .metrics.artifacts import (
     OutlierResult,
@@ -44,7 +45,7 @@ from .prep.geometry import (
 )
 from .prep.images import QAImages
 from .prep.imaging import select_slice, trim_count, trim_initial
-from .types import FBIRN_ROI_SIZE, BoolArray, DetrendMethod, RoiCenter
+from .types import FBIRN_ROI_SIZE, BoolArray, DetrendMethod, PeAxis, RoiCenter
 from .validation import validate_qa_run
 
 
@@ -70,7 +71,7 @@ class AnalysisSettings:
     detrend: DetrendMethod = "poly"
     center: RoiCenter = "image"
     roi_size: int = FBIRN_ROI_SIZE
-    pe_axis_override: int | None = None
+    pe_axis_override: PeAxis | None = None
     detrend_order: int | None = None
 
 
@@ -84,7 +85,6 @@ class QAMetrics:
     # The whole ghost family off one set of masks, or None when no PE axis
     # resolved: every ghost statistic is defined relative to an axis.
     ghost: GhostResult | None
-    pe_axis: int | None  # phase-encode axis actually used for the ghost masks
     drift_pct: float
     percent_fluctuation: float
     weisskoff: WeisskoffResult
@@ -94,6 +94,20 @@ class QAMetrics:
     motion: MotionResult
     center_of_mass: CenterOfMassResult
     smoothness: SmoothnessResult
+
+    @property
+    def pe_axis(self) -> PeAxis | None:
+        """The phase-encode axis the ghost masks were actually built on.
+
+        Read off `ghost` rather than stored beside it. The axis and the ghost
+        family are one fact -- `estimate_ghost` is handed the axis and records
+        it, and there is no ghost result at all without one -- so a second copy
+        here could only ever agree with `ghost.pe_axis` or be a bug, and
+        "resolved an axis but measured no ghost" would be a state the type
+        allowed and nothing forbade. Held as a property, the two cannot
+        disagree, and None means exactly what the absent ghost means.
+        """
+        return None if self.ghost is None else self.ghost.pe_axis
 
 
 @dataclass(frozen=True, eq=False)
@@ -144,7 +158,11 @@ def preprocess(
         # The value a stored zero reads back as, so a nulled image edge is
         # recognizable under a nonzero intercept (see `edge_valid_mask`).
         zero_value=float(scan.inter),
-        pe_axis=scan.pe_axis,
+        # Narrowed here, at the one door into the pure pipeline: a sidecar may
+        # name the through-plane axis, which nothing downstream can measure on
+        # (see `load.pe_axis.in_plane`). `run_qa` rejects an explicitly
+        # *requested* through-plane axis outright, before reaching this.
+        pe_axis=in_plane(scan.pe_axis),
         detrend_method=detrend,
         detrend_order=detrend_order,
         # Which plane this is, for the same reason as the trim: once the volume
@@ -182,7 +200,7 @@ def _prime_phantom_mask_cache(images: QAImages, mask: BoolArray) -> None:
 def run_qa(
     scan: QAScan,
     trim_sec: float = 5.0,
-    pe_axis: int | None = None,
+    pe_axis: PeAxis | None = None,
     detrend: DetrendMethod = "poly",
     center: RoiCenter = "image",
     roi_size: int = FBIRN_ROI_SIZE,
@@ -239,7 +257,6 @@ def run_qa(
         sfnr=sfnr(images, roi),
         rdc=wk.rdc,
         ghost=ghost,
-        pe_axis=pe_axis,
         drift_pct=drift_percent(images, roi),
         percent_fluctuation=percent_fluctuation(images, roi),
         weisskoff=wk,
@@ -320,8 +337,8 @@ def _warn_if_roi_does_not_fit(
 
 
 def _resolve_pe_axis(
-    pe_axis: int | None, images: QAImages, geom: PhantomGeometry
-) -> int | None:
+    pe_axis: PeAxis | None, images: QAImages, geom: PhantomGeometry
+) -> PeAxis | None:
     """Resolve the phase-encode axis: explicit override -> scan metadata -> ghost.
 
     `pe_axis=None` takes the axis from the scan's metadata, and failing that
@@ -338,7 +355,7 @@ def _resolve_pe_axis(
 
 
 def _build_ghost_family(
-    pe_axis: int | None, images: QAImages, geom: PhantomGeometry
+    pe_axis: PeAxis | None, images: QAImages, geom: PhantomGeometry
 ) -> GhostResult | None:
     """PE/readout percent ghost, the top-10% companion, and the ACR difference.
 

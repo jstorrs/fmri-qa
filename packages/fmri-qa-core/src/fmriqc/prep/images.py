@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from functools import cached_property
 
 from .._arrays import ArrayValue, readonly
-from ..types import BoolArray, DetrendMethod, FloatArray
+from ..types import BoolArray, DetrendMethod, FloatArray, PeAxis
 from .imaging import (
     edge_valid_mask,
     fluctuation_noise,
@@ -54,7 +54,7 @@ class QAImages(ArrayValue):
     tr: float
     n_trimmed: int = 0  # warm-up volumes dropped ahead of `center_slice`
     zero_value: float = 0.0  # image value a stored zero maps to (NIfTI scl_inter)
-    pe_axis: int | None = None
+    pe_axis: PeAxis | None = None  # in-plane only; see `load.pe_axis.in_plane`
     detrend_method: DetrendMethod = "poly"
     detrend_order: int | None = None  # poly degree / spline interior-knot count
     slice_index: int | None = None  # which plane of the volume this is (0-based)

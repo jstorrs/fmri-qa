@@ -21,7 +21,7 @@ from ..load.scan import QAScan
 from ..metrics.smoothness import SmoothnessResult
 from ..pipeline import AnalysisSettings, QAResult, run_qa
 from ..prep.geometry import ROI, roi_fits
-from ..types import BoolArray, FloatArray, LengthUnit, PeLabel
+from ..types import BoolArray, FloatArray, LengthUnit, PeAxis, PeLabel, readout_axis
 from ..version import core_version
 from .artifact import (
     ArtifactImages,
@@ -129,12 +129,13 @@ def _provenance(result: QAResult, *, name: str, source: str) -> Provenance:
     )
 
 
-# The two direction words, narrowed to the set the artifact publishes. Both
-# sources hand this module a plain `str`: `PE_ROWCOL` is the single definition
-# of the axis -> word map and sits in `load`, below the layer that owns the
-# published set, and the sidecar's DICOM direction is whatever the converter
-# wrote. Looking the word up here is what makes `pe_label` true of its type.
-_PE_LABELS: dict[str, PeLabel] = {"row": "row", "col": "col"}
+# The two direction words, narrowed to the set the artifact publishes. The
+# sidecar's DICOM direction is whatever the converter wrote -- a plain `str`,
+# and a sidecar may carry any string at all -- so looking the word up here is
+# what makes a label taken from it true of its type. The *axis* needs no such
+# guard: `PE_ROWCOL` is keyed by `PeAxis` and is total, so an axis indexes
+# straight into a `PeLabel`.
+_SIDECAR_PE_LABELS: dict[str, PeLabel] = {"row": "row", "col": "col"}
 
 
 def _pe_label(result: QAResult, settings: AnalysisSettings) -> PeLabel:
@@ -147,9 +148,9 @@ def _pe_label(result: QAResult, settings: AnalysisSettings) -> PeLabel:
     no axis at all.
     """
     if settings.pe_axis_override is None and result.meta and result.meta.pe_dir:
-        return _PE_LABELS.get(result.meta.pe_dir, "?")
+        return _SIDECAR_PE_LABELS.get(result.meta.pe_dir, "?")
     axis = result.metrics.pe_axis
-    return "?" if axis is None else _PE_LABELS.get(PE_ROWCOL.get(axis, ""), "?")
+    return "?" if axis is None else PE_ROWCOL[axis]
 
 
 def _measurements(result: QAResult, settings: AnalysisSettings) -> Measurements:
@@ -252,9 +253,9 @@ def _psf_curves(s: SmoothnessResult) -> PsfCurves:
     PSF narrower than the voxel grid is not squashed — because it depends on the
     measured smoothness, which is analysis, not layout.
     """
+    dirs: tuple[tuple[str, PeAxis], tuple[str, PeAxis]]
     if s.pe_axis is not None:
-        # ro_axis == 1 - pe_axis; spell it out so both entries are concrete ints.
-        dirs = (("PE", s.pe_axis), ("RO", 1 - s.pe_axis))
+        dirs = (("PE", s.pe_axis), ("RO", readout_axis(s.pe_axis)))
     else:  # no PE axis resolved -- fall back to raw array axes
         dirs = (("axis0", 0), ("axis1", 1))
     unit: LengthUnit = "mm" if s.voxel_mm is not None else "vox"

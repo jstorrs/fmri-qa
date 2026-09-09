@@ -6,17 +6,47 @@ metric that provides the last-resort estimate. The sidecar
 `dim_info` phase field is the fallback. `scan.from_nifti` tries these in order
 and leaves the axis unresolved if neither answers, for `pipeline.run_qa` to
 estimate from the Nyquist ghost.
+
+Both sources answer with a plain axis index, because both can legitimately name
+the through-plane axis. `in_plane` is the single point that narrows one to the
+`PeAxis` the pipeline measures on.
 """
 
 from typing import Any
 
 from ..exceptions import InvalidScanError
+from ..types import PE_AXES, PeAxis, PeLabel
 
 # DICOM in-plane phase-encode axis -> row/col: NIfTI i (axis 0) is the DICOM
 # row direction, j (axis 1) the column direction (verified against dcm2niix
 # InPlanePhaseEncodingDirectionDICOM on a Siemens acquisition). The single source
 # of truth for the row/col label the metadata, report, and CLI all show.
-PE_ROWCOL: dict[int, str] = {0: "row", 1: "col"}
+#
+# Keyed by `PeAxis`, so it is *total*: every in-plane axis has a word, and a
+# caller holding one indexes straight into it. That is what lets the artifact
+# builder publish a `PeLabel` without a lookup default standing in for a case
+# that cannot arise (see `analysis.build._pe_label`).
+PE_ROWCOL: dict[PeAxis, PeLabel] = {0: "row", 1: "col"}
+
+
+def in_plane(axis: int | None) -> PeAxis | None:
+    """`axis` as an in-plane `PeAxis`, or None if it is not one.
+
+    The single narrowing point between what a header can *say* and what the
+    single-slice pipeline can *measure*. A BIDS sidecar may name the
+    through-plane axis (`k` -> 2), which is a perfectly well-formed answer to a
+    question this pipeline does not ask: every ghost statistic is defined by
+    rolling the phantom half the FOV along an in-plane axis. Rather than let a 2
+    travel inward as a plain `int` and be re-tested wherever it lands, it is
+    narrowed once, here, to the type the rest of the package speaks.
+
+    None means "no in-plane axis to work with", which is the same answer as an
+    absent one -- and `run_qa` treats it the same way, estimating the axis from
+    the Nyquist ghost. `validate_qa_run` still *rejects* an explicit
+    through-plane axis by name, so a caller who asked for one is told so rather
+    than quietly given an estimate.
+    """
+    return axis if axis in PE_AXES else None
 
 
 def _pe_axis_from_sidecar(sidecar: dict[str, Any]) -> int | None:

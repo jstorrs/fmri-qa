@@ -4,9 +4,9 @@ import numpy as np
 
 from .exceptions import InvalidScanError
 from .load.scan import QAScan
+from .types import PE_AXES
 
 MIN_ANALYSIS_FRAMES = 4
-SUPPORTED_PE_AXES = (0, 1)
 
 
 def validate_scan(scan: QAScan, *, minimum_frames: int = 1) -> None:
@@ -69,7 +69,7 @@ def validate_qa_run(
         )
 
     resolved_pe = scan.pe_axis if pe_axis is None else pe_axis
-    if resolved_pe is not None and resolved_pe not in SUPPORTED_PE_AXES:
+    if resolved_pe is not None and resolved_pe not in PE_AXES:
         raise InvalidScanError(
             "phase-encode axis",
             resolved_pe,

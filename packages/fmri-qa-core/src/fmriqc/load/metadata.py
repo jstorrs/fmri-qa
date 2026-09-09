@@ -17,7 +17,7 @@ from typing import Any
 
 from ..exceptions import InvalidScanError
 from .paths import sidecar_path
-from .pe_axis import PE_ROWCOL
+from .pe_axis import PE_ROWCOL, in_plane
 
 
 @dataclass(frozen=True)
@@ -160,7 +160,8 @@ def _pe_direction(pe_axis: int | None, sidecar: dict[str, Any]) -> str | None:
     """
     if dicom := sidecar.get("InPlanePhaseEncodingDirectionDICOM"):
         return str(dicom).lower()
-    return PE_ROWCOL.get(pe_axis) if pe_axis is not None else None
+    axis = in_plane(pe_axis)
+    return None if axis is None else PE_ROWCOL[axis]
 
 
 def _scan_meta(

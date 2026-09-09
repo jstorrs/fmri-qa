@@ -24,7 +24,7 @@ from dataclasses import dataclass
 
 from .._arrays import ArrayValue
 from ..pipeline import AnalysisSettings
-from ..types import BoolArray, FloatArray, LengthUnit, PeLabel
+from ..types import BoolArray, FloatArray, LengthUnit, PeAxis, PeLabel
 
 # Bumped whenever the on-disk layout changes incompatibly (see `serialize`).
 # 2: added the `phantom_fraction` / `roi_inside_phantom` localization diagnostics.
@@ -143,7 +143,7 @@ class Measurements:
     ghost_top_pct: float
     ro_ghost_pct: float
     acr_ghost_pct: float
-    pe_axis: int | None
+    pe_axis: PeAxis | None
     pe_label: PeLabel
     # transient artifacts
     outlier_max_pct: float

@@ -17,6 +17,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from fmriqc.analysis.validation import _matches, _resolved_annotations
+from fmriqc.types import PeAxis
 
 
 @dataclass(frozen=True, slots=True)
@@ -25,6 +26,7 @@ class _Example:
 
     count: int
     label: str | None
+    axis: PeAxis | None
 
 
 def test_resolved_annotations_recover_real_types_from_a_stringized_module() -> None:
@@ -40,3 +42,28 @@ def test_resolved_annotations_recover_real_types_from_a_stringized_module() -> N
     assert _matches(None, hints["label"])
     assert _matches("x", hints["label"])
     assert not _matches(3, hints["label"])
+
+
+def test_matches_accepts_both_spellings_of_an_optional_annotation() -> None:
+    """An optional `Literal` is a `typing.Union`, not a `types.UnionType`.
+
+    `str | None` evaluates to `types.UnionType`, but a `typing` special form on
+    the left -- `PeAxis | None`, i.e. `Literal[0, 1] | None` -- evaluates to
+    `typing.Optional[...]`, whose origin is `typing.Union` instead. The two mean
+    the same thing, and a validator that knows only the first silently rejects
+    *every* value of such a field, including the valid ones: the failure is a
+    saved artifact refusing to be written, attributed to a field that is
+    perfectly well-formed. `Measurements.pe_axis` and
+    `AnalysisSettings.pe_axis_override` are both this shape.
+    """
+    hints = _resolved_annotations(_Example)
+
+    assert _matches(0, hints["axis"])
+    assert _matches(1, hints["axis"])
+    assert _matches(None, hints["axis"])
+    # Outside the closed set -- including the through-plane axis a sidecar can
+    # name, which is what the artifact validator relies on this to refuse.
+    assert not _matches(2, hints["axis"])
+    assert not _matches(-1, hints["axis"])
+    # `True == 1`, so a membership test would have let a bool through here.
+    assert not _matches(True, hints["axis"])
