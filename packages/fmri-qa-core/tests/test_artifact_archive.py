@@ -388,7 +388,11 @@ def test_load_migrating_a_schema_5_artifact_reports_displacement_in_voxels(
 
 # Fields each schema version introduced, per document section, so a current
 # document can be rewritten as the older one it grew out of (the reverse of
-# `serialize.migrate._MIGRATIONS`).
+# `serialize.migrate._MIGRATIONS`). Division of labour with
+# `test_artifact_fixtures.py`: this file's migration tests check each step in
+# isolation against this hand-maintained description of the schema history;
+# that file loads real `.npz` archives an old build actually wrote, which
+# this table cannot stand in for (see its module docstring). Keep both.
 _ADDED_IN = {
     2: {"measurements": ("phantom_fraction", "roi_inside_phantom")},
     3: {"measurements": ("phantom_mask_ok",)},

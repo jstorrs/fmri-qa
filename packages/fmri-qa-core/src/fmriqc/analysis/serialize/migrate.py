@@ -10,6 +10,14 @@ in sequence, so a v1 file reaches the current schema through every intermediate
 step. A field the older schema did not carry comes back *unknown*, never
 reconstructed: a value this build derives would be a fact about this build, not
 about the artifact.
+
+Bumping `ARTIFACT_SCHEMA_VERSION` is not done until the outgoing version has a
+committed fixture: run the old code (a `git worktree` checkout of the last
+commit at that version) over the shared synthetic phantom and save the file to
+`tests/fixtures/schema_v{N}.qa.npz` (see `test_artifact_fixtures.py`). A
+migration step tested only against a same-build document synthesized to look
+old -- which is what `test_artifact_archive.py` does -- proves the step matches
+its own docstring, not that a real file from that version still parses.
 """
 
 import warnings
