@@ -117,7 +117,7 @@ if TYPE_CHECKING:
     from .metrics.smoothness import SmoothnessResult, estimate_smoothness
     from .pipeline import QAMetrics, QAResult, preprocess, run_qa
     from .prep.detrend import (
-        detrend_fn,
+        Detrender,
         poly_degree,
         poly_residuals,
         spline_nodes,
@@ -179,6 +179,7 @@ __all__ = [
     "ClipRail",
     "Curves",
     "DetrendMethod",
+    "Detrender",
     "FmriqcError",
     "GhostRegions",
     "GhostResult",
@@ -213,7 +214,6 @@ __all__ = [
     "core_version",
     "detect_phantom",
     "detect_saturation",
-    "detrend_fn",
     "drift_percent",
     "edge_valid_mask",
     "estimate_center_of_mass",
@@ -328,7 +328,7 @@ _EXPORTS: dict[str, tuple[str, ...]] = {
     ".metrics.smoothness": ("SmoothnessResult", "estimate_smoothness"),
     ".pipeline": ("QAMetrics", "QAResult", "preprocess", "run_qa"),
     ".prep.detrend": (
-        "detrend_fn",
+        "Detrender",
         "poly_degree",
         "poly_residuals",
         "spline_nodes",

@@ -35,7 +35,7 @@ from .metrics.ghost import GhostResult, estimate_ghost, estimate_pe_axis
 from .metrics.motion import MotionResult, estimate_motion
 from .metrics.saturation import SaturationResult, detect_saturation
 from .metrics.smoothness import SmoothnessResult, estimate_smoothness
-from .prep.detrend import detrend_fn
+from .prep.detrend import Detrender
 from .prep.geometry import (
     ROI,
     PhantomGeometry,
@@ -145,8 +145,8 @@ def preprocess(
     data = trim_initial(scan.data, scan.tr, trim_sec)
     z, phantom_mask = select_slice(data, center)
     center_slice = data[:, :, z, :]
-    detrend_op, detrend_order = detrend_fn(center_slice, scan.tr, detrend)
-    fluctuations = detrend_op(center_slice)
+    detrender = Detrender.for_series(center_slice, scan.tr, detrend)
+    fluctuations = detrender(center_slice)
     images = QAImages(
         center_slice=center_slice,
         fluctuations=fluctuations,
@@ -163,8 +163,10 @@ def preprocess(
         # (see `load.pe_axis.in_plane`). `run_qa` rejects an explicitly
         # *requested* through-plane axis outright, before reaching this.
         pe_axis=in_plane(scan.pe_axis),
-        detrend_method=detrend,
-        detrend_order=detrend_order,
+        # Both read off the fit that actually ran, not one from the fit and the
+        # other from this function's argument.
+        detrend_method=detrender.method,
+        detrend_order=detrender.order,
         # Which plane this is, for the same reason as the trim: once the volume
         # is dropped nothing else can say.
         slice_index=z,

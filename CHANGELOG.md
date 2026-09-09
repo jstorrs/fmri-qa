@@ -194,6 +194,19 @@ versioning when the first stable public interface is released.
 
 ### Changed
 
+- **The detrender is a value object, not an anonymous `(callable, int)` pair.**
+  `prep.detrend.Detrender` carries the `method` and the `order` it resolved to
+  and *is* the operator: `Detrender.for_series(center_slice, tr, method)`
+  derives the fit complexity, and calling the result detrends an array.
+  It replaces `detrend_fn`, whose returned tuple callers destructured
+  positionally -- `hilo.stats` discarded the order with a `_`, and `preprocess`
+  recorded `QAImages.detrend_method` from its own *argument* while taking the
+  order from the fit, two sources for one decision. Both now read off the
+  detrender that actually ran. Applying a detrender dispatches on `method` as
+  exhaustively as choosing one does, so a new `DetrendMethod` member is a type
+  error at both ends. Detrended output is unchanged, bit for bit.
+  `Detrender` is exported from `fmriqc` in place of `detrend_fn`.
+
 - **Adding an option to a closed set is now a type error at every place that
   dispatches on it.** The three functions that switch on an option `Literal`
   -- `detrend_fn` (`DetrendMethod`), `resolve_roi` and `select_slice`

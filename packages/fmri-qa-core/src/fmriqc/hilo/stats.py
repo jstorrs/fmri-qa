@@ -1,7 +1,7 @@
 """Per-scan reduction to the mean/SD maps `run_hilo` pools over the shared core."""
 
 from ..load.scan import QAScan
-from ..prep.detrend import detrend_fn
+from ..prep.detrend import Detrender
 from ..prep.imaging import fluctuation_noise, trim_initial
 from ..types import BoolArray, DetrendMethod, FloatArray
 from .mask import phantom_core_mask
@@ -20,6 +20,6 @@ def hilo_stats(
     """
     data = trim_initial(scan.data, scan.tr, trim_sec)  # (X, Y, Z, T)
     mean_map = data.mean(axis=-1)
-    detrend_op, _ = detrend_fn(data, scan.tr, detrend)
-    sd_map = fluctuation_noise(detrend_op(data))
+    detrender = Detrender.for_series(data, scan.tr, detrend)
+    sd_map = fluctuation_noise(detrender(data))
     return mean_map, sd_map, phantom_core_mask(mean_map, erode)

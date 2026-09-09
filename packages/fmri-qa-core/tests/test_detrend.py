@@ -6,7 +6,7 @@ from hypothesis import given
 from hypothesis import strategies as st
 
 from fmriqc.exceptions import InvalidScanError
-from fmriqc.prep.detrend import detrend_fn, poly_residuals, spline_residuals
+from fmriqc.prep.detrend import Detrender, poly_residuals, spline_residuals
 from fmriqc.prep.imaging import trim_count
 
 
@@ -37,11 +37,19 @@ def test_spline_residuals_removes_constant() -> None:
     assert np.allclose(spline_residuals(y, 2), 0.0, atol=1e-6)
 
 
-def test_detrend_fn_returns_operator_and_order() -> None:
+def test_detrender_carries_its_method_and_order_and_applies_them() -> None:
+    """The operator and the two facts describing it are one value.
+
+    A `Detrender` that reports "poly, degree n" is the one that fits a degree-n
+    Legendre polynomial: `__call__` re-reads the same fields, so the record a
+    run publishes cannot describe a different fit from the one it ran.
+    """
     cs = np.random.default_rng(0).normal(size=(4, 4, 80))
-    op, order = detrend_fn(cs, tr=2.0, method="poly")
-    assert order >= 0
-    assert op(cs).shape == cs.shape
+    detrender = Detrender.for_series(cs, tr=2.0, method="poly")
+
+    assert (detrender.method, detrender.order) == ("poly", 1)
+    assert detrender(cs).shape == cs.shape
+    assert np.allclose(detrender(cs), poly_residuals(cs, detrender.order))
 
 
 def test_detrend_fn_refuses_an_order_the_frames_cannot_determine() -> None:
@@ -56,7 +64,7 @@ def test_detrend_fn_refuses_an_order_the_frames_cannot_determine() -> None:
     series = np.zeros((2, 2, 40))
     for method in ("poly", "spline"):
         with pytest.raises(InvalidScanError) as excinfo:
-            detrend_fn(series, tr=2000.0, method=method)
+            Detrender.for_series(series, tr=2000.0, method=method)
         assert excinfo.value.field == "detrend order"
         assert "40 analyzed frames" in str(excinfo.value)
         assert "TR of 2000" in str(excinfo.value)
@@ -66,14 +74,14 @@ def test_detrend_fn_refuses_an_order_the_frames_cannot_determine() -> None:
 def test_detrend_rejects_a_fit_with_no_residual_degrees_of_freedom(method, tr) -> None:
     series = np.random.default_rng(1).normal(size=(4, 4, 4))
     with pytest.raises(InvalidScanError, match="no residual degrees of freedom"):
-        detrend_fn(series, tr, method)
+        Detrender.for_series(series, tr, method)
 
 
 @pytest.mark.parametrize("method,tr", [("poly", 100.0), ("spline", 2.0)])
 def test_detrend_keeps_a_fit_with_one_residual_degree_of_freedom(method, tr) -> None:
     series = np.random.default_rng(1).normal(size=(4, 4, 4))
-    op, _ = detrend_fn(series, tr, method)
-    assert np.linalg.norm(op(series)) > 1
+    detrender = Detrender.for_series(series, tr, method)
+    assert np.linalg.norm(detrender(series)) > 1
 
 
 @given(

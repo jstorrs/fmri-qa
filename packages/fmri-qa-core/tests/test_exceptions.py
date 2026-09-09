@@ -12,14 +12,14 @@ from fmriqc.exceptions import (
     InvalidChoiceError,
 )
 from fmriqc.hilo.compatibility import require_compatible_scans
-from fmriqc.prep.detrend import detrend_fn
+from fmriqc.prep.detrend import Detrender
 from fmriqc.prep.geometry import resolve_roi
 from fmriqc.prep.imaging import extract_center_slice
 
 
-def test_detrend_fn_rejects_unknown_method() -> None:
+def test_detrender_rejects_unknown_method() -> None:
     with pytest.raises(InvalidChoiceError, match="detrend method"):
-        detrend_fn(np.zeros((2, 2, 10)), 2.0, "bogus")  # type: ignore[arg-type]
+        Detrender.for_series(np.zeros((2, 2, 10)), 2.0, "bogus")  # type: ignore[arg-type]
 
 
 def test_extract_center_slice_rejects_unknown_center() -> None:
@@ -36,13 +36,13 @@ def test_resolve_roi_rejects_unknown_center() -> None:
 
 def test_invalid_choice_is_fmriqc_error_and_value_error() -> None:
     with pytest.raises(FmriqcError) as info:
-        detrend_fn(np.zeros((2, 2, 10)), 2.0, "bogus")  # type: ignore[arg-type]
+        Detrender.for_series(np.zeros((2, 2, 10)), 2.0, "bogus")  # type: ignore[arg-type]
     assert isinstance(info.value, ValueError)
 
 
 def test_invalid_choice_carries_structured_payload() -> None:
     with pytest.raises(InvalidChoiceError) as info:
-        detrend_fn(np.zeros((2, 2, 10)), 2.0, "bogus")  # type: ignore[arg-type]
+        Detrender.for_series(np.zeros((2, 2, 10)), 2.0, "bogus")  # type: ignore[arg-type]
     err = info.value
     assert err.name == "detrend method"
     assert err.value == "bogus"
