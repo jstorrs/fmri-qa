@@ -8,6 +8,20 @@ versioning when the first stable public interface is released.
 
 ### Changed
 
+- **`fmri-qa` and `fmri-qa-report` expand their own wildcards**, so the
+  command lines this project prints work in PowerShell and cmd. A POSIX shell
+  expands `data/*.nii.gz` before the command starts; PowerShell does not, so
+  the line `fmri-qa-import` prints for the user to paste — `analyze with:
+  fmri-qa data/*.nii.gz` — arrived as a single literal argument and failed with
+  `No such file or no access: 'data/*.nii.gz'`, naming a path nobody typed and
+  giving no hint that the shell was the difference. Both commands now expand a
+  pattern that names nothing on disk. An argument naming an existing path is
+  never treated as a pattern, so a file whose name contains `*`, `?` or `[`
+  still works, and on POSIX — where the shell has already expanded — every
+  argument takes that path and nothing changes. A pattern matching nothing is
+  still reported as a missing input rather than dropped, so a mistyped pattern
+  cannot quietly analyze fewer scans than were asked for.
+
 - **`--artifact` files into a directory that already exists**, instead of
   failing after the analysis. With one scan `PATH` was taken literally, so the
   natural `mkdir results` followed by `--artifact results` ran the whole

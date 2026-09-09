@@ -2,15 +2,52 @@
 
 The `argparse` `type=` callables that reject an out-of-range value at parse
 time — so a bad flag is a usage error with a clear message rather than a
-traceback deep in the pipeline — plus the warning reprinter both commands route
-their captured warnings through.
+traceback deep in the pipeline — the warning reprinter both commands route
+their captured warnings through, and the wildcard expansion that makes one
+documented command line work in a shell that does not expand its own.
 """
 
 import argparse
+import glob
 import math
+import re
 import sys
 import warnings
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
+from pathlib import Path
+
+# The characters that make an argument a pattern rather than a name.
+_WILDCARD = re.compile(r"[*?\[]")
+
+
+def expand_globs(paths: Sequence[str]) -> list[str]:
+    """Every path, with any wildcard pattern that named nothing expanded here.
+
+    A POSIX shell expands a wildcard before the command is started, so `fmri-qa
+    data/*.nii.gz` arrives as one argument per scan. PowerShell and cmd do not:
+    the same line -- the line `fmri-qa-import` prints for the user to paste --
+    arrives as a single literal argument with a `*` still in it, and fails as a
+    missing file naming a path no one typed. Expanding here makes one command
+    line mean the same thing on every platform.
+
+    An argument naming something that exists is never expanded, so a file whose
+    name really does contain a wildcard character is still usable, and on POSIX
+    (where the shell already did this) every argument takes that path. A pattern
+    matching nothing is passed through as itself, to be reported as the missing
+    input it is rather than silently dropped -- which would turn a mistyped
+    pattern into a run that quietly analyzed fewer scans than were asked for.
+    """
+    expanded: list[str] = []
+    for path in paths:
+        if Path(path).exists() or not _WILDCARD.search(path):
+            expanded.append(path)
+            continue
+        # glob.glob, not Path.glob: the pattern is one string that may carry
+        # wildcards in its directory components too, and be absolute or
+        # relative. Path.glob cannot take that without being taken apart first.
+        matched = sorted(glob.glob(path, recursive=True))  # noqa: PTH207
+        expanded.extend(matched or [path])
+    return expanded
 
 
 def nonnegative_float(value: str) -> float:

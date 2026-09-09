@@ -7,6 +7,8 @@ the acquisition data at hand.
 """
 
 import argparse
+import glob
+import re
 import sys
 from collections.abc import Sequence
 from pathlib import Path
@@ -16,6 +18,35 @@ from fmriqc.analysis import QAArtifact, load_artifact
 from . import write_report
 from .document import TIERS
 from .summary import package_version
+
+# The characters that make an argument a pattern rather than a name.
+_WILDCARD = re.compile(r"[*?\[]")
+
+
+def _expand_globs(paths: Sequence[str]) -> list[str]:
+    """Every path, with any wildcard pattern that named nothing expanded here.
+
+    PowerShell and cmd do not expand a wildcard before starting the command, so
+    `fmri-qa-report artifacts/*.qa.npz` -- the line the README gives -- reaches
+    this process with the `*` still in it and fails as a missing artifact.
+
+    A deliberate twin of `fmriqc.cli.arguments.expand_globs` rather than an
+    import of it: the report package may reach into `fmriqc.analysis` and
+    `fmriqc.types` and nothing else (see `tests/test_layering.py`), and a shell
+    quirk on the way into a command line is not knowledge worth widening that
+    seam for. Keep the two in step.
+    """
+    expanded: list[str] = []
+    for path in paths:
+        if Path(path).exists() or not _WILDCARD.search(path):
+            expanded.append(path)
+            continue
+        # glob.glob, not Path.glob: the pattern is one string that may carry
+        # wildcards in its directory components too, and be absolute or
+        # relative. Path.glob cannot take that without being taken apart first.
+        matched = sorted(glob.glob(path, recursive=True))  # noqa: PTH207
+        expanded.extend(matched or [path])
+    return expanded
 
 
 def _same_file(a: Path, b: Path) -> bool:
@@ -81,6 +112,8 @@ def _parser() -> argparse.ArgumentParser:
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = _parser().parse_args(argv)
+    # Before the overwrite check counts them: on Windows the wildcard is here.
+    args.artifacts = _expand_globs(args.artifacts)
 
     # Refuse before reading anything: an output that names an input is a usage
     # error, and one that must be caught while the input is still intact.

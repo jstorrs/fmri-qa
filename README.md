@@ -431,6 +431,11 @@ Options:
 Multiple scans are summarized in one table. A bad file is reported to stderr and
 the batch continues; the process exits non-zero if any file failed.
 
+Wildcards work the same way on every platform: a POSIX shell expands them
+before `fmri-qa` starts, and where the shell does not — PowerShell and cmd —
+the command expands them itself, so the lines in this README can be pasted as
+written.
+
 `--artifact PATH` writes the complete analysis result — settings, provenance,
 every measurement and curve, and the summary images — as a compressed `.npz`.
 With a single scan `PATH` is the output file; with several it is a directory

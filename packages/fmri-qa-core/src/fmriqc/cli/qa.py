@@ -15,7 +15,12 @@ from pathlib import Path
 
 import fmriqc as q
 
-from .arguments import nonnegative_float, positive_int, print_warnings
+from .arguments import (
+    expand_globs,
+    nonnegative_float,
+    positive_int,
+    print_warnings,
+)
 from .destinations import (
     ARTIFACT_SUFFIX,
     report_destination_problems,
@@ -109,6 +114,8 @@ def _parser() -> argparse.ArgumentParser:
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = _parser().parse_args(argv)
+    # Before anything counts the scans: on Windows the wildcard is still here.
+    args.paths = expand_globs(args.paths)
 
     batch = len(args.paths) > 1
     # Refuse before analyzing anything: a destination that lands on an input or

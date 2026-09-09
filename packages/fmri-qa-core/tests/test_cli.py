@@ -519,3 +519,55 @@ def test_help_renders(entry, capsys) -> None:
         entry(["-h"])
     assert info.value.code == 0
     assert "usage:" in capsys.readouterr().out
+
+
+# --------------------------------------------------------------------------
+# wildcard arguments, for the shells that do not expand their own
+# --------------------------------------------------------------------------
+
+
+def test_a_wildcard_argument_is_expanded(tmp_path, write_scan, capsys) -> None:
+    """What PowerShell hands over verbatim, and a POSIX shell never would."""
+    write_scan(tmp_path, name="first")
+    write_scan(tmp_path, name="second", seed=3)
+    rc = cli.main([f"{tmp_path}/*.nii.gz", "--roi-size", "9"])
+    out = capsys.readouterr().out
+    assert rc == 0
+    assert "first.nii.gz" in out and "second.nii.gz" in out
+
+
+def test_a_wildcard_matching_one_scan_is_not_a_batch(
+    tmp_path, write_scan, capsys
+) -> None:
+    """The pattern the user actually typed: one scan, so `--artifact` is a file.
+
+    Expansion happens before the scan count is taken, so a pattern matching a
+    single file behaves exactly as naming that file does.
+    """
+    write_scan(tmp_path, name="only")
+    out = tmp_path / "one.npz"
+    rc = cli.main(
+        [f"{tmp_path}/*only*.nii.gz", "--roi-size", "9", "--artifact", str(out)]
+    )
+    assert rc == 0
+    assert out.is_file()
+    assert q.load_artifact(out).provenance.scan == "only.nii.gz"
+
+
+def test_a_wildcard_matching_nothing_is_reported_not_dropped(tmp_path, capsys) -> None:
+    """A mistyped pattern must fail, not quietly analyze zero scans."""
+    rc = cli.main([f"{tmp_path}/*.nii.gz", "--roi-size", "9"])
+    assert rc == 1
+    assert "*.nii.gz" in capsys.readouterr().err
+
+
+def test_a_file_whose_name_contains_a_wildcard_still_works(
+    tmp_path, write_scan, capsys
+) -> None:
+    """An existing path is never treated as a pattern, whatever it is called."""
+    scan = Path(write_scan(tmp_path, name="odd"))
+    literal = scan.with_name("odd[1].nii.gz")
+    scan.rename(literal)
+    rc = cli.main([str(literal), "--roi-size", "9"])
+    assert rc == 0
+    assert "odd[1].nii.gz" in capsys.readouterr().out

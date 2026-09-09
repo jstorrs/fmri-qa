@@ -133,3 +133,40 @@ def test_help_renders(capsys) -> None:
         cli.main(["-h"])
     assert info.value.code == 0
     assert "usage:" in capsys.readouterr().out
+
+
+def test_a_wildcard_argument_is_expanded(tmp_path, artifact, capsys) -> None:
+    """PowerShell hands `artifacts/*.qa.npz` over with the `*` still in it."""
+    for name in ("first", "second"):
+        q.save_artifact(artifact, tmp_path / f"{name}.qa.npz")
+    pdf = tmp_path / "qa.pdf"
+    rc = cli.main([f"{tmp_path}/*.qa.npz", "--pdf", str(pdf)])
+    assert rc == 0
+    assert pdf.is_file()
+
+
+def test_a_wildcard_matching_nothing_is_reported_not_dropped(tmp_path, capsys) -> None:
+    """A pattern that names no artifact must fail, not render an empty packet."""
+    rc = cli.main([f"{tmp_path}/*.qa.npz", "--pdf", str(tmp_path / "qa.pdf")])
+    assert rc == 1
+    assert "*.qa.npz" in capsys.readouterr().err
+
+
+def test_the_two_glob_expanders_have_not_drifted() -> None:
+    """The seam forbids sharing the helper, so prove the copies still agree.
+
+    `fmriqc.cli.arguments.expand_globs` is the original; this package may not
+    import it (`test_layering`), so it keeps a twin. A fix applied to one and
+    not the other is the failure this catches.
+    """
+    import inspect
+
+    from fmriqc.cli.arguments import expand_globs
+    from fmriqc_report.cli import _expand_globs
+
+    def body(fn) -> list[str]:
+        source = inspect.getsource(fn)
+        lines = source.split('"""')[-1].splitlines()  # past the docstring
+        return [line.strip() for line in lines if line.strip()]
+
+    assert body(_expand_globs) == body(expand_globs)
