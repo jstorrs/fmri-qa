@@ -26,7 +26,8 @@ fixture shows it. `load.pe_axis` reads `PhaseEncodingDirection` first — and th
 is not a DICOM tag. There is no tag that carries the BIDS axis-and-polarity
 answer; dcm2niix derives it from vendor private data, which is why it writes the
 weaker `PhaseEncodingAxis` (axis, no polarity) for the synthetic study in
-`tests/fixtures/dicom`, which has no CSA header to derive polarity from. So the
-loader already consumes dcm2niix's vendor conclusions. Reading DICOM here would
+`tests/fixtures/dicom`, which has no CSA header to derive polarity from — and
+why the loader reads that field too, ahead of the raw DICOM row/col tag. So the
+loader already runs on dcm2niix's vendor conclusions. Reading DICOM here would
 not remove a dependency; it would mean reimplementing it.
 """

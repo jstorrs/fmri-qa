@@ -1,15 +1,16 @@
 """Phase-encode axis resolution from the BIDS sidecar and NIfTI header.
 
-The two authoritative, header-only PE-axis sources, kept apart from the ghost
-metric that provides the last-resort estimate. The sidecar
-`PhaseEncodingDirection` is authoritative (see the project notes); the NIfTI
-`dim_info` phase field is the fallback. `scan.from_nifti` tries these in order
-and leaves the axis unresolved if neither answers, for `pipeline.run_qa` to
-estimate from the Nyquist ghost.
+The authoritative, header-only PE-axis sources, kept apart from the ghost metric
+that provides the last-resort estimate. The BIDS sidecar comes first (see the
+project notes), and within it dcm2niix's own conclusions -- `PhaseEncodingDirection`,
+then `PhaseEncodingAxis` -- before the raw DICOM row/col tag; the NIfTI `dim_info`
+phase field is the last header answer. `scan.from_nifti` tries them in that order
+and leaves the axis unresolved if none answers, for `pipeline.run_qa` to estimate
+from the Nyquist ghost.
 
-Both sources answer with a plain axis index, because both can legitimately name
-the through-plane axis. `in_plane` is the single point that narrows one to the
-`PeAxis` the pipeline measures on.
+Every source answers with a plain axis index, because any of them can legitimately
+name the through-plane axis. `in_plane` is the single point that narrows one to
+the `PeAxis` the pipeline measures on.
 """
 
 from typing import Any
@@ -49,23 +50,47 @@ def in_plane(axis: int | None) -> PeAxis | None:
     return axis if axis in PE_AXES else None
 
 
+# BIDS axis letters -> NIfTI array axis. The polarity suffix is dropped: ghost
+# placement rolls the phantom half the FOV along the axis, which is symmetric,
+# so which way the phase encoding ran changes no mask. Both fields in
+# `_SIDECAR_PE_FIELDS` speak this vocabulary, so they read it from one map.
+_BIDS_AXES: dict[str, int] = {"i": 0, "i-": 0, "j": 1, "j-": 1, "k": 2, "k-": 2}
+
+# The sidecar's phase-encode fields, most authoritative first, and both ahead of
+# the raw DICOM tag. Both are dcm2niix's *conclusions* about the series, already
+# expressed in NIfTI array terms: `PhaseEncodingDirection` when it could
+# determine the polarity from vendor private data, `PhaseEncodingAxis` when it
+# could only determine the axis. The axis is the entire answer this pipeline
+# needs, so the weaker field is worth exactly as much here as the stronger one.
+#
+# Both outrank `InPlanePhaseEncodingDirectionDICOM`, which is DICOM (0018,1312)
+# verbatim, in DICOM's row/col *image* terms -- turning that into an array axis
+# needs the mapping `PE_ROWCOL`'s comment records having verified on one vendor
+# and one orientation, while these two arrive needing no mapping at all. Reading
+# them is the same choice `convert` makes: rely on dcm2niix's vendor work rather
+# than redo a piece of it. A series dcm2niix could not determine polarity for
+# gets exactly this -- see the synthetic study in `tests/fixtures/dicom`, which
+# has no CSA header and so is described by `PhaseEncodingAxis` alone.
+_SIDECAR_PE_FIELDS = ("PhaseEncodingDirection", "PhaseEncodingAxis")
+
+
 def _pe_axis_from_sidecar(sidecar: dict[str, Any]) -> int | None:
     """PE axis (0/1/2) from the sidecar, or None if it carries no PE field.
 
-    `PhaseEncodingDirection` (BIDS i/j/k, with an optional polarity we drop) maps
-    straight to the array axis; `InPlanePhaseEncodingDirectionDICOM` (ROW/COL) is
-    the DICOM fallback (row = i = axis 0, col = j = axis 1).
+    dcm2niix's two BIDS answers are tried in turn, then
+    `InPlanePhaseEncodingDirectionDICOM` (ROW/COL) as the DICOM fallback
+    (row = i = axis 0, col = j = axis 1). See `_SIDECAR_PE_FIELDS` for the order.
     """
-    if ped := sidecar.get("PhaseEncodingDirection"):
-        value = str(ped)
-        try:
-            return {"i": 0, "i-": 0, "j": 1, "j-": 1, "k": 2, "k-": 2}[value]
-        except KeyError:
-            raise InvalidScanError(
-                "PhaseEncodingDirection",
-                ped,
-                "expected one of 'i', 'i-', 'j', 'j-', 'k', or 'k-'",
-            ) from None
+    for field in _SIDECAR_PE_FIELDS:
+        if value := sidecar.get(field):
+            try:
+                return _BIDS_AXES[str(value)]
+            except KeyError:
+                raise InvalidScanError(
+                    field,
+                    value,
+                    "expected one of 'i', 'i-', 'j', 'j-', 'k', or 'k-'",
+                ) from None
     if dicom := sidecar.get("InPlanePhaseEncodingDirectionDICOM"):
         value = str(dicom).upper()
         try:

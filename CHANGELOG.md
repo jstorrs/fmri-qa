@@ -6,6 +6,19 @@ versioning when the first stable public interface is released.
 
 ## Unreleased
 
+### Changed
+
+- **The phase-encode axis now reads dcm2niix's `PhaseEncodingAxis`**, between
+  `PhaseEncodingDirection` and the raw `InPlanePhaseEncodingDirectionDICOM` tag.
+  It is what dcm2niix writes when it resolved the axis but could not determine
+  the polarity from vendor private data — and the axis is the entire answer this
+  pipeline needs, since ghost placement is symmetric. It outranks the DICOM tag
+  because it already speaks in NIfTI array letters, where (0018,1312) speaks in
+  DICOM's row/col image frame and needs a mapping of ours to become an axis. On
+  an axial acquisition the two agree; where they do not, an oblique or
+  transposed series previously took the DICOM tag's answer or fell through to
+  the header's `dim_info`.
+
 ### Added
 
 - **`fmri-qa-import`: DICOM in, QA-ready NIfTI out.** Point it at a directory and

@@ -28,8 +28,9 @@ class QAScan:
 
     `pe_axis` is the phase-encode axis as a NIfTI voxel-array index (0/1/2). The
     single-slice QA pipeline supports the in-plane axes 0/1 and rejects axis 2.
-    The value comes from the sidecar `PhaseEncodingDirection` (authoritative),
-    falling back to the header `dim_info` phase field; it is `None` when the
+    The value comes from the sidecar (authoritative -- see `pe_axis` for the
+    order it reads its three fields in), falling back to the header `dim_info`
+    phase field; it is `None` when the
     metadata names no axis, and `run_qa` then estimates one from the Nyquist
     ghost. Polarity is dropped (unneeded here). `tr` is in seconds, from the sidecar
     `RepetitionTime` or the header pixdim converted by its declared time unit.
