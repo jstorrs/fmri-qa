@@ -12,10 +12,8 @@ re-derive analysis quantities from raw arrays, and none of them needs the
 """
 
 from datetime import UTC, datetime
-from importlib.metadata import PackageNotFoundError, version
 
 import numpy as np
-from scipy.spatial import ConvexHull, QhullError
 
 from ..load.metadata import ScanMeta
 from ..load.pe_axis import PE_ROWCOL
@@ -24,6 +22,7 @@ from ..metrics.smoothness import SmoothnessResult
 from ..pipeline import AnalysisSettings, QAResult, run_qa
 from ..prep.geometry import ROI, roi_fits
 from ..types import BoolArray, FloatArray, LengthUnit, PeLabel
+from ..version import core_version
 from .artifact import (
     ArtifactImages,
     Curves,
@@ -38,14 +37,6 @@ from .artifact import (
 
 # Points used to sample the Gaussian PSF model curve.
 _PSF_SAMPLES = 100
-
-
-def core_version() -> str:
-    """The installed `fmri-qa-core` version, or "unknown" from a bare source tree."""
-    try:
-        return version("fmri-qa-core")
-    except PackageNotFoundError:
-        return "unknown"
 
 
 def analyze(
@@ -307,6 +298,10 @@ def _convex_hull(mask: BoolArray) -> FloatArray:
     if xs.size < 3:
         return np.zeros((0, 2), dtype=np.float64)
     pts = np.column_stack([xs, ys]).astype(np.float64)
+    # Deferred: scipy.spatial costs over a second to import and this is its only
+    # use in the package, so a bare --version/--help never pays for it.
+    from scipy.spatial import ConvexHull, QhullError
+
     try:
         verts = ConvexHull(pts).vertices
     except QhullError:  # collinear: pixels but no area to enclose

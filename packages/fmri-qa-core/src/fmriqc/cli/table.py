@@ -6,6 +6,12 @@ interface, and its header has no room to say. The machine-readable form of the
 same numbers is `record`.
 """
 
+# The `q.*` parameter annotations below name artifact types that live behind
+# `fmriqc`'s lazy re-exports; evaluated at `def` time they would resolve the
+# whole calculation stack just to import this module. Deferring them keeps a
+# `--help` or a usage error from paying for numpy, scipy and nibabel.
+from __future__ import annotations
+
 import fmriqc as q
 
 

@@ -9,6 +9,7 @@ layers at read time.
 """
 
 from ..pipeline import AnalysisSettings
+from ..version import core_version
 from .artifact import (
     ARTIFACT_SCHEMA_VERSION,
     ArtifactImages,
@@ -21,7 +22,7 @@ from .artifact import (
     RoiBox,
     WeisskoffCurve,
 )
-from .build import analyze, build_artifact, core_version
+from .build import analyze, build_artifact
 from .serialize import load_artifact, save_artifact
 
 __all__ = [

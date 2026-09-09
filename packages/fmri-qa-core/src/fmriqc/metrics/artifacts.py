@@ -9,7 +9,6 @@ cran-fmriqa MAD-normalized temporal/spectral spike scores over the ROI mean.
 from dataclasses import dataclass
 
 import numpy as np
-from scipy.special import erfcinv
 
 from ..prep.geometry import ROI
 from ..prep.images import QAImages
@@ -102,6 +101,11 @@ def outlier_fraction(
     if n_vox == 0:
         return OutlierResult(fraction=np.full(n_t, np.nan), n_voxels=0, qthr=qthr)
     mad = np.median(np.abs(resid), axis=1)  # (n_vox,)
+    # Deferred: scipy.special drags in scipy's compiled special-function stack for
+    # this one call, and it is the only user in the package -- keep it off the
+    # --version/--help/artifact-only import path.
+    from scipy.special import erfcinv
+
     alpha = float(np.sqrt(2.0) * erfcinv(2.0 * qthr / n_t))  # Q^-1(qthr / n_t)
     thr = alpha * np.sqrt(np.pi / 2.0) * mad  # per-voxel outlier threshold
     is_out = (np.abs(resid) > thr[:, None]) & (mad > 0)[:, None]

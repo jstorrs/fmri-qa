@@ -5,6 +5,12 @@ destination that names an input, or that two scans share, destroys work. Both
 are decided here, up front, from the paths alone — before any analysis runs.
 """
 
+# The `q.*` parameter annotations below name artifact types that live behind
+# `fmriqc`'s lazy re-exports; evaluated at `def` time they would resolve the
+# whole calculation stack just to import this module. Deferring them keeps a
+# `--help` or a usage error from paying for numpy, scipy and nibabel.
+from __future__ import annotations
+
 import sys
 from collections.abc import Sequence
 from pathlib import Path

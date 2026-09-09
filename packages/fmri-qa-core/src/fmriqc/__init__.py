@@ -31,112 +31,128 @@ separate `fmri-qa-report` distribution, which consumes a `QAArtifact` and never
 imports the layers above.
 
 Everything named in `__all__` below is importable straight from `fmriqc`.
+
+Every one of those names, though, is re-exported *lazily*: this module defines
+no eager `from .x import Y` at all. Reaching just far enough to build an
+`argparse.ArgumentParser` -- `--version`, `--help`, a bad flag -- used to pay
+for every subpackage's imports, scipy and scikit-image included, before a
+single argument was parsed. `__getattr__` below (PEP 562) resolves a name to
+its owning module and imports that module -- and only that module's chain --
+on first access, so `import fmriqc` stays cheap and the cost lands on the call
+site that actually uses the name. `_EXPORTS` is the map from defining module to
+the names it contributes; `test_lazy_imports.py` asserts its flattened contents
+equal `__all__` exactly, so the two cannot silently drift apart.
 """
 
 import logging
+from importlib import import_module
+from typing import TYPE_CHECKING
 
-from .analysis import (
-    ARTIFACT_SCHEMA_VERSION,
-    AnalysisSettings,
-    ArtifactImages,
-    Curves,
-    GhostRegions,
-    Measurements,
-    Provenance,
-    PsfCurves,
-    QAArtifact,
-    RoiBox,
-    WeisskoffCurve,
-    analyze,
-    build_artifact,
-    core_version,
-    load_artifact,
-    save_artifact,
-)
-from .exceptions import (
-    FmriqcError,
-    IncompatibleScansError,
-    InvalidArtifactError,
-    InvalidChoiceError,
-    InvalidScanError,
-)
-from .hilo import (
-    HILO_ERODE,
-    HiLoResult,
-    phantom_core_mask,
-    run_hilo,
-    separate_noise,
-)
-from .load.metadata import ScanMeta
-from .load.pe_axis import PE_ROWCOL
-from .load.scan import QAScan
-from .metrics.artifacts import (
-    OutlierResult,
-    SpikeResult,
-    outlier_fraction,
-    spike_scores,
-)
-from .metrics.center_of_mass import CenterOfMassResult, estimate_center_of_mass
-from .metrics.fbirn import (
-    WeisskoffResult,
-    drift_percent,
-    percent_fluctuation,
-    sfnr,
-    snr,
-    weisskoff,
-)
-from .metrics.ghost import (
-    GHOST_RADIUS,
-    GHOST_TOP_FRACTION,
-    GhostResult,
-    estimate_ghost,
-    estimate_pe_axis,
-    ghost_masks,
-    ghost_ratio,
-    ghost_ratios,
-)
-from .metrics.motion import MotionResult, estimate_motion
-from .metrics.saturation import SaturationResult, detect_saturation
-from .metrics.smoothness import SmoothnessResult, estimate_smoothness
-from .pipeline import QAMetrics, QAResult, preprocess, run_qa
-from .prep.detrend import (
-    detrend_fn,
-    poly_degree,
-    poly_residuals,
-    spline_nodes,
-    spline_residuals,
-)
-from .prep.geometry import (
-    ROI,
-    PhantomGeometry,
-    detect_phantom,
-    resolve_roi,
-    roi_fits,
-)
-from .prep.images import QAImages
-from .prep.imaging import (
-    edge_valid_mask,
-    extract_center_slice,
-    find_phantom_center,
-    fluctuation_noise,
-    image_center,
-    odd_even_difference,
-    phantom_area,
-    phantom_contrast,
-    phantom_plausible,
-    roi_indexes,
-    segment_phantom,
-    select_slice,
-    trim_count,
-    trim_initial,
-)
-from .types import (
-    DETREND_METHODS,
-    FBIRN_ROI_SIZE,
-    ROI_CENTER_MODES,
-    DetrendMethod,
-    RoiCenter,
-)
+if TYPE_CHECKING:
+    # Import statements kept verbatim (not the lazy `_EXPORTS` map below) so
+    # mypy and pyright resolve every name statically; never executed at runtime.
+    from .analysis import (
+        ARTIFACT_SCHEMA_VERSION,
+        AnalysisSettings,
+        ArtifactImages,
+        Curves,
+        GhostRegions,
+        Measurements,
+        Provenance,
+        PsfCurves,
+        QAArtifact,
+        RoiBox,
+        WeisskoffCurve,
+        analyze,
+        build_artifact,
+        load_artifact,
+        save_artifact,
+    )
+    from .exceptions import (
+        FmriqcError,
+        IncompatibleScansError,
+        InvalidArtifactError,
+        InvalidChoiceError,
+        InvalidScanError,
+    )
+    from .hilo import (
+        HILO_ERODE,
+        HiLoResult,
+        phantom_core_mask,
+        run_hilo,
+        separate_noise,
+    )
+    from .load.metadata import ScanMeta
+    from .load.pe_axis import PE_ROWCOL
+    from .load.scan import QAScan
+    from .metrics.artifacts import (
+        OutlierResult,
+        SpikeResult,
+        outlier_fraction,
+        spike_scores,
+    )
+    from .metrics.center_of_mass import CenterOfMassResult, estimate_center_of_mass
+    from .metrics.fbirn import (
+        WeisskoffResult,
+        drift_percent,
+        percent_fluctuation,
+        sfnr,
+        snr,
+        weisskoff,
+    )
+    from .metrics.ghost import (
+        GHOST_RADIUS,
+        GHOST_TOP_FRACTION,
+        GhostResult,
+        estimate_ghost,
+        estimate_pe_axis,
+        ghost_masks,
+        ghost_ratio,
+        ghost_ratios,
+    )
+    from .metrics.motion import MotionResult, estimate_motion
+    from .metrics.saturation import SaturationResult, detect_saturation
+    from .metrics.smoothness import SmoothnessResult, estimate_smoothness
+    from .pipeline import QAMetrics, QAResult, preprocess, run_qa
+    from .prep.detrend import (
+        detrend_fn,
+        poly_degree,
+        poly_residuals,
+        spline_nodes,
+        spline_residuals,
+    )
+    from .prep.geometry import (
+        ROI,
+        PhantomGeometry,
+        detect_phantom,
+        resolve_roi,
+        roi_fits,
+    )
+    from .prep.images import QAImages
+    from .prep.imaging import (
+        edge_valid_mask,
+        extract_center_slice,
+        find_phantom_center,
+        fluctuation_noise,
+        image_center,
+        odd_even_difference,
+        phantom_area,
+        phantom_contrast,
+        phantom_plausible,
+        roi_indexes,
+        segment_phantom,
+        select_slice,
+        trim_count,
+        trim_initial,
+    )
+    from .types import (
+        DETREND_METHODS,
+        FBIRN_ROI_SIZE,
+        ROI_CENTER_MODES,
+        DetrendMethod,
+        RoiCenter,
+    )
+    from .version import core_version
 
 # A library configures no handlers of its own (see style/logging.md).
 logging.getLogger(__name__).addHandler(logging.NullHandler())
@@ -232,3 +248,140 @@ __all__ = [
     "trim_initial",
     "weisskoff",
 ]
+
+# Single source of truth for the lazy re-export: which submodule defines each
+# name in `__all__`. Keyed by module path (not name) so one dict entry covers
+# a whole `from .x import (...)` block, mirroring the import statements above.
+# `test_lazy_imports.py` asserts this flattens to exactly `__all__` -- the
+# check that stops the two from drifting apart the way two hand-kept lists would.
+_EXPORTS: dict[str, tuple[str, ...]] = {
+    ".analysis": (
+        "ARTIFACT_SCHEMA_VERSION",
+        "AnalysisSettings",
+        "ArtifactImages",
+        "Curves",
+        "GhostRegions",
+        "Measurements",
+        "Provenance",
+        "PsfCurves",
+        "QAArtifact",
+        "RoiBox",
+        "WeisskoffCurve",
+        "analyze",
+        "build_artifact",
+        "load_artifact",
+        "save_artifact",
+    ),
+    ".exceptions": (
+        "FmriqcError",
+        "IncompatibleScansError",
+        "InvalidArtifactError",
+        "InvalidChoiceError",
+        "InvalidScanError",
+    ),
+    ".hilo": (
+        "HILO_ERODE",
+        "HiLoResult",
+        "phantom_core_mask",
+        "run_hilo",
+        "separate_noise",
+    ),
+    ".load.metadata": ("ScanMeta",),
+    ".load.pe_axis": ("PE_ROWCOL",),
+    ".load.scan": ("QAScan",),
+    ".metrics.artifacts": (
+        "OutlierResult",
+        "SpikeResult",
+        "outlier_fraction",
+        "spike_scores",
+    ),
+    ".metrics.center_of_mass": ("CenterOfMassResult", "estimate_center_of_mass"),
+    ".metrics.fbirn": (
+        "WeisskoffResult",
+        "drift_percent",
+        "percent_fluctuation",
+        "sfnr",
+        "snr",
+        "weisskoff",
+    ),
+    ".metrics.ghost": (
+        "GHOST_RADIUS",
+        "GHOST_TOP_FRACTION",
+        "GhostResult",
+        "estimate_ghost",
+        "estimate_pe_axis",
+        "ghost_masks",
+        "ghost_ratio",
+        "ghost_ratios",
+    ),
+    ".metrics.motion": ("MotionResult", "estimate_motion"),
+    ".metrics.saturation": ("SaturationResult", "detect_saturation"),
+    ".metrics.smoothness": ("SmoothnessResult", "estimate_smoothness"),
+    ".pipeline": ("QAMetrics", "QAResult", "preprocess", "run_qa"),
+    ".prep.detrend": (
+        "detrend_fn",
+        "poly_degree",
+        "poly_residuals",
+        "spline_nodes",
+        "spline_residuals",
+    ),
+    ".prep.geometry": (
+        "ROI",
+        "PhantomGeometry",
+        "detect_phantom",
+        "resolve_roi",
+        "roi_fits",
+    ),
+    ".prep.images": ("QAImages",),
+    ".prep.imaging": (
+        "edge_valid_mask",
+        "extract_center_slice",
+        "find_phantom_center",
+        "fluctuation_noise",
+        "image_center",
+        "odd_even_difference",
+        "phantom_area",
+        "phantom_contrast",
+        "phantom_plausible",
+        "roi_indexes",
+        "segment_phantom",
+        "select_slice",
+        "trim_count",
+        "trim_initial",
+    ),
+    ".version": ("core_version",),
+    ".types": (
+        "DETREND_METHODS",
+        "FBIRN_ROI_SIZE",
+        "ROI_CENTER_MODES",
+        "DetrendMethod",
+        "RoiCenter",
+    ),
+}
+
+# Built once from `_EXPORTS`, never hand-maintained: the reverse lookup
+# `__getattr__` needs to find a name's owning module in O(1).
+_NAME_TO_MODULE: dict[str, str] = {
+    name: module for module, names in _EXPORTS.items() for name in names
+}
+
+
+def __getattr__(name: str) -> object:
+    """Resolve `fmriqc.<name>` by importing its owning module on first access.
+
+    Caches the result as a module global (assigning into `globals()`), so this
+    runs at most once per name -- every later access is a plain attribute
+    lookup, same as an eager re-export.
+    """
+    try:
+        module_path = _NAME_TO_MODULE[name]
+    except KeyError:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}") from None
+    value = getattr(import_module(module_path, __name__), name)
+    globals()[name] = value
+    return value
+
+
+def __dir__() -> list[str]:
+    """List the public names, matching what an eager module would show."""
+    return sorted(__all__)

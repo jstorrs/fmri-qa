@@ -20,6 +20,7 @@ RANKS = {
     "types": 0,
     "exceptions": 0,
     "_arrays": 0,
+    "version": 0,
     "load": 1,
     "prep": 2,
     "validation": 2,

@@ -6,6 +6,12 @@ layout is a published contract, pinned by `JSON_SCHEMA_VERSION`; adding or
 renaming a field is a deliberate edit here and a bump there.
 """
 
+# The `q.*` parameter annotations below name artifact types that live behind
+# `fmriqc`'s lazy re-exports; evaluated at `def` time they would resolve the
+# whole calculation stack just to import this module. Deferring them keeps a
+# `--help` or a usage error from paying for numpy, scipy and nibabel.
+from __future__ import annotations
+
 import argparse
 import math
 
