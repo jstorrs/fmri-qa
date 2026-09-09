@@ -8,6 +8,25 @@ versioning when the first stable public interface is released.
 
 ### Added
 
+- **`fmri-qa-import`: DICOM in, QA-ready NIfTI out.** Point it at a directory and
+  it runs [dcm2niix](https://github.com/rordenlab/dcm2niix), pinning the flags a
+  QA conversion cannot be left to chance on — above all `-l o`, which keeps the
+  scanner's stored integers. dcm2niix's `-l y` rescales them while still writing
+  an *integer* NIfTI, so `QAScan.stored_integer` sees nothing wrong and the
+  saturation check reports a clipped acquisition as clean rather than as not
+  determinable; `-g i` makes the pinning stick past a site's `~/.dcm2nii.ini`.
+  Each series is filed as `<date>_<time>_s<NNN>_<description>`, built from the
+  BIDS sidecar because dcm2niix's `-f` template cannot produce those four fields:
+  `%t` is the study's time (the same for every series in a session), `%s` is not
+  zero-padded (so series 11 sorts before series 2), and `%d` keeps the protocol's
+  punctuation. `--names dcm2niix` keeps dcm2niix's naming and `--filename` takes
+  any template; `--dcm2niix-arg` passes anything else through, warning if it
+  would undo `-l o`. The converter is the optional `fmri-qa-core[dicom]` extra,
+  which carries a bundled binary; a dcm2niix on `PATH` or named with
+  `--dcm2niix` works instead. New `fmriqc.convert` subpackage
+  (`import_dicom`, `ImportResult`, `ImportedSeries`, `ConversionError`). See the
+  README's *Importing DICOM* section.
+
 - **The saturation check now says when it cannot answer.** An ADC rail is an
   integer artifact of the receiver, so the check requires a series that still
   carries the scanner's integers. `QAScan.from_nifti` reads the NIfTI datatype,

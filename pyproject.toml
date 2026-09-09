@@ -90,8 +90,11 @@ ignore = [
 # The report renders human-facing text with intentional typography (× ° —), and
 # its tests assert on that text.
 "packages/fmri-qa-report/**" = ["RUF001"]
-# Stubs mirror external library signatures verbatim (e.g. scipy's `input` param).
-"stubs/**" = ["A002"]
+# Stubs mirror external library signatures verbatim, including names we would
+# not choose: scipy's `input` parameter (A002) and the dcm2niix wrapper's
+# module-level `bin` (A001). Renaming either would make the stub describe a
+# module that does not exist.
+"stubs/**" = ["A001", "A002"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["fmriqc", "fmriqc_report"]

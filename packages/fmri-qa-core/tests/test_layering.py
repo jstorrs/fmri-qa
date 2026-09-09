@@ -22,6 +22,10 @@ RANKS = {
     "_arrays": 0,
     "version": 0,
     "load": 1,
+    # `convert` sits beside `load`, not under it: both are the tier that gets
+    # data in, and convert produces exactly the files load reads. It borrows
+    # load's path conventions, which a rank below load would forbid.
+    "convert": 1,
     "prep": 2,
     "validation": 2,
     "metrics": 3,

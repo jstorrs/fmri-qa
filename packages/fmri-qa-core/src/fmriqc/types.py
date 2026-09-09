@@ -86,5 +86,21 @@ def readout_axis(pe_axis: PeAxis) -> PeAxis:
     return 1 if pe_axis == 0 else 0
 
 
+# How much of the DICOM identity dcm2niix keeps in the BIDS sidecar it writes
+# (`convert.dcm2niix`). "pii" strips the patient and keeps the dates, which is
+# what a QA import wants: `convert.naming` builds the file name from the series'
+# acquisition date and time, and "all" throws that date away. Named here rather
+# than passed as dcm2niix's own `-ba o/y/n` so the choice reads as what it means.
+Anonymize = Literal["pii", "all", "none"]
+ANONYMIZE_MODES: tuple[Anonymize, ...] = get_args(Anonymize)
+
+# Which name an imported series is filed under: the one `convert.naming` builds
+# from the sidecar (date, time, zero-padded series, description), or whatever
+# dcm2niix's own `-f` template produced. See `convert.naming` for why the two
+# are not the same thing.
+NameStyle = Literal["qa", "dcm2niix"]
+NAME_STYLES: tuple[NameStyle, ...] = get_args(NameStyle)
+
+
 # Fixed summary-ROI side (voxels). Glover/fBIRN uses 21; user-configurable.
 FBIRN_ROI_SIZE = 21

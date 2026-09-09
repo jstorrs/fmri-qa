@@ -32,9 +32,17 @@ dependencies = [
     "scipy>=1.16.2",
 ]
 
+# The DICOM importer's converter. An extra rather than a dependency: the wheel
+# carries a ~3 MB compiled dcm2niix, which is dead weight for the common case of
+# analyzing NIfTI that someone else converted, and a site with its own dcm2niix
+# on PATH needs none of it (`fmri-qa-import --dcm2niix` names a third).
+[project.optional-dependencies]
+dicom = ["dcm2niix>=1.0.20250506"]
+
 [project.scripts]
 fmri-qa = "fmriqc.cli:main"
 fmri-qa-hilo = "fmriqc.cli:hilo_main"
+fmri-qa-import = "fmriqc.cli:import_main"
 
 [build-system]
 requires = ["hatchling"]

@@ -3,6 +3,10 @@
 The public surface is re-exported here; the implementation lives in topical
 subpackages (`ls` the package to find a concern):
 
+* `convert`   -- DICOM -> NIfTI import: `dcm2niix` (running the converter
+                 with the flags a QA series cannot be converted without),
+                 `naming` (the date/time/series/description file name), and
+                 `session` (`import_dicom`: a directory in, named series out)
 * `load`      -- NIfTI + BIDS-sidecar I/O: `scan` (`QAScan`), `metadata`
                  (`ScanMeta`), `pe_axis` (phase-encode resolution),
                  `repetition_time` (TR resolution)
@@ -24,8 +28,9 @@ subpackages (`ls` the package to find a concern):
                  contract), and `serialize` (the `.npz` on-disk form, with the
                  per-version migrations that keep an old archive readable)
 * `hilo`      -- high/low flip-angle thermal/instability separation (its own pipeline)
-* `cli`       -- the two commands (`fmri-qa`, `fmri-qa-hilo`) and the two forms
-                 they report in: the fixed-width `table` and the JSON `record`
+* `cli`       -- the three commands (`fmri-qa`, `fmri-qa-hilo`,
+                 `fmri-qa-import`) and the two forms the analyzing two report
+                 in: the fixed-width `table` and the JSON `record`
 * `types`     -- the shared array dtypes and option Literals
 
 This package is the *calculation* half of fmri-qa. Reports and plots live in the
@@ -70,7 +75,9 @@ if TYPE_CHECKING:
         load_artifact,
         save_artifact,
     )
+    from .convert.session import ImportedSeries, ImportResult, import_dicom
     from .exceptions import (
+        ConversionError,
         FmriqcError,
         IncompatibleScansError,
         InvalidArtifactError,
@@ -149,11 +156,15 @@ if TYPE_CHECKING:
     )
     from .prep.scale import VoxelSize
     from .types import (
+        ANONYMIZE_MODES,
         DETREND_METHODS,
         FBIRN_ROI_SIZE,
+        NAME_STYLES,
         PE_AXES,
         ROI_CENTER_MODES,
+        Anonymize,
         DetrendMethod,
+        NameStyle,
         PeAxis,
         RoiCenter,
     )
@@ -163,20 +174,24 @@ if TYPE_CHECKING:
 logging.getLogger(__name__).addHandler(logging.NullHandler())
 
 __all__ = [
+    "ANONYMIZE_MODES",
     "ARTIFACT_SCHEMA_VERSION",
     "DETREND_METHODS",
     "FBIRN_ROI_SIZE",
     "GHOST_RADIUS",
     "GHOST_TOP_FRACTION",
     "HILO_ERODE",
+    "NAME_STYLES",
     "PE_AXES",
     "PE_ROWCOL",
     "ROI",
     "ROI_CENTER_MODES",
     "AnalysisSettings",
+    "Anonymize",
     "ArtifactImages",
     "CenterOfMassResult",
     "ClipRail",
+    "ConversionError",
     "Curves",
     "DetrendMethod",
     "Detrender",
@@ -184,12 +199,15 @@ __all__ = [
     "GhostRegions",
     "GhostResult",
     "HiLoResult",
+    "ImportResult",
+    "ImportedSeries",
     "IncompatibleScansError",
     "InvalidArtifactError",
     "InvalidChoiceError",
     "InvalidScanError",
     "Measurements",
     "MotionResult",
+    "NameStyle",
     "OutlierResult",
     "PeAxis",
     "PhantomGeometry",
@@ -228,6 +246,7 @@ __all__ = [
     "ghost_ratio",
     "ghost_ratios",
     "image_center",
+    "import_dicom",
     "load_artifact",
     "odd_even_difference",
     "outlier_fraction",
@@ -281,7 +300,9 @@ _EXPORTS: dict[str, tuple[str, ...]] = {
         "load_artifact",
         "save_artifact",
     ),
+    ".convert.session": ("ImportResult", "ImportedSeries", "import_dicom"),
     ".exceptions": (
+        "ConversionError",
         "FmriqcError",
         "IncompatibleScansError",
         "InvalidArtifactError",
@@ -361,11 +382,15 @@ _EXPORTS: dict[str, tuple[str, ...]] = {
     ".prep.scale": ("VoxelSize",),
     ".version": ("core_version",),
     ".types": (
+        "ANONYMIZE_MODES",
         "DETREND_METHODS",
         "FBIRN_ROI_SIZE",
+        "NAME_STYLES",
         "PE_AXES",
         "ROI_CENTER_MODES",
+        "Anonymize",
         "DetrendMethod",
+        "NameStyle",
         "PeAxis",
         "RoiCenter",
     ),

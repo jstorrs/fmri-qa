@@ -115,7 +115,9 @@ run then looks exactly like a clean one.
 
 So `fmri-qa` is opinionated about conversion: **give it integer-stored NIfTI**
 (`dcm2niix` does this by default — check with `fslhd` or
-`nib.load(f).header.get_data_dtype()`). On a float-stored series the loader
+`nib.load(f).header.get_data_dtype()`), or give it DICOM and let
+[`fmri-qa-import`](#importing-dicom) convert it with the flags that keep the
+integers. On a float-stored series the loader
 warns, and the clipping fields report *not determinable* — `?` in the table,
 `null` in the JSON, `None` in the artifact — rather than the "no clipping found"
 that would quietly hide the runs this check exists to catch. Every other metric
@@ -254,12 +256,22 @@ uv sync --all-packages
 ```
 
 Downstream, install whichever half you need — `fmri-qa-report` pulls in
-`fmri-qa-core`, so installing it gives you both commands:
+`fmri-qa-core`, so installing it gives you the core's commands too:
 
 ```bash
 pip install fmri-qa-core      # metrics and artifacts only
 pip install fmri-qa-report    # + plots and PDF packets
 ```
+
+`fmri-qa-import` needs a dcm2niix. The `dicom` extra carries a bundled one, so
+nothing else has to be installed:
+
+```bash
+pip install 'fmri-qa-core[dicom]'
+```
+
+Skip the extra if the machine already has dcm2niix on `PATH` — the command finds
+it there, and `--dcm2niix` names a third.
 
 Published work using the package should cite the software metadata in
 [`CITATION.cff`](CITATION.cff). User-facing changes are recorded in
@@ -273,6 +285,105 @@ stays out of the default sync:
 ```bash
 make sync-notebooks    # uv sync --all-packages --all-extras --group notebooks
 ```
+
+## Importing DICOM
+
+```bash
+uv run fmri-qa-import /path/to/dicom/dir -o session_nifti
+```
+
+```
+# dcm2niix v1.0.20260724 (.../site-packages/dcm2niix/dcm2niix)
+series  acquired             file
+     2  2026-09-09 14:30:12  20260909_143012_s002_QA_EPI_ISO.nii.gz
+    11  2026-09-09 14:55:33  20260909_145533_s011_QA_EPI_32ch_rep.nii.gz
+# 2 series -> session_nifti
+# analyze with:  fmri-qa session_nifti/*.nii.gz
+```
+
+This runs [dcm2niix](https://github.com/rordenlab/dcm2niix) and adds the two
+things that are easy to get wrong: the flags that keep a series *checkable*, and
+names that read and sort.
+
+### The flags it pins
+
+dcm2niix has some thirty options and most are matters of taste. Four are not —
+and they are *defaults*, which is the problem, because dcm2niix reads
+`~/.dcm2nii.ini` before its own defaults. A file written months ago by another
+tool can change what a QA conversion produces without appearing on anyone's
+command line.
+
+| Flag | Why it is not optional |
+| --- | --- |
+| `-l o` | keep the stored integers exactly as the scanner sent them |
+| `-g i` | ignore `~/.dcm2nii.ini`, so the other three are actually in force |
+| `-b y` | write the BIDS sidecar — TR, voxel size and phase-encode direction come from it |
+| `-w 2` | add a suffix on a name conflict rather than overwrite |
+
+`-l o` is the one that matters most, and the reason this is a command rather
+than a line in this README telling you to run dcm2niix yourself. `-l y`
+"losslessly" rescales 16-bit integers to fill the dynamic range. The file it
+writes is *still an integer NIfTI*, so the storage check above sees nothing
+wrong and no warning fires — but every stored sample has been multiplied and the
+ADC rail no longer sits at `2**n - 1`. On a synthetic series clipped flat at
+4095, `-l o` finds a 12-bit rail and 7140 clipped samples and `-l y` finds none
+and reports the run clean. That is the one saturation failure the storage gate
+cannot catch, because the evidence it tests for is present and merely wrong.
+
+### The names it builds
+
+A QA archive is browsed by date, series number, series description and time, and
+dcm2niix's `-f` template cannot produce those four:
+
+- `%t` is the **study** date and time, identical for every series in a session,
+  so it cannot say when a series ran. There is no series-time token.
+- `%s` is **not zero-padded**, so `..._11_...` sorts before `..._2_...` — a
+  listing that looks ordered and is not.
+- `%d` keeps the protocol's punctuation, so `QA EPI 32ch (rep)` becomes a name
+  that needs quoting in a shell.
+
+All four fields are in the BIDS sidecar, so the name is built from that instead:
+`<date>_<time>_s<NNN>_<description>`. Time leads the series number because it is
+the more reliable order — series numbers restart between studies, so a directory
+holding several sessions sorts right by time and only accidentally by series.
+
+Every field is optional, since each is a DICOM tag some export omits: a partial
+sidecar gives a shorter name rather than no name. A series whose sidecar names
+nothing keeps the name dcm2niix gave it, and so does a series whose name would
+collide with another's — a multi-echo or magnitude/phase series agrees on all
+four fields and differs only in dcm2niix's postfix, so renaming both to the one
+name they share would silently keep whichever moved last. The command says which
+files those were.
+
+Prefer dcm2niix's own naming? `--names dcm2niix` keeps it, and `--filename`
+takes any `-f` template.
+
+Options:
+
+| Flag | Default | Meaning |
+| --- | --- | --- |
+| `-o`, `--out` | `./<source name>_nifti` | where to write the NIfTI |
+| `--names` | `qa` | `qa` (date/time/series/description) or `dcm2niix` |
+| `--filename` | `%t_%s_%d` | dcm2niix `-f` template (the fallback name under `--names qa`) |
+| `--anonymize` | `pii` | `pii` strips the patient and keeps the dates, `all` strips the dates too, `none` keeps everything |
+| `--no-compress` | — | write `.nii` instead of `.nii.gz` |
+| `--depth` | `5` | sub-directory levels of the source to search |
+| `--dcm2niix` | bundled, else `PATH` | which dcm2niix to run |
+| `--dcm2niix-arg` | — | extra argument, repeatable, passed last so it wins |
+| `--force` | — | overwrite files already in the output directory |
+| `--log` | — | print everything dcm2niix said |
+
+The import is all-or-nothing: it converts into a staging directory and moves the
+result into place only once every file has a name and none would overwrite
+something already there. The names come out of the DICOM, so they cannot be
+checked before converting — checking them before the *move* is what keeps a
+refused import from leaving half a session behind.
+
+`--dcm2niix-arg` is an escape hatch, passed after everything the command chose
+so it wins; a value starting with `-` needs the `=` form
+(`--dcm2niix-arg=-i --dcm2niix-arg=y`). Overriding `-l` warns, because that
+particular override disarms the saturation check rather than breaking anything
+visibly.
 
 ## Command line
 

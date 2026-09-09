@@ -85,3 +85,23 @@ class InvalidArtifactError(FmriqcError, ValueError):
         super().__init__(f"cannot read artifact {path}: {reason}")
         self.path = path
         self.reason = reason
+
+
+class ConversionError(FmriqcError, RuntimeError):
+    """A DICOM directory could not be converted into QA-ready NIfTI.
+
+    Raised by `convert` for every way an import can refuse: no dcm2niix to run,
+    a source that is not a readable directory, a converter that exited non-zero,
+    or a destination already holding files the import would overwrite. Also a
+    `RuntimeError` — the failure is in the environment or the external tool, not
+    in an argument's value, so `ValueError` would be the wrong stdlib kin.
+
+    ``stage`` names the step that refused (`"dcm2niix"`, `"source"`,
+    `"destination"`) and ``reason`` states what was wrong, so a caller can
+    branch on the stage instead of matching the message.
+    """
+
+    def __init__(self, stage: str, reason: str) -> None:
+        super().__init__(f"{stage}: {reason}")
+        self.stage = stage
+        self.reason = reason
