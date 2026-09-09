@@ -5,18 +5,17 @@ axis; every statistic here is a region-matched ghost-to-signal ratio built on
 that idea. `estimate_ghost` builds the masks for both in-plane axes once and
 measures the whole family from them, returning a `GhostResult` that carries the
 masks it sampled — so a report draws the regions the numbers came from rather
-than rebuilding them. When no sidecar/header PE axis is available, the same
-machinery picks the axis where the ghost actually lands (`estimate_pe_axis`),
-which `run_qa` uses as its last-resort fallback (see `load.pe_axis`).
+than rebuilding them. `ghost_ratios` computes that same per-axis ratio for both
+in-plane axes without picking a winner; `estimate_pe_axis` picks one -- the
+axis where the ghost actually lands -- which `run_qa` uses as its last-resort
+fallback when no sidecar/header PE axis is available (see `load.pe_axis`).
 """
 
 from dataclasses import dataclass
-from typing import Literal, overload
 
 import numpy as np
 from skimage.morphology import isotropic_dilation, isotropic_erosion
 
-from ..prep.imaging import edge_valid_mask
 from ..types import BoolArray, FloatArray
 
 # Fraction of the brightest ghost-region voxels averaged for the localized-ghost
@@ -203,73 +202,69 @@ def ghost_ratio(
     phantom_mask: BoolArray,
     pe_axis: int = 0,
     radius: int = GHOST_RADIUS,
-    valid_mask: BoolArray | None = None,
+    *,
+    valid_mask: BoolArray,
 ) -> float:
     """fBIRN Nyquist ghost-to-signal ratio for one candidate axis.
 
-    A single axis' worth of `estimate_ghost` — what `estimate_pe_axis` needs to
+    A single axis' worth of `estimate_ghost` — what `ghost_ratios` needs to
     score a candidate, before any axis is settled. A run that has settled its
     axis calls `estimate_ghost` and reads `pe_ratio`, so the whole family comes
     off one set of masks. `valid_mask` excludes zeroed image edges (see
-    `edge_valid_mask`); it defaults to detecting them from `mean_image`.
+    `edge_valid_mask`) and is required rather than defaulted: an image with a
+    nonzero NIfTI `scl_inter` nulls its edge to the intercept, not to 0.0, so a
+    mask built from `edge_valid_mask`'s own default (`zero=0.0`) would silently
+    detect no nulled edge on exactly the scans that default is wrong for. Pass
+    `edge_valid_mask(mean_image, zero=...)` or `QAImages.valid_mask`.
     """
-    if valid_mask is None:
-        valid_mask = edge_valid_mask(mean_image)
     signal_mask, ghost_mask = ghost_masks(phantom_mask, pe_axis, radius, valid_mask)
     return _mean_ratio(mean_image, signal_mask, ghost_mask)
 
 
-@overload
-def estimate_pe_axis(
-    mean_image: FloatArray,
-    phantom_mask: BoolArray,
-    radius: int = ...,
-    return_ratios: Literal[False] = ...,
-    *,
-    valid_mask: BoolArray | None = ...,
-) -> int | None: ...
-@overload
-def estimate_pe_axis(
-    mean_image: FloatArray,
-    phantom_mask: BoolArray,
-    radius: int = ...,
-    *,
-    return_ratios: Literal[True],
-    valid_mask: BoolArray | None = ...,
-) -> tuple[int | None, dict[int, float]]: ...
-def estimate_pe_axis(
+def ghost_ratios(
     mean_image: FloatArray,
     phantom_mask: BoolArray,
     radius: int = GHOST_RADIUS,
-    return_ratios: bool = False,
-    valid_mask: BoolArray | None = None,
-) -> int | tuple[int | None, dict[int, float]] | None:
-    """Guess the phase-encode axis from where the Nyquist ghost actually lands.
+    *,
+    valid_mask: BoolArray,
+) -> dict[int, float]:
+    """`ghost_ratio` for both in-plane axes, keyed by axis index.
 
     Rolling the phantom along the *true* PE axis lines the ghost region up with
     real ghost signal (high mean); along the wrong axis it lands on background
-    (low mean). The axis with the larger ghost-to-signal ratio wins.
-
-    Only axes the ratio could actually be measured on are candidates. An axis
+    (low mean) — what `estimate_pe_axis` compares to pick a winner. An axis
     whose ghost region came back empty — the phantom spans the FOV along it, or
-    the segmentation collapsed — scores NaN, which is not a low ratio but no
-    ratio at all: comparing against it is what a float comparison with NaN
-    silently gets wrong, always answering False and leaving whichever axis was
-    looked at first as the winner. When neither axis is measurable there is
-    nothing to compare and the answer is None, not a coin flip presented as a
-    measurement.
-
-    Returns the axis index (0 or 1), None if the ghost resolves neither, or
-    `(axis, {axis: ratio})` if `return_ratios` is set. NOTE: shares the tuning
-    caveats of `ghost_ratio` — a win by a hair is still a guess, so verify
-    against the acquisition's known PE direction before trusting it.
+    the segmentation collapsed — scores NaN (see `_mean_ratio`): not a low
+    ratio but no ratio at all, a distinction `estimate_pe_axis` relies on.
     """
-    ratios = {
+    return {
         axis: ghost_ratio(
             mean_image, phantom_mask, pe_axis=axis, radius=radius, valid_mask=valid_mask
         )
         for axis in (0, 1)
     }
+
+
+def estimate_pe_axis(
+    mean_image: FloatArray,
+    phantom_mask: BoolArray,
+    radius: int = GHOST_RADIUS,
+    *,
+    valid_mask: BoolArray,
+) -> int | None:
+    """Guess the phase-encode axis from where the Nyquist ghost actually lands.
+
+    The axis with the larger `ghost_ratios` ratio wins, but only among axes the
+    ratio could actually be measured on: comparing against a NaN ratio is what
+    a plain float comparison silently gets wrong, always answering False and
+    leaving whichever axis was looked at first as the winner. When neither axis
+    is measurable there is nothing to compare and the answer is None, not a
+    coin flip presented as a measurement.
+
+    NOTE: shares the tuning caveats of `ghost_ratio` — a win by a hair is still
+    a guess, so verify against the acquisition's known PE direction before
+    trusting it.
+    """
+    ratios = ghost_ratios(mean_image, phantom_mask, radius, valid_mask=valid_mask)
     measurable = [axis for axis, ratio in ratios.items() if np.isfinite(ratio)]
-    best = max(measurable, key=ratios.__getitem__) if measurable else None
-    return (best, ratios) if return_ratios else best
+    return max(measurable, key=ratios.__getitem__) if measurable else None

@@ -148,11 +148,18 @@ def _optional_text(sidecar: dict[str, Any], key: str) -> str | None:
 
 
 def _pe_direction(pe_axis: int | None, sidecar: dict[str, Any]) -> str | None:
-    """DICOM row/col phase-encode direction, preferring the sidecar."""
+    """DICOM row/col phase-encode direction, preferring the sidecar's own wording.
+
+    `InPlanePhaseEncodingDirectionDICOM` (ROW/COL) is checked first because it
+    already speaks in row/col terms. Otherwise `pe_axis` is used directly rather
+    than re-deriving a row/col label from `PhaseEncodingDirection` here: by the
+    time this runs, `QAScan.from_nifti` has already resolved `pe_axis` from that
+    same sidecar field via `_pe_axis_from_sidecar` (`pe_axis.py`'s single source
+    of truth for the BIDS i/j -> array-axis mapping), so re-consuming it would
+    only recompute the answer `pe_axis` already carries.
+    """
     if dicom := sidecar.get("InPlanePhaseEncodingDirectionDICOM"):
         return str(dicom).lower()
-    if ped := sidecar.get("PhaseEncodingDirection"):
-        return PE_ROWCOL.get({"i": 0, "i-": 0, "j": 1, "j-": 1}.get(str(ped), -1))
     return PE_ROWCOL.get(pe_axis) if pe_axis is not None else None
 
 

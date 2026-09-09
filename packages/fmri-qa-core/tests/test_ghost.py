@@ -10,7 +10,12 @@ import warnings
 
 import numpy as np
 
-from fmriqc.metrics.ghost import GhostResult, estimate_ghost, estimate_pe_axis
+from fmriqc.metrics.ghost import (
+    GhostResult,
+    estimate_ghost,
+    estimate_pe_axis,
+    ghost_ratios,
+)
 
 ALL_VALID = np.ones((8, 8), dtype=bool)
 
@@ -51,9 +56,8 @@ def test_readout_ratio_is_near_zero_on_the_axis_the_ghost_missed() -> None:
 
 def test_estimate_pe_axis_picks_the_axis_the_ghost_lands_on() -> None:
     img, mask = _phantom_with_axis0_ghost(np.full((2, 2), 5.0))
-    axis, ratios = estimate_pe_axis(
-        img, mask, radius=0, return_ratios=True, valid_mask=ALL_VALID
-    )
+    ratios = ghost_ratios(img, mask, radius=0, valid_mask=ALL_VALID)
+    axis = estimate_pe_axis(img, mask, radius=0, valid_mask=ALL_VALID)
     assert axis == 0
     assert ratios[0] > ratios[1]
 
@@ -67,7 +71,8 @@ def test_estimate_pe_axis_is_none_when_neither_axis_is_measurable() -> None:
     """
     img = np.full((8, 8), 5.0)
     mask = np.ones((8, 8), dtype=bool)
-    axis, ratios = estimate_pe_axis(img, mask, radius=0, return_ratios=True)
+    ratios = ghost_ratios(img, mask, radius=0, valid_mask=ALL_VALID)
+    axis = estimate_pe_axis(img, mask, radius=0, valid_mask=ALL_VALID)
     assert axis is None
     assert all(np.isnan(r) for r in ratios.values())
 
@@ -86,9 +91,8 @@ def test_estimate_pe_axis_ignores_an_unmeasurable_axis() -> None:
     img[:, 2:4] = 100.0
     img[:, 6:8] = 5.0  # the axis-1 ghost
 
-    axis, ratios = estimate_pe_axis(
-        img, mask, radius=0, return_ratios=True, valid_mask=ALL_VALID
-    )
+    ratios = ghost_ratios(img, mask, radius=0, valid_mask=ALL_VALID)
+    axis = estimate_pe_axis(img, mask, radius=0, valid_mask=ALL_VALID)
 
     assert np.isnan(ratios[0]) and np.isfinite(ratios[1])
     assert axis == 1

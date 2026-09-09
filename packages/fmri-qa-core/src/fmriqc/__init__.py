@@ -11,8 +11,10 @@ subpackages (`ls` the package to find a concern):
 * `metrics`   -- the physics tests, one module per family: `fbirn`
                  (SNR/SFNR/RDC/drift), `artifacts` (spikes/outliers), `ghost`
                  (`estimate_ghost`: the whole Nyquist-ghost family off one build
-                 of the region-matched masks, which the result carries),
-                 `saturation`, `motion`, `center_of_mass`, `smoothness`
+                 of the region-matched masks, which the result carries;
+                 `ghost_ratios`/`estimate_pe_axis` score and pick a PE axis
+                 before one is settled), `saturation`, `motion`,
+                 `center_of_mass`, `smoothness`
 * `pipeline`  -- `preprocess`, the full `run_qa` orchestration, and the
                  aggregate `QAMetrics`/`QAResult`
 * `analysis`  -- the publishable `QAArtifact`: `artifact` (the value objects),
@@ -91,6 +93,7 @@ from .metrics.ghost import (
     estimate_pe_axis,
     ghost_masks,
     ghost_ratio,
+    ghost_ratios,
 )
 from .metrics.motion import MotionResult, estimate_motion
 from .metrics.saturation import SaturationResult, detect_saturation
@@ -198,6 +201,7 @@ __all__ = [
     "fluctuation_noise",
     "ghost_masks",
     "ghost_ratio",
+    "ghost_ratios",
     "image_center",
     "load_artifact",
     "odd_even_difference",

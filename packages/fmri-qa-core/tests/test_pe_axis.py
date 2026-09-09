@@ -92,6 +92,22 @@ def test_from_nifti_prefers_sidecar_over_header(tmp_path) -> None:
     assert q.QAScan.from_nifti(nifti).pe_axis == 1
 
 
+def test_meta_pe_dir_from_sidecar_phase_encoding_direction(tmp_path) -> None:
+    """`pe_dir` for a `PhaseEncodingDirection` sidecar, with no header fallback.
+
+    `PhaseEncodingDirection` carries no row/col wording of its own, so `pe_dir`
+    must come from the resolved `pe_axis` (`_pe_axis_from_sidecar` already
+    turned "j" into axis 1) rather than a second, direct re-derivation from the
+    sidecar in `_pe_direction` -- pinning the row/col label this sidecar shape
+    produces now that that re-derivation is gone.
+    """
+    nifti = _write_scan(tmp_path, {"PhaseEncodingDirection": "j"}, phase=None)
+    scan = q.QAScan.from_nifti(nifti)
+    assert scan.pe_axis == 1
+    assert scan.meta is not None
+    assert scan.meta.pe_dir == "col"
+
+
 def test_from_nifti_falls_back_to_header_dim_info(tmp_path) -> None:
     # No PE field in the sidecar; the header dim_info phase axis is used.
     nifti = _write_scan(tmp_path, {"FlipAngle": 77}, phase=1)
