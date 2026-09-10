@@ -34,6 +34,9 @@ from numpy.typing import NDArray
 # flow through arithmetic instead of decaying to Any.
 FloatArray = NDArray[np.float64]
 BoolArray = NDArray[np.bool_]
+# Raw bytes: the artifact's JSON document, stored as the numeric dtype the
+# NumPy readers a site already has can actually open (see `analysis.serialize`).
+ByteArray = NDArray[np.uint8]
 IntArray = NDArray[np.intp]
 
 # Closed sets of option strings, modeled as Literal so a bad value is a type

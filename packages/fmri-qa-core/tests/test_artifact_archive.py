@@ -535,10 +535,91 @@ def _both_nan(x: float, y: float) -> bool:
 
 
 def _rewrite_document(path, edit) -> None:
-    """Rewrite the archive's JSON member through `edit`, keeping every array."""
+    """Rewrite the archive's JSON member through `edit`, keeping every array.
+
+    Writes the member back in the form `save_artifact` uses -- UTF-8 bytes as
+    `uint8` -- so what these tests hand the loader is shaped like a real
+    archive; `test_a_document_stored_the_old_way_still_reads` covers `<U`.
+    """
     with np.load(path, allow_pickle=False) as archive:
-        document = json.loads(str(archive["__document__"]))
+        document = json.loads(bytes(archive["__document__"]).decode("utf-8"))
         arrays = {n: archive[n] for n in archive.files if n != "__document__"}
-    payload = {"__document__": np.array(json.dumps(edit(document))), **arrays}
+    edited = np.frombuffer(json.dumps(edit(document)).encode("utf-8"), dtype=np.uint8)
+    payload = {"__document__": edited, **arrays}
     with Path(path).open("wb") as fh:
         np.savez_compressed(fh, **payload)
+
+
+# --------------------------------------------------------------------------
+# the __document__ member's stored form
+# --------------------------------------------------------------------------
+
+
+def test_the_document_is_stored_as_utf8_bytes(tmp_path, artifact) -> None:
+    """`uint8`, not `<U`: the dtype the readers a site already has can take.
+
+    npy-matlab maps `u1 u2 u4 u8 i1 i2 i4 i8 f4 f8 b1` and errors on anything
+    else, and RcppCNPy is numeric only, so a `<U` document is one neither can
+    open at all.
+    """
+    saved = q.save_artifact(artifact, tmp_path / "scan.qa.npz")
+    with np.load(saved) as archive:
+        member = archive["__document__"]
+    assert member.dtype == np.uint8
+    assert json.loads(bytes(member).decode("utf-8"))["schema_version"] == (
+        artifact.schema_version
+    )
+
+
+def test_the_stored_document_is_ascii_even_when_the_text_is_not(
+    tmp_path, artifact
+) -> None:
+    """Unicode rides as `\\uXXXX`, so a consumer needs no encoding to read it.
+
+    `json.dumps` escapes by default; this pins that, because MATLAB's `char()`
+    on the uint8 vector is byte-per-character and would mojibake real UTF-8.
+    """
+    prov = replace(artifact.provenance, scan="sujet_créé_Ω_頭部.nii.gz")
+    saved = q.save_artifact(replace(artifact, provenance=prov), tmp_path / "u.qa.npz")
+    with np.load(saved) as archive:
+        member = archive["__document__"]
+    assert bytes(member).isascii()
+    assert q.load_artifact(saved).provenance.scan == "sujet_créé_Ω_頭部.nii.gz"
+
+
+def test_a_name_python_holds_as_a_lone_surrogate_survives(tmp_path, artifact) -> None:
+    """What a Windows file name with an undecodable byte becomes in Python.
+
+    It reaches `json.dumps` as an unpaired surrogate, which has no UTF-8 form;
+    the ASCII escaping is what keeps the write from raising on it.
+    """
+    name = "bad_\udcff_name.nii.gz"
+    prov = replace(artifact.provenance, scan=name)
+    saved = q.save_artifact(replace(artifact, provenance=prov), tmp_path / "s.qa.npz")
+    assert q.load_artifact(saved).provenance.scan == name
+
+
+def test_a_document_stored_the_old_way_still_reads(tmp_path, artifact) -> None:
+    """Every archive written before this carries `<U`; it must still load.
+
+    The retired-schema fixtures cover this too, but they also exercise the
+    migrations; this isolates the stored form from the layout.
+    """
+    saved = q.save_artifact(artifact, tmp_path / "new.qa.npz")
+    with np.load(saved) as archive:
+        members = dict(archive)
+    text = bytes(members.pop("__document__")).decode("utf-8")
+    old = tmp_path / "old.qa.npz"
+    np.savez_compressed(old, __document__=np.array(text), **members)
+
+    with np.load(old) as archive:  # the form this test is about
+        assert archive["__document__"].dtype.kind == "U"
+
+    # Compared as documents, not as artifacts: the fixture's motion metrics are
+    # NaN, and NaN != NaN would fail a dataclass comparison for reasons that
+    # have nothing to do with the stored form.
+    loaded = q.load_artifact(old)
+    assert asdict(loaded.provenance) == asdict(artifact.provenance)
+    assert asdict(loaded.settings) == asdict(artifact.settings)
+    assert loaded.schema_version == artifact.schema_version
+    assert loaded.measurements.snr == artifact.measurements.snr

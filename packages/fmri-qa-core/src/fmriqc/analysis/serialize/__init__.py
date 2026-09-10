@@ -7,6 +7,17 @@ labels — rides in a JSON document stored as the `__document__` member. So the
 file is inspectable with nothing but `numpy` and `json`, and an array can be
 pulled out without materializing the rest.
 
+That member holds the document's UTF-8 bytes as a `uint8` array, not a NumPy
+`<U` string. Both are lossless — `json.dumps` escapes every non-ASCII character
+to an ASCII `\\uXXXX` sequence, so the text is ASCII either way — but `<U` is
+UCS-4 and spends four bytes on each of those ASCII characters. More to the
+point, the readers a
+site is likely to have reach numeric dtypes only: npy-matlab maps exactly
+`u1 u2 u4 u8 i1 i2 i4 i8 f4 f8 b1` and errors on `<U`, and RcppCNPy is numeric
+too. As `uint8` the document is an array they can already read, and MATLAB's
+`char()` turns it straight into text because the bytes are ASCII. Archives
+written before this still carry `<U`; `load_artifact` reads both.
+
 The mapping is written out explicitly, section by section, rather than derived
 by reflection over the dataclasses: the layout is a published contract pinned by
 `ARTIFACT_SCHEMA_VERSION`, and adding a field should be a deliberate edit here,
@@ -35,6 +46,7 @@ from zipfile import BadZipFile
 import numpy as np
 
 from ...exceptions import InvalidArtifactError
+from ...types import ByteArray
 from ..artifact import QAArtifact
 from ..validation import validate_artifact, validate_document
 from .compose import compose
@@ -82,7 +94,19 @@ def save_artifact(artifact: QAArtifact, path: str | Path) -> Path:
             out, f"refusing to write an artifact that would not read back: {exc}"
         ) from exc
     out.parent.mkdir(parents=True, exist_ok=True)
-    payload: dict[str, Member] = {_DOCUMENT: np.array(json.dumps(document)), **arrays}
+    # `json.dumps` defaults to ensure_ascii=True, and that default is load-bearing
+    # here rather than incidental: it escapes every non-ASCII character, so the
+    # bytes below are ASCII whatever a scanner or a file name put in the document,
+    # and a consumer can take them as text without knowing an encoding. Turning it
+    # off would also make this line *raise* on a path Python holds as a lone
+    # surrogate -- what a Windows file name with an undecodable byte becomes.
+    text = json.dumps(document).encode("utf-8")
+    # The document's own dtype is neither of `Member`'s two: it is the JSON
+    # text, not a measured array.
+    payload: dict[str, Member | ByteArray] = {
+        _DOCUMENT: np.frombuffer(text, dtype=np.uint8),
+        **arrays,
+    }
     # In the destination's own directory: a move is only atomic within a single
     # filesystem, and the system temporary directory is often on another.
     fd, name = tempfile.mkstemp(dir=out.parent, prefix=f".{out.name}.", suffix=".tmp")
@@ -111,6 +135,19 @@ def save_artifact(artifact: QAArtifact, path: str | Path) -> Path:
     return out
 
 
+def _document_text(member: np.ndarray) -> str:
+    """The JSON text of the `__document__` member, in either stored form.
+
+    Read before the schema version is known -- the version is *inside* this
+    document -- so the two forms are told apart by dtype rather than by version:
+    `uint8` is the UTF-8 bytes written now, and a NumPy `<U` string is what
+    every archive written before that carries.
+    """
+    if member.dtype == np.uint8:
+        return bytes(member).decode("utf-8")
+    return str(member)
+
+
 def load_artifact(path: str | Path) -> QAArtifact:
     """Read a `QAArtifact` back from an `.npz` written by `save_artifact`.
 
@@ -128,7 +165,7 @@ def load_artifact(path: str | Path) -> QAArtifact:
             names = list(archive.files)
             if _DOCUMENT not in names:
                 raise InvalidArtifactError(src, "not an fmriqc artifact archive")
-            document = json.loads(str(archive[_DOCUMENT]))
+            document = json.loads(_document_text(archive[_DOCUMENT]))
             if not isinstance(document, dict):
                 raise InvalidArtifactError(
                     src, "malformed artifact: expected a JSON object"

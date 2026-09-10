@@ -8,6 +8,21 @@ versioning when the first stable public interface is released.
 
 ### Changed
 
+- **The artifact's `__document__` member is stored as UTF-8 bytes (`uint8`),
+  not a NumPy `<U` string**, so the readers a site is likely to already have can
+  open it. npy-matlab maps exactly `u1 u2 u4 u8 i1 i2 i4 i8 f4 f8 b1` and errors
+  on anything else, and RcppCNPy reads numeric types only — so a `<U` document
+  was the one member neither MATLAB nor R could touch, while every measured
+  array in the same archive read fine. As `uint8` it is an array they already
+  handle, and because `json.dumps` escapes non-ASCII to `\uXXXX` the bytes are
+  ASCII whatever a file name or scanner field contains, so MATLAB's `char()`
+  converts it directly. It is also 3.8× smaller (7,436 → 1,955 bytes on a
+  fixture): `<U` is UCS-4 and was spending four bytes on each ASCII character.
+  No schema change — the document's content and layout are identical, only the
+  envelope differs — and `load_artifact` reads both forms, telling them apart by
+  dtype, because the schema version lives *inside* the document and cannot be
+  consulted first. Archives written by earlier builds load unchanged.
+
 - **`fmri-qa` and `fmri-qa-report` expand their own wildcards**, so the
   command lines this project prints work in PowerShell and cmd. A POSIX shell
   expands `data/*.nii.gz` before the command starts; PowerShell does not, so
