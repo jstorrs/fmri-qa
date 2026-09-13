@@ -1,5 +1,6 @@
 # Runs the same gate as `make check` (see style/tooling.md) on every push and PR:
-# ruff format --check, ruff lint, mypy, pyright, pytest -- against the locked env.
+# ruff format --check, ruff lint, mypy, pyright, pytest, and the documentation
+# build -- against the locked env.
 name: CI
 
 on:
@@ -30,7 +31,9 @@ jobs:
       # --locked fails if uv.lock is out of date with pyproject.toml, so a stale
       # lockfile is caught here rather than drifting silently.
       - name: Sync the locked environment
-        run: uv sync --all-packages --all-extras --locked
+        # The docs group comes too: `make check` ends by building the analysis
+        # pages, whose figures are rendered by running the pipeline.
+        run: uv sync --all-packages --all-extras --group docs --locked
 
       - name: Run the gate
         run: make check

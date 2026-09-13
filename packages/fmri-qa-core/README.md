@@ -24,6 +24,14 @@ Rendering one into a PDF is the separate
 [`fmri-qa-report`](../fmri-qa-report) distribution's job; this package depends
 on nothing that draws.
 
+## What it calculates
+
+[`docs/`](docs/index.md) has a page per analysis — what it is for, the
+computation with its equations, a figure rendered by running this package over
+a synthetic phantom, and the exact netCDF names it contributes — plus
+[`docs/artifact.md`](docs/artifact.md) on the file itself. Build them into HTML
+from the workspace root with `make sync-docs && make docs`.
+
 ## Commands
 
 - `fmri-qa SCAN... [--artifact PATH]` — the metrics table (or `--json`), and

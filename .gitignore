@@ -26,3 +26,6 @@ data/
 bids/
 QA_FMRI_2025-10-07a/
 *.zip
+
+# Built documentation (make docs)
+_build/

@@ -31,219 +31,28 @@ script, a cron job) and skip the drawing stack entirely. See
 [`notes/analysis_report_split.md`](notes/analysis_report_split.md) for the
 rationale and the artifact's layout.
 
-## Metrics
+## What it measures
 
-All scalar metrics are measured over a fixed square ROI (default 21×21, the
-fBIRN size) on a single slice.
+Eight analyses run over a scan. Each has a page describing what it is for, the
+computation and its equations, a figure drawn by running the pipeline over a
+synthetic phantom, and the exact netCDF names it contributes to the artifact:
 
-| Metric | Definition |
+| Analysis | In one line |
 | --- | --- |
-| **SNR** | ROI mean signal / `sqrt(var(odd-sum − even-sum) / n_frames)` |
-| **SFNR** | ROI mean of the voxelwise `signal / temporal-fluctuation-noise` |
-| **RDC** | Weisskoff radius of decorrelation: `cv1_pooled / cv[full ROI]` |
-| **drift %** | peak-to-peak of the ROI-mean fitted trend, as % of mean signal |
-| **fluctuation %** | SD of the ROI-mean residual, as % of mean signal |
-| **ghost %** | fBIRN percent ghost: `100 × mean ghost region / mean signal region` |
-| **ghT %** | PE percent ghost of the brightest 10% of ghost voxels (Greve / bxh ghostiness): a localized companion to `ghost %` on the same scale, so a bright ghost the region mean dilutes still shows (always `≥ ghost %`) |
-| **RO %** | the same region-matched percent ghost measured along the readout axis — the background-relative baseline the ACR difference is taken against |
-| **ACRg %** | ACR/AAPM percent-signal-ghosting: `100 × \|ghost_pe − ghost_freq\| / signal`, over the N/2-shifted phantom masks (i.e. `\|ghost % − RO %\|`) |
-| **outl %** | worst-frame outlier-voxel fraction (AFNI 3dToutcount): `100 × max_t (outlier voxels / phantom voxels)`; a clean run sits near the 0.1% chance level |
-| **tcOut** / **spcOut** | MAD-normalized spike scores of the ROI-mean residual — peak / robust-spread in the time domain (a transient volume) and on its DC-dropped FFT magnitude (a dominant periodic artifact); unitless, a clean phantom sits low (a few) and a spike stands well above |
-| **clip** / **clipPre** | ADC-saturation counts: voxel·time samples pinned at the inferred `2ⁿ−1` rail, in the analyzed data (`clip`) vs. the dropped warm-up volumes (`clipPre`); `0` when none |
-| **motn** | peak per-volume in-plane translation of the phantom vs. its temporal mean (voxels), from a 3dvolreg-style registration |
-| **scl %** / **shr %** | peak per-volume scaling and shear strain of the phantom (percent) — the gradient-heating deformation the rotation-free motion model isolates |
-| **com** | peak per-volume shift of the whole-slice intensity centroid from its temporal mean (circular COM, bxh volmeasures), in voxels — a cheap first-moment jump/drift trace complementing `motn` |
-| **fwPE** / **fwRO** | spatial smoothness of the noise field (AFNI 3dFWHMx): Gaussian FWHM of the detrended fluctuations over the phantom along the phase-encode and readout axes, in mm (voxels if the voxel size is unknown); `?` in the table and `null` in the JSON when no phase-encode axis resolved and neither direction has a name |
+| [fBIRN stability](packages/fmri-qa-core/docs/analyses/stability.md) | SNR, SFNR, drift and fluctuation over a fixed ROI, the Weisskoff RDC, and the trim + detrending every other analysis shares |
+| [Phantom localization](packages/fmri-qa-core/docs/analyses/localization.md) | the slice, the phantom mask and its outline, the summary ROI — and the verdicts that say whether either landed correctly |
+| [Nyquist ghosting](packages/fmri-qa-core/docs/analyses/ghosting.md) | the N/2 ghost against the tissue that produced it: fBIRN percent ghost, its localized top-10% companion, the readout baseline, and the ACR/AAPM difference |
+| [ADC saturation](packages/fmri-qa-core/docs/analyses/saturation.md) | whether the receiver clipped on its `2ⁿ−1` rail, counted separately before and after the warm-up trim — with a third answer for "not determinable" |
+| [Outliers and spikes](packages/fmri-qa-core/docs/analyses/outliers.md) | the per-frame outlier-voxel fraction (AFNI `3dToutcount`) and two MAD-normalized spike scores, in time and in frequency |
+| [Motion and deformation](packages/fmri-qa-core/docs/analyses/motion.md) | a `3dvolreg`-style rotation-free registration for the translation, scale and shear gradient heating produces, plus a mask-free centroid trace |
+| [Smoothness and point spread](packages/fmri-qa-core/docs/analyses/smoothness.md) | the directional FWHM of the noise field (AFNI `3dFWHMx`) and the empirical point-spread curves, the confound the RDC is read against |
+| [Thermal vs. instability noise](packages/fmri-qa-core/docs/analyses/hilo.md) | `fmri-qa-hilo`: a high/low flip-angle pair split into additive and multiplicative noise (Greve) |
 
-Drift is removed before the noise metrics are measured, using either a Legendre
-polynomial (`--detrend poly`, default) or a least-squares B-spline
-(`--detrend spline`); in both cases the fit complexity is set from the run
-duration.
-
-## Localization
-
-The `--center` mode controls both slice and ROI placement:
-
-- **`image`** (default, Glover) — the geometric middle slice with a fixed
-  21×21 ROI at the image-matrix center. Assumes the phantom is centered in the
-  FOV.
-- **`phantom`** — the slice with the largest phantom cross-section, with the ROI
-  at the detected phantom center. More robust to a mispositioned phantom, but
-  non-standard.
-
-The phase-encode axis (used to place the ghost) comes from the BIDS JSON
-sidecar `PhaseEncodingDirection` (or `InPlanePhaseEncodingDirectionDICOM`)
-where one is present; failing that, from the NIfTI header `dim_info`; and only
-if both are missing, from estimating the axis on the analyzed slice by where the
-Nyquist ghost lands. `--pe-axis` overrides all three.
-
-The rest of the sidecar — echo time, flip angle, coil, scanner, and so on — is
-carried into the artifact for the report header. A field of the wrong type (an
-`EchoTime` written as a string, say) is recorded as unknown with a warning
-naming it, rather than guessed at.
-
-The current metrics operate on one image slice, so phase encoding must be
-in-plane (NIfTI axis `0`/`i` or `1`/`j`). Through-plane (`2`/`k`) acquisitions
-are rejected with an input error rather than being analyzed on the wrong plane.
-
-## Saturation
-
-The clip ceiling of the reconstruction is sequence-dependent and not recorded,
-so it is inferred. A clipped magnitude image piles up on a hardware `2ⁿ−1` rail
-(a 12-bit ADC gives 4095), so if the series maximum sits exactly on such a rail
-the run may be saturated; a maximum that is *not* a `2ⁿ−1` value means no
-clipping. The pile-up on that rail is then counted — but split at the trim
-boundary: `clip` counts samples in the analyzed volumes (which bias the
-metrics; a trailing `!` flags any), while `clipPre` counts samples confined to
-the dropped warm-up volumes. The full, untrimmed series is checked because
-clipping is worst in those high-signal warm-up volumes — but clipping there
-doesn't reach the statistics, and is expected for sequences (e.g. ABCD) that
-deliberately acquire through the approach to steady state. A lone sample on the
-rail is likely just a bright voxel; a pile-up across a volume is real
-saturation.
-
-Saturation is a hint about the **acquisition**, not the reconstruction: it says
-the receiver gain (or another knob on the scanner side) wants adjusting before
-the next run.
-
-### This check needs the scanner's integers
-
-A rail is an artifact of the receiver's ADC, so the check can only run on a
-series that still carries the integers the scanner stored. Some converters write
-float NIfTI and rescale as they go; that throws the rail away, and a saturated
-run then looks exactly like a clean one.
-
-So `fmri-qa` is opinionated about conversion: **give it integer-stored NIfTI**
-(`dcm2niix` does this by default — check with `fslhd` or
-`nib.load(f).header.get_data_dtype()`), or give it DICOM and let
-[`fmri-qa-import`](#importing-dicom) convert it with the flags that keep the
-integers. On a float-stored series the loader
-warns, and the clipping fields report *not determinable* — `?` in the table,
-`null` in the JSON, `None` in the artifact — rather than the "no clipping found"
-that would quietly hide the runs this check exists to catch. Every other metric
-is unaffected and still computed.
-
-## Outliers
-
-The `outl %` metric is a per-frame temporal-stability check, following AFNI's
-`3dToutcount`. For each phantom voxel the robust spread of its detrended
-residual is `σ = √(π/2)·MAD`, and a frame counts as an outlier for that voxel
-when `|residual| > α·σ`, with `α = Q⁻¹(qthr / n_frames)` chosen so a clean voxel
-flags a frame with probability `qthr` (0.001). The per-frame outlier fraction is
-then the share of phantom voxels flagged; a stable run hovers near the 0.1%
-chance level, and a frame standing well above it marks a bad volume. The
-detrended residuals are the pipeline's Legendre-detrended fluctuations (as
-afni_proc.py recommends detrending before outlier classification); the full
-per-frame trace is plotted in the PDF report and `outl %` reports its worst
-frame.
-
-## Motion
-
-The `motn` / `scl %` / `shr %` metrics come from a 3dvolreg-style per-volume
-registration of the phantom to its temporal-mean image, following AFNI's
-`3dvolreg` but with a model tailored to a rigid phantom. A stationary phantom
-cannot rotate, so the rotation degrees of freedom are dropped; what gradient
-heating *does* produce is a slow translation plus a scaling and shear of the
-image as the gradient calibration drifts. The registration therefore fits a 2-D
-affine restricted to translation + symmetric strain (anisotropic scale + shear)
-— five parameters, no rotation — per frame, by forward-additive Lucas-Kanade
-over the phantom mask, pivoting the strain at the phantom centroid so
-translation and deformation stay separable. `motn` is the peak translation
-magnitude (voxels), `scl %` the peak scaling, and `shr %` the peak shear; the
-full per-frame translation and strain traces are plotted in the PDF report,
-where a slow monotonic strain ramp is the thermal-drift signature. This is a
-diagnostic only — the analyzed series is **not** resampled from the fit, so the
-FBIRN metrics stay measured on the acquired data.
-
-Each motion fit must be identifiable, finite, and converged. Failed frames
-raise a warning and carry NaN translation/strain values; `MotionResult.converged`
-identifies usable frames. If any frame fails, the run's peak motion metrics are
-undefined (`null` in CLI JSON), and the PDF labels the unresolved frame count.
-
-## Smoothness
-
-The `fwPE` / `fwRO` metrics are the spatial smoothness of the noise field along
-the phase-encode and readout axes, following AFNI's `3dFWHMx`. The guide warns
-that the Weisskoff RDC is confounded by smoothness — a smoother noise field
-decorrelates more slowly and inflates the RDC — so an explicit FWHM complements
-it, and splitting it by direction exposes anisotropic reconstruction smoothing
-(the PE and RO axes are filtered differently). For each in-plane axis the
-Gaussian FWHM is recovered from the variance of the noise field's forward first
-differences (the Classic `mri_estimate_FWHM_1dif` estimator): for a smoothed
-white-noise field the first-difference variance relates to the voxel variance by
-`arg = 1 − 0.5·var_diff/var`, giving `σ = √(−1 / (4·ln arg))` and
-`FWHM = √(8 ln 2)·σ`. It is estimated on the pipeline's detrended fluctuations —
-each voxel robustly standardized over time (median removed, divided by its MAD,
-AFNI's `-unif`, so the estimate reflects correlation length rather than the
-spatially varying noise amplitude) — on each frame over the phantom mask, and
-aggregated across frames by geometric mean (AFNI `-geom`). The axes are labeled
-`PE`/`RO` from the phase-encode direction; `SmoothnessResult.fwhm` also exposes
-the combined (geometric-mean) FWHM (AFNI `ccomb`).
-
-### Point-spread curves
-
-The PDF report plots a directional **point-spread function** (PSF) alongside the
-FWHM numbers. Because the noise field is a PSF convolved with white noise, its
-normalized spatial autocorrelation is the autocorrelation of the PSF, which for a
-Gaussian equals `PSF²`; squaring the measured autocorrelation of the noise field
-at each lag therefore recovers the empirical point-spread profile. The report
-overlays those empirical points on the Gaussian PSF implied by the Classic FWHM,
-for both PE and RO — a narrower curve is a sharper direction, and empirical points
-falling off the Gaussian flag a non-Gaussian (e.g. long-tailed) point spread.
-
-## Thermal vs. instability noise (high/low flip)
-
-A separate `fmri-qa-hilo` command separates a phantom's noise into its **thermal**
-(additive, electronic) and **instability** (multiplicative: drift, gradient
-heating, physiological-like fluctuation) components, following Doug Greve's
-high/low flip-angle method. It needs two runs of the same acquisition that differ
-*only* in flip angle: thermal-noise variance is independent of signal level, while
-instability-noise variance scales with signal², so acquiring at a high and a low
-flip angle gives two equations that solve for the two components. With the squared
-signal ratio `M = (mean_high / mean_low)²`,
-
-```
-ThermalVar      = (M · VarLow − VarHigh) / (M − 1)
-InstabilityVar  = VarHigh − ThermalVar
-```
-
-(falling back to `ThermalVar = VarLow`, `InstabilityVar = VarHigh − VarLow` if the
-separation drives the instability variance negative), and
-`ThermalFSNR = MeanHigh / √ThermalVar`, `InstabilityFSNR = MeanHigh / √InstabilityVar`.
-Each scan is reduced to a temporal-mean map and a temporal-SD-of-detrended-residual
-map over the whole volume, and the statistics are pooled over the **shared** eroded
-phantom core — the intersection of the two runs' `3dAutomask -erode 5`-style masks,
-so both means cover identical voxels. A high `InstabilityFSNR` (small
-`InstabilityVar` relative to `VarHigh`) is a stable scanner.
-
-```bash
-uv run fmri-qa-hilo HIGH_flip.nii.gz LOW_flip.nii.gz
-```
-
-```
-# hi/lo flip-angle thermal/instability noise separation (Greve)
-# high = FBIRN_QA_fMRI_flip77_14.nii.gz (flip 77)
-# low  = FBIRN_QA_fMRI_flip10_15.nii.gz (flip 10)
-# core voxels = 20502
-ThermalFSNR                639.6224
-InstabilityFSNR           3083.9969
-MeanHigh                  1023.3249
-MeanLow                    184.3902
-VarHigh                      2.6697
-VarLow                       2.5632
-ThermalVar                   2.5596
-InstabilityVar               0.1101
-M                           30.8000
-InstabilityFraction          0.0412
-```
-
-Pass the high-flip scan first (a warning fires if the flip angles say otherwise).
-`--trim-sec`, `--detrend`, and `--erode` mirror the main command. This is a
-pair-level diagnostic, kept apart from the per-scan batch table.
-
-The pair must match in array geometry, frame count, affine, voxel size, TR, and
-TE (when recorded); incompatibilities are rejected before either scan is
-processed so differently sampled acquisitions cannot be pooled by array index.
+[The analysis artifact](packages/fmri-qa-core/docs/artifact.md) documents the
+file those numbers are published in — its dimensions and coordinates, the
+`measurements.*` and `provenance.*` attributes, and how to read one from MATLAB,
+R, Python or `ncdump`. The [documentation index](packages/fmri-qa-core/docs/index.md)
+builds into browsable HTML with `make sync-docs && make docs`.
 
 ## Install
 
@@ -276,13 +85,15 @@ Published work using the package should cite the software metadata in
 [`CITATION.cff`](CITATION.cff). User-facing changes are recorded in
 [`CHANGELOG.md`](CHANGELOG.md).
 
-The exploratory notebooks (DICOM conversion, BIDS, and interactive viewers) pull
-in a heavier stack. It is development tooling, not part of either published
-distribution, so it lives in the workspace's `notebooks` dependency group and
-stays out of the default sync:
+Two stacks are heavier than either published distribution and stay out of the
+default sync, each as its own workspace dependency group. The exploratory
+notebooks (DICOM conversion, BIDS, and interactive viewers) are development
+tooling; so is the Sphinx build for the analysis documentation:
 
 ```bash
 make sync-notebooks    # uv sync --all-packages --all-extras --group notebooks
+make sync-docs         # uv sync --all-packages --all-extras --group docs
+make docs              # build the analysis pages into docs/_build/html
 ```
 
 ## Importing DICOM
@@ -336,14 +147,9 @@ command line.
 | `-w 2` | add a suffix on a name conflict rather than overwrite |
 
 `-l o` is the one that matters most, and the reason this is a command rather
-than a line in this README telling you to run dcm2niix yourself. `-l y`
-"losslessly" rescales 16-bit integers to fill the dynamic range. The file it
-writes is *still an integer NIfTI*, so the storage check above sees nothing
-wrong and no warning fires — but every stored sample has been multiplied and the
-ADC rail no longer sits at `2**n - 1`. On a synthetic series clipped flat at
-4095, `-l o` finds a 12-bit rail and 7140 clipped samples and `-l y` finds none
-and reports the run clean. That is the one saturation failure the storage gate
-cannot catch, because the evidence it tests for is present and merely wrong.
+than a line in this README telling you to run dcm2niix yourself: it is what
+keeps the [ADC-saturation
+check](packages/fmri-qa-core/docs/analyses/saturation.md) able to answer at all.
 
 ### The names it builds
 
@@ -414,6 +220,9 @@ FBIRN_QA_fMRI_flip77_13.nii.gz           col       ok     467.3     452.0   10.9
 ABCD_QA_fMRI_16.nii.gz                   col       ok      76.7      75.3   13.355    0.682    5.074   10.084    3.192    1.882   0.077    3.30    5.86      0       68   0.025   0.268   0.034  0.094   1.53   2.17
 ```
 
+Every column is defined on the analysis page that publishes it — see [what it
+measures](#what-it-measures).
+
 Options:
 
 | Flag | Default | Meaning |
@@ -436,6 +245,20 @@ before `fmri-qa` starts, and where the shell does not — PowerShell and cmd —
 the command expands them itself, so the lines in this README can be pasted as
 written.
 
+A second command takes a *pair* of scans that differ only in flip angle and
+separates thermal from instability noise (see [thermal vs. instability
+noise](packages/fmri-qa-core/docs/analyses/hilo.md)):
+
+```bash
+uv run fmri-qa-hilo HIGH_flip.nii.gz LOW_flip.nii.gz
+```
+
+Pass the high-flip scan first. `--trim-sec`, `--detrend`, and `--erode` mirror
+the main command. This is a pair-level diagnostic, kept apart from the per-scan
+batch table, and it writes no artifact.
+
+### Saving an artifact
+
 `--artifact PATH` writes the complete analysis result — settings, provenance,
 every measurement and curve, and the summary images — as a compressed
 netCDF-4 file. With a single scan `PATH` is the output file; with several it is a
@@ -447,82 +270,16 @@ does what it looks like:
 uv run fmri-qa data/*_fMRI_*.nii.gz --artifact artifacts/
 ```
 
-The file records the schema it was written under, and a later build reads it:
-an older layout is migrated forward on load, with a warning, and any field that
-schema did not carry comes back as "not recorded" rather than as a value nothing
-measured. Only an artifact from a *newer* build than the one reading it is
-refused, since its layout cannot be known. Artifacts written by earlier builds
-as compressed `.qa.npz` archives still load: the container is recognized from
-the file's leading bytes, not from its name, so a directory filled before this
-version keeps opening. Nothing writes an `.npz` any more.
-
 An existing file at the destination is replaced, atomically. An output that
 names one of the run's own inputs (the scan, its sidecar, or, for
 `fmri-qa-report --pdf`, an artifact) is refused before anything is read, since
 replacing it would destroy the data the output describes.
 
-### Reading an artifact elsewhere
-
-netCDF-4 is the format the readers a site already has can open without going
-looking for a package that understands NumPy's. MATLAB's `ncread`, `ncinfo`,
-`ncdisp` and `ncreadatt` are built into the base product and need no toolbox; R
-reads one through `ncdf4` on CRAN (and the document through `jsonlite`); Python
-has netCDF4-python and xarray; `ncdump` comes with the netCDF tools. Each array
-is a variable under the dotted name the library
-gives it (`curves.roi_signal`, `images.sfnr`), declared over shared named
-dimensions (`frame`, `frequency`, `row`, `col`, …), each of which carries a
-coordinate variable of its own so an axis has values and not only a name;
-boolean masks are stored as flagged `uint8` bytes in CF style; every scalar
-measurement and every recorded provenance field is a global attribute of its own
-(`measurements.snr`, `provenance.tr`, and `provenance.voxel_mm` as a vector of
-three); and the JSON document holding the settings, provenance and those same
-measurements is the global attribute `document`.
-
-`frame` counts from the analyzed series, after the warm-up trim — the acquired
-volume number is that index plus `provenance.n_trimmed` — and the seconds along
-it ride as `curves.time`, named as a CF auxiliary coordinate so xarray hands
-over both.
-
-```matlab
-ncdisp('scan.qa.nc')                                   % the whole layout
-signal = ncread('scan.qa.nc', 'curves.roi_signal');
-snr = ncreadatt('scan.qa.nc', '/', 'measurements.snr');
-tr = ncreadatt('scan.qa.nc', '/', 'provenance.tr');
-doc = jsondecode(ncreadatt('scan.qa.nc', '/', 'document'));
-```
-
-```r
-nc <- ncdf4::nc_open("scan.qa.nc")
-signal <- ncdf4::ncvar_get(nc, "curves.roi_signal")
-doc <- jsonlite::fromJSON(ncdf4::ncatt_get(nc, 0, "document")$value)
-```
-
-```python
-import xarray as xr
-
-dataset = xr.open_dataset("scan.qa.nc")
-dataset["curves.roi_signal"]
-dataset["curves.roi_signal"].plot()  # against the frame axis the file supplies
-dataset.attrs["document"]
-```
-
-`ncdump -h scan.qa.nc` prints the same header at a shell.
-
-One caveat on that last MATLAB line: the document spells an unresolved
-measurement as the bare token `NaN`, which Python and R's JSON parsers accept
-and MATLAB's `jsondecode` rejects. It only affects decoding the *document* —
-the arrays and the `measurements.*` attributes are unaffected, so a MATLAB user
-needs the JSON only for the settings and provenance.
-
-A measurement that does not apply at all (the clipping ceiling of a series with
-no ADC rail, say) has no attribute, rather than one holding a NaN: the document
-spells that `null`, and the absence is what distinguishes it from a NaN, which
-says the estimator ran and could not resolve the value.
-
-A netCDF-4 file is an HDF5 file, and HDF5 locks a file it opens. On an NFS or
-SMB share with locking disabled or broken, a reader can fail where a plain read
-would have worked; `HDF5_USE_FILE_LOCKING=FALSE` in that reader's environment is
-the escape. Nothing here sets it for you.
+**Reading an artifact elsewhere** — MATLAB, R, Python/xarray and `ncdump` all
+open one without a package they have to go looking for, and an artifact from an
+older build (including the `.qa.npz` archives earlier versions wrote) still
+loads. [The analysis artifact](packages/fmri-qa-core/docs/artifact.md) has the
+layout, the recipes, and the version rules.
 
 ### JSON on stdout
 
@@ -581,10 +338,11 @@ Each page carries the metadata and metrics, the four summary images (signal,
 SFNR, fluctuation noise, static spatial noise) with the phantom mask and ROI
 overlaid, the Weisskoff plot, the ROI signal with its fitted trend, and the
 residual time course, spectrum, per-frame outlier fraction, per-frame in-plane
-motion (translation and scale/shear strain), and the directional PSF curves (PE
-and RO). `--tier physics` follows that dashboard overview with a full-size
-stability page, a per-metric characterization table (value + definition), and a
-methods page describing how each metric is computed.
+motion (translation and scale/shear strain, with the count of any frames whose
+fit did not resolve), and the directional PSF curves (PE and RO). `--tier
+physics` follows that dashboard overview with a full-size stability page, a
+per-metric characterization table (value + definition), and a methods page
+describing how each metric is computed.
 
 Several scans combine into one branded packet: `--cover` prepends a cover with
 the scan inventory and `--appendix` appends a provenance page, and a running
