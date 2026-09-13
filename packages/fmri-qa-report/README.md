@@ -4,8 +4,8 @@ The presentation half of [fmri-qa](../../README.md): plots and multi-page PDF
 packets rendered from a `fmriqc.analysis.QAArtifact`.
 
 ```console
-$ fmri-qa scan.nii.gz --artifact qa.npz
-$ fmri-qa-report qa.npz --pdf report.pdf --tier physics
+$ fmri-qa scan.nii.gz --artifact qa.nc
+$ fmri-qa-report qa.nc --pdf report.pdf --tier physics
 ```
 
 The artifact is the only input. Every number, curve, mask, and image it draws is

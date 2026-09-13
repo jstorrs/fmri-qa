@@ -8,6 +8,48 @@ versioning when the first stable public interface is released.
 
 ### Changed
 
+- **The analysis artifact is written as a netCDF-4 file (`<scan>.qa.nc`), not a
+  compressed `.npz`**, so the readers a site already has can open it with
+  nothing installed. MATLAB's `ncread`, `ncinfo`, `ncdisp` and `ncreadatt` are
+  built in and need no toolbox; R has `ncdf4`; `ncdump` is a shell command;
+  netCDF4-python and xarray are one call. A `.npz` reached none of them without
+  third-party code — npy-matlab plus a manual unzip on the MATLAB side, RcppCNPy
+  numeric-only on the R side — and could never carry the JSON document in a form
+  any of them accepted. The arrays keep the dotted names they had
+  (`curves.weisskoff.cv`, `images.ghost.pe_ghost`), now declared over shared
+  named dimensions (`frame`, `frequency`, `row`, `col`, …) so a reader sees
+  which arrays lie along the same axis instead of inferring it from equal
+  lengths; every one is deflated and carries a Fletcher-32 checksum over its own
+  stored bytes, so damage there is loud rather than a plausible number — damage
+  to the container's metadata can still redirect a read, so the checksum makes
+  corruption noisy, not the file tamper-proof;
+  boolean masks are stored as `uint8` marked in CF style
+  (`flag_values`/`flag_meanings`), since netCDF has no boolean type; **every
+  scalar measurement is published as its own global attribute**
+  (`measurements.snr`, `measurements.ghost_pct`, …), so no reader has to decode
+  JSON to get a number; and the JSON document rides verbatim in the global
+  attribute `document`, beside cheap `schema_version`, `title`, `source` and
+  `Conventions = "CF-1.10"` globals. A measurement the document spells `null` —
+  the quantity does not apply — has no attribute at all, which is what keeps it
+  distinct from a NaN, which says the estimator could not resolve it. No schema
+  change — the document's fields and their meanings are identical, only the
+  envelope differs — and `load_artifact` still opens every `.qa.npz` an earlier
+  build wrote, telling the two containers apart by the file's leading bytes
+  rather than by its suffix, since the schema version lives *inside* the
+  container and cannot be consulted first. Nothing a site already has on disk is
+  orphaned. Three costs, stated plainly. `fmri-qa-core` now depends on
+  `netCDF4`, a ~10 MB wheel carrying libhdf5 and libnetcdf — the Unidata C
+  library MATLAB, R and Octave are themselves linked against, which is what
+  makes "the file opens there" a claim and not a hope. A netCDF-4 file is an
+  HDF5 file, and HDF5 takes an advisory lock on every file it opens: on an NFS
+  or SMB share whose locking is disabled or broken, a reader may need
+  `HDF5_USE_FILE_LOCKING=FALSE` in its environment where a plain read would have
+  worked, and this package deliberately does not set it for the whole process.
+  And HDF5 carries about 110 KB of fixed metadata for a layout this size, so the
+  test phantom's artifact is 132 KB against the `.npz`'s 24 KB; the overhead does
+  not grow with the scan (a 128×128×300 acquisition is 436 KB against 230 KB),
+  and compression keeps the rest close. No coordinate variables yet.
+
 - **The artifact's `__document__` member is stored as UTF-8 bytes (`uint8`),
   not a NumPy `<U` string**, so the readers a site is likely to already have can
   open it. npy-matlab maps exactly `u1 u2 u4 u8 i1 i2 i4 i8 f4 f8 b1` and errors
@@ -21,7 +63,9 @@ versioning when the first stable public interface is released.
   No schema change — the document's content and layout are identical, only the
   envelope differs — and `load_artifact` reads both forms, telling them apart by
   dtype, because the schema version lives *inside* the document and cannot be
-  consulted first. Archives written by earlier builds load unchanged.
+  consulted first. Archives written by earlier builds load unchanged. The
+  container has since changed again — the document now rides in a netCDF global
+  attribute (above) — but an `.npz` written in either form still reads.
 
 - **`fmri-qa` and `fmri-qa-report` expand their own wildcards**, so the
   command lines this project prints work in PowerShell and cmd. A POSIX shell
@@ -44,7 +88,7 @@ versioning when the first stable public interface is released.
   `[WinError 5] Access is denied` on Windows, `IsADirectoryError` elsewhere,
   neither naming the actual mistake, and the metrics table printed just above
   it made the run look like it had worked. An existing directory now takes
-  `<scan>.qa.npz` the same way a batch does. A `PATH` that is not an existing
+  `<scan>.qa.nc` the same way a batch does. A `PATH` that is not an existing
   directory is still the output file name, so nothing that worked changes: a
   file and a directory cannot share a name, and the old behavior in this case
   was an error, never a written artifact.
@@ -168,9 +212,9 @@ versioning when the first stable public interface is released.
   settings, provenance, scalar measurements, stability curves, and the four
   fBIRN summary images — fully resolved, so no consumer recomputes a metric.
   `analyze(scan)` produces one; `save_artifact`/`load_artifact` move it through
-  a single versioned `.npz`.
+  a single versioned netCDF-4 file.
 - `fmri-qa --artifact PATH` saves the artifact for each analyzed scan (a file
-  for one scan, a directory of `<scan>.qa.npz` for a batch).
+  for one scan, a directory of `<scan>.qa.nc` for a batch).
 - `fmri-qa-report ARTIFACT... --pdf FILE`, the new reporting command.
 - Structured validation for scan data, analysis parameters, and high/low pairs.
 - A versioned, standards-compliant JSON output contract.
@@ -257,7 +301,7 @@ versioning when the first stable public interface is released.
 - The ROI-fit warning suggested `center='image'` even when that was the mode in
   use; it names the other mode now.
 - `save_artifact` wrote the destination in place, so an interrupted write left
-  a truncated `.npz` in the archive. It writes a temporary file beside the
+  a truncated artifact in the archive. It writes a temporary file beside the
   destination and moves it into place. A malformed document that failed inside
   a schema migration escaped as a bare `KeyError` instead of
   `InvalidArtifactError`.

@@ -19,7 +19,7 @@ from fmriqc.load.paths import nifti_stem, same_file, sidecar_path
         ("scan.nii.gz", "scan"),
         ("scan.nii", "scan"),
         ("sub-01_task-qa_bold.nii.gz", "sub-01_task-qa_bold"),
-        ("scan.qa.npz", "scan.qa"),  # not a NIfTI name: the last suffix goes
+        ("scan.qa.nc", "scan.qa"),  # not a NIfTI name: the last suffix goes
         ("scan", "scan"),
     ],
 )

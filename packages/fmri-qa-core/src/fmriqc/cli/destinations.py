@@ -20,14 +20,14 @@ import fmriqc as q
 from fmriqc.load.paths import nifti_stem, same_file, sidecar_path
 
 # Suffix for a saved artifact, so a batch's files are recognizable at a glance.
-ARTIFACT_SUFFIX = ".qa.npz"
+ARTIFACT_SUFFIX = ".qa.nc"
 
 
 def artifact_path(base: str, path: str, batch: bool) -> Path:
     """Where one scan's artifact is written under `--artifact BASE`.
 
     A batch cannot share one file, so `BASE` is a directory and each scan gets
-    `<scan stem>.qa.npz` inside it. A single-scan run writes exactly `BASE` --
+    `<scan stem>.qa.nc` inside it. A single-scan run writes exactly `BASE` --
     unless `BASE` is a directory that already exists, which is filed into the
     same way a batch would be.
 
@@ -66,7 +66,7 @@ def artifact_collisions(base: str, paths: Sequence[str]) -> dict[Path, list[str]
     A batch names each artifact by the scan's stem, so inputs from different
     directories with the same file name (`sub-01/qa.nii.gz`, `sub-02/qa.nii.gz`)
     collide. Writing them in turn would leave one file holding the last scan's
-    analysis and silently drop the rest, and a later `fmri-qa-report BASE/*.npz`
+    analysis and silently drop the rest, and a later `fmri-qa-report BASE/*.qa.nc`
     would render a packet quietly missing scans. `main` checks this up front and
     refuses rather than analyze work it cannot keep.
     """

@@ -38,7 +38,7 @@ def test_a_scan_without_a_sidecar_still_renders(tmp_path, bare_artifact) -> None
 
 def test_a_reloaded_artifact_renders_identically(tmp_path, artifact) -> None:
     """The seam's payoff: a saved artifact is as good as a freshly computed one."""
-    reloaded = q.load_artifact(q.save_artifact(artifact, tmp_path / "qa.npz"))
+    reloaded = q.load_artifact(q.save_artifact(artifact, tmp_path / "qa.nc"))
     live_pages = report.write_report([("scan", artifact)], tmp_path / "live.pdf")
     disk_pages = report.write_report([("scan", reloaded)], tmp_path / "disk.pdf")
     assert live_pages == disk_pages == 1
@@ -126,7 +126,7 @@ def test_write_report_marks_an_incomplete_packet(tmp_path, artifact) -> None:
         pdf,
         cover=True,
         appendix=True,
-        omitted=[("run-2.qa.npz", "unreadable")],
+        omitted=[("run-2.qa.nc", "unreadable")],
     )
     assert pages == 3  # cover + one dashboard page + appendix
     assert b"1 of 2 scans; 1 omitted" in pdf.read_bytes()

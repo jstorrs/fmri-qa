@@ -60,12 +60,26 @@ that does both.
 
 ## On disk
 
-`save_artifact` / `load_artifact` move an artifact through a single compressed
-`.npz`: every array is a member under its dotted path
-(`curves.weisskoff.cv`, `images.ghost.pe_ghost`), and everything that is not an
-array rides in a JSON document under `__document__`. The file needs nothing but
-`numpy` and `json` to inspect, and one array can be pulled out without
-materializing the rest.
+`save_artifact` / `load_artifact` move an artifact through a single netCDF-4
+file (`<scan>.qa.nc`): every array is a compressed, checksummed variable under
+its dotted path (`curves.weisskoff.cv`, `images.ghost.pe_ghost`), declared over
+shared named dimensions (`frame`, `frequency`, `row`, `col`, …); everything that
+is not an array rides in a JSON document held in the global attribute
+`document`; and every scalar measurement is published as an attribute of its own
+beside it. The file needs nothing a site does not already have to inspect —
+MATLAB's built-in `ncread`/`ncdisp`, R's `ncdf4`, `ncdump`, xarray — and one
+array can be pulled out without materializing the rest.
+
+netCDF replaced a compressed `.npz` for exactly that reason: the `.npz` was
+readable with `numpy` and `json` and with little else, needing npy-matlab and a
+manual unzip in MATLAB and offering R nothing but numeric arrays. The costs are
+a ~10 MB `netCDF4` wheel (libhdf5 and libnetcdf, the library those readers use
+themselves), HDF5's advisory file locking on network shares, and size: HDF5
+spends about 110 KB of fixed metadata on a layout this size, so the test
+phantom's artifact is 132 KB against the `.npz`'s 24 KB, and a real
+128×128×300 acquisition 436 KB against 230 KB. `load_artifact` reads both
+containers, telling them apart by the file's leading bytes rather than its
+suffix; nothing writes an `.npz` any more.
 
 `ARTIFACT_SCHEMA_VERSION` pins the layout, and a mismatch is refused by name
 rather than misread field by field. The mapping in `analysis/serialize/` is
@@ -100,8 +114,8 @@ asserted to have no matplotlib and no ReportLab importable.
 ## Using it
 
 ```console
-$ fmri-qa scan.nii.gz --artifact qa.npz          # calculate once
-$ fmri-qa-report qa.npz --pdf report.pdf         # render as often as you like
+$ fmri-qa scan.nii.gz --artifact qa.nc           # calculate once
+$ fmri-qa-report qa.nc --pdf report.pdf          # render as often as you like
 ```
 
 A batch writes one artifact per scan into a directory, and `fmri-qa-report`
@@ -109,7 +123,7 @@ takes several artifacts to build one packet:
 
 ```console
 $ fmri-qa run-*.nii.gz --artifact artifacts/
-$ fmri-qa-report artifacts/*.qa.npz --pdf packet.pdf --tier physics --cover --appendix
+$ fmri-qa-report artifacts/*.qa.nc --pdf packet.pdf --tier physics --cover --appendix
 ```
 
 ## Consequences worth knowing
@@ -132,5 +146,8 @@ $ fmri-qa-report artifacts/*.qa.npz --pdf packet.pdf --tier physics --cover --ap
   carried in the artifact as a `Verdicts` section.
 - A second format driver (HTML) costs a file in `formats/`, unchanged content
   modules, and no analysis work at all.
-- Trending across artifacts — reading a directory of `.npz` files into a table
+- Trending across artifacts — reading a directory of `.qa.nc` files into a table
   — needs nothing from either package that is not already public.
+- Coordinate variables for the named dimensions are the obvious remaining
+  addition: a reader gets the axes by name today, but not the values along
+  them.

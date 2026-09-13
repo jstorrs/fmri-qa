@@ -32,15 +32,15 @@ def test_compose_carries_omitted_scans_onto_the_cover_and_appendix(artifact) -> 
     Whoever receives the PDF may never see the terminal that printed the error,
     and a packet of three scans reads as complete unless it says otherwise.
     """
-    omitted = [("run-2.qa.npz", "not an fmriqc artifact archive")]
+    omitted = [("run-2.qa.nc", "not an fmriqc artifact archive")]
     blocks = report.compose(
         [("run-1", artifact)], "dashboard", cover=True, appendix=True, omitted=omitted
     )
     cover, _, appendix = blocks
     assert isinstance(cover, report.Cover) and isinstance(appendix, report.Appendix)
     assert cover.scans == ("run-1",)
-    assert cover.omitted == (("run-2.qa.npz", "not an fmriqc artifact archive"),)
+    assert cover.omitted == (("run-2.qa.nc", "not an fmriqc artifact archive"),)
     assert appendix.rows[-1] == (
-        "run-2.qa.npz",
+        "run-2.qa.nc",
         "omitted from this packet: not an fmriqc artifact archive",
     )

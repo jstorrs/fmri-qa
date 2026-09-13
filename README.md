@@ -13,17 +13,17 @@ calculating a result, and presenting one:
 
 | Package | Import | Does | Needs |
 | --- | --- | --- | --- |
-| **`fmri-qa-core`** | `fmriqc` | the metrics, the pipeline, and the **analysis artifact** they are published as | numpy, scipy, nibabel, scikit-image |
+| **`fmri-qa-core`** | `fmriqc` | the metrics, the pipeline, and the **analysis artifact** they are published as | numpy, scipy, nibabel, scikit-image, netCDF4 |
 | **`fmri-qa-report`** | `fmriqc_report` | plots and multi-page PDF packets, built from an artifact | matplotlib, reportlab, svglib (+ core) |
 
 A `QAArtifact` is the only thing that crosses: the run's settings, provenance,
 scalar measurements, stability curves, and the four fBIRN summary images —
 everything a report needs, and none of the heavy inputs. It saves to a single
-`.npz`, so calculation and reporting are separate steps:
+netCDF-4 file, so calculation and reporting are separate steps:
 
 ```bash
-uv run fmri-qa scan.nii.gz --artifact qa.npz      # calculate once
-uv run fmri-qa-report qa.npz --pdf report.pdf     # render as often as you like
+uv run fmri-qa scan.nii.gz --artifact qa.nc      # calculate once
+uv run fmri-qa-report qa.nc --pdf report.pdf     # render as often as you like
 ```
 
 Install the core alone where you only want numbers (a trend database, a console
@@ -437,11 +437,11 @@ the command expands them itself, so the lines in this README can be pasted as
 written.
 
 `--artifact PATH` writes the complete analysis result — settings, provenance,
-every measurement and curve, and the summary images — as a compressed `.npz`.
-With a single scan `PATH` is the output file; with several it is a directory
-taking one `<scan>.qa.npz` per scan. A `PATH` that is already a directory is
-filed into either way, so `mkdir results` and `--artifact results` does what it
-looks like:
+every measurement and curve, and the summary images — as a compressed
+netCDF-4 file. With a single scan `PATH` is the output file; with several it is a
+directory taking one `<scan>.qa.nc` per scan. A `PATH` that is already a
+directory is filed into either way, so `mkdir results` and `--artifact results`
+does what it looks like:
 
 ```bash
 uv run fmri-qa data/*_fMRI_*.nii.gz --artifact artifacts/
@@ -451,12 +451,71 @@ The file records the schema it was written under, and a later build reads it:
 an older layout is migrated forward on load, with a warning, and any field that
 schema did not carry comes back as "not recorded" rather than as a value nothing
 measured. Only an artifact from a *newer* build than the one reading it is
-refused, since its layout cannot be known.
+refused, since its layout cannot be known. Artifacts written by earlier builds
+as compressed `.qa.npz` archives still load: the container is recognized from
+the file's leading bytes, not from its name, so a directory filled before this
+version keeps opening. Nothing writes an `.npz` any more.
 
 An existing file at the destination is replaced, atomically. An output that
 names one of the run's own inputs (the scan, its sidecar, or, for
 `fmri-qa-report --pdf`, an artifact) is refused before anything is read, since
 replacing it would destroy the data the output describes.
+
+### Reading an artifact elsewhere
+
+netCDF-4 is the format the readers a site already has can open without going
+looking for a package that understands NumPy's. MATLAB's `ncread`, `ncinfo`,
+`ncdisp` and `ncreadatt` are built into the base product and need no toolbox; R
+reads one through `ncdf4` on CRAN (and the document through `jsonlite`); Python
+has netCDF4-python and xarray; `ncdump` comes with the netCDF tools. Each array
+is a variable under the dotted name the library
+gives it (`curves.roi_signal`, `images.sfnr`), declared over shared named
+dimensions (`frame`, `frequency`, `row`, `col`, …); boolean masks are stored as
+flagged `uint8` bytes in CF style; every scalar measurement is a global
+attribute of its own (`measurements.snr`, `measurements.ghost_pct`); and the
+JSON document holding the settings, provenance and those same measurements is
+the global attribute `document`.
+
+```matlab
+ncdisp('scan.qa.nc')                                   % the whole layout
+signal = ncread('scan.qa.nc', 'curves.roi_signal');
+snr = ncreadatt('scan.qa.nc', '/', 'measurements.snr');
+doc = jsondecode(ncreadatt('scan.qa.nc', '/', 'document'));
+```
+
+```r
+nc <- ncdf4::nc_open("scan.qa.nc")
+signal <- ncdf4::ncvar_get(nc, "curves.roi_signal")
+doc <- jsonlite::fromJSON(ncdf4::ncatt_get(nc, 0, "document")$value)
+```
+
+```python
+import xarray as xr
+
+dataset = xr.open_dataset("scan.qa.nc")
+dataset["curves.roi_signal"]
+dataset.attrs["document"]
+```
+
+`ncdump -h scan.qa.nc` prints the same header at a shell.
+
+One caveat on that last MATLAB line: the document spells an unresolved
+measurement as the bare token `NaN`, which Python and R's JSON parsers accept
+and MATLAB's `jsondecode` rejects. It only affects decoding the *document* —
+the arrays and the `measurements.*` attributes are unaffected, so a MATLAB user
+needs the JSON only for the settings and provenance.
+
+A measurement that does not apply at all (the clipping ceiling of a series with
+no ADC rail, say) has no attribute, rather than one holding a NaN: the document
+spells that `null`, and the absence is what distinguishes it from a NaN, which
+says the estimator ran and could not resolve the value.
+
+A netCDF-4 file is an HDF5 file, and HDF5 locks a file it opens. On an NFS or
+SMB share with locking disabled or broken, a reader can fail where a plain read
+would have worked; `HDF5_USE_FILE_LOCKING=FALSE` in that reader's environment is
+the escape. Nothing here sets it for you.
+
+### JSON on stdout
 
 With `--json`, stdout carries a single versioned JSON document —
 `{"schema_version": 5, "config": {...}, "requested": [...], "scans": [...],
@@ -492,7 +551,7 @@ Reporting reads artifacts, never scans:
 
 ```bash
 uv run fmri-qa data/*_fMRI_*.nii.gz --artifact artifacts/
-uv run fmri-qa-report artifacts/*.qa.npz --pdf qa.pdf
+uv run fmri-qa-report artifacts/*.qa.nc --pdf qa.pdf
 ```
 
 | Flag | Default | Meaning |
@@ -536,7 +595,7 @@ artifact = q.analyze(scan, name="scan.nii.gz")
 m = artifact.measurements
 print(m.snr, m.sfnr, m.rdc, m.drift_pct)
 
-q.save_artifact(artifact, "qa.npz")
+q.save_artifact(artifact, "qa.nc")
 ```
 
 `analyze` is the front door, but the pipeline underneath is a linear chain of
@@ -570,7 +629,7 @@ from pathlib import Path
 import fmriqc as q
 import fmriqc_report as report
 
-artifact = q.load_artifact("qa.npz")
+artifact = q.load_artifact("qa.nc")
 
 theme = report.Theme(
     font_title="Times-Bold",

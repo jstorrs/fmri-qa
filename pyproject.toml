@@ -21,6 +21,11 @@ dev = [
     "pytest>=8.0",
     "pytest-cov>=6.0",
     "ruff>=0.13",
+    # Only the artifact tests use it: xarray is the one-line path a notebook
+    # takes to a `.qa.nc`, and the claim that it opens one cleanly is worth
+    # checking in the gate. It is dev tooling and never a distribution
+    # dependency — nothing either package ships imports it.
+    "xarray>=2024.1",
 ]
 # The exploratory notebooks (DICOM conversion, BIDS, interactive viewers) need a
 # far heavier stack than either distribution ships. It is development tooling,

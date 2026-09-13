@@ -1,25 +1,48 @@
-"""The `.npz` round trip: a saved artifact reads back as the one that was written.
+"""The artifact round trip: a saved artifact reads back as the one written.
 
 The other half of the artifact contract (`test_artifact.py` pins what goes into
-one): that `save_artifact`/`load_artifact` preserve every section, that a
-malformed or foreign archive is refused rather than half-read, and that an
-archive written under an older schema is migrated forward with the fields that
-schema did not carry marked unknown rather than invented.
+one): that `save_artifact`/`load_artifact` preserve every section, that the
+netCDF-4 file they agree on says what it holds, that a malformed or foreign
+file is refused rather than half-read, that the `.npz` container every earlier
+build wrote still opens, and that a file written under an older schema is
+migrated forward with the fields that schema did not carry marked unknown
+rather than invented.
+
+Everything asserted about the stored bytes goes through `netCDF4` and `xarray`
+rather than the package's own reader: the reason for this container is that a
+reader which knows nothing about fmriqc can open it, so the tests read it as
+one. `netCDF4` is the Unidata C library itself -- what `ncdump`, MATLAB and R
+read through -- so a file it opens cleanly is a file those open too, and it is a
+dependency of this package rather than something to skip when absent. xarray is
+a dev dependency for the same claim one level up, and "opens cleanly" is
+asserted as *no warning at all*: a netCDF library warns about what a file gets
+subtly wrong, and those are exactly the defects that would reach a user as a
+puzzle rather than as an error.
 """
 
 import json
+import os
+import warnings
 from dataclasses import asdict, replace
-from pathlib import Path
 
+# `netCDF4` is imported here and not in each test on purpose: the two "without a
+# warning" tests below run under `simplefilter("error")`, and importing the
+# wheel raises its own Cython `RuntimeWarning`. Taking the import at module
+# scope means every test enters that filter with the library already loaded, so
+# what the filter can catch is what opening the artifact does and nothing else.
+import netCDF4
 import numpy as np
 import pytest
 
 import fmriqc as q
 from fmriqc.analysis import ARTIFACT_SCHEMA_VERSION
+from fmriqc.analysis.serialize import netcdf
+from fmriqc.analysis.serialize.compose import _floats
+from fmriqc.analysis.serialize.decompose import decompose
 
 
 def test_save_load_round_trips_every_section(tmp_path, artifact) -> None:
-    path = q.save_artifact(artifact, tmp_path / "qa.npz")
+    path = q.save_artifact(artifact, tmp_path / "qa.nc")
     loaded = q.load_artifact(path)
 
     assert loaded.schema_version == ARTIFACT_SCHEMA_VERSION
@@ -45,7 +68,7 @@ def test_save_load_round_trips_every_section(tmp_path, artifact) -> None:
 
 
 def test_save_uses_the_exact_path_given(tmp_path, artifact) -> None:
-    """NumPy's own savez would append `.npz`; a caller's name is honoured."""
+    """A caller's name is honoured exactly, suffix or no suffix."""
     path = q.save_artifact(artifact, tmp_path / "nested" / "run1.artifact")
     assert path.is_file() and path.name == "run1.artifact"
     assert q.load_artifact(path).measurements.snr == artifact.measurements.snr
@@ -60,13 +83,13 @@ def test_save_refuses_an_artifact_the_reader_would_reject(tmp_path, artifact) ->
     """
     broken = replace(artifact, provenance=replace(artifact.provenance, te="0.03"))
     with pytest.raises(q.InvalidArtifactError, match=r"provenance\.te"):
-        q.save_artifact(broken, tmp_path / "qa.npz")
-    assert not (tmp_path / "qa.npz").exists()
+        q.save_artifact(broken, tmp_path / "qa.nc")
+    assert not (tmp_path / "qa.nc").exists()
 
 
 def test_a_refused_save_preserves_the_archive_already_there(tmp_path, artifact) -> None:
     """A rejected write leaves the valid file it would have replaced untouched."""
-    path = q.save_artifact(artifact, tmp_path / "qa.npz")
+    path = q.save_artifact(artifact, tmp_path / "qa.nc")
     before = path.read_bytes()
     broken = replace(artifact, provenance=replace(artifact.provenance, n_frames=0))
     with pytest.raises(q.InvalidArtifactError, match="n_frames"):
@@ -84,42 +107,96 @@ def test_a_failed_save_leaves_neither_a_file_nor_a_temporary(
     truncated one is indistinguishable from a whole one until it is opened. The
     bytes go to a temporary beside the destination and are moved in only once
     they are complete, so a failure leaves the directory exactly as it was.
+
+    The failure is provoked at the fsync, which is the last thing to happen
+    before the rename and so the point at which a temporary full of bytes
+    already exists -- the case the cleanup is actually for.
     """
 
     def fails(*args, **kwargs):
         raise OSError("no space left on device")
 
-    monkeypatch.setattr(np, "savez_compressed", fails)
+    monkeypatch.setattr(os, "fsync", fails)
     archive_dir = tmp_path / "archive"
     with pytest.raises(OSError, match="no space left on device"):
-        q.save_artifact(artifact, archive_dir / "qa.npz")
+        q.save_artifact(artifact, archive_dir / "qa.nc")
     assert list(archive_dir.iterdir()) == []
 
 
-def test_load_rejects_a_file_that_is_not_an_artifact(tmp_path) -> None:
+def test_load_rejects_a_netcdf_file_that_is_not_an_artifact(tmp_path) -> None:
+    """A well-formed netCDF carrying no document is a file, not an artifact."""
+    path = tmp_path / "weather.nc"
+    _write_netcdf(path, {"temperature": np.arange(3.0)}, attributes={})
+    with pytest.raises(q.InvalidArtifactError, match="not an fmriqc artifact"):
+        q.load_artifact(path)
+
+
+def test_load_rejects_an_npz_that_is_not_an_artifact(tmp_path) -> None:
     plain = tmp_path / "plain.npz"
     np.savez_compressed(plain, values=np.arange(3))
     with pytest.raises(q.InvalidArtifactError, match="not an fmriqc artifact"):
         q.load_artifact(plain)
 
 
-def test_load_rejects_unreadable_bytes(tmp_path) -> None:
-    junk = tmp_path / "junk.npz"
-    junk.write_bytes(b"not an archive")
-    with pytest.raises(q.InvalidArtifactError):
-        q.load_artifact(junk)
+def test_load_rejects_a_document_attribute_that_is_not_text(tmp_path) -> None:
+    """The document is JSON text; a numeric attribute of that name is not it."""
+    path = tmp_path / "numeric.nc"
+    signal = {"images.signal": np.ones((2, 2))}
+    _write_netcdf(path, signal, attributes={"document": np.int32(7)})
+    with pytest.raises(q.InvalidArtifactError, match="document attribute is not text"):
+        q.load_artifact(path)
 
 
-def test_load_rejects_non_object_documents_and_plain_arrays(tmp_path) -> None:
-    for document in ([], None, 4, "text"):
-        path = tmp_path / "bad.npz"
-        np.savez(path, __document__=np.array(json.dumps(document)))
-        with pytest.raises(q.InvalidArtifactError, match="JSON object"):
-            q.load_artifact(path)
-    path = tmp_path / "plain.npy"
-    np.save(path, np.ones(3))
+@pytest.mark.parametrize(
+    ("name", "content"),
+    [
+        ("junk.bin", b"not an archive"),
+        ("plain.npy", None),  # a NumPy array file: neither container
+        ("empty.nc", b""),
+        ("truncated.nc", None),  # a real artifact, cut off mid-file
+    ],
+)
+def test_load_rejects_a_file_that_is_neither_container(
+    tmp_path, artifact, name, content
+) -> None:
+    """The container is decided by the leading bytes, and nothing else matches.
+
+    Including the case that matters most for an archive: a file that starts
+    with HDF5's signature because it really is an artifact, and stops in the
+    middle because the write that produced it did not finish.
+    """
+    path = tmp_path / name
+    if content is not None:
+        path.write_bytes(content)
+    elif name.endswith(".npy"):
+        np.save(path, np.ones(3))
+    else:
+        whole = q.save_artifact(artifact, tmp_path / "whole.nc").read_bytes()
+        path.write_bytes(whole[: len(whole) // 2])
     with pytest.raises(q.InvalidArtifactError):
         q.load_artifact(path)
+
+
+def test_load_rejects_a_path_that_is_not_a_readable_file(tmp_path) -> None:
+    """A name that is a directory, or nothing at all, is not an artifact either.
+
+    Both fail at the open that sniffs the leading bytes, before any container
+    reader is chosen -- and a caller of `load_artifact` still has exactly one
+    exception type to catch.
+    """
+    (tmp_path / "archive").mkdir()
+    for path in (tmp_path / "archive", tmp_path / "absent.qa.nc"):
+        with pytest.raises(q.InvalidArtifactError):
+            q.load_artifact(path)
+
+
+def test_load_rejects_non_object_documents(tmp_path) -> None:
+    for document in ([], None, 4, "text"):
+        path = tmp_path / "bad.nc"
+        signal = {"images.signal": np.ones((2, 2))}
+        _write_netcdf(path, signal, attributes={"document": json.dumps(document)})
+        with pytest.raises(q.InvalidArtifactError, match="JSON object"):
+            q.load_artifact(path)
 
 
 def test_load_rejects_invalid_scalar_records(tmp_path, artifact) -> None:
@@ -157,7 +234,7 @@ def test_load_rejects_invalid_scalar_records(tmp_path, artifact) -> None:
         ("curves.psf.unit", "vox"),
     )
     for field, value in edits:
-        path = q.save_artifact(artifact, tmp_path / "bad.npz")
+        path = q.save_artifact(artifact, tmp_path / "bad.nc")
 
         def edit(doc, field=field, value=value):
             target = doc
@@ -173,6 +250,13 @@ def test_load_rejects_invalid_scalar_records(tmp_path, artifact) -> None:
 
 
 def test_load_rejects_inconsistent_arrays(tmp_path, artifact) -> None:
+    """An array whose shape contradicts the document is refused, not reshaped.
+
+    Each replacement is written with private dimensions rather than into the
+    shared one it no longer fits, so what the loader sees is a file that is
+    perfectly well-formed netCDF and a perfectly wrong artifact -- the shape
+    check in `validation` is the only thing standing between the two.
+    """
     edits = (
         ("curves.roi_signal", np.zeros(1)),
         ("curves.translation", np.zeros((38, 3))),
@@ -186,21 +270,34 @@ def test_load_rejects_inconsistent_arrays(tmp_path, artifact) -> None:
         ("images.signal", np.ones(1)),
         ("images.sfnr", np.ones((1, 1))),
         ("images.phantom_mask", np.ones((1, 1), dtype=bool)),
-        ("images.phantom_mask", np.full((32, 32), 2)),
-        ("images.signal", np.full((32, 32), "1")),
-        ("images.signal", np.ones((32, 32), dtype=complex)),
+        ("images.phantom_mask", np.full((32, 32), 2.0)),
         ("images.ghost.pe_signal", np.ones((1, 1), dtype=bool)),
         ("images.phantom_hull", np.zeros((3, 3))),
         ("images.phantom_hull", np.full((3, 2), np.nan)),
     )
     for field, value in edits:
-        path = q.save_artifact(artifact, tmp_path / "bad.npz")
-        with np.load(path, allow_pickle=False) as archive:
-            payload = {key: archive[key] for key in archive.files}
-        payload[field] = value
-        np.savez(path, **payload)
+        path = q.save_artifact(artifact, tmp_path / "bad.nc")
+        document, arrays = _read_netcdf(path)
+        _write_netcdf(
+            path,
+            arrays | {field: value},
+            attributes={"document": json.dumps(document)},
+        )
         with pytest.raises(q.InvalidArtifactError):
             q.load_artifact(path)
+
+
+def test_load_rejects_an_array_that_is_not_real_numbers() -> None:
+    """A member of a kind no measurement can be is refused, not coerced.
+
+    Checked against `compose` directly rather than through a file, because the
+    layout stores float64 and flagged bytes and refuses every other dtype at
+    `encode` -- so the guard now answers only for a hand-built `.npz`, which is
+    exactly where a foreign array could still arrive.
+    """
+    for value in (np.full((2, 2), "1"), np.ones((2, 2), dtype=complex)):
+        with pytest.raises(ValueError, match="real numeric array"):
+            _floats({"images.signal": value}, "images.signal")
 
 
 def test_artifact_arrays_own_readonly_copies(tmp_path, artifact) -> None:
@@ -208,8 +305,9 @@ def test_artifact_arrays_own_readonly_copies(tmp_path, artifact) -> None:
     images = replace(artifact.images, signal=signal)
     signal[:] = 0
     assert images.signal.any()
-    loaded = q.load_artifact(q.save_artifact(artifact, tmp_path / "qa.npz"))
+    loaded = q.load_artifact(q.save_artifact(artifact, tmp_path / "qa.nc"))
     for obj in (artifact, loaded):
+        assert obj.images.ghost is not None
         for array in (
             obj.images.signal,
             obj.images.phantom_mask,
@@ -240,7 +338,7 @@ def test_failed_motion_survives_the_artifact_round_trip(tmp_path, artifact) -> N
             shear_pct=np.full(n, np.nan),
         ),
     )
-    loaded = q.load_artifact(q.save_artifact(broken, tmp_path / "failed-motion.npz"))
+    loaded = q.load_artifact(q.save_artifact(broken, tmp_path / "failed-motion.nc"))
     assert np.isnan(loaded.curves.translation).all()
     assert np.isnan(loaded.measurements.max_translation)
 
@@ -251,7 +349,7 @@ def test_load_rejects_an_artifact_from_a_newer_build(tmp_path, artifact) -> None
     The one direction that cannot be migrated: this build does not know what a
     later schema put in the file, so guessing would be worse than refusing.
     """
-    path = q.save_artifact(artifact, tmp_path / "qa.npz")
+    path = q.save_artifact(artifact, tmp_path / "qa.nc")
     _rewrite_document(path, lambda doc: doc | {"schema_version": 99})
     with pytest.raises(q.InvalidArtifactError, match="schema version 99, newer"):
         q.load_artifact(path)
@@ -259,7 +357,7 @@ def test_load_rejects_an_artifact_from_a_newer_build(tmp_path, artifact) -> None
 
 def test_load_rejects_an_old_version_it_cannot_migrate_from(tmp_path, artifact) -> None:
     """An older version with no route forward is named, not silently mangled."""
-    path = q.save_artifact(artifact, tmp_path / "qa.npz")
+    path = q.save_artifact(artifact, tmp_path / "qa.nc")
     _rewrite_document(path, lambda doc: doc | {"schema_version": 0})
     with pytest.raises(q.InvalidArtifactError, match="no migration from 0"):
         q.load_artifact(path)
@@ -274,7 +372,7 @@ def test_load_migrates_a_schema_1_artifact(tmp_path, artifact) -> None:
     diagnostics it did not are unknown rather than invented, since a fabricated
     pass would vouch for numbers nothing here can vouch for.
     """
-    path = q.save_artifact(artifact, tmp_path / "qa.npz")
+    path = q.save_artifact(artifact, tmp_path / "qa.nc")
     _rewrite_document(path, _as_schema(1))
 
     with pytest.warns(UserWarning, match="migrated to"):
@@ -299,7 +397,7 @@ def test_load_migrating_a_schema_2_artifact_keeps_what_it_recorded(
     Schema 2 measured the phantom fraction and the ROI fit; it just had no
     verdict field. The migration must not throw away the two it does have.
     """
-    path = q.save_artifact(artifact, tmp_path / "qa.npz")
+    path = q.save_artifact(artifact, tmp_path / "qa.nc")
     _rewrite_document(path, _as_schema(2))
 
     with pytest.warns(UserWarning, match="schema 2, migrated"):
@@ -321,7 +419,7 @@ def test_load_migrating_a_schema_3_artifact_leaves_the_trim_unrecorded(
     index mapped through a guess is worse than one a reader knows it cannot map.
     Everything schema 3 did record survives.
     """
-    path = q.save_artifact(artifact, tmp_path / "qa.npz")
+    path = q.save_artifact(artifact, tmp_path / "qa.nc")
     _rewrite_document(path, _as_schema(3))
 
     with pytest.warns(UserWarning, match="schema 3, migrated"):
@@ -343,7 +441,7 @@ def test_load_migrating_a_schema_4_artifact_leaves_slice_and_contrast_unrecorded
     build's definition passed off as the writing build's measurement. The
     verdict schema 4 did record is kept as it was made.
     """
-    path = q.save_artifact(artifact, tmp_path / "qa.npz")
+    path = q.save_artifact(artifact, tmp_path / "qa.nc")
     _rewrite_document(path, _as_schema(4))
 
     with pytest.warns(UserWarning, match="schema 4, migrated"):
@@ -367,7 +465,7 @@ def test_load_migrating_a_schema_5_artifact_reports_displacement_in_voxels(
     fixture's own `fwhm_unit` is "mm" (voxel size known), showing the two units
     can disagree on a migrated artifact in a way they never do on a fresh one.
     """
-    path = q.save_artifact(artifact, tmp_path / "qa.npz")
+    path = q.save_artifact(artifact, tmp_path / "qa.nc")
     _rewrite_document(path, _as_schema(5))
 
     with pytest.warns(UserWarning, match="schema 5, migrated"):
@@ -399,7 +497,7 @@ def test_load_migrating_a_schema_6_artifact_keeps_its_clipping_answers(
     record the storage datatype to tell them apart. So the step carries them
     through untouched, which is what this pins.
     """
-    path = q.save_artifact(artifact, tmp_path / "qa.npz")
+    path = q.save_artifact(artifact, tmp_path / "qa.nc")
     _rewrite_document(path, _as_schema(6))
 
     with pytest.warns(UserWarning, match="schema 6, migrated"):
@@ -481,14 +579,14 @@ def test_load_rejects_a_closed_set_value_from_outside_the_set(
         ("pe_label", _with_measurement("pe_label", "diagonal")),
         ("psf.unit", _with_psf_unit("cm")),
     ):
-        path = q.save_artifact(artifact, tmp_path / f"{field}.npz")
+        path = q.save_artifact(artifact, tmp_path / f"{field}.nc")
         _rewrite_document(path, edit)
         with pytest.raises(q.InvalidArtifactError, match=field):
             q.load_artifact(path)
 
 
 def test_load_rejects_a_document_missing_a_section(tmp_path, artifact) -> None:
-    path = q.save_artifact(artifact, tmp_path / "qa.npz")
+    path = q.save_artifact(artifact, tmp_path / "qa.nc")
     _rewrite_document(path, lambda doc: {**doc, "images": {}})
     with pytest.raises(q.InvalidArtifactError, match="malformed artifact"):
         q.load_artifact(path)
@@ -503,7 +601,7 @@ def test_load_rejects_a_schema_1_archive_missing_its_measurements(
     One that does not is malformed, and must be refused as such rather than
     raise the bare KeyError of whichever migration step reached for it.
     """
-    path = q.save_artifact(artifact, tmp_path / "qa.npz")
+    path = q.save_artifact(artifact, tmp_path / "qa.nc")
     _rewrite_document(
         path,
         lambda doc: (
@@ -534,41 +632,225 @@ def _both_nan(x: float, y: float) -> bool:
     return bool(np.isnan(x) and np.isnan(y))
 
 
+# --------------------------------------------------------------------------
+# reading and writing the stored file without going through the serializer
+# --------------------------------------------------------------------------
+#
+# Every test above that corrupts a stored artifact does it through these two,
+# and they deliberately drive `netCDF4` directly rather than the package's own
+# `netcdf` module. Two reasons: a test that wrote through the writer could only
+# ever produce files the writer permits, which is the opposite of what a
+# rejection test needs; and reading the file back through a plain netCDF reader
+# is itself the claim this container was chosen for.
+
+
+# The CF marker the writer puts on a mask, and what tells one apart on the way
+# back in. Spelled out here rather than imported, so a change to the marker has
+# to be made in both places deliberately.
+_FLAG_VALUES = np.array([0, 1], dtype=np.uint8)
+
+
+def _read_netcdf(path) -> tuple[dict, dict[str, np.ndarray]]:
+    """The document and every array of a stored artifact, read with netCDF4 alone."""
+    with netCDF4.Dataset(str(path)) as dataset:
+        dataset.set_auto_mask(False)
+        document = json.loads(dataset.getncattr("document"))
+        arrays = {
+            name: (
+                np.asarray(variable[...] != 0)
+                if "flag_values" in variable.ncattrs()
+                else np.asarray(variable[...])
+            )
+            for name, variable in dataset.variables.items()
+        }
+    return document, arrays
+
+
+def _write_netcdf(path, arrays, attributes) -> None:
+    """A netCDF file holding exactly `arrays` and `attributes`, no layout rules.
+
+    Every array gets dimensions of its own, because a test's replacement array
+    generally no longer fits the axis the real one shared -- which is the point
+    of it. Booleans are stored as the flagged bytes the real writer uses;
+    anything else is stored as float64, so an "array" a document says is a mask
+    arrives as numbers and is refused for being numbers.
+    """
+    with (
+        netCDF4.Dataset(str(path), "w", format="NETCDF4") as dataset,
+        warnings.catch_warnings(),
+    ):
+        # netCDF4 1.7.4 trips NumPy 2.5's deprecation of setting `.shape` on
+        # every multi-dimensional write; `netcdf.write` drops the same warning,
+        # and its comment says why.
+        warnings.filterwarnings(
+            "ignore",
+            message="Setting the shape on a NumPy array",
+            category=DeprecationWarning,
+        )
+        dataset.setncatts(attributes)
+        for name, array in arrays.items():
+            dimensions = tuple(f"{name}_axis{axis}" for axis in range(array.ndim))
+            for dimension, length in zip(dimensions, array.shape, strict=True):
+                dataset.createDimension(dimension, length)
+            is_mask = array.dtype == np.bool_
+            stored = dataset.createVariable(
+                name, np.dtype(np.uint8 if is_mask else np.float64), dimensions
+            )
+            stored[...] = array.astype(np.uint8 if is_mask else np.float64)
+            if is_mask:
+                stored.flag_values = _FLAG_VALUES
+
+
 def _rewrite_document(path, edit) -> None:
-    """Rewrite the archive's JSON member through `edit`, keeping every array.
-
-    Writes the member back in the form `save_artifact` uses -- UTF-8 bytes as
-    `uint8` -- so what these tests hand the loader is shaped like a real
-    archive; `test_a_document_stored_the_old_way_still_reads` covers `<U`.
-    """
-    with np.load(path, allow_pickle=False) as archive:
-        document = json.loads(bytes(archive["__document__"]).decode("utf-8"))
-        arrays = {n: archive[n] for n in archive.files if n != "__document__"}
-    edited = np.frombuffer(json.dumps(edit(document)).encode("utf-8"), dtype=np.uint8)
-    payload = {"__document__": edited, **arrays}
-    with Path(path).open("wb") as fh:
-        np.savez_compressed(fh, **payload)
+    """Rewrite the stored document through `edit`, keeping every array as it is."""
+    document, arrays = _read_netcdf(path)
+    _write_netcdf(path, arrays, {"document": json.dumps(edit(document))})
 
 
 # --------------------------------------------------------------------------
-# the __document__ member's stored form
+# what the netCDF file says about itself
 # --------------------------------------------------------------------------
 
 
-def test_the_document_is_stored_as_utf8_bytes(tmp_path, artifact) -> None:
-    """`uint8`, not `<U`: the dtype the readers a site already has can take.
+def test_the_file_is_netcdf4(tmp_path, artifact) -> None:
+    """HDF5's signature: what a netCDF-4 file starts with, and what is sniffed.
 
-    npy-matlab maps `u1 u2 u4 u8 i1 i2 i4 i8 f4 f8 b1` and errors on anything
-    else, and RcppCNPy is numeric only, so a `<U` document is one neither can
-    open at all.
+    Also what `load_artifact` dispatches on -- the container is decided by
+    these bytes and never by the file's name, because `--artifact` writes
+    whatever name the user asked for.
     """
-    saved = q.save_artifact(artifact, tmp_path / "scan.qa.npz")
-    with np.load(saved) as archive:
-        member = archive["__document__"]
-    assert member.dtype == np.uint8
-    assert json.loads(bytes(member).decode("utf-8"))["schema_version"] == (
-        artifact.schema_version
-    )
+    saved = q.save_artifact(artifact, tmp_path / "scan.qa.nc")
+    assert saved.read_bytes()[:8] == b"\x89HDF\r\n\x1a\n"
+    with netCDF4.Dataset(str(saved)) as dataset:
+        assert dataset.data_model == "NETCDF4"
+        # Flat: xarray's `open_dataset` sees only the root group, so everything
+        # a reader needs has to be in it.
+        assert not dataset.groups
+
+
+def test_the_document_rides_as_an_ascii_global_attribute(tmp_path, artifact) -> None:
+    """One attribute, readable as text, holding the whole non-array record.
+
+    This is what MATLAB reads as `jsondecode(ncreadatt(f, '/', 'document'))`
+    and R as `ncatt_get(f, 0, "document")`, so it has to be text a reader can
+    take without being told an encoding.
+    """
+    saved = q.save_artifact(artifact, tmp_path / "scan.qa.nc")
+    with netCDF4.Dataset(str(saved)) as dataset:
+        stored = dataset.getncattr("document")
+    assert isinstance(stored, str) and stored.isascii()
+    assert json.loads(stored)["schema_version"] == artifact.schema_version
+
+
+def test_the_cheap_attributes_answer_without_decoding_the_document(
+    tmp_path, artifact
+) -> None:
+    """A reader that never touches JSON can still tell what the file is."""
+    saved = q.save_artifact(artifact, tmp_path / "scan.qa.nc")
+    with netCDF4.Dataset(str(saved)) as dataset:
+        attributes = {name: dataset.getncattr(name) for name in dataset.ncattrs()}
+    assert attributes["schema_version"] == ARTIFACT_SCHEMA_VERSION
+    assert attributes["Conventions"] == "CF-1.10"
+    assert "fmri-qa" in attributes["title"]
+    assert attributes["source"].startswith("fmri-qa-core ")
+
+
+# How each JSON scalar is published as an attribute. `bool` before `int`
+# because a Python bool is an int, and a verdict stored as a number a reader
+# has to know is a verdict would be the guessing the flagged masks avoid.
+_ATTRIBUTE_DTYPES = ((bool, np.uint8), (int, np.int32), (float, np.float64))
+
+
+def _measurement_attributes(path) -> dict[str, object]:
+    """Every `measurements.*` global attribute of a stored artifact."""
+    with netCDF4.Dataset(str(path)) as dataset:
+        return {
+            name.removeprefix("measurements."): dataset.getncattr(name)
+            for name in dataset.ncattrs()
+            if name.startswith("measurements.")
+        }
+
+
+def test_every_resolved_measurement_is_published_as_its_own_attribute(
+    tmp_path, artifact
+) -> None:
+    """`ncreadatt(f, '/', 'measurements.snr')`: a number without a JSON parser.
+
+    The attribute is the document's own value in the netCDF type that holds it,
+    so a reader that never decodes the document still gets exactly what the
+    document says -- including a NaN, which means the estimator could not
+    resolve the value.
+    """
+    saved = q.save_artifact(artifact, tmp_path / "scan.qa.nc")
+    document, _ = _read_netcdf(saved)
+    measured = document["measurements"]
+    published = _measurement_attributes(saved)
+
+    assert set(published) == {k for k, v in measured.items() if v is not None}
+    for name, value in measured.items():
+        if value is None:
+            continue
+        stored = published[name]
+        if isinstance(value, str):
+            assert stored == value, name
+            continue
+        # `getncattr` is typed as returning anything at all, so the numeric
+        # attributes are named as arrays before their dtype is asked about.
+        number = np.asarray(stored)
+        expected = next(d for kind, d in _ATTRIBUTE_DTYPES if isinstance(value, kind))
+        assert number.dtype == expected, name
+        assert number == value or (np.isnan(number) and np.isnan(value)), name
+
+
+def test_a_measurement_the_document_calls_null_has_no_attribute(
+    tmp_path, artifact
+) -> None:
+    """Absence is how "does not apply" is spelled, since NaN already means more.
+
+    The fixture's clipping check runs, so `clip_ceiling` is null because the
+    series has no rail -- not because nothing looked. An attribute cannot be
+    null, and publishing NaN for it would say the estimator tried and failed.
+    """
+    saved = q.save_artifact(artifact, tmp_path / "scan.qa.nc")
+    document, _ = _read_netcdf(saved)
+    published = _measurement_attributes(saved)
+
+    assert document["measurements"]["clip_ceiling"] is None
+    assert "clip_ceiling" not in published
+    # and the distinction it protects: a NaN measurement *is* published
+    assert np.isnan(document["measurements"]["max_translation"])
+    assert np.isnan(np.asarray(published["max_translation"]))
+
+
+def test_save_refuses_a_measurement_no_attribute_can_hold(tmp_path, artifact) -> None:
+    """An integer past NC_INT is refused rather than published wrapped around.
+
+    The other two ways an attribute could fail are not reachable from a valid
+    artifact: the three string measurements are closed vocabularies (`"mm"`,
+    `"row"`, ...) that `validate_document` holds them to, so a non-ASCII or
+    non-scalar measurement can only arrive in a hand-built document -- which is
+    what the `encode` tests below cover.
+    """
+    counts = replace(artifact.measurements, n_clipped_pre=2**31)
+    with pytest.raises(q.InvalidArtifactError, match="netCDF integer"):
+        q.save_artifact(replace(artifact, measurements=counts), tmp_path / "qa.nc")
+    assert not (tmp_path / "qa.nc").exists()
+
+
+def test_encode_refuses_a_measurement_that_is_not_ascii(artifact) -> None:
+    """A netCDF text attribute is characters, and ASCII is what fixes which."""
+    document, arrays = decompose(artifact)
+    document["measurements"]["fwhm_unit"] = "µm"
+    with pytest.raises(ValueError, match="not ASCII"):
+        netcdf.encode(document, arrays)
+
+
+def test_encode_refuses_a_measurement_that_is_not_a_scalar(artifact) -> None:
+    """`measurements` is flat by design; a nested value has no attribute form."""
+    document, arrays = decompose(artifact)
+    document["measurements"]["snr"] = [1.0, 2.0]
+    with pytest.raises(ValueError, match="no attribute can hold"):
+        netcdf.encode(document, arrays)
 
 
 def test_the_stored_document_is_ascii_even_when_the_text_is_not(
@@ -576,14 +858,13 @@ def test_the_stored_document_is_ascii_even_when_the_text_is_not(
 ) -> None:
     """Unicode rides as `\\uXXXX`, so a consumer needs no encoding to read it.
 
-    `json.dumps` escapes by default; this pins that, because MATLAB's `char()`
-    on the uint8 vector is byte-per-character and would mojibake real UTF-8.
+    `json.dumps` escapes by default; this pins that, because a netCDF text
+    attribute is bytes a reader takes as characters without being told which.
     """
     prov = replace(artifact.provenance, scan="sujet_créé_Ω_頭部.nii.gz")
-    saved = q.save_artifact(replace(artifact, provenance=prov), tmp_path / "u.qa.npz")
-    with np.load(saved) as archive:
-        member = archive["__document__"]
-    assert bytes(member).isascii()
+    saved = q.save_artifact(replace(artifact, provenance=prov), tmp_path / "u.qa.nc")
+    with netCDF4.Dataset(str(saved)) as dataset:
+        assert dataset.getncattr("document").isascii()
     assert q.load_artifact(saved).provenance.scan == "sujet_créé_Ω_頭部.nii.gz"
 
 
@@ -595,31 +876,417 @@ def test_a_name_python_holds_as_a_lone_surrogate_survives(tmp_path, artifact) ->
     """
     name = "bad_\udcff_name.nii.gz"
     prov = replace(artifact.provenance, scan=name)
-    saved = q.save_artifact(replace(artifact, provenance=prov), tmp_path / "s.qa.npz")
+    saved = q.save_artifact(replace(artifact, provenance=prov), tmp_path / "s.qa.nc")
     assert q.load_artifact(saved).provenance.scan == name
 
 
-def test_a_document_stored_the_old_way_still_reads(tmp_path, artifact) -> None:
-    """Every archive written before this carries `<U`; it must still load.
+def _declared(path) -> tuple[dict[str, tuple[str, ...]], dict[str, int]]:
+    """Each variable's dimensions and each dimension's length, read as netCDF."""
+    with netCDF4.Dataset(str(path)) as dataset:
+        declared = {name: var.dimensions for name, var in dataset.variables.items()}
+        lengths = {name: len(dim) for name, dim in dataset.dimensions.items()}
+    return declared, lengths
 
-    The retired-schema fixtures cover this too, but they also exercise the
-    migrations; this isolates the stored form from the layout.
+
+def test_every_stored_array_is_declared_over_named_dimensions(
+    tmp_path, artifact
+) -> None:
+    """The file says which axis each array lies along, not just how long it is."""
+    saved = q.save_artifact(artifact, tmp_path / "scan.qa.nc")
+    declared, lengths = _declared(saved)
+
+    assert set(declared) == set(decompose(artifact)[1])
+    assert all(dimensions for dimensions in declared.values())
+    assert lengths["frame"] == artifact.provenance.n_frames
+    assert (lengths["row"], lengths["col"]) == artifact.images.signal.shape
+
+
+def test_curves_along_one_axis_share_one_dimension(tmp_path, artifact) -> None:
+    """Sharing a dimension is the file's claim that two arrays share an axis.
+
+    A reader that opens this in xarray gets the per-frame traces aligned on
+    `frame` without being told which of them belong together; a bag of
+    equal-length vectors would leave it guessing.
     """
-    saved = q.save_artifact(artifact, tmp_path / "new.qa.npz")
-    with np.load(saved) as archive:
-        members = dict(archive)
-    text = bytes(members.pop("__document__")).decode("utf-8")
+    saved = q.save_artifact(artifact, tmp_path / "scan.qa.nc")
+    declared, _ = _declared(saved)
+
+    assert declared["curves.roi_signal"] == declared["curves.time"] == ("frame",)
+    assert declared["curves.spectrum_hz"] == declared["curves.spectrum_magnitude"]
+    assert declared["curves.translation"] == ("frame", "image_axis")
+    assert declared["images.sfnr"] == declared["images.phantom_mask"] == ("row", "col")
+    assert declared["images.ghost.pe_ghost"] == ("row", "col")
+    assert declared["curves.weisskoff.cv"] == declared["curves.weisskoff.rdc"]
+
+
+def test_axes_that_only_happen_to_match_stay_separate(tmp_path, artifact) -> None:
+    """Three length-2 axes, three meanings: none of them is the others.
+
+    `image_axis` is (row, col) in array order, `psf_direction` is (PE, RO) in
+    the order the PSF curves use, and `hull_coord` is the hull's (x, y) plot
+    order. Declaring them as one dimension because they are all 2 long would
+    publish a relationship that is not there.
+    """
+    saved = q.save_artifact(artifact, tmp_path / "scan.qa.nc")
+    declared, lengths = _declared(saved)
+
+    paired = ("image_axis", "psf_direction", "hull_coord")
+    assert all(lengths[axis] == 2 for axis in paired)
+    assert declared["curves.translation"][1] == "image_axis"
+    assert declared["curves.psf.empirical"][0] == "psf_direction"
+    assert declared["images.phantom_hull"][1] == "hull_coord"
+    # and the two PSF abscissas are not each other either
+    assert declared["curves.psf.empirical"][1] != declared["curves.psf.model"][1]
+
+
+def test_masks_are_stored_as_cf_flagged_bytes(tmp_path, artifact) -> None:
+    """netCDF has no boolean, so a mask is 0/1 bytes that say what they mean.
+
+    The flags are what makes the file self-describing enough to reconstruct a
+    `bool` array from it -- and what a reader with no fmriqc knowledge reads to
+    learn that 1 is inside the phantom.
+    """
+    saved = q.save_artifact(artifact, tmp_path / "scan.qa.nc")
+    with netCDF4.Dataset(str(saved)) as dataset:
+        dataset.set_auto_mask(False)
+        mask = dataset["images.phantom_mask"]
+        stored = np.asarray(mask[...])
+        attributes = {name: mask.getncattr(name) for name in mask.ncattrs()}
+
+    assert stored.dtype == np.uint8
+    assert set(np.unique(stored)) <= {0, 1}
+    assert np.array_equal(attributes["flag_values"], _FLAG_VALUES)
+    assert attributes["flag_meanings"] == "outside inside"
+    assert q.load_artifact(saved).images.phantom_mask.dtype == np.bool_
+
+
+def test_the_units_a_reader_is_told_are_the_ones_that_are_certain(
+    tmp_path, artifact
+) -> None:
+    """Seconds, hertz and percent are labelled; a unit the file cannot know is not.
+
+    The PSF abscissas are mm or voxels depending on what the header gave, so
+    they carry a long name and no `units` rather than a guess.
+    """
+    saved = q.save_artifact(artifact, tmp_path / "scan.qa.nc")
+    with netCDF4.Dataset(str(saved)) as dataset:
+        attributes = {
+            name: set(variable.ncattrs())
+            for name, variable in dataset.variables.items()
+        }
+        units = {
+            name: dataset[name].getncattr("units")
+            for name in ("curves.time", "curves.spectrum_hz", "curves.shear_pct")
+        }
+
+    assert units == {
+        "curves.time": "s",
+        "curves.spectrum_hz": "Hz",
+        "curves.shear_pct": "percent",
+    }
+    assert "units" not in attributes["curves.psf.displacement"]
+    assert all("long_name" in value for value in attributes.values())
+
+
+def test_every_array_is_compressed_and_checksummed(tmp_path, artifact) -> None:
+    """Deflate and a Fletcher-32 checksum on every variable, floats shuffled.
+
+    The checksum is the one the zip container gave the `.npz` for free and
+    netCDF-3 would have dropped: without it a flipped byte in an image reads
+    back as a plausible number.
+
+    What is asserted about `shuffle` is that the filter is *on* for the floats
+    and off for the byte masks, not that it makes this file smaller -- on this
+    fixture it does not. The phantom is stored as `uint16`, so its mean image
+    holds only a few hundred distinct float64 values and plain deflate finds
+    runs the shuffle breaks up: 134,928 B with the filter against 129,772 B
+    without. Shuffle is kept on for the acquisitions the container is for,
+    whose mean and SFNR images are noisy float64 with a distinct value in
+    nearly every voxel, where it saves around 13%.
+    """
+    saved = q.save_artifact(artifact, tmp_path / "scan.qa.nc")
+    with netCDF4.Dataset(str(saved)) as dataset:
+        filters = {
+            name: (variable.filters(), variable.dtype)
+            for name, variable in dataset.variables.items()
+        }
+
+    assert filters  # a layout with no variables would pass every claim below
+    for name, (applied, dtype) in filters.items():
+        assert applied["zlib"] and applied["complevel"] == 4, name
+        assert applied["fletcher32"], name
+        assert applied["shuffle"] == (dtype != np.uint8), name
+
+
+def test_loaded_arrays_are_plain_native_endian_ndarrays(tmp_path, artifact) -> None:
+    """What a caller gets is an ordinary array, not a masked or byte-swapped one.
+
+    netCDF4 masks `_FillValue` and out-of-range values unless told not to, and
+    a `MaskedArray` reaching `compose` would make a fill value indistinguishable
+    from a measurement. Byte order is the same kind of claim one level down: an
+    artifact written on one machine and read on another must arrive as numbers
+    this machine can compute with directly.
+    """
+    loaded = q.load_artifact(q.save_artifact(artifact, tmp_path / "scan.qa.nc"))
+    for array in (
+        loaded.images.signal,
+        loaded.images.phantom_mask,
+        loaded.curves.time,
+        loaded.curves.translation,
+    ):
+        assert type(array) is np.ndarray
+        assert not isinstance(array, np.ma.MaskedArray)
+        assert array.dtype.byteorder in ("=", "|")
+
+
+def test_a_flipped_byte_inside_an_array_is_refused(tmp_path, artifact) -> None:
+    """A corrupted array fails to read rather than reading as wrong numbers.
+
+    Written as a file that is nearly all array -- one variable of incompressible
+    noise, whose chunk is the great majority of the bytes -- so that the byte
+    flipped in the middle of it is inside that chunk whatever HDF5 does with
+    the metadata around it.
+    """
+    noise = np.random.default_rng(0).standard_normal((64, 64))
+    document, _ = decompose(artifact)
+    content = netcdf.encode(document, {"images.signal": noise})
+    path = tmp_path / "noise.nc"
+    netcdf.write(content, path)
+    raw = bytearray(path.read_bytes())
+    assert len(raw) < noise.nbytes * 1.5  # the array really is most of the file
+
+    raw[len(raw) // 2] ^= 0xFF
+    path.write_bytes(bytes(raw))
+    with pytest.raises(q.InvalidArtifactError):
+        netcdf.read(path)
+
+
+def test_a_flipped_byte_anywhere_is_refused_or_harmless(tmp_path, artifact) -> None:
+    """However a stored artifact is damaged, `load_artifact` is what answers.
+
+    A reader of a QA archive must not have to catch whichever exception an HDF5
+    error, a JSON parse or a shape check happened to raise; one type means "this
+    file is not a readable artifact" and nothing else escapes. The offsets are
+    landmarks rather than a random sweep, so the test says the same thing on
+    every run: the signature, the superblock behind it, the text of the stored
+    document, and the tail where the last chunk lies.
+    """
+    saved = q.save_artifact(artifact, tmp_path / "scan.qa.nc")
+    whole = saved.read_bytes()
+    document_at = whole.find(b'"schema_version"')
+    assert document_at > 0  # the document is stored as plain text, so this finds it
+    path = tmp_path / "damaged.nc"
+
+    for offset in (0, 64, document_at + 8, len(whole) - 4096, len(whole) - 1):
+        damaged = bytearray(whole)
+        damaged[offset] ^= 0xFF
+        path.write_bytes(bytes(damaged))
+        try:
+            loaded = q.load_artifact(path)
+        except q.InvalidArtifactError:
+            continue
+        # A flip that lands in slack space changes nothing a reader can see.
+        assert np.array_equal(loaded.images.sfnr, artifact.images.sfnr), offset
+
+
+def test_an_artifact_with_no_hull_round_trips(tmp_path, artifact) -> None:
+    """A phantom too small to outline stores an empty array, and reads back one.
+
+    `_convex_hull` yields `(0, 2)` for a mask with no area (see
+    `analysis/build.py`), which netCDF-3 could not have stored at all: a
+    zero-length dimension there is *the* unlimited one, of which a file may
+    have one. netCDF-4 has ordinary zero-length dimensions.
+    """
+    images = replace(artifact.images, phantom_hull=np.zeros((0, 2)))
+    saved = q.save_artifact(replace(artifact, images=images), tmp_path / "flat.qa.nc")
+    loaded = q.load_artifact(saved)
+
+    assert loaded.images.phantom_hull.shape == (0, 2)
+    _, lengths = _declared(saved)
+    assert lengths["hull_vertex"] == 0
+    assert np.array_equal(loaded.images.signal, artifact.images.signal)
+
+
+# The axes the layout publishes, as a reader meets them. Spelled out rather
+# than read back off the file, since the point is that these names are the
+# contract a foreign reader is handed.
+_DIMENSIONS = {
+    "frame",
+    "frequency",
+    "image_axis",
+    "roi_width",
+    "psf_direction",
+    "psf_lag",
+    "psf_model_sample",
+    "row",
+    "col",
+    "hull_vertex",
+    "hull_coord",
+}
+
+
+def test_xarray_opens_the_artifact_without_a_warning(tmp_path, artifact) -> None:
+    """`xr.open_dataset` is the one-line path a notebook takes to an artifact."""
+    saved = str(q.save_artifact(artifact, tmp_path / "scan.qa.nc"))
+    # Imported here, before the filter, and not at the top of the module: what
+    # is asserted is that *opening the file* warns about nothing, and importing
+    # either library under `error` raises the netCDF4 wheel's own Cython
+    # `RuntimeWarning` -- a defect in the wheel that no artifact can fix, and
+    # one a test of the file must not be able to trip over.
+    import xarray as xr
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        with xr.open_dataset(saved) as dataset:
+            dimensions = set(dataset.sizes)
+            variables = set(dataset.data_vars)
+            attributes = dict(dataset.attrs)
+            sfnr = dataset["images.sfnr"].to_numpy()
+            time = dataset["curves.time"]
+
+    assert dimensions == _DIMENSIONS
+    assert {"curves.weisskoff.cv", "images.ghost.pe_ghost"} <= variables
+    assert attributes["schema_version"] == artifact.schema_version
+    assert attributes["measurements.snr"] == artifact.measurements.snr
+    assert np.allclose(sfnr, artifact.images.sfnr, equal_nan=True)
+    # The dotted name survives, and so does the axis the trace lies along.
+    assert time.dims == ("frame",)
+    assert time.attrs["units"] == "s"
+
+
+def test_the_unidata_library_opens_the_artifact_without_a_warning(
+    tmp_path, artifact
+) -> None:
+    """The C library itself: what `ncdump`, MATLAB and R read through.
+
+    The headline claim of this container is that a reader which has never heard
+    of fmriqc opens the file, finds the axes named, and can turn the flagged
+    bytes back into a mask on its own.
+    """
+    saved = str(q.save_artifact(artifact, tmp_path / "scan.qa.nc"))
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        with netCDF4.Dataset(saved) as dataset:
+            assert dataset.data_model == "NETCDF4"
+            assert set(dataset.dimensions) == _DIMENSIONS
+            mask = dataset["images.phantom_mask"]
+            document = dataset.getncattr("document")
+            snr = dataset.getncattr("measurements.snr")
+            flags = np.asarray(mask.flag_values)
+            stored = np.asarray(mask[:])
+
+    assert '"schema_version"' in document
+    assert snr == artifact.measurements.snr
+    assert np.array_equal(flags, [0, 1])
+    assert np.array_equal(stored != 0, artifact.images.phantom_mask)
+
+
+# --------------------------------------------------------------------------
+# the layout, before a file exists
+# --------------------------------------------------------------------------
+
+
+def test_the_layout_declares_every_array_the_artifact_publishes(artifact) -> None:
+    """`decompose` and the netCDF layout are one contract in two files.
+
+    A field added to one and not the other would be an array with no declared
+    axes; `encode` refuses it, and this says so before a save has to.
+    """
+    document, arrays = decompose(artifact)
+    content = netcdf.encode(document, arrays)
+    assert set(content.variables) == set(arrays)
+
+
+def test_encode_refuses_an_array_the_layout_does_not_declare(artifact) -> None:
+    document, arrays = decompose(artifact)
+    with pytest.raises(ValueError, match="not an array this artifact layout"):
+        netcdf.encode(document, arrays | {"curves.invented": np.zeros(3)})
+
+
+def test_encode_refuses_an_array_of_the_wrong_rank(artifact) -> None:
+    document, arrays = decompose(artifact)
+    with pytest.raises(ValueError, match="rank 2"):
+        netcdf.encode(document, arrays | {"curves.time": np.zeros((3, 3))})
+
+
+def test_encode_refuses_two_arrays_that_disagree_about_one_axis(artifact) -> None:
+    """A shared dimension is a claim, and a file cannot make it two ways."""
+    document, arrays = decompose(artifact)
+    with pytest.raises(ValueError, match="already fixed it at"):
+        netcdf.encode(document, arrays | {"curves.roi_signal": np.zeros(3)})
+
+
+def test_encode_refuses_a_dtype_the_container_would_narrow(artifact) -> None:
+    """A QA number quietly stored at half its precision is a silent loss."""
+    document, arrays = decompose(artifact)
+    narrowed = arrays["curves.time"].astype(np.float32)
+    with pytest.raises(ValueError, match="dtype float32"):
+        netcdf.encode(document, arrays | {"curves.time": narrowed})
+
+
+# --------------------------------------------------------------------------
+# the retired `.npz` container
+# --------------------------------------------------------------------------
+#
+# Nothing writes one any more, and every artifact written before this one does
+# -- so the reader stays, and these build the two forms by hand rather than
+# through a writer that no longer exists. The committed fixtures in
+# `test_artifact_fixtures.py` cover real historical bytes; these isolate the
+# stored form from the schema history the fixtures also exercise.
+
+
+def _as_npz(path, document: str, arrays, document_member) -> None:
+    """An `.npz` artifact in the layout the retired writer used."""
+    np.savez_compressed(path, __document__=document_member(document), **arrays)
+
+
+def _as_utf8_bytes(text: str) -> np.ndarray:
+    """The document member as the last `.npz` builds wrote it."""
+    return np.frombuffer(text.encode("utf-8"), dtype=np.uint8)
+
+
+def test_load_rejects_a_damaged_npz(tmp_path, artifact) -> None:
+    """A zip that starts right and stops early is refused, not half-read.
+
+    NumPy's loader answers a damaged archive with whichever of four libraries'
+    exceptions it reached -- `BadZipFile`, an inflate error, a truncated member
+    -- and the reader turns all of them into the one thing a caller can act on.
+    """
+    saved = q.save_artifact(artifact, tmp_path / "new.qa.nc")
+    document, arrays = _read_netcdf(saved)
     old = tmp_path / "old.qa.npz"
-    np.savez_compressed(old, __document__=np.array(text), **members)
+    _as_npz(old, json.dumps(document), arrays, _as_utf8_bytes)
 
-    with np.load(old) as archive:  # the form this test is about
-        assert archive["__document__"].dtype.kind == "U"
+    whole = old.read_bytes()
+    old.write_bytes(whole[: len(whole) // 2])
+    assert old.read_bytes()[:4] == b"PK\x03\x04"  # still claims to be the container
+    with pytest.raises(q.InvalidArtifactError):
+        q.load_artifact(old)
 
-    # Compared as documents, not as artifacts: the fixture's motion metrics are
-    # NaN, and NaN != NaN would fail a dataclass comparison for reasons that
-    # have nothing to do with the stored form.
+
+@pytest.mark.parametrize(
+    "document_member", [_as_utf8_bytes, np.array], ids=["uint8", "unicode"]
+)
+def test_an_npz_artifact_still_loads(tmp_path, artifact, document_member) -> None:
+    """Both stored forms of the old document member, opened by the same call.
+
+    `uint8` is what the last `.npz` builds wrote; a NumPy `<U` string is what
+    everything before them wrote. Neither is written now, and both must read.
+
+    Compared as documents, not as artifacts: the fixture's motion metrics are
+    NaN, and NaN != NaN would fail a dataclass comparison for reasons that have
+    nothing to do with the stored form.
+    """
+    saved = q.save_artifact(artifact, tmp_path / "new.qa.nc")
+    document, arrays = _read_netcdf(saved)
+    old = tmp_path / "old.qa.npz"
+    _as_npz(old, json.dumps(document), arrays, document_member)
+
+    assert old.read_bytes()[:4] == b"PK\x03\x04"  # the other container, by its magic
     loaded = q.load_artifact(old)
     assert asdict(loaded.provenance) == asdict(artifact.provenance)
     assert asdict(loaded.settings) == asdict(artifact.settings)
     assert loaded.schema_version == artifact.schema_version
     assert loaded.measurements.snr == artifact.measurements.snr
+    assert loaded.images.phantom_mask.dtype == np.bool_

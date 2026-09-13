@@ -8,7 +8,7 @@ This document describes the philosophy for API stability and breaking changes in
 
 The exceptions to this freedom are anything a *user* has on disk or in a script — these are interfaces even though the code around them isn't:
 
-- **On-disk file formats** — the `.npz` analysis artifact, and any self-identifying file a tool reads back later
+- **On-disk file formats** — the `.qa.nc` analysis artifact, and any self-identifying file a tool reads back later
 - **Config / input file schemas** — user-authored, version-controlled files
 - **CLI flags, subcommands, and positional arguments** that scripts may depend on
 - **stdout output** that downstream tools parse (see [logging.md](logging.md))
@@ -96,8 +96,10 @@ If you can see all the usages, you can update all the usages.
 
 ### What Requires Care
 
-- The `.npz` analysis artifact — the seam between the two distributions, and the file a
-  user keeps
+- The `.qa.nc` analysis artifact — the seam between the two distributions, and the file a
+  user keeps. Its container has changed once already (a compressed `.npz` before
+  netCDF-4); the promise did not — new code reads every old file, and the
+  container is recognized from the file's leading bytes rather than its name
 - The JSON the CLI emits, and the per-scan table it prints
 - Configuration and input file schemas
 - Any binary or serialization format a later run has to read back
@@ -105,7 +107,7 @@ If you can see all the usages, you can update all the usages.
 ### Schema Versioning
 
 The artifact carries its own version. `ARTIFACT_SCHEMA_VERSION` is written into every file
-as `schema_version`, and the mapping between the dataclasses and the archive members is
+as `schema_version`, and the mapping between the dataclasses and the file's variables is
 spelled out field by field rather than derived by reflection — so adding a field is a
 deliberate edit to the format, not a silent one.
 
@@ -131,6 +133,16 @@ When changing file formats:
 2. **Support reading old versions** - New code reads old files, warning as it migrates them
 3. **Write new version only** - Don't maintain old writers
 4. **Document migrations** - If manual migration needed, document it
+
+A change of *container* — the same document and the same arrays in a different
+envelope, as when the artifact moved from `.npz` to netCDF-4 — is not a schema
+change and does not bump the version. The version pins the document's layout, so
+bumping it for an envelope would tell older builds to refuse a document they
+understand perfectly and put a step in the migration chain that changes no
+field. Tell the containers apart by the file's leading bytes instead: a version
+stored *inside* a file cannot be consulted until the container holding it has
+been opened. The old container keeps a reader and loses its writer, exactly as
+rule 2 and rule 3 say.
 
 ## CLI and Output Interfaces
 
@@ -166,7 +178,7 @@ silent behavior change is not.
 | CLI flags / arguments | Aliases for renames; loud failures over silent changes |
 | stdout output formats | Semi-stable - users pipe to other tools |
 | Exit codes | Stable - scripts check these |
-| The `.npz` analysis artifact | Versioned; new code migrates old files forward |
+| The `.qa.nc` analysis artifact | Versioned; new code migrates old files forward, and still reads the retired `.npz` container |
 | On-disk / binary formats | Versioned; new code reads old; document migrations |
 
 **Code is cheap, data is precious.** Be bold with code changes, careful with anything a user has on disk or in a script.

@@ -3,7 +3,7 @@
 The artifact is the contract between the calculation half and every consumer,
 so these pin that everything a report needs is settled at build time — derived
 properties into plain fields, curves extracted, masks and outlines materialized
-— with no metric object left for a reader to walk. The `.npz` round trip that
+— with no metric object left for a reader to walk. The artifact round trip that
 carries it to disk is `test_artifact_archive.py`.
 """
 
@@ -163,7 +163,7 @@ def test_a_noise_only_scan_keeps_its_failed_mask_verdict(tmp_path) -> None:
     settings = q.AnalysisSettings(trim_sec=0, center="phantom", roi_size=3)
     with pytest.warns(UserWarning, match="no slice holds a recognizable phantom"):
         artifact = q.analyze(q.QAScan(data=noise, tr=2.0), settings)
-    loaded = q.load_artifact(q.save_artifact(artifact, tmp_path / "noise.qa.npz"))
+    loaded = q.load_artifact(q.save_artifact(artifact, tmp_path / "noise.qa.nc"))
     m = loaded.measurements
     assert 0.0 < m.phantom_fraction < 0.95  # the share alone would have passed
     assert m.phantom_mask_ok is False
@@ -328,7 +328,7 @@ def test_undeterminable_clipping_survives_the_archive(tmp_path, make_scan) -> No
         assert getattr(artifact.measurements, name) is None, name
     assert artifact.measurements.clip_ceiling is None
 
-    loaded = q.load_artifact(q.save_artifact(artifact, tmp_path / "undet.qa.npz"))
+    loaded = q.load_artifact(q.save_artifact(artifact, tmp_path / "undet.qa.nc"))
     assert loaded.measurements.clipped_any is None
     assert loaded.measurements.n_clipped_kept is None
 

@@ -17,9 +17,11 @@ import fmriqc
 
 # The modules `import fmriqc` alone must never pull in -- each is expensive and
 # each has exactly one call site in the package (see `analysis/build.py`,
-# `metrics/artifacts.py`), or is a real dependency (`nibabel`, `skimage`) that
-# a name access, not a bare import, should trigger.
-_HEAVY_MODULES = ("skimage", "scipy.special", "scipy.spatial", "nibabel")
+# `metrics/artifacts.py`, `analysis/serialize/netcdf.py`), or is a real
+# dependency (`nibabel`, `skimage`) that a name access, not a bare import,
+# should trigger. `netCDF4` loads libhdf5 and libnetcdf behind it, which is why
+# the artifact writer defers it the way the pipeline defers `scipy.spatial`.
+_HEAVY_MODULES = ("skimage", "scipy.special", "scipy.spatial", "nibabel", "netCDF4")
 
 # Probe run in a fresh interpreter (see test_bare_import_does_not_load_the_heavy_stack):
 # only `sys.modules` after a bare `import fmriqc` speaks to the claim, not this

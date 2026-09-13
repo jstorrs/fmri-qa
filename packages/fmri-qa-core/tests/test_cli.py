@@ -41,7 +41,7 @@ def test_main_reports_bad_file_and_continues_batch(
 
 
 def test_main_saves_a_loadable_artifact(tmp_path, write_scan, capsys) -> None:
-    out = tmp_path / "qa.npz"
+    out = tmp_path / "qa.nc"
     rc = cli.main([write_scan(tmp_path), "--roi-size", "9", "--artifact", str(out)])
     assert rc == 0
     assert f"# wrote {out}" in capsys.readouterr().out
@@ -64,7 +64,7 @@ def test_main_files_one_scan_into_an_existing_artifact_directory(
     out.mkdir()
     rc = cli.main([write_scan(tmp_path), "--roi-size", "9", "--artifact", str(out)])
     assert rc == 0
-    written = out / "scan.qa.npz"
+    written = out / "scan.qa.nc"
     assert f"# wrote {written}" in capsys.readouterr().out
     assert q.load_artifact(written).provenance.scan == "scan.nii.gz"
 
@@ -88,9 +88,9 @@ def test_main_saves_one_artifact_per_scan_in_a_batch(
     out = tmp_path / "artifacts"
     rc = cli.main([first, second, "--roi-size", "9", "--artifact", str(out)])
     assert rc == 0
-    written = sorted(p.name for p in out.glob("*.npz"))
-    assert written == ["first.qa.npz", "second.qa.npz"]
-    assert q.load_artifact(out / "first.qa.npz").provenance.scan == "first.nii.gz"
+    written = sorted(p.name for p in out.glob("*.nc"))
+    assert written == ["first.qa.nc", "second.qa.nc"]
+    assert q.load_artifact(out / "first.qa.nc").provenance.scan == "first.nii.gz"
 
 
 def test_main_refuses_a_batch_whose_artifacts_would_collide(
@@ -100,7 +100,7 @@ def test_main_refuses_a_batch_whose_artifacts_would_collide(
 
     A batch names each artifact after the scan's stem, so `a/scan.nii.gz` and
     `b/scan.nii.gz` land on one file: the second analysis replaces the first and
-    a later `fmri-qa-report BASE/*.npz` renders a packet quietly missing a scan.
+    a later `fmri-qa-report BASE/*.nc` renders a packet quietly missing a scan.
     The run is refused up front instead, before any analysis is done.
     """
     (tmp_path / "a").mkdir()
@@ -123,7 +123,7 @@ def test_main_refuses_an_artifact_that_would_overwrite_the_scan(
     """`--artifact` naming the input must fail before anything is read or written.
 
     The scan is loaded first and the archive is moved over its destination last,
-    so without the guard the run succeeds and leaves an `.npz` where the NIfTI
+    so without the guard the run succeeds and leaves an artifact where the NIfTI
     was. The relative spelling is the one a shell produces, and it must not
     slip past a comparison of the literal strings.
     """
@@ -158,12 +158,12 @@ def test_main_refuses_a_batch_destination_that_is_another_input(
 ) -> None:
     """Every destination is checked against every input, not only its own scan.
 
-    A batch names `a.nii.gz`'s artifact `BASE/a.qa.npz`; if that file is itself
+    A batch names `a.nii.gz`'s artifact `BASE/a.qa.nc`; if that file is itself
     one of the inputs, analyzing `a.nii.gz` would replace it. The whole run is
     refused, so the other input is never analyzed either.
     """
     scan = write_scan(tmp_path, name="a")
-    other = tmp_path / "a.qa.npz"  # named like the batch's output for `a`
+    other = tmp_path / "a.qa.nc"  # named like the batch's output for `a`
     other.write_bytes(b"not a scan, but an input all the same")
 
     rc = cli.main([scan, str(other), "--roi-size", "9", "--artifact", str(tmp_path)])
@@ -184,7 +184,7 @@ def test_main_allows_a_batch_of_distinctly_named_scans(
     out = tmp_path / "artifacts"
     rc = cli.main([first, second, "--roi-size", "9", "--artifact", str(out)])
     assert rc == 0
-    assert sorted(p.name for p in out.glob("*.npz")) == ["run1.qa.npz", "run2.qa.npz"]
+    assert sorted(p.name for p in out.glob("*.nc")) == ["run1.qa.nc", "run2.qa.nc"]
 
 
 def test_main_reports_artifact_failure_without_a_traceback(
@@ -198,7 +198,7 @@ def test_main_reports_artifact_failure_without_a_traceback(
             "--roi-size",
             "9",
             "--artifact",
-            str(blocked / "qa.npz"),
+            str(blocked / "qa.nc"),
         ]
     )
     captured = capsys.readouterr()
@@ -223,7 +223,7 @@ def test_main_reports_a_refused_artifact_without_a_traceback(
         return replace(artifact, provenance=replace(artifact.provenance, te="0.03"))
 
     monkeypatch.setattr(q, "analyze", broken)
-    out = tmp_path / "qa.npz"
+    out = tmp_path / "qa.nc"
     rc = cli.main([write_scan(tmp_path), "--roi-size", "9", "--artifact", str(out)])
     captured = capsys.readouterr()
     assert rc == 1
@@ -429,7 +429,7 @@ def _reject_json_constant(value: str) -> None:
 
 
 def test_json_stdout_stays_pure_with_an_artifact(tmp_path, write_scan, capsys) -> None:
-    out = tmp_path / "qa.npz"
+    out = tmp_path / "qa.nc"
     rc = cli.main(
         [write_scan(tmp_path), "--roi-size", "9", "--json", "--artifact", str(out)]
     )
@@ -545,7 +545,7 @@ def test_a_wildcard_matching_one_scan_is_not_a_batch(
     single file behaves exactly as naming that file does.
     """
     write_scan(tmp_path, name="only")
-    out = tmp_path / "one.npz"
+    out = tmp_path / "one.nc"
     rc = cli.main(
         [f"{tmp_path}/*only*.nii.gz", "--roi-size", "9", "--artifact", str(out)]
     )

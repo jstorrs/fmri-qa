@@ -39,7 +39,7 @@ def test_cover_and_appendix_paginate_without_losing_rows() -> None:
 
 
 def test_the_cover_lists_omitted_scans_under_their_own_heading() -> None:
-    cover = report.Cover(("run-1",), omitted=(("run-2.qa.npz", "unreadable"),))
+    cover = report.Cover(("run-1",), omitted=(("run-2.qa.nc", "unreadable"),))
     assert [kind for kind, _ in cover_rows(cover)] == ["scan", "heading", "omitted"]
 
 

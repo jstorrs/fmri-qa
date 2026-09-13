@@ -12,13 +12,16 @@ presence; a document layout the current writer could no longer produce at
 all; or a key-ordering/encoding difference that only shows up in bytes an old
 build actually wrote.
 
-This module is the other half. `tests/fixtures/schema_v{1..5}.qa.npz` are not
-synthesized: each is the literal archive produced by checking out that
+This module is the other half. The `tests/fixtures/schema_v*` archives are not
+synthesized: each is the literal file produced by checking out that
 schema version's own commit (the last commit before the next schema bump) and
 running *that build's* `save_artifact` over the same synthetic phantom the
 rest of this suite uses (`conftest.synthetic_series`, seed 0). Loading one
 here exercises real historical bytes, not today's writer's idea of what an
-old file looked like. Neither half of the suite replaces the other: a bug
+old file looked like -- including the *container* those bytes are in, which is
+why the fixtures are discovered by either suffix: every committed one so far is
+a `.qa.npz`, because that is what the builds that wrote them wrote, and the
+next one will be a `.qa.nc`. Neither half of the suite replaces the other: a bug
 that broke a migration step and its exact inverse in the same commit could
 still pass a single fixture, and a fixture proves nothing about a step in
 isolation the way `test_artifact_archive.py` does.
@@ -39,7 +42,7 @@ from fmriqc.analysis import ARTIFACT_SCHEMA_VERSION
 from fmriqc.analysis.serialize.migrate import _MIGRATIONS
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
-_FIXTURE_NAME = re.compile(r"schema_v(\d+)\.qa\.npz$")
+_FIXTURE_NAME = re.compile(r"schema_v(\d+)\.qa\.(?:npz|nc)$")
 
 # Which section of `QAArtifact` each field named below lives in, so the tables
 # below can name a field once instead of nesting them by section.
@@ -150,7 +153,7 @@ def _discover_fixtures() -> dict[int, Path]:
     below is what turns that into a failure instead.
     """
     found = {}
-    for path in sorted(FIXTURES_DIR.glob("schema_v*.qa.npz")):
+    for path in sorted(FIXTURES_DIR.glob("schema_v*")):
         match = _FIXTURE_NAME.match(path.name)
         if match:
             found[int(match.group(1))] = path

@@ -25,8 +25,8 @@ subpackages (`ls` the package to find a concern):
                  aggregate `QAMetrics`/`QAResult`
 * `analysis`  -- the publishable `QAArtifact`: `artifact` (the value objects),
                  `build` (`analyze`: scan -> artifact), `validation` (the
-                 contract), and `serialize` (the `.npz` on-disk form, with the
-                 per-version migrations that keep an old archive readable)
+                 contract), and `serialize` (the netCDF-4 on-disk form, with
+                 the per-version migrations that keep an old archive readable)
 * `hilo`      -- high/low flip-angle thermal/instability separation (its own pipeline)
 * `cli`       -- the three commands (`fmri-qa`, `fmri-qa-hilo`,
                  `fmri-qa-import`) and the two forms the analyzing two report

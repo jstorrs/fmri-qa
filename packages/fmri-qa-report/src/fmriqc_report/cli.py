@@ -1,6 +1,6 @@
 """`fmri-qa-report`: render saved analysis artifacts into a PDF packet.
 
-The presentation half's entry point. It reads `.npz` artifacts written by
+The presentation half's entry point. It reads the `.qa.nc` artifacts written by
 `fmri-qa --artifact` — never a NIfTI series — so reporting is a separate step
 that can run on a different machine, long after the calculation, with none of
 the acquisition data at hand.
@@ -27,7 +27,7 @@ def _expand_globs(paths: Sequence[str]) -> list[str]:
     """Every path, with any wildcard pattern that named nothing expanded here.
 
     PowerShell and cmd do not expand a wildcard before starting the command, so
-    `fmri-qa-report artifacts/*.qa.npz` -- the line the README gives -- reaches
+    `fmri-qa-report artifacts/*.qa.nc` -- the line the README gives -- reaches
     this process with the `*` still in it and fails as a missing artifact.
 
     A deliberate twin of `fmriqc.cli.arguments.expand_globs` rather than an
@@ -75,7 +75,7 @@ def _parser() -> argparse.ArgumentParser:
     """The command line this command accepts."""
     parser = argparse.ArgumentParser(
         prog="fmri-qa-report",
-        description="Render fmri-qa analysis artifacts (.npz) into a PDF report.",
+        description="Render fmri-qa analysis artifacts (.qa.nc) into a PDF report.",
     )
     parser.add_argument(
         "--version", action="version", version=f"%(prog)s {package_version()}"

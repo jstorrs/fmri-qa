@@ -14,7 +14,9 @@ about the artifact.
 Bumping `ARTIFACT_SCHEMA_VERSION` is not done until the outgoing version has a
 committed fixture: run the old code (a `git worktree` checkout of the last
 commit at that version) over the shared synthetic phantom and save the file to
-`tests/fixtures/schema_v{N}.qa.npz` (see `test_artifact_fixtures.py`). A
+`tests/fixtures/schema_v{N}.qa.nc` -- or `.qa.npz`, if the build being checked
+out is old enough to still write that container; `test_artifact_fixtures.py`
+finds either, and the loader tells them apart by their leading bytes. A
 migration step tested only against a same-build document synthesized to look
 old -- which is what `test_artifact_archive.py` does -- proves the step matches
 its own docstring, not that a real file from that version still parses.

@@ -189,7 +189,7 @@ def test_a_malformed_sidecar_field_is_unknown_and_named(
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         artifact = q.analyze(scan, q.AnalysisSettings(trim_sec=0, roi_size=3))
-    path = q.save_artifact(artifact, tmp_path / "qa.npz")
+    path = q.save_artifact(artifact, tmp_path / "qa.nc")
     assert getattr(q.load_artifact(path).provenance, field) is None
 
 
