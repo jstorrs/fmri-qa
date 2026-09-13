@@ -63,7 +63,9 @@ that does both.
 `save_artifact` / `load_artifact` move an artifact through a single netCDF-4
 file (`<scan>.qa.nc`): every array is a compressed, checksummed variable under
 its dotted path (`curves.weisskoff.cv`, `images.ghost.pe_ghost`), declared over
-shared named dimensions (`frame`, `frequency`, `row`, `col`, …); everything that
+shared named dimensions (`frame`, `frequency`, `row`, `col`, …), each of which
+carries a coordinate variable of its own so a reader gets the values along an
+axis and not only its name; everything that
 is not an array rides in a JSON document held in the global attribute
 `document`; and every scalar measurement is published as an attribute of its own
 beside it. The file needs nothing a site does not already have to inspect —
@@ -76,8 +78,8 @@ manual unzip in MATLAB and offering R nothing but numeric arrays. The costs are
 a ~10 MB `netCDF4` wheel (libhdf5 and libnetcdf, the library those readers use
 themselves), HDF5's advisory file locking on network shares, and size: HDF5
 spends about 110 KB of fixed metadata on a layout this size, so the test
-phantom's artifact is 132 KB against the `.npz`'s 24 KB, and a real
-128×128×300 acquisition 436 KB against 230 KB. `load_artifact` reads both
+phantom's artifact is 135 KB against the `.npz`'s 24 KB, and a real
+128×128×300 acquisition 441 KB against 230 KB. `load_artifact` reads both
 containers, telling them apart by the file's leading bytes rather than its
 suffix; nothing writes an `.npz` any more.
 
@@ -148,6 +150,3 @@ $ fmri-qa-report artifacts/*.qa.nc --pdf packet.pdf --tier physics --cover --app
   modules, and no analysis work at all.
 - Trending across artifacts — reading a directory of `.qa.nc` files into a table
   — needs nothing from either package that is not already public.
-- Coordinate variables for the named dimensions are the obvious remaining
-  addition: a reader gets the axes by name today, but not the values along
-  them.

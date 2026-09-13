@@ -470,11 +470,17 @@ reads one through `ncdf4` on CRAN (and the document through `jsonlite`); Python
 has netCDF4-python and xarray; `ncdump` comes with the netCDF tools. Each array
 is a variable under the dotted name the library
 gives it (`curves.roi_signal`, `images.sfnr`), declared over shared named
-dimensions (`frame`, `frequency`, `row`, `col`, …); boolean masks are stored as
-flagged `uint8` bytes in CF style; every scalar measurement is a global
-attribute of its own (`measurements.snr`, `measurements.ghost_pct`); and the
-JSON document holding the settings, provenance and those same measurements is
-the global attribute `document`.
+dimensions (`frame`, `frequency`, `row`, `col`, …), each of which carries a
+coordinate variable of its own so an axis has values and not only a name;
+boolean masks are stored as flagged `uint8` bytes in CF style; every scalar
+measurement is a global attribute of its own (`measurements.snr`,
+`measurements.ghost_pct`); and the JSON document holding the settings,
+provenance and those same measurements is the global attribute `document`.
+
+`frame` counts from the analyzed series, after the warm-up trim — the acquired
+volume number is that index plus `provenance.n_trimmed` — and the seconds along
+it ride as `curves.time`, named as a CF auxiliary coordinate so xarray hands
+over both.
 
 ```matlab
 ncdisp('scan.qa.nc')                                   % the whole layout
@@ -494,6 +500,7 @@ import xarray as xr
 
 dataset = xr.open_dataset("scan.qa.nc")
 dataset["curves.roi_signal"]
+dataset["curves.roi_signal"].plot()  # against the frame axis the file supplies
 dataset.attrs["document"]
 ```
 

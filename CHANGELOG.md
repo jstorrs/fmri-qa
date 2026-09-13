@@ -46,9 +46,28 @@ versioning when the first stable public interface is released.
   `HDF5_USE_FILE_LOCKING=FALSE` in its environment where a plain read would have
   worked, and this package deliberately does not set it for the whole process.
   And HDF5 carries about 110 KB of fixed metadata for a layout this size, so the
-  test phantom's artifact is 132 KB against the `.npz`'s 24 KB; the overhead does
-  not grow with the scan (a 128×128×300 acquisition is 436 KB against 230 KB),
-  and compression keeps the rest close. No coordinate variables yet.
+  test phantom's artifact is 135 KB against the `.npz`'s 24 KB; the overhead does
+  not grow with the scan (a 128×128×300 acquisition is 441 KB against 230 KB),
+  and compression keeps the rest close.
+
+  **Every dimension also carries a coordinate variable**, so a reader gets the
+  values along an axis and not just its name: `frequency` and `roi_width` are
+  the same numbers as `curves.spectrum_hz` and `curves.weisskoff.roi_sizes`,
+  `frame`, `row`, `col`, the two PSF sample axes and the hull's vertices are the
+  index along the axis, and the three length-2 label axes name their positions
+  in CF flags (`image_axis` "row col", `hull_coord` "x y", and `psf_direction`
+  the document's own PSF labels -- "PE RO", or "axis0 axis1" on a run where no
+  phase-encode axis resolved) rather than as netCDF strings, which Octave and
+  older readers handle poorly. `frame` counts from the *analyzed* series, as every frame index in the
+  artifact does, and its `comment` says so — the acquired volume number is the
+  index plus `provenance.n_trimmed`. Where an axis's real values cannot be a
+  coordinate variable — the seconds along `frame` are `curves.time`, and the PSF
+  lags differ by direction and so are 2-D — the variables point at them with a
+  CF `coordinates` attribute, so `xr.open_dataset` gives both the index and the
+  quantity and `ds["curves.roi_signal"].plot()` draws against seconds. The axes
+  are derived when the file is written and never read back, exactly as the
+  `measurements.*` attributes are; they are stored unfiltered and contiguous,
+  and add 3,322 B to the test phantom's artifact.
 
 - **The artifact's `__document__` member is stored as UTF-8 bytes (`uint8`),
   not a NumPy `<U` string**, so the readers a site is likely to already have can

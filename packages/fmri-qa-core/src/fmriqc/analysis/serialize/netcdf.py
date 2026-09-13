@@ -37,8 +37,8 @@ that buys are the reasons it is version 4 and not the classic version 1:
   measurably worse on the synthetic phantom the tests analyze, whose mean image
   holds a few hundred distinct values because the fixture is stored as `uint16`:
   plain deflate finds runs in those that the shuffle breaks up, and the test
-  phantom's artifact is 134,928 B with it against 129,772 B without (+4%), a
-  128x128x300 one 446,018 B against 342,658 B (+30%). Kept on regardless, and
+  phantom's artifact is 138,250 B with it against 134,219 B without (+3%), a
+  128x128x300 one 451,719 B against 346,767 B (+30%). Kept on regardless, and
   every size this package publishes was measured with it on.
 * **A per-variable checksum.** `fletcher32` is stored with every array and
   verified on every read, so a flipped bit inside an array's stored bytes is an
@@ -52,19 +52,44 @@ that buys are the reasons it is version 4 and not the classic version 1:
   so an empty array there would silently restructure the file rather than store
   an empty array.
 
-Three things the layout does that a bag of arrays does not:
+Four things the layout does that a bag of arrays does not:
 
 * **Dimensions are named and shared.** Every per-frame trace is declared over
   one `frame` dimension, both spectrum traces over `frequency`, every image over
   `row`/`col` -- so a reader that opens the file sees which arrays lie along the
   same axis instead of having to infer it from equal lengths. Two axes that
   merely happen to be the same size stay separate: `image_axis` is (row, col) in
-  array order and `psf_direction` is (PE, RO) in the order the PSF curves use,
-  and `hull_coord` is the hull's (x, y) *plot* order -- three different meanings
-  that are all length 2, and conflating them would publish a relationship that
-  is not there. Everything sits in the root group and nothing in a subgroup:
+  array order, `psf_direction` is (PE, RO) in the order the PSF curves use --
+  or (axis0, axis1) on a run where no PE axis resolved -- and `hull_coord` is
+  the hull's (x, y) *plot* order: three different meanings that are all length
+  2, and conflating them would publish a relationship that is not there.
+  Everything sits in the root group and nothing in a subgroup:
   `xr.open_dataset` sees only the root group, and Octave's group support is
   uneven, so a group would cost readers more than the tidiness is worth.
+* **Every dimension carries a coordinate variable.** A named axis says which
+  arrays lie along one line; a coordinate says *where* along it, and CF spells
+  that as a 1-D variable named for the dimension itself. Without them a reader
+  gets "dimensions without coordinates" and plots against 0..n-1; with them
+  `ds["curves.roi_signal"].plot()` draws over an axis the file supplied. Where
+  the values are already an array here, the coordinate is those same values --
+  `frequency` is `curves.spectrum_hz`, `roi_width` is
+  `curves.weisskoff.roi_sizes`, and both arrays stay where they are. Where the
+  axis is a position, the coordinate is that position: `frame` (which is what
+  `measurements.outlier_worst_frame` indexes, counting from the trimmed series),
+  `row`, `col`, the two PSF sample axes, and the hull's vertices. The three
+  length-2 label axes name their positions with CF `flag_values`/`flag_meanings`
+  on an NC_INT rather than as an NC_STRING: strings are a netCDF-4-only type
+  that Octave's package and older readers handle poorly, and a flagged integer
+  says the same thing in the vocabulary the masks already use. An axis whose
+  real values are not one-dimensional keeps them where they are and points at
+  them instead -- the seconds labelling `frame` are `curves.time`, and the PSF
+  lags differ by direction, so they are 2-D -- which a CF `coordinates`
+  attribute on each variable does, and which is why xarray hands a user
+  `ds["curves.roi_signal"].coords["curves.time"]` beside the frame index. Like
+  the `measurements.*` attributes, all of this is derived at encode time and
+  **never read back**: the dotted arrays and the JSON document remain the single
+  source of truth for `load_artifact`, so a coordinate cannot drift from what it
+  was derived from.
 * **Boolean masks become `u1`.** netCDF-4 has no boolean type either, so each
   mask is stored as 0/1 bytes marked in CF style (`flag_values`,
   `flag_meanings`), which is what makes the bytes self-describing enough to turn
@@ -183,7 +208,9 @@ _INT32 = np.iinfo(np.int32)
 
 # An attribute value in the forms this layout writes: text, the numeric scalars
 # a measurement (or `schema_version`) becomes, and the `u1` pair marking a mask.
-type _AttributeValue = str | np.int32 | np.float64 | np.uint8 | NDArray[np.uint8]
+type _AttributeValue = (
+    str | np.int32 | np.float64 | np.uint8 | NDArray[np.uint8] | NDArray[np.int32]
+)
 
 # What marks a `u1` variable as a boolean mask, in CF's flag vocabulary, and
 # what `read` looks for to turn one back into `bool`.
@@ -305,6 +332,103 @@ _LAYOUT: dict[str, _Layout] = {
 
 
 @dataclass(frozen=True, slots=True)
+class _Index:
+    """An axis whose coordinate is the position along it: 0..n-1, as NC_INT.
+
+    The index a reader would otherwise have had to invent, published so that
+    two artifacts align on it and a plot has an abscissa. `comment` is where an
+    index that means something beyond its own position says what.
+    """
+
+    long_name: str
+    comment: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class _Values:
+    """An axis labelled by an array the artifact already publishes.
+
+    That array stays exactly where it is under its own dotted name; the
+    coordinate is the same numbers again under the dimension's name, which is
+    the only spelling CF -- and so xarray, and so `ncdisp` -- reads as the axis
+    itself. A file that does not carry `source` gets no coordinate for this
+    axis rather than an invented one.
+    """
+
+    source: str
+    long_name: str
+    units: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class _Labels:
+    """A short axis whose positions are named, as CF flags on an NC_INT.
+
+    Not an NC_STRING variable: strings are a netCDF-4-only type that Octave's
+    netCDF package and older readers handle poorly, and the flag vocabulary
+    says the same thing in the terms this file already uses for the masks.
+
+    `meanings` is either the names themselves, fixed by this layout as one
+    space-separated string, or a path into the document to the list of strings
+    that names the positions for *this* artifact. The PSF directions are the
+    case for the second: they are PE and RO on most runs and axis0 and axis1
+    when no phase-encode axis resolved, and a coordinate that said "PE RO"
+    regardless would publish a claim the document contradicts.
+    """
+
+    long_name: str
+    meanings: str | tuple[str, ...]
+
+
+# One coordinate variable per dimension the table above declares, written out
+# in the same explicit style and for the same reason: which values a reader is
+# handed for an axis is a published claim, so an axis that reaches `encode`
+# without an entry here is refused rather than left unlabelled. Every one is
+# derived at encode time and none is ever read back -- see the module
+# docstring.
+_COORDINATES: dict[str, _Index | _Values | _Labels] = {
+    "frame": _Index(
+        "index of the analyzed frame",
+        comment=(
+            "0-based index into the analyzed series, which is what every frame "
+            "index in this artifact counts along: measurements.outlier_worst_frame "
+            "indexes this axis directly, and the acquired volume number is this "
+            "index plus provenance.n_trimmed, the warm-up volumes the run dropped."
+        ),
+    ),
+    "frequency": _Values(
+        "curves.spectrum_hz", "residual spectrum frequency, DC dropped", "Hz"
+    ),
+    "roi_width": _Values("curves.weisskoff.roi_sizes", "ROI width sampled, in voxels"),
+    "row": _Index("image row, in array index order"),
+    "col": _Index("image column, in array index order"),
+    "psf_lag": _Index("sample along the empirical point-spread profile"),
+    "psf_model_sample": _Index("sample along the model point-spread curve"),
+    "hull_vertex": _Index("vertex of the closed phantom outline"),
+    "image_axis": _Labels("in-plane image axis, in array order", "row col"),
+    "psf_direction": _Labels(
+        "point-spread direction, phase-encode first", ("curves", "psf", "labels")
+    ),
+    "hull_coord": _Labels("hull vertex coordinate, in plot order", "x y"),
+}
+
+# Where an axis's real values live when they cannot be the axis's own
+# coordinate variable. `frame` is an index and the seconds along it are
+# `curves.time`; the two PSF sample axes are indices because the lags differ by
+# direction and so are 2-D. CF calls these auxiliary coordinates, and a
+# variable names its own in a `coordinates` attribute -- which is what makes
+# xarray hand a reader the seconds beside the index.
+_AUXILIARY: dict[str, str] = {
+    "frame": "curves.time",
+    "psf_lag": "curves.psf.displacement",
+    "psf_model_sample": "curves.psf.model_x",
+}
+
+# The CF attribute naming a variable's auxiliary coordinates, space separated.
+_AUXILIARY_ATTRIBUTE = "coordinates"
+
+
+@dataclass(frozen=True, slots=True)
 class _Variable:
     """One netCDF variable: the stored array, its axes, and its attributes."""
 
@@ -320,13 +444,18 @@ class NetcdfContent:
     What `encode` produces and `write` pours into a file. Splitting the two is
     what keeps every way the layout can refuse an artifact -- an array it does
     not declare, a rank that disagrees with the declaration, two arrays claiming
-    one dimension at two lengths, a measurement no attribute can hold -- on the
-    near side of opening a file, so a refusal cannot leave a partly written one
-    behind.
+    one dimension at two lengths, an axis with no coordinate declared for it, a
+    measurement no attribute can hold -- on the near side of opening a file, so
+    a refusal cannot leave a partly written one behind.
+
+    `variables` are the artifact's own arrays; `coordinates` are the axes
+    derived from them, kept apart because they are stored differently and
+    because nothing reads them back.
     """
 
     dimensions: dict[str, int]
     variables: dict[str, _Variable]
+    coordinates: dict[str, _Variable]
     attributes: dict[str, _AttributeValue]
 
 
@@ -336,18 +465,124 @@ def encode(document: dict[str, Any], arrays: Mapping[str, Member]) -> NetcdfCont
     Raises:
         ValueError: If an array is not one this layout declares, disagrees with
             its declared rank, or claims a dimension another array has already
-            fixed at a different length; or if a scalar measurement is of a kind
-            no netCDF attribute can hold.
+            fixed at a different length; if an axis has no declared coordinate;
+            or if a scalar measurement is of a kind no netCDF attribute can
+            hold.
     """
+    # Only the auxiliary coordinates this file actually carries: a `coordinates`
+    # attribute naming a variable that is not here would send a reader looking
+    # for an axis nothing can supply.
+    auxiliary = {
+        axis: source for axis, source in _AUXILIARY.items() if source in arrays
+    }
     dimensions: dict[str, int] = {}
     variables: dict[str, _Variable] = {}
     for name, array in arrays.items():
-        variables[name] = _variable(name, array, dimensions)
+        variables[name] = _variable(name, array, dimensions, auxiliary)
     return NetcdfContent(
         dimensions=dimensions,
         variables=variables,
+        coordinates=_coordinates(dimensions, arrays, document),
         attributes=_global_attributes(document),
     )
+
+
+def _coordinates(
+    dimensions: dict[str, int], arrays: Mapping[str, Member], document: dict[str, Any]
+) -> dict[str, _Variable]:
+    """One coordinate variable per axis, derived from the arrays and document.
+
+    An axis whose values live in an array this file does not carry gets no
+    coordinate rather than an invented one -- `encode` takes whatever arrays it
+    is handed, and a made-up abscissa would be worse than none.
+
+    Raises:
+        ValueError: If an axis has no coordinate declared for it, or if a
+            labelled axis is not as long as it has labels.
+        KeyError: If the document lacks the labels a coordinate reads from it.
+    """
+    coordinates: dict[str, _Variable] = {}
+    for axis, length in dimensions.items():
+        declared = _COORDINATES.get(axis)
+        if declared is None:
+            raise ValueError(f"the {axis} axis has no coordinate this layout declares")
+        coordinate = _coordinate(axis, length, declared, arrays, document)
+        if coordinate is not None:
+            coordinates[axis] = coordinate
+    return coordinates
+
+
+def _coordinate(
+    axis: str,
+    length: int,
+    declared: _Index | _Values | _Labels,
+    arrays: Mapping[str, Member],
+    document: dict[str, Any],
+) -> _Variable | None:
+    """One axis's coordinate variable, or None when its values are not here."""
+    if isinstance(declared, _Values):
+        return _value_coordinate(axis, declared, arrays)
+    if isinstance(declared, _Labels):
+        return _label_coordinate(axis, length, declared, document)
+    return _index_coordinate(axis, length, declared)
+
+
+def _value_coordinate(
+    axis: str, declared: _Values, arrays: Mapping[str, Member]
+) -> _Variable | None:
+    """An axis carrying the values of the curve that already measures it."""
+    source = arrays.get(declared.source)
+    if source is None:
+        return None
+    attributes: dict[str, _AttributeValue] = {"long_name": declared.long_name}
+    if declared.units is not None:
+        attributes["units"] = declared.units
+    return _Variable(np.asarray(source), (axis,), attributes)
+
+
+def _label_coordinate(
+    axis: str, length: int, declared: _Labels, document: dict[str, Any]
+) -> _Variable:
+    """An axis whose positions are named, as CF flags on the position itself.
+
+    Raises:
+        ValueError: If the axis is not as long as it has labels, which would
+            publish a flag table a reader cannot apply.
+        KeyError: If the labels are read from the document and it lacks them.
+    """
+    meanings = _label_meanings(declared, document)
+    if len(meanings) != length:
+        raise ValueError(
+            f"the {axis} axis is {length} long, but its labels are {meanings}"
+        )
+    positions = np.arange(length, dtype=np.int32)
+    return _Variable(
+        positions,
+        (axis,),
+        {
+            "long_name": declared.long_name,
+            _FLAG_VALUES: positions,
+            "flag_meanings": " ".join(meanings),
+        },
+    )
+
+
+def _label_meanings(declared: _Labels, document: dict[str, Any]) -> list[str]:
+    """The names of a labelled axis's positions, fixed or from the document."""
+    if isinstance(declared.meanings, str):
+        return declared.meanings.split()
+    labels: Any = document
+    for key in declared.meanings:
+        labels = labels[key]
+    return [str(label) for label in labels]
+
+
+def _index_coordinate(axis: str, length: int, declared: _Index) -> _Variable:
+    """An axis carrying the position along it, 0..n-1."""
+    attributes: dict[str, _AttributeValue] = {"long_name": declared.long_name}
+    if declared.comment is not None:
+        attributes["comment"] = declared.comment
+    return _Variable(np.arange(length, dtype=np.int32), (axis,), attributes)
 
 
 def _global_attributes(document: dict[str, Any]) -> dict[str, _AttributeValue]:
@@ -435,7 +670,12 @@ def _attribute(name: str, value: Any) -> _AttributeValue:
     raise ValueError(f"{name} is a {type(value).__name__}, which no attribute can hold")
 
 
-def _variable(name: str, array: Member, dimensions: dict[str, int]) -> _Variable:
+def _variable(
+    name: str,
+    array: Member,
+    dimensions: dict[str, int],
+    auxiliary: dict[str, str],
+) -> _Variable:
     """One array as a netCDF variable, registering the axes it lies along.
 
     `dimensions` is extended in place with any axis this array is the first to
@@ -457,7 +697,26 @@ def _variable(name: str, array: Member, dimensions: dict[str, int]) -> _Variable
         attributes["units"] = layout.units
     if array.dtype == np.bool_:
         attributes |= _mask_attributes()
+    labelled = _labelling(name, layout.dimensions, auxiliary)
+    if labelled:
+        attributes[_AUXILIARY_ATTRIBUTE] = labelled
     return _Variable(_stored(name, array), layout.dimensions, attributes)
+
+
+def _labelling(
+    name: str, dimensions: tuple[str, ...], auxiliary: dict[str, str]
+) -> str:
+    """The arrays that label this variable's axes, as CF names it them.
+
+    A variable never names itself: `curves.time` *is* the seconds along the
+    frame axis, and an array pointing at itself would be a claim about a
+    relationship rather than one.
+    """
+    return " ".join(
+        auxiliary[axis]
+        for axis in dimensions
+        if axis in auxiliary and auxiliary[axis] != name
+    )
 
 
 def _stored(name: str, array: Member) -> NDArray[Any]:
@@ -497,7 +756,9 @@ def write(content: NetcdfContent, path: Path) -> None:
     Every array variable is deflated and carries a `fletcher32` checksum, so a
     corrupted array fails to read rather than reading as wrong numbers. The
     float ones are shuffled first; see the module docstring for what that costs
-    on the synthetic phantom and what it is expected to save on a real one.
+    on the synthetic phantom and what it is expected to save on a real one. The
+    coordinate variables get none of that, and are written first so `ncdisp`
+    lists the axes before the arrays along them.
     """
     # Deferred: importing netCDF4 loads libhdf5 and libnetcdf, and the pipeline
     # defers `scipy.spatial` for the same reason -- a bare `--version` or
@@ -523,8 +784,38 @@ def write(content: NetcdfContent, path: Path) -> None:
         dataset.setncatts(content.attributes)
         for axis, length in content.dimensions.items():
             dataset.createDimension(axis, length)
+        for axis, coordinate in content.coordinates.items():
+            _write_coordinate(dataset, axis, coordinate)
         for name, variable in content.variables.items():
             _write_variable(dataset, name, variable)
+
+
+def _write_coordinate(dataset: "Dataset", axis: str, coordinate: _Variable) -> None:
+    """Create one coordinate variable and fill it, with every filter left off.
+
+    A coordinate is a few hundred bytes of ascending numbers, and a filtered
+    variable costs HDF5 a fixed couple of kilobytes of filter pipeline and
+    chunk-index metadata whatever it holds: eleven of them deflated and
+    checksummed grow the test phantom's artifact by 27,265 B, against 3,322 B
+    stored contiguously and plain -- 20% of the file for the axes, or 2.5%.
+    The checksum is not missed, because these are the one part of the file
+    nothing reads back: `read` skips them and rebuilds the artifact from the
+    arrays and the document, so damage to an axis cannot reach a loaded
+    artifact the way damage to an array could.
+
+    An empty axis -- `hull_vertex` when the phantom is too small to outline --
+    is left chunked, because HDF5 has no contiguous layout for a dataset with
+    no elements and refuses to create one. There is nothing to store either
+    way, so the only thing the fallback costs is the chunk index.
+    """
+    stored = dataset.createVariable(
+        axis,
+        coordinate.data.dtype.name,
+        coordinate.dimensions,
+        contiguous=coordinate.data.size > 0,
+    )
+    stored.setncatts(coordinate.attributes)
+    stored[...] = coordinate.data
 
 
 def _write_variable(dataset: "Dataset", name: str, variable: _Variable) -> None:
@@ -550,8 +841,10 @@ def read(path: Path) -> tuple[str, dict[str, NDArray[Any]]]:
 
     Masks come back as `bool`, so what a caller receives is what was written
     however the bytes were stored. The scalar measurements published as global
-    attributes are deliberately *not* read: the document is the one record this
-    package reads back, and reading both would be two answers to one question.
+    attributes are deliberately *not* read, and neither are the coordinate
+    variables: the document and the dotted arrays are the one record this
+    package reads back, and reading a derived copy too would be two answers to
+    one question.
 
     Raises:
         InvalidArtifactError: If the file is not readable as netCDF-4, carries
@@ -573,6 +866,12 @@ def read(path: Path) -> tuple[str, dict[str, NDArray[Any]]]:
             arrays = {
                 name: _restored(variable)
                 for name, variable in dataset.variables.items()
+                # A variable named for a dimension is that axis's coordinate
+                # (CF 1.3), which this module derived on the way out and
+                # `compose` has no field for. Skipped by that rule rather than
+                # by a list of names, so an axis added to the layout is
+                # excluded by the same reasoning that included it.
+                if name not in dataset.dimensions
             }
     except InvalidArtifactError:
         raise
