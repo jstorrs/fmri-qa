@@ -767,13 +767,13 @@ def test_the_cheap_attributes_answer_without_decoding_the_document(
 _ATTRIBUTE_DTYPES = ((bool, np.uint8), (int, np.int32), (float, np.float64))
 
 
-def _measurement_attributes(path) -> dict[str, object]:
-    """Every `measurements.*` global attribute of a stored artifact."""
+def _section_attributes(path, section: str) -> dict[str, object]:
+    """Every `<section>.*` global attribute of a stored artifact, by field name."""
     with netCDF4.Dataset(str(path)) as dataset:
         return {
-            name.removeprefix("measurements."): dataset.getncattr(name)
+            name.removeprefix(f"{section}."): dataset.getncattr(name)
             for name in dataset.ncattrs()
-            if name.startswith("measurements.")
+            if name.startswith(f"{section}.")
         }
 
 
@@ -790,7 +790,7 @@ def test_every_resolved_measurement_is_published_as_its_own_attribute(
     saved = q.save_artifact(artifact, tmp_path / "scan.qa.nc")
     document, _ = _read_netcdf(saved)
     measured = document["measurements"]
-    published = _measurement_attributes(saved)
+    published = _section_attributes(saved, "measurements")
 
     assert set(published) == {k for k, v in measured.items() if v is not None}
     for name, value in measured.items():
@@ -819,7 +819,7 @@ def test_a_measurement_the_document_calls_null_has_no_attribute(
     """
     saved = q.save_artifact(artifact, tmp_path / "scan.qa.nc")
     document, _ = _read_netcdf(saved)
-    published = _measurement_attributes(saved)
+    published = _section_attributes(saved, "measurements")
 
     assert document["measurements"]["clip_ceiling"] is None
     assert "clip_ceiling" not in published
@@ -852,9 +852,14 @@ def test_encode_refuses_a_measurement_that_is_not_ascii(artifact) -> None:
 
 
 def test_encode_refuses_a_measurement_that_is_not_a_scalar(artifact) -> None:
-    """`measurements` is flat by design; a nested value has no attribute form."""
+    """`measurements` is flat by design; a nested value has no attribute form.
+
+    A *list* does have one -- the shared encoder publishes it as the vector
+    `provenance.voxel_mm` rides as -- so the kind with nowhere to go is the
+    nested object, which only a hand-edited document can put here.
+    """
     document, arrays = decompose(artifact)
-    document["measurements"]["snr"] = [1.0, 2.0]
+    document["measurements"]["snr"] = {"value": 1.0}
     with pytest.raises(ValueError, match="no attribute can hold"):
         netcdf.encode(document, arrays)
 
@@ -884,6 +889,140 @@ def test_a_name_python_holds_as_a_lone_surrogate_survives(tmp_path, artifact) ->
     prov = replace(artifact.provenance, scan=name)
     saved = q.save_artifact(replace(artifact, provenance=prov), tmp_path / "s.qa.nc")
     assert q.load_artifact(saved).provenance.scan == name
+
+
+def test_every_recorded_provenance_field_is_published_as_its_own_attribute(
+    tmp_path, artifact
+) -> None:
+    """`ncreadatt(f, '/', 'provenance.tr')`: the run's own record, un-decoded.
+
+    The rule the measurements follow, applied to the section that says where
+    the series came from -- with one shape the measurements never take. A JSON
+    list is a vector attribute of its element type, so `voxel_mm` is three
+    doubles and `matrix` two integers, each arriving in one call.
+    """
+    saved = q.save_artifact(artifact, tmp_path / "scan.qa.nc")
+    document, _ = _read_netcdf(saved)
+    recorded = document["provenance"]
+    published = _section_attributes(saved, "provenance")
+
+    assert set(published) == {k for k, v in recorded.items() if v is not None}
+    for name, value in recorded.items():
+        if value is None:
+            continue
+        stored = published[name]
+        if isinstance(value, str):
+            assert stored == value, name
+            continue
+        # `getncattr` is typed as returning anything at all, so the numeric
+        # attributes are named as arrays before their dtype is asked about.
+        number = np.asarray(stored)
+        element = value[0] if isinstance(value, list) else value
+        expected = next(d for kind, d in _ATTRIBUTE_DTYPES if isinstance(element, kind))
+        assert number.dtype == expected, name
+        shape = (len(value),) if isinstance(value, list) else ()
+        assert number.shape == shape, name
+        assert np.array_equal(number, value), name
+
+    assert np.asarray(published["voxel_mm"]).shape == (3,)
+    assert np.asarray(published["matrix"]).shape == (2,)
+
+
+def test_a_provenance_field_the_document_calls_null_has_no_attribute(
+    tmp_path, artifact
+) -> None:
+    """Absence is how "not recorded" is spelled, as it is for a measurement.
+
+    The synthetic phantom's sidecar gives a flip angle and no echo time, and
+    nothing anywhere names a coil. A netCDF attribute cannot say "nobody wrote
+    this down", and a zero would say something else entirely.
+    """
+    saved = q.save_artifact(artifact, tmp_path / "scan.qa.nc")
+    document, _ = _read_netcdf(saved)
+    published = _section_attributes(saved, "provenance")
+
+    assert document["provenance"]["te"] is None
+    assert document["provenance"]["coil"] is None
+    assert not {"te", "coil"} & set(published)
+    assert published["flip_angle"] == document["provenance"]["flip_angle"]
+
+
+def test_provenance_text_is_published_as_the_scanner_supplied_it(
+    tmp_path, artifact
+) -> None:
+    """Unlike a measurement, this text is not this package's to constrain.
+
+    A scan name comes from a file system and a manufacturer from a scanner
+    header, so neither is a closed vocabulary that could be held to ASCII.
+    netCDF4 writes a `str` attribute as UTF-8 NC_CHAR, and what a reader gets
+    back is the same string.
+    """
+    prov = replace(
+        artifact.provenance, scan="sujet_créé_Ω_頭部.nii.gz", manufacturer="Siemens™"
+    )
+    saved = q.save_artifact(replace(artifact, provenance=prov), tmp_path / "u.qa.nc")
+    published = _section_attributes(saved, "provenance")
+
+    assert published["scan"] == "sujet_créé_Ω_頭部.nii.gz"
+    assert published["manufacturer"] == "Siemens™"
+    assert q.load_artifact(saved).provenance == prov
+
+
+def test_a_lone_surrogate_name_is_published_escaped_rather_than_refused(
+    tmp_path, artifact
+) -> None:
+    """The one string with no UTF-8 form: lossy but present beats no file.
+
+    A Windows file name with an undecodable byte reaches Python as an unpaired
+    surrogate, which `str.encode` cannot render. The convenience attribute
+    carries the escape rather than failing the save; the document beside it
+    still spells the name exactly, and that is what `load_artifact` reads.
+    """
+    name = "bad_\udcff_name.nii.gz"
+    prov = replace(artifact.provenance, scan=name)
+    saved = q.save_artifact(replace(artifact, provenance=prov), tmp_path / "s.qa.nc")
+
+    assert _section_attributes(saved, "provenance")["scan"] == "bad_\\udcff_name.nii.gz"
+    assert q.load_artifact(saved).provenance.scan == name
+
+
+def test_save_refuses_a_provenance_integer_no_attribute_can_hold(
+    tmp_path, artifact
+) -> None:
+    """The NC_INT bound the measurements are held to, over a reachable field.
+
+    `n_trimmed` is only required to be non-negative, so a document can carry a
+    count past NC_INT and still be a valid artifact; publishing it wrapped
+    around would be a number a reader has no way to distrust.
+    """
+    prov = replace(artifact.provenance, n_trimmed=2**31)
+    with pytest.raises(q.InvalidArtifactError, match="netCDF integer"):
+        q.save_artifact(replace(artifact, provenance=prov), tmp_path / "qa.nc")
+    assert not (tmp_path / "qa.nc").exists()
+
+
+def test_encode_refuses_a_provenance_list_with_no_element_type(artifact) -> None:
+    """An attribute is a *typed* vector, and an empty list names no type."""
+    document, arrays = decompose(artifact)
+    document["provenance"]["voxel_mm"] = []
+    with pytest.raises(ValueError, match="list of nothing"):
+        netcdf.encode(document, arrays)
+
+
+def test_encode_refuses_a_provenance_list_that_mixes_kinds(artifact) -> None:
+    """One vector, one type -- two kinds in a list name no attribute either."""
+    document, arrays = decompose(artifact)
+    document["provenance"]["voxel_mm"] = [3.0, 3, 3.0]
+    with pytest.raises(ValueError, match="list of float, int"):
+        netcdf.encode(document, arrays)
+
+
+def test_encode_refuses_a_provenance_list_of_text(artifact) -> None:
+    """A vector of strings is NC_STRING, the type the label axes also avoid."""
+    document, arrays = decompose(artifact)
+    document["provenance"]["voxel_mm"] = ["3.0", "3.0", "3.0"]
+    with pytest.raises(ValueError, match="list of text"):
+        netcdf.encode(document, arrays)
 
 
 # The axes the layout publishes, as a reader meets them. Spelled out rather
@@ -1485,6 +1624,32 @@ def test_xarray_opens_the_artifact_without_a_warning(tmp_path, artifact) -> None
     # The dotted name survives, and so does the axis the trace lies along.
     assert time.dims == ("frame",)
     assert time.attrs["units"] == "s"
+
+
+def test_xarray_hands_over_the_provenance_attributes(tmp_path, artifact) -> None:
+    """What a notebook gets for free: the run's record, typed, without JSON.
+
+    A vector attribute arrives as an array and text as a `str` -- so
+    `ds.attrs["provenance.voxel_mm"]` is a voxel size to compute with rather
+    than something to parse, and a non-ASCII scan name written as UTF-8 NC_CHAR
+    is the same string on the way back out.
+    """
+    prov = replace(artifact.provenance, scan="sujet_créé_Ω_頭部.nii.gz")
+    saved = str(q.save_artifact(replace(artifact, provenance=prov), tmp_path / "u.nc"))
+    # Imported before the filter, for the reason the test above gives.
+    import xarray as xr
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        with xr.open_dataset(saved) as dataset:
+            attributes = dict(dataset.attrs)
+
+    assert isinstance(attributes["provenance.tr"], float)
+    assert attributes["provenance.tr"] == prov.tr
+    voxel = np.asarray(attributes["provenance.voxel_mm"])
+    assert voxel.shape == (3,)
+    assert np.array_equal(voxel, prov.voxel_mm)
+    assert attributes["provenance.scan"] == "sujet_créé_Ω_頭部.nii.gz"
 
 
 def test_xarray_resolves_every_axis_as_a_coordinate(tmp_path, artifact) -> None:

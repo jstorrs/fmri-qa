@@ -25,13 +25,21 @@ versioning when the first stable public interface is released.
   corruption noisy, not the file tamper-proof;
   boolean masks are stored as `uint8` marked in CF style
   (`flag_values`/`flag_meanings`), since netCDF has no boolean type; **every
-  scalar measurement is published as its own global attribute**
-  (`measurements.snr`, `measurements.ghost_pct`, …), so no reader has to decode
-  JSON to get a number; and the JSON document rides verbatim in the global
+  scalar measurement and every recorded provenance field is published as its own
+  global attribute** (`measurements.snr`, `provenance.tr`, `provenance.scan`, …),
+  so no reader has to decode JSON to get a number or to learn which scan, TR and
+  voxel size the file describes — a list becomes the vector of its element type,
+  so `provenance.voxel_mm` is three doubles and `provenance.matrix` two integers
+  in one read; and the JSON document rides verbatim in the global
   attribute `document`, beside cheap `schema_version`, `title`, `source` and
-  `Conventions = "CF-1.10"` globals. A measurement the document spells `null` —
-  the quantity does not apply — has no attribute at all, which is what keeps it
-  distinct from a NaN, which says the estimator could not resolve it. No schema
+  `Conventions = "CF-1.10"` globals. A field the document spells `null` — the
+  quantity does not apply, or nothing recorded it — has no attribute at all,
+  which is what keeps it distinct from a NaN, which says the estimator could not
+  resolve it. Provenance text is whatever a file system or a scanner header
+  supplied and is written as UTF-8 `NC_CHAR` rather than held to the closed
+  vocabularies the string measurements are; a name Python holds as a lone
+  surrogate, which has no UTF-8 form at all, rides as its `\udcff` escape in the
+  attribute, with the document beside it still spelling the name exactly. No schema
   change — the document's fields and their meanings are identical, only the
   envelope differs — and `load_artifact` still opens every `.qa.npz` an earlier
   build wrote, telling the two containers apart by the file's leading bytes

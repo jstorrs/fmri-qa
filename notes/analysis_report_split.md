@@ -67,8 +67,8 @@ shared named dimensions (`frame`, `frequency`, `row`, `col`, …), each of which
 carries a coordinate variable of its own so a reader gets the values along an
 axis and not only its name; everything that
 is not an array rides in a JSON document held in the global attribute
-`document`; and every scalar measurement is published as an attribute of its own
-beside it. The file needs nothing a site does not already have to inspect —
+`document`; and every scalar measurement and every recorded provenance field is
+published as an attribute of its own beside it. The file needs nothing a site does not already have to inspect —
 MATLAB's built-in `ncread`/`ncdisp`, R's `ncdf4`, `ncdump`, xarray — and one
 array can be pulled out without materializing the rest.
 

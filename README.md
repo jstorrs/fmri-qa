@@ -473,9 +473,10 @@ gives it (`curves.roi_signal`, `images.sfnr`), declared over shared named
 dimensions (`frame`, `frequency`, `row`, `col`, …), each of which carries a
 coordinate variable of its own so an axis has values and not only a name;
 boolean masks are stored as flagged `uint8` bytes in CF style; every scalar
-measurement is a global attribute of its own (`measurements.snr`,
-`measurements.ghost_pct`); and the JSON document holding the settings,
-provenance and those same measurements is the global attribute `document`.
+measurement and every recorded provenance field is a global attribute of its own
+(`measurements.snr`, `provenance.tr`, and `provenance.voxel_mm` as a vector of
+three); and the JSON document holding the settings, provenance and those same
+measurements is the global attribute `document`.
 
 `frame` counts from the analyzed series, after the warm-up trim — the acquired
 volume number is that index plus `provenance.n_trimmed` — and the seconds along
@@ -486,6 +487,7 @@ over both.
 ncdisp('scan.qa.nc')                                   % the whole layout
 signal = ncread('scan.qa.nc', 'curves.roi_signal');
 snr = ncreadatt('scan.qa.nc', '/', 'measurements.snr');
+tr = ncreadatt('scan.qa.nc', '/', 'provenance.tr');
 doc = jsondecode(ncreadatt('scan.qa.nc', '/', 'document'));
 ```
 
