@@ -34,12 +34,15 @@ Two spellings are checked, for two different mistakes:
 """
 
 import re
+import warnings
 from dataclasses import fields
+from functools import cache
 from pathlib import Path
 
 import fmriqc
 from fmriqc.analysis.artifact import AnalysisSettings, Measurements, Provenance
-from fmriqc.analysis.serialize.netcdf import _COORDINATES, _LAYOUT
+from fmriqc.analysis.serialize.decompose import decompose
+from fmriqc.analysis.serialize.netcdf import _COORDINATES, _LAYOUT, _leaves
 
 DOCS = Path(fmriqc.__file__).parents[2] / "docs"
 ANALYSES = DOCS / "analyses"
@@ -91,12 +94,34 @@ def _owners() -> dict[str, list[str]]:
     return owners
 
 
+@cache
+def _document_scalars() -> set[str]:
+    """The `curves.*` and `images.*` attributes, as the serializer names them.
+
+    Read off a real document rather than a table, because these are the leaves
+    of nested blocks and the flattening is the serializer's rule -- so the
+    newest committed fixture is loaded and decomposed, which is the same
+    document a fresh analysis writes and costs no pipeline run.
+    """
+    fixtures = Path(__file__).parent / "fixtures"
+    newest = max(fixtures.glob("schema_v*.qa.npz"), key=lambda p: int(p.stem[8:-3]))
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")  # an older schema migrates, with a note
+        document, _ = decompose(fmriqc.load_artifact(newest))
+    return {
+        path
+        for section in ("curves", "images")
+        for path, _ in _leaves(section, document[section])
+    }
+
+
 def _expected() -> dict[str, set[str]]:
     """Every name the artifact publishes, grouped by what kind of name it is."""
     return {
         "variable": set(_LAYOUT),
         "coordinate": set(_COORDINATES),
         "measurement": {f"measurements.{f.name}" for f in fields(Measurements)},
+        "scalar": _document_scalars(),
     }
 
 

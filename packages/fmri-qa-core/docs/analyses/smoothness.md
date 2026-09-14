@@ -150,12 +150,14 @@ differently.
 | `psf_direction` | coordinate, flags | the two directions, phase-encode first; the names are the document's, since they are `PE`/`RO` on most runs and `axis0`/`axis1` when no axis resolved |
 | `psf_lag` | coordinate, index | sample along the empirical profile |
 | `psf_model_sample` | coordinate, index | sample along the model curve |
+| `curves.psf.labels` | attribute, text | the two direction names, phase-encode first, as one line: `PE RO`, or `axis0 axis1` when no axis resolved |
+| `curves.psf.fwhm` | attribute, double[2] | the per-direction FWHM the model curves are drawn from, in `curves.psf.unit` |
+| `curves.psf.unit` | attribute, text | `mm` or `vox`: the unit of both abscissas and of `curves.psf.fwhm` |
+| `curves.psf.xmax` | attribute, double | the plotting range the analysis chose, so a plot draws the curve it meant |
 
 The two PSF abscissas carry no `units` attribute, because the unit is not a
 fact about the layout: it is millimetres or voxels depending on what the
-artifact's own header gave. The document's `psf` block records it, along with
-the direction `labels`, the per-direction `fwhm`, and the `xmax` the analysis
-chose for the plotting range.
+artifact's own header gave, and `curves.psf.unit` is where that is recorded.
 
 `measurements.fwhm` is NaN when the estimator could not resolve smoothness at
 all; `fwhm_pe` and `fwhm_ro` are the two measurements that go *absent* rather

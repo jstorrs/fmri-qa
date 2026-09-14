@@ -164,10 +164,13 @@ scalar on the [stability](stability.md) page is averaged over.
 | `images.phantom_hull` | variable `(hull_vertex, hull_coord)` | closed convex outline of the mask, in (x, y) plot order |
 | `hull_vertex` | coordinate, index | vertex of the closed outline; length 0 when the mask has no area |
 | `hull_coord` | coordinate, flags `x y` | which outline coordinate, in plot order |
+| `images.roi.row0` | attribute, int | first row of the summary ROI, inclusive |
+| `images.roi.row1` | attribute, int | last row of the summary ROI, exclusive |
+| `images.roi.col0` | attribute, int | first column of the summary ROI, inclusive |
+| `images.roi.col1` | attribute, int | last column of the summary ROI, exclusive |
 
-The summary ROI is not an array, so it is not a variable: it rides in the JSON
-document as the `roi` block of the `images` section, four half-open bounds in
-array order (`row0`, `row1`, `col0`, `col1`).
+The summary ROI is not an array, so it is four attributes rather than a
+variable: half-open bounds in array order, indexing the `row` and `col` axes.
 
 The two verdicts follow the artifact's absent-versus-NaN rule in its sharper
 form. `analyze` always answers them, so an absent verdict can only come from an

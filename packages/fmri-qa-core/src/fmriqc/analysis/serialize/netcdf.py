@@ -101,17 +101,20 @@ Four things the layout does that a bag of arrays does not:
   (the PSF abscissas, in mm or voxels per `curves.psf.unit`) or that has no unit
   at all (raw image intensity) is left unlabelled rather than guessed at.
 
-**Every scalar measurement, every provenance field and every setting is also a
-global attribute**, named for its document path (`measurements.snr`,
-`provenance.tr`, `settings.roi_size`), so no reader has to decode JSON to get a
-number, to learn which scan it describes, or to see what the run was asked for
--- `ncdisp` lists them all and `ncreadatt` hands one over. A float is an NC_DOUBLE, an
-integer an NC_INT, a bool an NC_UBYTE 0 or 1, a string NC_CHAR, and a JSON list
-the vector of its element type: `provenance.voxel_mm` is three NC_DOUBLEs and
-`provenance.matrix` two NC_INTs, which is a shape a netCDF attribute has and a
-reader gets whole. An empty list, or one that mixes kinds, names no type the
-file can hold and is refused. A field the document spells `null` gets **no
-attribute at all**, and that absence is the encoding: the document distinguishes
+**Every scalar the document holds is also a global attribute**, named for its
+document path, with a nested object flattening into the name (`measurements.snr`,
+`provenance.tr`, `settings.roi_size`, `curves.psf.fwhm`, `images.roi.row0`), so
+no reader has to decode JSON at all -- `ncdisp` lists them all and `ncreadatt`
+hands one over. A float is an NC_DOUBLE, an integer an NC_INT, a bool an
+NC_UBYTE 0 or 1, a string NC_CHAR, and a JSON list of numbers the vector of its
+element type: `provenance.voxel_mm` is three NC_DOUBLEs and `provenance.matrix`
+two NC_INTs, which is a shape a netCDF attribute has and a reader gets whole. A
+list of words is one space-separated NC_CHAR text, the way CF itself spells
+`flag_meanings`: `curves.psf.labels` reads `PE RO`, and a word with a space in
+it would be unrecoverable from that and is refused. An empty list, or one that
+mixes kinds, names no type the file can hold and is refused too. A field the
+document spells `null` gets **no attribute at all**, and that absence is the
+encoding: the document distinguishes
 a NaN ("the estimator could not resolve this") from a null ("the quantity does
 not apply here", in provenance "nothing recorded it", and in settings "not
 overridden"), an attribute cannot be null, and writing NaN for both would
@@ -120,8 +123,9 @@ and a missing one means the other thing.
 
 The sections part company on one point, text. A measurement's strings are
 closed vocabularies this package fixes ("mm"/"vox", "row"/"col"/"?"), and so
-are a setting's ("poly"/"spline", "image"/"phantom"), so one that is not ASCII
-can only be a hand-edited document and is refused. Provenance strings are not
+are a setting's ("poly"/"spline", "image"/"phantom") and the curve and image
+scalars' ("PE"/"RO", "mm"/"vox"), so one that is not ASCII can only be a
+hand-edited document and is refused. Provenance strings are not
 this package's to constrain -- `scan` and `source` come from
 file names, `coil`, `manufacturer`, `model`, `serial` and `software` from
 scanner headers -- so they are written as text rather than refused: netCDF4
@@ -183,7 +187,7 @@ of both.
 
 import json
 import warnings
-from collections.abc import Mapping
+from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
 from enum import Enum, auto
 from pathlib import Path
@@ -225,6 +229,8 @@ _DOCUMENT = "document"
 _SETTINGS = "settings"
 _MEASUREMENTS = "measurements"
 _PROVENANCE = "provenance"
+_CURVES = "curves"
+_IMAGES = "images"
 
 # The rest of the global attributes, for a reader that never decodes the JSON.
 _CONVENTIONS = "CF-1.10"
@@ -640,8 +646,8 @@ def _global_attributes(document: dict[str, Any]) -> dict[str, _AttributeValue]:
     The document is the artifact's own record, unchanged from the `.npz` layout
     and still the only one `read` consults. Beside it ride two conveniences for
     a reader that never decodes JSON: a cheap header, so it can tell what the
-    file is and refuse a version it does not know, and every recorded
-    measurement and provenance field as an attribute of its own.
+    file is and refuse a version it does not know, and every scalar the
+    document holds as an attribute of its own.
 
     `source` is CF's own name for what produced a file, so it keeps that
     spelling and is derived from `provenance.core_version` -- which is a
@@ -676,6 +682,8 @@ def _global_attributes(document: dict[str, Any]) -> dict[str, _AttributeValue]:
         **_section_attributes(_SETTINGS, stored, _Text.CLOSED),
         **_section_attributes(_MEASUREMENTS, stored, _Text.CLOSED),
         **_section_attributes(_PROVENANCE, stored, _Text.FREE),
+        **_section_attributes(_CURVES, stored, _Text.CLOSED),
+        **_section_attributes(_IMAGES, stored, _Text.CLOSED),
         _DOCUMENT: text,
     }
 
@@ -688,7 +696,9 @@ def _section_attributes(
     One encoder for every published section, so the kind-to-type table is
     stated once and `measurements.snr`, `provenance.tr` and `settings.trim_sec`
     are NC_DOUBLEs for the same reason. `text` is the only thing the sections
-    disagree about.
+    disagree about. A nested object -- the `psf` block of `curves`, the `roi`
+    box of `images` -- flattens into the name, so its fields are attributes
+    under their full document path (`curves.psf.fwhm`, `images.roi.row0`).
 
     A `null` field is skipped rather than written as anything: see the module
     docstring -- absence is how "the quantity does not apply", "nothing
@@ -696,12 +706,25 @@ def _section_attributes(
     "the estimator could not resolve it".
     """
     attributes: dict[str, _AttributeValue] = {}
-    for name, value in (document.get(section) or {}).items():
+    for path, value in _leaves(section, document.get(section) or {}):
+        attributes[path] = _attribute(path, value, text)
+    return attributes
+
+
+def _leaves(prefix: str, mapping: dict[str, Any]) -> Iterator[tuple[str, Any]]:
+    """Every recorded value under `mapping`, by its dotted path from `prefix`.
+
+    A nested object yields its own leaves under its key rather than itself, and
+    a `null` yields nothing: see `_section_attributes`.
+    """
+    for name, value in mapping.items():
+        path = f"{prefix}.{name}"
         if value is None:
             continue
-        attribute = f"{section}.{name}"
-        attributes[attribute] = _attribute(attribute, value, text)
-    return attributes
+        if isinstance(value, dict):
+            yield from _leaves(path, value)
+        else:
+            yield path, value
 
 
 def _attribute(name: str, value: Any, text: _Text) -> _AttributeValue:
@@ -709,38 +732,52 @@ def _attribute(name: str, value: Any, text: _Text) -> _AttributeValue:
 
     Raises:
         ValueError: If the value is an integer outside NC_INT, a closed-set
-            string that is not ASCII, a list that is empty or mixes kinds, or
-            of a kind no attribute can hold.
+            string that is not ASCII, a list that is empty, mixes kinds or holds
+            a word with a space in it, or of a kind no attribute can hold.
     """
     if isinstance(value, list):
         return _vector(name, value, text)
     return _scalar(name, value, text)
 
 
-def _vector(name: str, values: list[Any], text: _Text) -> NDArray[Any]:
-    """A JSON list as one attribute holding the vector of its element type.
+def _vector(name: str, values: list[Any], text: _Text) -> _AttributeValue:
+    """A JSON list as one attribute: a typed vector, or a line of words.
 
     `provenance.voxel_mm` is three NC_DOUBLEs and `provenance.matrix` two
     NC_INTs, which is a shape a netCDF attribute has natively and a reader gets
     in one call rather than as three attributes it has to reassemble.
 
     An empty list and a list of two kinds are both refused: an attribute is a
-    *typed* vector, and neither of those names a type the file could hold. Text
-    is refused for the same reason -- a vector of strings is NC_STRING, the
-    netCDF-4-only type the label axes already avoid.
+    *typed* vector, and neither of those names a type the file could hold. A
+    list of strings has no vector form either -- that would be NC_STRING, the
+    netCDF-4-only type the label axes already avoid -- so it is one
+    space-separated NC_CHAR text, the way CF itself spells `flag_meanings`:
+    `curves.psf.labels` reads `PE RO`. A word with a space in it could not be
+    told apart from two, and is refused.
 
     Raises:
-        ValueError: If the list is empty, mixes kinds, holds strings, or holds
-            an element `_scalar` refuses.
+        ValueError: If the list is empty, mixes kinds, holds a word with
+            whitespace in it, or holds an element `_scalar` refuses.
     """
     kinds = {type(value).__name__ for value in values}
     if len(kinds) != 1:
         named = ", ".join(sorted(kinds)) if kinds else "nothing"
         raise ValueError(f"{name} is a list of {named}, which no attribute can hold")
-    numbers = [_scalar(name, value, text) for value in values]
-    if any(isinstance(number, str) for number in numbers):
-        raise ValueError(f"{name} is a list of text, which no attribute can hold")
-    return np.array(numbers)
+    if all(isinstance(value, str) for value in values):
+        return _words(name, values, text)
+    return np.array([_scalar(name, value, text) for value in values])
+
+
+def _words(name: str, words: list[str], text: _Text) -> str:
+    """A list of strings as one space-separated text attribute.
+
+    Raises:
+        ValueError: If a word has whitespace in it, or `_text` refuses it.
+    """
+    for word in words:
+        if not word or any(character.isspace() for character in word):
+            raise ValueError(f"{name} holds {word!r}, which is not a single word")
+    return _text(name, " ".join(words), text)
 
 
 def _scalar(name: str, value: Any, text: _Text) -> _AttributeValue:

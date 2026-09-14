@@ -50,7 +50,7 @@ synthetic phantom, and the exact netCDF names it contributes to the artifact:
 
 [The analysis artifact](packages/fmri-qa-core/docs/artifact.md) documents the
 file those numbers are published in — its dimensions and coordinates, the
-`settings.*`, `measurements.*` and `provenance.*` attributes, and how to read one from MATLAB,
+global attributes that carry every scalar in it, and how to read one from MATLAB,
 R, Python or `ncdump`. The [documentation index](packages/fmri-qa-core/docs/index.md)
 builds into browsable HTML with `make sync-docs && make docs`.
 

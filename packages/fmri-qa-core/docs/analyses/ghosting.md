@@ -158,10 +158,10 @@ well-calibrated acquisition looks like.
 | `images.ghost.pe_ghost` | variable `(row, col)`, mask | phase-encode ghost region |
 | `images.ghost.ro_signal` | variable `(row, col)`, mask | readout signal region, the baseline's denominator |
 | `images.ghost.ro_ghost` | variable `(row, col)`, mask | readout ghost region |
+| `images.has_ghost` | attribute, ubyte flag | whether the four masks above are present |
 
 The four masks are present as a group or not at all: a run with no resolved
-phase-encode axis has no ghost regions, and the document's `images` section
-records that as `has_ghost` false. `measurements.pe_axis` is the one
+phase-encode axis has no ghost regions, and `images.has_ghost` is 0. `measurements.pe_axis` is the one
 measurement that is *absent* rather than NaN when it does not apply, because
 "no axis" is not a number the estimator failed to resolve — it is a quantity
 that does not exist for that run. The four percentages are NaN in the same

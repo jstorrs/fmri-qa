@@ -126,10 +126,10 @@ which is what a clean run is supposed to look like.
 | `measurements.tc_outlier` | attribute, double | temporal spike score, peak over robust spread |
 | `measurements.spec_outlier` | attribute, double | spectral spike score, on the DC-dropped residual spectrum |
 | `curves.outlier_fraction` | variable `(frame)`, 1 | fraction (not percent) of masked voxels flagged in each frame |
+| `curves.outlier_qthr` | attribute, double | the per-voxel chance level, the reference line the trace is read against |
 
-The per-voxel chance level is not an array, so it rides in the JSON document as
-`outlier_qthr` in its `curves` section — the reference line a plot draws the
-trace against. The two spike scores are computed on the residual and spectrum
+The chance level is not an array, so it is an attribute rather than a variable.
+The two spike scores are computed on the residual and spectrum
 the [stability](stability.md) page publishes; this analysis adds no second copy
 of either.
 

@@ -851,15 +851,18 @@ def test_encode_refuses_a_measurement_that_is_not_ascii(artifact) -> None:
         netcdf.encode(document, arrays)
 
 
-def test_encode_refuses_a_measurement_that_is_not_a_scalar(artifact) -> None:
-    """`measurements` is flat by design; a nested value has no attribute form.
+def test_encode_refuses_a_value_no_attribute_can_hold(artifact) -> None:
+    """A list of objects: the one JSON shape with no attribute form at all.
 
-    A *list* does have one -- the shared encoder publishes it as the vector
-    `provenance.voxel_mm` rides as -- so the kind with nowhere to go is the
-    nested object, which only a hand-edited document can put here.
+    A nested object flattens into the name and a list becomes a vector or a
+    line of words, so every shape a document takes on its own has a home. An
+    object *inside* a list is the kind with nowhere to go, which only a
+    hand-edited document can put here -- and `validate_document` refuses it
+    before `save_artifact` reaches this, so the guard answers for `encode`
+    called directly.
     """
     document, arrays = decompose(artifact)
-    document["measurements"]["snr"] = {"value": 1.0}
+    document["measurements"]["snr"] = [{"value": 1.0}]
     with pytest.raises(ValueError, match="no attribute can hold"):
         netcdf.encode(document, arrays)
 
@@ -1044,11 +1047,51 @@ def test_encode_refuses_a_provenance_list_that_mixes_kinds(artifact) -> None:
         netcdf.encode(document, arrays)
 
 
-def test_encode_refuses_a_provenance_list_of_text(artifact) -> None:
-    """A vector of strings is NC_STRING, the type the label axes also avoid."""
+def test_every_curve_and_image_scalar_is_published_as_its_own_attribute(
+    tmp_path, artifact
+) -> None:
+    """The last of the document: nothing in it now needs JSON to read.
+
+    These two sections nest -- the `psf` block, the `roi` box -- and the nest
+    flattens into the name, so `curves.psf.fwhm` is a two-double vector and
+    `images.roi.row0` an integer, by the same table as every other section. The
+    one new shape is a list of words: `curves.psf.labels` is one text, `PE RO`,
+    spelled the way CF spells `flag_meanings`.
+    """
+    saved = q.save_artifact(artifact, tmp_path / "scan.qa.nc")
+    document, _ = _read_netcdf(saved)
+
+    for section in ("curves", "images"):
+        recorded = dict(netcdf._leaves(section, document[section]))
+        published = _section_attributes(saved, section)
+        assert set(published) == {
+            name.removeprefix(f"{section}.") for name in recorded
+        }, section
+        for path, value in recorded.items():
+            stored = published[path.removeprefix(f"{section}.")]
+            if isinstance(value, list) and isinstance(value[0], str):
+                assert stored == " ".join(value), path
+                continue
+            if isinstance(value, str):
+                assert stored == value, path
+                continue
+            number = np.asarray(stored)
+            element = value[0] if isinstance(value, list) else value
+            expected = next(
+                d for kind, d in _ATTRIBUTE_DTYPES if isinstance(element, kind)
+            )
+            assert number.dtype == expected, path
+            assert np.array_equal(number, value), path
+
+    assert _section_attributes(saved, "curves")["psf.labels"] == "PE RO"
+    assert np.asarray(_section_attributes(saved, "images")["has_ghost"]) == 1
+
+
+def test_encode_refuses_a_word_list_whose_word_is_not_one_word(artifact) -> None:
+    """`PE RO` must mean two words: a space inside one would read as three."""
     document, arrays = decompose(artifact)
-    document["provenance"]["voxel_mm"] = ["3.0", "3.0", "3.0"]
-    with pytest.raises(ValueError, match="list of text"):
+    document["curves"]["psf"]["labels"] = ["P E", "RO"]
+    with pytest.raises(ValueError, match="not a single word"):
         netcdf.encode(document, arrays)
 
 
@@ -1557,9 +1600,11 @@ def test_a_flipped_byte_inside_an_array_is_refused(tmp_path, artifact) -> None:
     noise, whose chunk is much the largest thing in it -- so that the byte
     flipped in the middle of it is inside that chunk whatever HDF5 does with
     the metadata around it. The rest is HDF5's fixed overhead, the stored
-    document, and the `row`/`col` axes the one variable declares.
+    document and its attributes, and the `row`/`col` axes the one variable
+    declares -- a few tens of kilobytes, so the array is made large enough to
+    dwarf them.
     """
-    noise = np.random.default_rng(0).standard_normal((64, 64))
+    noise = np.random.default_rng(0).standard_normal((256, 256))
     document, _ = decompose(artifact)
     content = netcdf.encode(document, {"images.signal": noise})
     path = tmp_path / "noise.nc"

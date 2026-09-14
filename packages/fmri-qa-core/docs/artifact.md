@@ -113,21 +113,23 @@ global attribute `document`, with six top-level keys:
 | `settings` | the knobs, the same values as the `settings.*` attributes |
 | `provenance` | the fields listed below |
 | `measurements` | every scalar, the same values as the `measurements.*` attributes |
-| `curves` | the curve scalars: `outlier_qthr`, and the `psf` block (`labels`, `fwhm`, `unit`, `xmax`) |
-| `images` | the `roi` box (`row0`, `row1`, `col0`, `col1`) and `has_ghost` |
+| `curves` | the curve scalars, the same values as the `curves.*` attributes |
+| `images` | the ROI box and the ghost flag, the same values as the `images.*` attributes |
 
-### `settings.*`, `measurements.*` and `provenance.*`
+### Every scalar, as an attribute
 
-**Every setting, every scalar measurement and every recorded provenance field is
-also a global attribute of its own**, named for its document path —
-`settings.roi_size`, `measurements.snr`, `provenance.tr` — so no reader has to
-decode JSON to see what the run was asked for or to get a number. `ncdisp`
-lists them all and `ncreadatt` hands one over.
+**Every scalar the document holds is also a global attribute of its own**,
+named for its document path, with a nested object flattening into the name —
+`settings.roi_size`, `measurements.snr`, `provenance.tr`, `curves.psf.fwhm`,
+`images.roi.row0` — so no reader has to decode JSON at all. `ncdisp` lists them
+all and `ncreadatt` hands one over.
 
 A float is an `NC_DOUBLE`, an integer an `NC_INT`, a bool an `NC_UBYTE` 0 or 1,
-a string `NC_CHAR`, and a JSON list the vector of its element type:
+a string `NC_CHAR`, and a JSON list of numbers the vector of its element type:
 `provenance.voxel_mm` is three doubles and `provenance.matrix` two ints, which
-is a shape a netCDF attribute has and a reader gets whole.
+is a shape a netCDF attribute has and a reader gets whole. A list of words is
+one space-separated text, the way CF spells `flag_meanings`: `curves.psf.labels`
+reads `PE RO`.
 
 These attributes are a convenience for a foreign reader and nothing else. The
 JSON document stays the single source of truth for `load_artifact`, which never
@@ -253,9 +255,8 @@ dataset.attrs["document"]
 One caveat on that last MATLAB line: the document spells an unresolved
 measurement as the bare token `NaN`, which Python and R's JSON parsers accept
 and MATLAB's `jsondecode` rejects. It only affects decoding the *document* —
-the arrays and the attributes are unaffected, and every setting, measurement
-and provenance field is an attribute, so a MATLAB user needs the JSON only for
-the few curve and image scalars listed under `document` above.
+the arrays and the attributes are unaffected, and every scalar in the document
+is also an attribute, so a MATLAB user never needs to decode it.
 
 A netCDF-4 file is an HDF5 file, and HDF5 takes an advisory lock on a file it
 opens. On an NFS or SMB share with locking disabled or broken, a reader can
