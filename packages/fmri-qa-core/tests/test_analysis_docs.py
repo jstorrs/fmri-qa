@@ -38,7 +38,7 @@ from dataclasses import fields
 from pathlib import Path
 
 import fmriqc
-from fmriqc.analysis.artifact import Measurements, Provenance
+from fmriqc.analysis.artifact import AnalysisSettings, Measurements, Provenance
 from fmriqc.analysis.serialize.netcdf import _COORDINATES, _LAYOUT
 
 DOCS = Path(fmriqc.__file__).parents[2] / "docs"
@@ -49,7 +49,9 @@ CONTRIBUTION_HEADING = "## What it contributes to the artifact"
 
 # A dotted name in backticks, anywhere on a page. The four prefixes are the ones
 # that name something the artifact actually holds.
-DOTTED = re.compile(r"`(curves|images|measurements|provenance)\.([A-Za-z0-9_.]+)`")
+DOTTED = re.compile(
+    r"`(curves|images|measurements|provenance|settings)\.([A-Za-z0-9_.]+)`"
+)
 
 # A backticked name in a table cell.
 CELL_NAME = re.compile(r"`([A-Za-z0-9_.]+)`")
@@ -134,6 +136,7 @@ def test_pages_never_spell_a_name_that_does_not_exist() -> None:
     """Every dotted name in backticks, table or prose, must be a real one."""
     known = set().union(*_expected().values())
     known |= {f"provenance.{f.name}" for f in fields(Provenance)}
+    known |= {f"settings.{f.name}" for f in fields(AnalysisSettings)}
     offenders: dict[str, list[str]] = {}
     for page in [*_pages(), DOCS / "artifact.md"]:
         text = page.read_text()
@@ -142,6 +145,14 @@ def test_pages_never_spell_a_name_that_does_not_exist() -> None:
             if name not in known:
                 offenders.setdefault(page.name, []).append(name)
     assert not offenders, f"named in the docs but not in the artifact: {offenders}"
+
+
+def test_every_setting_is_named_in_the_artifact_page() -> None:
+    text = (DOCS / "artifact.md").read_text()
+    undocumented = [
+        f.name for f in fields(AnalysisSettings) if f"`settings.{f.name}`" not in text
+    ]
+    assert not undocumented, f"settings missing from artifact.md: {undocumented}"
 
 
 def test_every_provenance_field_is_named_in_the_artifact_page() -> None:

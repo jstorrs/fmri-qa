@@ -110,17 +110,18 @@ global attribute `document`, with six top-level keys:
 | Key | Holds |
 | --- | --- |
 | `schema_version` | the layout this file was written under |
-| `settings` | `trim_sec`, `detrend`, `center`, `roi_size`, `pe_axis_override`, and the resolved `detrend_order` |
+| `settings` | the knobs, the same values as the `settings.*` attributes |
 | `provenance` | the fields listed below |
 | `measurements` | every scalar, the same values as the `measurements.*` attributes |
 | `curves` | the curve scalars: `outlier_qthr`, and the `psf` block (`labels`, `fwhm`, `unit`, `xmax`) |
 | `images` | the `roi` box (`row0`, `row1`, `col0`, `col1`) and `has_ghost` |
 
-### `measurements.*` and `provenance.*`
+### `settings.*`, `measurements.*` and `provenance.*`
 
-**Every scalar measurement and every recorded provenance field is also a global
-attribute of its own**, named for its document path — `measurements.snr`,
-`provenance.tr` — so no reader has to decode JSON to get a number. `ncdisp`
+**Every setting, every scalar measurement and every recorded provenance field is
+also a global attribute of its own**, named for its document path —
+`settings.roi_size`, `measurements.snr`, `provenance.tr` — so no reader has to
+decode JSON to see what the run was asked for or to get a number. `ncdisp`
 lists them all and `ncreadatt` hands one over.
 
 A float is an `NC_DOUBLE`, an integer an `NC_INT`, a bool an `NC_UBYTE` 0 or 1,
@@ -131,6 +132,21 @@ is a shape a netCDF attribute has and a reader gets whole.
 These attributes are a convenience for a foreign reader and nothing else. The
 JSON document stays the single source of truth for `load_artifact`, which never
 consults them — so the two can only disagree if the document does.
+
+### The settings
+
+What the run was asked for, and the one thing it resolved. A setting that was
+not given — `pe_axis_override` unless `--pe-axis` was passed — has no
+attribute, by the same rule as a `null` provenance field.
+
+| Attribute | Type | Meaning |
+| --- | --- | --- |
+| `settings.trim_sec` | double | warm-up seconds dropped before analysis |
+| `settings.detrend` | text | `poly` or `spline`, the detrending method |
+| `settings.center` | text | `image` or `phantom`, where the ROI was centred |
+| `settings.roi_size` | int | side of the square ROI requested, in voxels |
+| `settings.pe_axis_override` | int | the phase-encode axis forced by `--pe-axis`; absent unless one was |
+| `settings.detrend_order` | int | the polynomial or spline order the run resolved from its duration |
 
 ### The provenance fields
 
@@ -205,14 +221,15 @@ the dotted name the library gives it (`curves.roi_signal`, `images.sfnr`),
 declared over shared named dimensions (`frame`, `frequency`, `row`, `col`, …),
 each of which carries a coordinate variable of its own so an axis has values
 and not only a name; boolean masks are flagged `uint8` bytes in CF style; every
-scalar measurement and every recorded provenance field is a global attribute of
-its own; and the JSON document is the global attribute `document`.
+setting, scalar measurement and recorded provenance field is a global attribute
+of its own; and the JSON document is the global attribute `document`.
 
 ```matlab
 ncdisp('scan.qa.nc')                                   % the whole layout
 signal = ncread('scan.qa.nc', 'curves.roi_signal');
 snr = ncreadatt('scan.qa.nc', '/', 'measurements.snr');
 tr = ncreadatt('scan.qa.nc', '/', 'provenance.tr');
+roi = ncreadatt('scan.qa.nc', '/', 'settings.roi_size');
 doc = jsondecode(ncreadatt('scan.qa.nc', '/', 'document'));
 ```
 
@@ -236,8 +253,9 @@ dataset.attrs["document"]
 One caveat on that last MATLAB line: the document spells an unresolved
 measurement as the bare token `NaN`, which Python and R's JSON parsers accept
 and MATLAB's `jsondecode` rejects. It only affects decoding the *document* —
-the arrays and the `measurements.*` attributes are unaffected, so a MATLAB user
-needs the JSON only for the settings and provenance.
+the arrays and the attributes are unaffected, and every setting, measurement
+and provenance field is an attribute, so a MATLAB user needs the JSON only for
+the few curve and image scalars listed under `document` above.
 
 A netCDF-4 file is an HDF5 file, and HDF5 takes an advisory lock on a file it
 opens. On an NFS or SMB share with locking disabled or broken, a reader can

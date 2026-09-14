@@ -22,6 +22,7 @@ itself openable.
     >> sfnr = ncread('scan.qa.nc', 'images.sfnr');
     >> snr  = ncreadatt('scan.qa.nc', '/', 'measurements.snr');
     >> tr   = ncreadatt('scan.qa.nc', '/', 'provenance.tr');
+    >> roi  = ncreadatt('scan.qa.nc', '/', 'settings.roi_size');
 
 Version 4, written through the `netCDF4` package -- the Unidata C library
 itself, the one MATLAB, R and Octave are linked against, so what this writes is
@@ -100,10 +101,11 @@ Four things the layout does that a bag of arrays does not:
   (the PSF abscissas, in mm or voxels per `curves.psf.unit`) or that has no unit
   at all (raw image intensity) is left unlabelled rather than guessed at.
 
-**Every scalar measurement and every provenance field is also a global
-attribute**, named for its document path (`measurements.snr`, `provenance.tr`,
-`provenance.scan`), so no reader has to decode JSON to get a number -- `ncdisp`
-lists them all and `ncreadatt` hands one over. A float is an NC_DOUBLE, an
+**Every scalar measurement, every provenance field and every setting is also a
+global attribute**, named for its document path (`measurements.snr`,
+`provenance.tr`, `settings.roi_size`), so no reader has to decode JSON to get a
+number, to learn which scan it describes, or to see what the run was asked for
+-- `ncdisp` lists them all and `ncreadatt` hands one over. A float is an NC_DOUBLE, an
 integer an NC_INT, a bool an NC_UBYTE 0 or 1, a string NC_CHAR, and a JSON list
 the vector of its element type: `provenance.voxel_mm` is three NC_DOUBLEs and
 `provenance.matrix` two NC_INTs, which is a shape a netCDF attribute has and a
@@ -111,15 +113,16 @@ reader gets whole. An empty list, or one that mixes kinds, names no type the
 file can hold and is refused. A field the document spells `null` gets **no
 attribute at all**, and that absence is the encoding: the document distinguishes
 a NaN ("the estimator could not resolve this") from a null ("the quantity does
-not apply here", and in provenance "nothing recorded it"), an attribute cannot
-be null, and writing NaN for both would collapse the distinction. So a NaN
-attribute means what a NaN measurement means, and a missing one means the other
-thing.
+not apply here", in provenance "nothing recorded it", and in settings "not
+overridden"), an attribute cannot be null, and writing NaN for both would
+collapse the distinction. So a NaN attribute means what a NaN measurement means,
+and a missing one means the other thing.
 
-The two sections part company on one point, text. A measurement's strings are
-closed vocabularies this package fixes ("mm"/"vox", "row"/"col"/"?"), so one
-that is not ASCII can only be a hand-edited document and is refused. Provenance
-strings are not this package's to constrain -- `scan` and `source` come from
+The sections part company on one point, text. A measurement's strings are
+closed vocabularies this package fixes ("mm"/"vox", "row"/"col"/"?"), and so
+are a setting's ("poly"/"spline", "image"/"phantom"), so one that is not ASCII
+can only be a hand-edited document and is refused. Provenance strings are not
+this package's to constrain -- `scan` and `source` come from
 file names, `coil`, `manufacturer`, `model`, `serial` and `software` from
 scanner headers -- so they are written as text rather than refused: netCDF4
 encodes a `str` attribute as the UTF-8 bytes of NC_CHAR. The one string with no
@@ -215,10 +218,11 @@ _COMPLEVEL: Final = 4
 # the arrays beside it, and a global attribute is not beside them.
 _DOCUMENT = "document"
 
-# The two document sections published field by field as global attributes, and
+# The document sections published field by field as global attributes, and
 # what each attribute is called: the document path the value came from, so
 # `measurements.snr` in the file is `measurements.snr` in the document and in
 # this package's vocabulary.
+_SETTINGS = "settings"
 _MEASUREMENTS = "measurements"
 _PROVENANCE = "provenance"
 
@@ -667,7 +671,9 @@ def _global_attributes(document: dict[str, Any]) -> dict[str, _AttributeValue]:
         # check it without JSON.
         "schema_version": np.int32(document["schema_version"]),
         # Ordered so that `ncdisp` lists the short attributes before the long
-        # blob: the header, then what the document says, then the document.
+        # blob: the header, then what the run was asked for, what it measured
+        # and what it measured it on, then the document.
+        **_section_attributes(_SETTINGS, stored, _Text.CLOSED),
         **_section_attributes(_MEASUREMENTS, stored, _Text.CLOSED),
         **_section_attributes(_PROVENANCE, stored, _Text.FREE),
         _DOCUMENT: text,
@@ -679,14 +685,15 @@ def _section_attributes(
 ) -> dict[str, _AttributeValue]:
     """Every recorded field of one document section, as an attribute apiece.
 
-    One encoder for both published sections, so the kind-to-type table is
-    stated once and `measurements.snr` and `provenance.tr` are NC_DOUBLEs for
-    the same reason. `text` is the only thing the two sections disagree about.
+    One encoder for every published section, so the kind-to-type table is
+    stated once and `measurements.snr`, `provenance.tr` and `settings.trim_sec`
+    are NC_DOUBLEs for the same reason. `text` is the only thing the sections
+    disagree about.
 
     A `null` field is skipped rather than written as anything: see the module
-    docstring -- absence is how "the quantity does not apply" and "nothing
-    recorded it" are spelled, because NaN already means "the estimator could
-    not resolve it".
+    docstring -- absence is how "the quantity does not apply", "nothing
+    recorded it" and "not overridden" are spelled, because NaN already means
+    "the estimator could not resolve it".
     """
     attributes: dict[str, _AttributeValue] = {}
     for name, value in (document.get(section) or {}).items():

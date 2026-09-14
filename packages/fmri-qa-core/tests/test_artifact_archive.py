@@ -947,6 +947,33 @@ def test_a_provenance_field_the_document_calls_null_has_no_attribute(
     assert published["flip_angle"] == document["provenance"]["flip_angle"]
 
 
+def test_every_setting_is_published_as_its_own_attribute(tmp_path, artifact) -> None:
+    """`ncreadatt(f, '/', 'settings.roi_size')`: what the run was asked for.
+
+    The same rule as the measurements, applied to the knobs: a float is a
+    double, an integer an NC_INT, the method names are text, and an override
+    nobody gave -- `pe_axis_override` is None unless `--pe-axis` was passed --
+    is no attribute at all rather than a number that would read as an axis.
+    """
+    saved = q.save_artifact(artifact, tmp_path / "scan.qa.nc")
+    document, _ = _read_netcdf(saved)
+    asked = document["settings"]
+    published = _section_attributes(saved, "settings")
+
+    assert set(published) == {k for k, v in asked.items() if v is not None}
+    assert asked["pe_axis_override"] is None
+    assert "pe_axis_override" not in published
+    assert published["detrend"] == asked["detrend"]
+    assert published["center"] == asked["center"]
+    for name in ("trim_sec", "roi_size", "detrend_order"):
+        number = np.asarray(published[name])
+        expected = next(
+            d for kind, d in _ATTRIBUTE_DTYPES if isinstance(asked[name], kind)
+        )
+        assert number.dtype == expected, name
+        assert number == asked[name], name
+
+
 def test_provenance_text_is_published_as_the_scanner_supplied_it(
     tmp_path, artifact
 ) -> None:

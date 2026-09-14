@@ -25,10 +25,11 @@ versioning when the first stable public interface is released.
   corruption noisy, not the file tamper-proof;
   boolean masks are stored as `uint8` marked in CF style
   (`flag_values`/`flag_meanings`), since netCDF has no boolean type; **every
-  scalar measurement and every recorded provenance field is published as its own
-  global attribute** (`measurements.snr`, `provenance.tr`, `provenance.scan`, …),
-  so no reader has to decode JSON to get a number or to learn which scan, TR and
-  voxel size the file describes — a list becomes the vector of its element type,
+  setting, every scalar measurement and every recorded provenance field is
+  published as its own global attribute** (`settings.roi_size`,
+  `measurements.snr`, `provenance.tr`, `provenance.scan`, …), so no reader has
+  to decode JSON to get a number, to see what the run was asked for, or to
+  learn which scan, TR and voxel size the file describes — a list becomes the vector of its element type,
   so `provenance.voxel_mm` is three doubles and `provenance.matrix` two integers
   in one read; and the JSON document rides verbatim in the global
   attribute `document`, beside cheap `schema_version`, `title`, `source` and
