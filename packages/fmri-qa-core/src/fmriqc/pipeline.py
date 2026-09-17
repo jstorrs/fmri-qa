@@ -5,8 +5,10 @@
 motion/centroid, the FBIRN ROI metrics, ghost ratios, and smoothness — into one
 `QAResult`. The heavy lifting lives in the operation modules; this is the glue,
 so it is also the natural home for the aggregate `QAMetrics`/`QAResult` value
-objects that gather every metric's output, and for `AnalysisSettings`, the
-record of what a run was asked for that `run_qa` writes into its result.
+objects that gather every metric's output. `run_qa` writes the `AnalysisSettings`
+it was asked for into `QAResult.settings`, but that record is defined in
+`settings`, not here, so the artifact types can carry it without loading this
+module.
 """
 
 import warnings
@@ -45,34 +47,9 @@ from .prep.geometry import (
 )
 from .prep.images import QAImages
 from .prep.imaging import select_slice, trim_count, trim_initial
+from .settings import AnalysisSettings
 from .types import FBIRN_ROI_SIZE, BoolArray, DetrendMethod, PeAxis, RoiCenter
 from .validation import validate_qa_run
-
-
-@dataclass(frozen=True, slots=True)
-class AnalysisSettings:
-    """The analysis knobs: what the run was asked for, and what that resolved to.
-
-    The first five fields are the request — exactly the parameters `run_qa` and
-    `analyze` accept, so re-running with these settings reproduces the result.
-    `roi_size` is the side *asked for*; the side actually analyzed (the same,
-    unless the image is smaller) is the ROI the result carries. `detrend_order`
-    is the one *resolved* value (the polynomial degree or the spline
-    interior-knot count the detrender chose for this series length), recorded
-    because it is a run parameter a reader must be able to report but only the
-    pipeline knows.
-
-    `run_qa` writes this record onto its `QAResult`, so an artifact built from
-    a result publishes the settings that result was computed with — never a
-    default filled in afterwards.
-    """
-
-    trim_sec: float = 5.0
-    detrend: DetrendMethod = "poly"
-    center: RoiCenter = "image"
-    roi_size: int = FBIRN_ROI_SIZE
-    pe_axis_override: PeAxis | None = None
-    detrend_order: int | None = None
 
 
 @dataclass(frozen=True, slots=True)

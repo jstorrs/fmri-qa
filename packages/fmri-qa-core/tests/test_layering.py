@@ -21,6 +21,7 @@ RANKS = {
     "exceptions": 0,
     "_arrays": 0,
     "version": 0,
+    "settings": 0,
     "load": 1,
     # `convert` sits beside `load`, not under it: both are the tier that gets
     # data in, and convert produces exactly the files load reads. It borrows

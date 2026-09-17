@@ -32,6 +32,7 @@ subpackages (`ls` the package to find a concern):
                  `fmri-qa-import`) and the two forms the analyzing two report
                  in: the fixed-width `table` and the JSON `record`
 * `types`     -- the shared array dtypes and option Literals
+* `settings`  -- `AnalysisSettings`, the record of what a run was asked for
 
 This package is the *calculation* half of fmri-qa. Reports and plots live in the
 separate `fmri-qa-report` distribution, which consumes a `QAArtifact` and never
@@ -60,7 +61,6 @@ if TYPE_CHECKING:
     # mypy and pyright resolve every name statically; never executed at runtime.
     from .analysis import (
         ARTIFACT_SCHEMA_VERSION,
-        AnalysisSettings,
         ArtifactImages,
         Curves,
         GhostRegions,
@@ -155,6 +155,7 @@ if TYPE_CHECKING:
         trim_initial,
     )
     from .prep.scale import VoxelSize
+    from .settings import AnalysisSettings
     from .types import (
         ANONYMIZE_MODES,
         DETREND_METHODS,
@@ -285,7 +286,6 @@ __all__ = [
 _EXPORTS: dict[str, tuple[str, ...]] = {
     ".analysis": (
         "ARTIFACT_SCHEMA_VERSION",
-        "AnalysisSettings",
         "ArtifactImages",
         "Curves",
         "GhostRegions",
@@ -380,6 +380,7 @@ _EXPORTS: dict[str, tuple[str, ...]] = {
         "trim_initial",
     ),
     ".prep.scale": ("VoxelSize",),
+    ".settings": ("AnalysisSettings",),
     ".version": ("core_version",),
     ".types": (
         "ANONYMIZE_MODES",

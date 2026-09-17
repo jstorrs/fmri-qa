@@ -9,8 +9,8 @@ seam is small, self-describing, and serializable (see `serialize`).
 Five sections, in the order a reader consumes them:
 
 * `AnalysisSettings` -- the knobs the run was asked for, plus what they resolved to
-  (the pipeline's own record, `pipeline.AnalysisSettings`, since `run_qa` is what
-  writes it; the one thing here that is not defined here)
+  (`settings.AnalysisSettings`, since both `run_qa` and this artifact speak it;
+  the one thing here that is not defined here)
 * `Provenance`       -- where the data came from and what produced this artifact
 * `Measurements`     -- the settled scalars (the numbers a table or a threshold reads)
 * `Curves`           -- the 1-D traces a stability plot draws
@@ -23,7 +23,7 @@ Nothing here imports the metric, prep, or load layers: an artifact is inert data
 from dataclasses import dataclass
 
 from .._arrays import ArrayValue
-from ..pipeline import AnalysisSettings
+from ..settings import AnalysisSettings
 from ..types import BoolArray, FloatArray, LengthUnit, PeAxis, PeLabel
 
 # Bumped whenever the on-disk layout changes incompatibly (see `serialize`).

@@ -8,7 +8,7 @@ sits in here; nothing in this subpackage reaches back into the metric, prep, or
 load layers at read time.
 """
 
-from ..pipeline import AnalysisSettings
+from ..settings import AnalysisSettings
 from ..version import core_version
 from .artifact import (
     ARTIFACT_SCHEMA_VERSION,

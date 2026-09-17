@@ -20,8 +20,9 @@ from ..load.metadata import ScanMeta
 from ..load.pe_axis import PE_ROWCOL
 from ..load.scan import QAScan
 from ..metrics.smoothness import SmoothnessResult
-from ..pipeline import AnalysisSettings, QAResult, run_qa
+from ..pipeline import QAResult, run_qa
 from ..prep.geometry import ROI, roi_fits
+from ..settings import AnalysisSettings
 from ..types import BoolArray, FloatArray, PeAxis, PeLabel, readout_axis
 from ..version import core_version
 from .artifact import (

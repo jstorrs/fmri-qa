@@ -13,7 +13,7 @@ from typing import Any, Literal, Union, get_args, get_origin, get_type_hints
 
 import numpy as np
 
-from ..pipeline import AnalysisSettings
+from ..settings import AnalysisSettings
 from .artifact import Measurements, Provenance, QAArtifact, RoiBox
 
 # The two spellings an optional field's annotation can arrive in. `int | None`

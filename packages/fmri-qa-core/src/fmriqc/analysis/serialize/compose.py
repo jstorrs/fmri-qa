@@ -14,7 +14,7 @@ from typing import Any
 
 import numpy as np
 
-from ...pipeline import AnalysisSettings
+from ...settings import AnalysisSettings
 from ...types import LENGTH_UNITS, PE_LABELS, BoolArray, FloatArray
 from ..artifact import (
     ArtifactImages,
