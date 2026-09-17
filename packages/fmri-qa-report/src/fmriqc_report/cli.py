@@ -49,7 +49,7 @@ def _expand_globs(paths: Sequence[str]) -> list[str]:
     return expanded
 
 
-def _same_file(a: Path, b: Path) -> bool:
+def _same_file(a: str | Path, b: str | Path) -> bool:
     """Whether two paths name one file — through relative forms and links alike.
 
     The PDF is written by moving a finished file over its destination, and the
@@ -60,10 +60,11 @@ def _same_file(a: Path, b: Path) -> bool:
     outputs; the report deliberately imports nothing from that side but the
     artifact.)
     """
+    first, second = Path(a), Path(b)
     try:
-        return a.samefile(b)
+        return first.samefile(second)
     except OSError:
-        return a.resolve() == b.resolve()
+        return first.resolve() == second.resolve()
 
 
 def _title(artifact: QAArtifact, path: str) -> str:
@@ -117,7 +118,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     # Refuse before reading anything: an output that names an input is a usage
     # error, and one that must be caught while the input is still intact.
-    overwritten = [a for a in args.artifacts if _same_file(Path(args.pdf), Path(a))]
+    overwritten = [a for a in args.artifacts if _same_file(args.pdf, a)]
     if overwritten:
         for path in overwritten:
             print(
