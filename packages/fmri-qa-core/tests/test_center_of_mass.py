@@ -5,6 +5,8 @@ import numpy as np
 from fmriqc.metrics.center_of_mass import CenterOfMassResult, estimate_center_of_mass
 from fmriqc.prep.scale import VoxelSize
 
+ALL_VALID = np.ones((16, 16), dtype=bool)
+
 
 def _block_slice(center: tuple[int, int], n: int = 16, t: int = 6) -> np.ndarray:
     """(n, n, t) slice: a bright 3x3 block at `center` (wrapping) on a flat floor."""
@@ -17,14 +19,14 @@ def _block_slice(center: tuple[int, int], n: int = 16, t: int = 6) -> np.ndarray
 
 
 def test_com_locates_a_central_phantom() -> None:
-    res = estimate_center_of_mass(_block_slice((8, 5)))
+    res = estimate_center_of_mass(_block_slice((8, 5)), valid_mask=ALL_VALID)
     assert np.allclose(res.com[:, 0], 8.0, atol=0.5)
     assert np.allclose(res.com[:, 1], 5.0, atol=0.5)
 
 
 def test_com_handles_a_phantom_wrapped_across_the_edge() -> None:
     # a block centered on row 0 straddles the wrapped boundary (rows 15, 0, 1)
-    res = estimate_center_of_mass(_block_slice((0, 8)))
+    res = estimate_center_of_mass(_block_slice((0, 8)), valid_mask=ALL_VALID)
     # circular COM stays near 0 (mod 16), not aliased to mid-FOV (~8)
     wrapped = (res.com[:, 0] + 8) % 16 - 8  # into (-8, 8]
     assert np.allclose(wrapped, 0.0, atol=0.5)
@@ -32,7 +34,7 @@ def test_com_handles_a_phantom_wrapped_across_the_edge() -> None:
 
 def test_uniform_field_has_no_defined_centroid() -> None:
     # a flat field is all pedestal: no above-floor signal -> NaN, not mid-FOV bias
-    res = estimate_center_of_mass(np.full((16, 16, 4), 42.0))
+    res = estimate_center_of_mass(np.full((16, 16, 4), 42.0), valid_mask=ALL_VALID)
     assert np.isnan(res.com).all()
 
 

@@ -327,7 +327,7 @@ def _estimate_intensity_centroid(
     The valid mask only heals missing data (a Siemens zeroed edge).
     """
     return estimate_center_of_mass(
-        images.center_slice, images.valid_mask, voxel_mm=voxel_mm
+        images.center_slice, valid_mask=images.valid_mask, voxel_mm=voxel_mm
     )
 
 

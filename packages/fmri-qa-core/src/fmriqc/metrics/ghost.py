@@ -34,7 +34,8 @@ def ghost_masks(
     phantom_mask: BoolArray,
     pe_axis: PeAxis,
     radius: int = GHOST_RADIUS,
-    valid_mask: BoolArray | None = None,
+    *,
+    valid_mask: BoolArray,
 ) -> tuple[BoolArray, BoolArray]:
     """Region-matched (signal, ghost) masks for a candidate PE axis.
 
@@ -44,12 +45,13 @@ def ghost_masks(
     ghost mask rolled back half the FOV onto the phantom, so the ratio compares
     each ghost patch against the exact tissue that produced it. The phantom/PE-
     ghost overlap zone -- where signal and ghost are superimposed and cannot be
-    separated -- is thereby excluded from both masks. `valid_mask` (see
-    `edge_valid_mask`) drops the ghost pixels that wrap onto a zeroed edge; it
-    defaults to keeping every pixel.
+    separated -- is thereby excluded from both masks. `valid_mask` excludes zeroed
+    image edges (see `edge_valid_mask`) and is required rather than defaulted: an
+    image with a nonzero NIfTI `scl_inter` nulls its edge to the intercept, not to
+    0.0, so a mask built from `edge_valid_mask`'s own default (`zero=0.0`) would
+    silently detect no nulled edge on exactly the scans that default is wrong for.
+    Pass `edge_valid_mask(mean_image, zero=...)` or `QAImages.valid_mask`.
     """
-    if valid_mask is None:
-        valid_mask = np.ones(phantom_mask.shape, dtype=bool)
     shift = phantom_mask.shape[pe_axis] // 2
     ghost = np.roll(phantom_mask, shift, axis=pe_axis)
 
@@ -183,9 +185,13 @@ def estimate_ghost(
     acquisition-dependent and should be verified per protocol. `valid_mask`
     excludes zeroed image edges (see `edge_valid_mask`).
     """
-    pe_signal, pe_ghost = ghost_masks(phantom_mask, pe_axis, radius, valid_mask)
+    pe_signal, pe_ghost = ghost_masks(
+        phantom_mask, pe_axis, radius, valid_mask=valid_mask
+    )
     ro_axis = readout_axis(pe_axis)
-    ro_signal, ro_ghost = ghost_masks(phantom_mask, ro_axis, radius, valid_mask)
+    ro_signal, ro_ghost = ghost_masks(
+        phantom_mask, ro_axis, radius, valid_mask=valid_mask
+    )
     return GhostResult(
         pe_axis=pe_axis,
         radius=radius,
@@ -202,7 +208,7 @@ def estimate_ghost(
 def ghost_ratio(
     mean_image: FloatArray,
     phantom_mask: BoolArray,
-    pe_axis: PeAxis = 0,
+    pe_axis: PeAxis,
     radius: int = GHOST_RADIUS,
     *,
     valid_mask: BoolArray,
@@ -219,7 +225,9 @@ def ghost_ratio(
     detect no nulled edge on exactly the scans that default is wrong for. Pass
     `edge_valid_mask(mean_image, zero=...)` or `QAImages.valid_mask`.
     """
-    signal_mask, ghost_mask = ghost_masks(phantom_mask, pe_axis, radius, valid_mask)
+    signal_mask, ghost_mask = ghost_masks(
+        phantom_mask, pe_axis, radius, valid_mask=valid_mask
+    )
     return _mean_ratio(mean_image, signal_mask, ghost_mask)
 
 

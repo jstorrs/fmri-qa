@@ -8,6 +8,18 @@ versioning when the first stable public interface is released.
 
 ### Changed
 
+- **`ghost_masks`, `ghost_ratio` and `estimate_center_of_mass` no longer invent
+  the mask or the axis a caller did not pass.** `ghost_masks` fell back to an
+  all-valid mask and `estimate_center_of_mass` to `edge_valid_mask` at its own
+  `zero=0.0` default; but an image with a nonzero NIfTI `scl_inter` nulls its
+  edge to the intercept, not to `0.0`, so a mask built against `0.0` finds no
+  nulled edge on exactly the scans where it matters, and the edge's constant
+  line entered the ghost ratio or pulled the centroid with nothing to say so.
+  `ghost_ratio` already refused to default its mask for this reason, but still
+  defaulted `pe_axis` to `0` — a ratio along an axis nothing measured.
+  `valid_mask` is now a required keyword on all three, and `ghost_ratio`'s
+  `pe_axis` has no default: pass `QAImages.valid_mask` or
+  `edge_valid_mask(image, zero=...)`, and the axis the run resolved.
 - **The analysis artifact is written as a netCDF-4 file (`<scan>.qa.nc`), not a
   compressed `.npz`**, so the readers a site already has can open it with
   nothing installed. MATLAB's `ncread`, `ncinfo`, `ncdisp` and `ncreadatt` are

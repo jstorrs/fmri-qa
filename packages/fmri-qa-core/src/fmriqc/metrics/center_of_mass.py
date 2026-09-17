@@ -12,7 +12,6 @@ from dataclasses import dataclass
 import numpy as np
 
 from .._arrays import ArrayValue
-from ..prep.imaging import edge_valid_mask
 from ..prep.scale import UNKNOWN_VOXEL_SIZE, VoxelSize
 from ..types import BoolArray, FloatArray
 
@@ -87,7 +86,8 @@ class CenterOfMassResult(ArrayValue):
 
 def estimate_center_of_mass(
     center_slice: FloatArray,
-    valid_mask: BoolArray | None = None,
+    *,
+    valid_mask: BoolArray,
     voxel_mm: tuple[float, float] | None = None,
 ) -> CenterOfMassResult:
     """Per-volume intensity-weighted center of mass of the phantom (circular).
@@ -123,10 +123,14 @@ def estimate_center_of_mass(
     background pedestal (the lowest *valid* magnitude) is subtracted so the floor
     sits at ~0, and the invalid voxels are then set to 0 -- so the gap matches the
     now-zero background instead of a hole in the ring. `valid_mask` (True = real
-    data) defaults to `edge_valid_mask` of the time-MIP, which detects exactly the
-    zeroed-edge case; pass one to override. Pedestal subtraction also removes the
-    background DC term outright, so the phantom (the dominant above-floor signal)
-    sets the resultant more cleanly than symmetry cancellation alone.
+    data) is required rather than defaulted: an image with a nonzero NIfTI
+    `scl_inter` nulls its edge to the intercept, not to 0.0, so a mask built from
+    `edge_valid_mask`'s own default (`zero=0.0`) would silently detect no nulled
+    edge on exactly the scans that default is wrong for. Pass
+    `edge_valid_mask(center_slice.max(axis=-1), zero=...)` or `QAImages.valid_mask`.
+    Pedestal subtraction also removes the background DC term outright, so the
+    phantom (the dominant above-floor signal) sets the resultant more cleanly
+    than symmetry cancellation alone.
 
     Weights are the per-frame magnitudes above the (fixed) pedestal, so the trace
     tracks where the signal actually sits over time. Complements `estimate_motion`
@@ -137,8 +141,6 @@ def estimate_center_of_mass(
     """
     shape = (int(center_slice.shape[0]), int(center_slice.shape[1]))
     nt = center_slice.shape[-1]
-    if valid_mask is None:
-        valid_mask = edge_valid_mask(center_slice.max(axis=-1))
 
     # Heal missing data before the circular mean: shift the background floor to ~0
     # by subtracting the lowest valid magnitude, then zero the invalid voxels so a
