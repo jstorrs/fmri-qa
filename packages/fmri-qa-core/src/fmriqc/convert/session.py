@@ -28,9 +28,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import assert_never
 
-from ..exceptions import ConversionError
+from ..exceptions import ConversionError, InvalidChoiceError
 from ..load.paths import NIFTI_SUFFIXES, nifti_stem, sidecar_path
-from ..types import Anonymize, NameStyle
+from ..types import ANONYMIZE_MODES, NAME_STYLES, Anonymize, NameStyle
 from . import naming
 from .dcm2niix import DEFAULT_TEMPLATE, build_args, find_dcm2niix, run, version
 
@@ -117,11 +117,25 @@ def import_dicom(
     `names="dcm2niix"` it keeps whatever `template` produced.
 
     Raises:
+        InvalidChoiceError: If `names` is not one of `NAME_STYLES` or
+            `anonymize` is not one of `ANONYMIZE_MODES`.
         ConversionError: If `source` is not a directory, if no dcm2niix can be
             found or it exits non-zero, or if the import would overwrite files
             already in `destination` and `force` is not set. In the last case
             nothing has been moved and the destination is untouched.
     """
+    # Guarded up front so an untyped caller still gets the named error, then
+    # matched exhaustively: `assert_never` is unreachable for a `NameStyle`, so
+    # adding a style to that Literal makes this a type error rather than a
+    # silent fall-through at runtime.
+    if names not in NAME_STYLES:
+        raise InvalidChoiceError("names", names, NAME_STYLES)
+    # `anonymize` is only ever looked up in `dcm2niix._BA`, a `dict[Anonymize,
+    # str]` total over the Literal -- there is no `match`/`assert_never` here to
+    # make it a type error later, so this guard is the only thing standing
+    # between an untyped caller and a bare `KeyError`.
+    if anonymize not in ANONYMIZE_MODES:
+        raise InvalidChoiceError("anonymize", anonymize, ANONYMIZE_MODES)
     source = Path(source)
     if not source.is_dir():
         raise ConversionError("source", f"{source} is not a directory")

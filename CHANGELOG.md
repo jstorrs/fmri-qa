@@ -299,6 +299,15 @@ versioning when the first stable public interface is released.
 
 ### Fixed
 
+- **`import_dicom` now raises `InvalidChoiceError` for a `names` or `anonymize`
+  value outside its permitted set.** It was the one public entry point that
+  took closed-set string options with no guard of its own — a bad `names`
+  reached `assert_never` and came back as a bare `AssertionError`, and a bad
+  `anonymize` reached `dcm2niix._BA` and came back as a bare `KeyError`,
+  either way escaping `except FmriqcError`. Both are now checked before
+  anything is staged or dcm2niix is even looked up. The CLI was never
+  affected — `--names`/`--anonymize` already restrict both flags with
+  `choices=`.
 - **`validate_artifact` now checks that a duplicated fact agrees with itself.**
   Two groups of published fields are derived copies of others — `clipped_any`/
   `clipped_kept` from the clipping counts, and the None-ness of `fwhm_pe`/
