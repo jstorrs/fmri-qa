@@ -5,6 +5,9 @@ text, both panel families, and the ReportLab driver's composition — plus the
 guarantees around writing the file itself.
 """
 
+import os
+import subprocess
+import sys
 from dataclasses import replace
 
 import numpy as np
@@ -12,6 +15,36 @@ import pytest
 
 import fmriqc as q
 import fmriqc_report as report
+
+
+def test_importing_the_package_leaves_the_matplotlib_backend_alone() -> None:
+    """A library must not change a process-global its importer chose.
+
+    `fmriqc_report` used to call `matplotlib.use("Agg")` at import time,
+    silently overriding whatever backend the importing process had already
+    selected (e.g. a notebook's inline backend). Run in a fresh interpreter
+    with a non-default, display-free backend set via `MPLBACKEND`, so the
+    probe reflects only this process's import, not whatever other tests have
+    already done to `matplotlib`'s global state.
+    """
+    code = (
+        "import matplotlib\n"
+        "before = matplotlib.get_backend()\n"
+        "import fmriqc_report\n"
+        "after = matplotlib.get_backend()\n"
+        "print(before)\n"
+        "print(after)\n"
+    )
+    env = dict(os.environ, MPLBACKEND="svg")
+    result = subprocess.run(  # noqa: S603 - fixed literal script, not untrusted input
+        [sys.executable, "-c", code],
+        capture_output=True,
+        text=True,
+        check=True,
+        env=env,
+    )
+    before, after = result.stdout.strip().splitlines()
+    assert before.lower() == after.lower() == "svg"
 
 
 def test_dashboard_renders_one_page_per_scan(tmp_path, artifact) -> None:

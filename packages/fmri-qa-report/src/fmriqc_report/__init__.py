@@ -12,11 +12,12 @@ vocabulary, `panels` the matplotlib figures, `document` the block/tier model a
 driver walks, and `formats` holds one driver per output format that composes
 them into a document. `write_report` / `add_report_pages` are the current
 (ReportLab PDF) entry points, re-exported here.
+
+Panels build `matplotlib.figure.Figure` objects directly and render them with
+`fig.savefig(..., format="svg")`, so no `pyplot` state and no particular
+backend is needed; importing this package never touches the process's
+matplotlib backend.
 """
-
-import matplotlib
-
-matplotlib.use("Agg")  # headless; no display needed
 
 from .document import (
     TIERS,

@@ -315,6 +315,12 @@ versioning when the first stable public interface is released.
 
 ### Fixed
 
+- **Importing `fmriqc_report` no longer switches the matplotlib backend to
+  `Agg`.** The package called `matplotlib.use("Agg")` at import time, silently
+  overriding whatever backend the importing process — a notebook's inline
+  backend, say — had already chosen. Rendering never needed it: panels build
+  `matplotlib.figure.Figure` objects directly and save them with `fig.savefig`,
+  with no `pyplot` involved.
 - **`import_dicom` now raises `InvalidChoiceError` for a `names` or `anonymize`
   value outside its permitted set.** It was the one public entry point that
   took closed-set string options with no guard of its own — a bad `names`
