@@ -67,6 +67,17 @@ def test_save_load_round_trips_every_section(tmp_path, artifact) -> None:
     assert np.array_equal(loaded.images.ghost.pe_ghost, artifact.images.ghost.pe_ghost)
 
 
+def test_analysis_reexports_the_one_error_load_artifact_raises() -> None:
+    """`fmriqc.analysis.InvalidArtifactError` is the same object as `q`'s.
+
+    A reader that may only cross the published-artifact seam (`fmri-qa-report`)
+    still needs to catch the one error `load_artifact` raises by name.
+    """
+    from fmriqc.analysis import InvalidArtifactError
+
+    assert InvalidArtifactError is q.InvalidArtifactError
+
+
 def test_save_uses_the_exact_path_given(tmp_path, artifact) -> None:
     """A caller's name is honoured exactly, suffix or no suffix."""
     path = q.save_artifact(artifact, tmp_path / "nested" / "run1.artifact")

@@ -253,6 +253,11 @@ versioning when the first stable public interface is released.
 
 ### Added
 
+- **`InvalidArtifactError` is now reachable from `fmriqc.analysis`.** It is the
+  one error `load_artifact` raises, and it was previously only reachable
+  through `fmriqc.exceptions` — off limits to `fmri-qa-report`, which may
+  import only `fmriqc.analysis` and `fmriqc.types`. A reader of an artifact can
+  now catch it by name instead of a blanket `except Exception`.
 - **`fmri-qa-hilo --version` now works.** `fmri-qa` and `fmri-qa-import` each
   carried their own copy of the flag and `fmri-qa-hilo` had none, so asking it
   for its version was a usage error. All three now share one, and answer alike.

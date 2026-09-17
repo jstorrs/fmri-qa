@@ -13,7 +13,7 @@ import sys
 from collections.abc import Sequence
 from pathlib import Path
 
-from fmriqc.analysis import QAArtifact, load_artifact
+from fmriqc.analysis import InvalidArtifactError, QAArtifact, load_artifact
 
 from . import write_report
 from .document import TIERS
@@ -134,9 +134,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     for path in args.artifacts:
         try:
             artifact = load_artifact(path)
-        except Exception as exc:  # noqa: BLE001 - report and continue the batch
+        except InvalidArtifactError as exc:
             print(f"ERROR: {exc}", file=sys.stderr)
-            omitted.append((Path(path).name, str(getattr(exc, "reason", exc))))
+            omitted.append((Path(path).name, exc.reason))
             continue
         items.append((_title(artifact, path), artifact))
 

@@ -8,9 +8,12 @@ sits in here; nothing in this subpackage reaches back into the metric, prep, or
 load layers at read time.
 
 The two halves are imported differently, and deliberately so. The artifact, its
-validator and its serializer are cheap leaves, so they load eagerly. `build` is
-not: projecting a `QAResult` means importing the pipeline, and behind it the
-whole metric, prep, and load stack -- scikit-image, scipy and nibabel included.
+validator and its serializer are cheap leaves, so they load eagerly. So does
+`InvalidArtifactError`, the one error `load_artifact` raises: `fmriqc.exceptions`
+imports nothing, and a reader that may cross only this seam has to be able to
+catch it by name. `build` is not: projecting a `QAResult` means importing the
+pipeline, and behind it the whole metric, prep, and load stack -- scikit-image,
+scipy and nibabel included.
 Eagerly re-exporting `analyze` and `build_artifact` from here would charge that
 cost to every reader of a finished artifact, which is exactly the dependency
 the published-artifact seam exists to prevent. So `__getattr__` below (PEP 562)
@@ -20,6 +23,7 @@ never pays for the machinery that computes one.
 
 from typing import TYPE_CHECKING
 
+from ..exceptions import InvalidArtifactError
 from ..settings import AnalysisSettings
 from ..version import core_version
 from .artifact import (
@@ -47,6 +51,7 @@ __all__ = [
     "ArtifactImages",
     "Curves",
     "GhostRegions",
+    "InvalidArtifactError",
     "Measurements",
     "Provenance",
     "PsfCurves",
