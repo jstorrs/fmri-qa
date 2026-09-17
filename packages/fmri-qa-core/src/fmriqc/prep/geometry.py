@@ -59,7 +59,7 @@ class PhantomGeometry(ArrayValue):
         a reader — including one in another distribution, which cannot import
         this layer — gets the verdict rather than the bounds to re-apply.
         """
-        return phantom_plausible(self.fraction, self.contrast)
+        return phantom_plausible(fraction=self.fraction, contrast=self.contrast)
 
 
 @dataclass(frozen=True, eq=False, slots=True)

@@ -83,7 +83,7 @@ def phantom_contrast(image: FloatArray, mask: BoolArray) -> float:
     return inside / background
 
 
-def phantom_plausible(fraction: float, contrast: float) -> bool:
+def phantom_plausible(*, fraction: float, contrast: float) -> bool:
     """Whether a segmentation with this frame share and contrast is a phantom.
 
     `segment_phantom` always returns *some* mask: given a frame of pure air it
@@ -113,7 +113,9 @@ def _segment_and_score(image: FloatArray) -> tuple[BoolArray, int]:
     """
     mask = segment_phantom(image)
     area = 0
-    if phantom_plausible(float(mask.mean()), phantom_contrast(image, mask)):
+    if phantom_plausible(
+        fraction=float(mask.mean()), contrast=phantom_contrast(image, mask)
+    ):
         area = int(mask.sum())
     return mask, area
 

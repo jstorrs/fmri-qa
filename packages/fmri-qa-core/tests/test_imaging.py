@@ -195,7 +195,7 @@ def test_phantom_contrast_of_a_mask_that_partitions_nothing_is_zero() -> None:
 def test_phantom_plausible_needs_both_share_and_contrast(
     fraction: float, contrast: float, plausible: bool
 ) -> None:
-    assert phantom_plausible(fraction, contrast) is plausible
+    assert phantom_plausible(fraction=fraction, contrast=contrast) is plausible
 
 
 def test_phantom_area_scores_a_frame_of_air_as_no_phantom() -> None:

@@ -8,6 +8,14 @@ versioning when the first stable public interface is released.
 
 ### Changed
 
+- **`phantom_plausible` now takes `fraction` and `contrast` as keyword-only
+  arguments.** The two are same-typed floats on different scales — a share of
+  the frame in [0, 1] and a phantom/background intensity ratio typically well
+  above 1 — with an order nothing at a call site revealed, so a swap
+  type-checked and silently inverted the single definition of "this
+  segmentation held": the figure slice selection ranks slices by and the
+  artifact publishes as `phantom_mask_ok`. All three call sites now name both
+  arguments.
 - **An impossible `Provenance` or `RoiBox` is now a `ValueError` at
   construction too.** The same, for the two records that describe the run and
   the ROI box: a series with no frames, a non-positive or non-finite `tr`, a
