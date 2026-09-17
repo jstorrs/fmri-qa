@@ -246,13 +246,13 @@ def _describe(
     path: Path, sidecar: Sidecar, *, renamed_from: str | None
 ) -> ImportedSeries:
     """One filed series, with the sidecar fields worth showing in a listing."""
-    number = sidecar.get("SeriesNumber")
-    description = sidecar.get("SeriesDescription")
-    stamp = sidecar.get("AcquisitionDateTime") or sidecar.get("AcquisitionTime")
+    stamp = naming.text_field(sidecar, "AcquisitionDateTime") or naming.text_field(
+        sidecar, "AcquisitionTime"
+    )
     return ImportedSeries(
         path=path,
-        series=number if isinstance(number, int) else None,
-        description=description if isinstance(description, str) else None,
-        acquired=stamp if isinstance(stamp, str) else None,
+        series=naming.series_number(sidecar),
+        description=naming.text_field(sidecar, "SeriesDescription"),
+        acquired=stamp,
         renamed_from=renamed_from,
     )

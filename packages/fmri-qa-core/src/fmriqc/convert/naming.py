@@ -68,6 +68,25 @@ def _digits(value: object, count: int) -> str | None:
     return found[:count] if len(found) >= count else None
 
 
+def series_number(sidecar: Sidecar) -> int | None:
+    """`SeriesNumber` as an int, or None if absent or not a plain int.
+
+    A JSON boolean is a `SeriesNumber` no export ever means: `isinstance(True,
+    int)` is true in Python, so `bool` is excluded explicitly rather than
+    trusted to fall out of the `int` check.
+    """
+    number = sidecar.get("SeriesNumber")
+    if isinstance(number, bool) or not isinstance(number, int):
+        return None
+    return number
+
+
+def text_field(sidecar: Sidecar, key: str) -> str | None:
+    """`sidecar[key]` narrowed to `str`, or None if absent or of another type."""
+    value = sidecar.get(key)
+    return value if isinstance(value, str) else None
+
+
 def acquired(sidecar: Sidecar) -> tuple[str | None, str | None]:
     """The series' `(YYYYMMDD, HHMMSS)`, either half None if the sidecar is silent.
 
@@ -76,26 +95,24 @@ def acquired(sidecar: Sidecar) -> tuple[str | None, str | None]:
     what survives `-ba y`, so a fully anonymized import still gets its series
     ordered by time even though it has lost the date.
     """
-    stamp = sidecar.get("AcquisitionDateTime")
-    if isinstance(stamp, str) and "T" in stamp:
+    stamp = text_field(sidecar, "AcquisitionDateTime")
+    if stamp is not None and "T" in stamp:
         date, _, time = stamp.partition("T")
         return _digits(date, 8), _digits(time, 6)
-    return None, _digits(sidecar.get("AcquisitionTime"), 6)
+    return None, _digits(text_field(sidecar, "AcquisitionTime"), 6)
 
 
 def _series_number(sidecar: Sidecar) -> str | None:
     """`sNNN` from `SeriesNumber`, zero-padded so a listing sorts by it."""
-    number = sidecar.get("SeriesNumber")
-    if isinstance(number, bool) or not isinstance(number, int):
-        return None
-    return f"s{number:03d}"
+    number = series_number(sidecar)
+    return f"s{number:03d}" if number is not None else None
 
 
 def _description(sidecar: Sidecar) -> str | None:
     """The sanitized series description, falling back to the protocol name."""
     for key in ("SeriesDescription", "ProtocolName"):
-        value = sidecar.get(key)
-        if isinstance(value, str) and (cleaned := sanitize(value)):
+        value = text_field(sidecar, key)
+        if value is not None and (cleaned := sanitize(value)):
             return cleaned
     return None
 

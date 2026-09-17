@@ -295,6 +295,16 @@ def test_an_import_files_each_series_under_its_qa_name(tmp_path, fake_dcm2niix) 
     assert result.series[0].description == "QA_EPI_ISO"
 
 
+def test_a_boolean_series_number_is_not_read_as_one(tmp_path, fake_dcm2niix) -> None:
+    """A JSON boolean `SeriesNumber` is not a series count: `series` stays None."""
+    binary = fake_dcm2niix({"2_QA": {**FULL_SIDECAR, "SeriesNumber": True}})
+    out = tmp_path / "nifti"
+
+    result = import_dicom(tmp_path, out, binary=binary)
+
+    assert result.series[0].series is None
+
+
 def test_the_sidecar_travels_with_the_nifti_it_describes(
     tmp_path, fake_dcm2niix
 ) -> None:
