@@ -5,6 +5,7 @@ fixture builds (no file I/O), so the whole functional core runs deterministicall
 """
 
 import gc
+import inspect
 import weakref
 from dataclasses import fields
 
@@ -124,6 +125,35 @@ def test_run_qa_records_the_request_it_answered(make_scan: MakeScan) -> None:
     assert s.pe_axis_override is None and result.metrics.pe_axis == 1
     assert result.images.detrender is not None
     assert s.detrend_order == result.images.detrender.order
+
+
+def test_the_pipeline_defaults_are_the_settings_defaults() -> None:
+    """`run_qa` and `preprocess` spell defaults that `AnalysisSettings` also holds.
+
+    `analyze(scan)` runs on the record's defaults and `run_qa(scan)` on its own,
+    so one edited alone makes the two entry points disagree about what an
+    unqualified run is. Indexed, not looked up, so a renamed knob fails here
+    too. This goes the day `run_qa` takes the settings record itself.
+    """
+    knobs = {
+        q.run_qa: {
+            "trim_sec": "trim_sec",
+            "detrend": "detrend",
+            "center": "center",
+            "roi_size": "roi_size",
+            "pe_axis": "pe_axis_override",
+        },
+        q.preprocess: {
+            "trim_sec": "trim_sec",
+            "detrend": "detrend",
+            "center": "center",
+        },
+    }
+    settings = q.AnalysisSettings()
+    for function, names in knobs.items():
+        parameters = inspect.signature(function).parameters
+        for parameter, attribute in names.items():
+            assert parameters[parameter].default == getattr(settings, attribute)
 
 
 def test_an_explicit_pe_axis_overrides_the_header(make_scan: MakeScan) -> None:
