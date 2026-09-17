@@ -28,25 +28,22 @@ SPLINE_CUTOFF_S = 256.0
 SPLINE_DEGREE = 2
 
 
-def spline_nodes(y: FloatArray, tr: float, cutoff_s: float = SPLINE_CUTOFF_S) -> int:
-    """Recommended number of interior knots: one spline segment per `cutoff_s`.
+def spline_nodes(y: FloatArray, tr: float) -> int:
+    """Recommended number of interior knots: one spline segment per `SPLINE_CUTOFF_S`.
 
     The spline analogue of `poly_degree` — the fit-complexity knob for
     `spline_residuals`, separated so it can be computed once from the header.
     """
     nt = y.shape[-1]
-    return int(max(round(nt * tr / cutoff_s) - 1, 0))
+    return int(max(round(nt * tr / SPLINE_CUTOFF_S) - 1, 0))
 
 
-def spline_residuals(
-    y: FloatArray,
-    n_nodes: int,
-    degree: int = SPLINE_DEGREE,
-) -> FloatArray:
+def spline_residuals(y: FloatArray, n_nodes: int) -> FloatArray:
     """Detrend along the last axis with a least-squares B-spline (handles N-D).
 
     A drop-in alternative to `poly_residuals`; `n_nodes` (interior knots, from
-    `spline_nodes`) sets the fit complexity the way `degree` does for the poly.
+    `spline_nodes`) sets the fit complexity the way `degree` does for the poly,
+    with the spline's own degree fixed at `SPLINE_DEGREE`.
     """
     nt = y.shape[-1]
     x = np.arange(nt, dtype=np.float64)
@@ -54,21 +51,21 @@ def spline_residuals(
     # interior knots spread evenly over the fitted (steady-state) span
     t = np.concatenate(
         (
-            np.full(degree + 1, 0.0),
+            np.full(SPLINE_DEGREE + 1, 0.0),
             np.linspace(0, nt, n_nodes + 2)[1:-1],
-            np.full(degree + 1, nt),
+            np.full(SPLINE_DEGREE + 1, nt),
         )
     )
 
     # Treat all leading-index combinations as separate signals: (nt, n_signals).
     signals = y.reshape(-1, nt).T
-    fitted = make_lsq_spline(x, signals, t, k=degree)(x)
+    fitted = make_lsq_spline(x, signals, t, k=SPLINE_DEGREE)(x)
     return np.asarray((signals - fitted).T.reshape(y.shape), dtype=np.float64)
 
 
-def poly_degree(y: FloatArray, tr: float, cutoff_s: float = POLY_CUTOFF_S) -> int:
+def poly_degree(y: FloatArray, tr: float) -> int:
     n = y.shape[-1]
-    return int(np.round(n * tr / cutoff_s))
+    return int(np.round(n * tr / POLY_CUTOFF_S))
 
 
 def poly_residuals(y: FloatArray, degree: int) -> FloatArray:

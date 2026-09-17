@@ -8,6 +8,14 @@ versioning when the first stable public interface is released.
 
 ### Changed
 
+- **`spline_nodes`, `poly_degree` and `spline_residuals` drop the `cutoff_s` and
+  `degree` parameters nothing ever passed.** `poly_degree(y, tr, cutoff_s)` sat
+  `cutoff_s` right next to `tr` — both seconds, both floats — so a swapped
+  positional call like `poly_degree(y, 200.0, 2.0)` type-checked and returned
+  a degree inflated 100x. No caller anywhere in the tree ever passed
+  `cutoff_s` or `degree`; the cutoffs remain exactly what they were, the
+  module constants `POLY_CUTOFF_S`, `SPLINE_CUTOFF_S`, and `SPLINE_DEGREE`,
+  now read directly instead of threaded through as overridable defaults.
 - **`Provenance`'s six identity fields — `scan`, `source`, `created`,
   `core_version`, `tr`, and `n_frames` — are required.** They defaulted to
   `""` and `0`, values the artifact validator rejects outright — so
