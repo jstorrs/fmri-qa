@@ -7,9 +7,18 @@ every `fmriqc` import in the report package must land in `fmriqc.analysis` (the
 artifact) or `fmriqc.types` (the shared array/option vocabulary). An import of
 `fmriqc.metrics`, `fmriqc.pipeline`, `fmriqc.prep`, or `fmriqc.load` — or of the
 `fmriqc` package as a whole, which pulls all of them — fails this test.
+
+That scan reads import *text*, which is necessary but not sufficient: an
+allowed import can still drag a forbidden module in behind it, through the
+`__init__.py` of the package it lands in. So the seam is checked twice here —
+once statically, over every source file, and once at runtime, by importing the
+report CLI in a fresh interpreter and looking at what actually ended up in
+`sys.modules`.
 """
 
 import ast
+import subprocess
+import sys
 from pathlib import Path
 
 import fmriqc_report
@@ -18,6 +27,34 @@ import fmriqc_report
 ALLOWED = frozenset({"fmriqc.analysis", "fmriqc.types"})
 
 _SOURCE_ROOT = Path(fmriqc_report.__file__).parent
+
+# The calculation stack, and the third-party libraries only it needs. Rendering
+# a report reaches none of these: `fmriqc.load` and `fmriqc.prep` are in the
+# list too, because the artifact carries everything a reader wants already
+# resolved, so not even a cheap leaf of those layers is touched at read time.
+_CALCULATION_ONLY = (
+    "fmriqc.pipeline",
+    "fmriqc.metrics",
+    "fmriqc.prep",
+    "fmriqc.load",
+    "skimage",
+    "scipy",
+    "nibabel",
+    "netCDF4",
+)
+
+# Run in a fresh interpreter: only a process that has imported nothing else can
+# say what `import fmriqc_report.cli` costs. This one already has the whole
+# stack loaded from the other tests in the suite.
+_PROBE = f"""
+import sys
+import fmriqc_report.cli
+calculation = {_CALCULATION_ONLY!r}
+loaded = sorted(
+    m for m in sys.modules if any(m == c or m.startswith(c + ".") for c in calculation)
+)
+print(loaded)
+"""
 
 
 def _modules() -> list[Path]:
@@ -67,3 +104,23 @@ def test_the_check_would_catch_a_pipeline_import() -> None:
     """A negative control, so the scan cannot pass by failing to see anything."""
     tree = ast.parse("import fmriqc\nfrom fmriqc.pipeline import run_qa\n")
     assert _fmriqc_imports(tree) - ALLOWED == {"fmriqc", "fmriqc.pipeline"}
+
+
+def test_importing_the_report_cli_does_not_load_the_calculation_stack() -> None:
+    """The seam at runtime, which the static scan above cannot speak to.
+
+    `fmriqc.analysis` is an allowed import, but what it *executes* is another
+    question: its `__init__` could pull the pipeline in behind the artifact and
+    the scan would still pass. Only a fresh interpreter's `sys.modules` settles
+    it, so that is what this asks.
+    """
+    result = subprocess.run(  # noqa: S603 - fixed literal script, not untrusted input
+        [sys.executable, "-c", _PROBE],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    assert result.stdout.strip() == "[]", (
+        f"importing the report CLI loaded the calculation stack: {result.stdout}\n"
+        f"{result.stderr}"
+    )

@@ -8,6 +8,15 @@ versioning when the first stable public interface is released.
 
 ### Changed
 
+- **Reading or rendering an artifact no longer loads the calculation stack.**
+  `fmriqc.analysis` re-exported `analyze` and `build_artifact` eagerly, so
+  importing anything from the artifact facade — `load_artifact`, or any of the
+  value objects the `fmri-qa-report` package reads — executed the pipeline and
+  behind it scikit-image, scipy, nibabel and the metrics. Those two names are
+  now resolved on first access instead, and nothing else about the facade
+  changes: `import fmriqc_report.cli` in a fresh interpreter fell from 3.7 s to
+  2.1 s, and a runtime probe beside the layering scan now holds the seam to
+  what actually loads rather than to what the imports say.
 - **`spline_nodes`, `poly_degree` and `spline_residuals` drop the `cutoff_s` and
   `degree` parameters nothing ever passed.** `poly_degree(y, tr, cutoff_s)` sat
   `cutoff_s` right next to `tr` — both seconds, both floats — so a swapped
