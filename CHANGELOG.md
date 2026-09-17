@@ -268,6 +268,16 @@ versioning when the first stable public interface is released.
 
 ### Fixed
 
+- **`validate_artifact` now checks that a duplicated fact agrees with itself.**
+  Two groups of published fields are derived copies of others — `clipped_any`/
+  `clipped_kept` from the clipping counts, and the None-ness of `fwhm_pe`/
+  `fwhm_ro` from `pe_axis` — and nothing compared them. A hand-edited or
+  foreign document could carry `n_clipped_kept: 500` beside `clipped_kept:
+  false`, and it loaded anyway: the CLI table dropped its "!" flag, and the
+  PDF report either said nothing about the clipping (if `clipped_any` was
+  also left false) or printed a "pre-SS only" line for clipping that was
+  really in the analyzed data. Such a document now loads only if its
+  duplicated fields agree; a self-contradictory one is refused.
 - **`save_artifact` now checks the one field `load_artifact` checks first.**
   It already held a written artifact to the reader's other checks, but let any
   `schema_version` through uncaught — 99, 0, a float, a string, even `True` —

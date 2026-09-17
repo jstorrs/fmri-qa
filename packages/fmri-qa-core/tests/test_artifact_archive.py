@@ -606,6 +606,39 @@ def test_load_rejects_a_closed_set_value_from_outside_the_set(
             q.load_artifact(path)
 
 
+def test_load_rejects_clipped_kept_disagreeing_with_its_count(
+    tmp_path, artifact
+) -> None:
+    """A document must not say the count is 5 but the flag is False.
+
+    `clipped_kept` is a property of `n_clipped_kept` in the type that measures
+    it, not an independent fact -- storing both is only for the flat artifact.
+    """
+    path = q.save_artifact(artifact, tmp_path / "qa.nc")
+    _rewrite_document(path, _with_measurement("n_clipped_kept", 5))
+    with pytest.raises(q.InvalidArtifactError, match="clipped_kept"):
+        q.load_artifact(path)
+
+
+def test_load_rejects_clipped_any_disagreeing_with_its_counts(
+    tmp_path, artifact
+) -> None:
+    """`clipped_any` is derived from both clipping counts, and must still hold."""
+    path = q.save_artifact(artifact, tmp_path / "qa.nc")
+    _rewrite_document(path, _with_measurement("n_clipped_pre", 3))
+    with pytest.raises(q.InvalidArtifactError, match="clipped_any"):
+        q.load_artifact(path)
+
+
+def test_load_rejects_fwhm_pe_null_when_pe_axis_is_known(tmp_path, artifact) -> None:
+    """`fwhm_pe` is None exactly when `pe_axis` is None, never independently."""
+    assert artifact.measurements.pe_axis is not None
+    path = q.save_artifact(artifact, tmp_path / "qa.nc")
+    _rewrite_document(path, _with_measurement("fwhm_pe", None))
+    with pytest.raises(q.InvalidArtifactError, match="fwhm_pe"):
+        q.load_artifact(path)
+
+
 def test_load_rejects_a_document_missing_a_section(tmp_path, artifact) -> None:
     path = q.save_artifact(artifact, tmp_path / "qa.nc")
     _rewrite_document(path, lambda doc: {**doc, "images": {}})
@@ -858,7 +891,7 @@ def test_save_refuses_a_measurement_no_attribute_can_hold(tmp_path, artifact) ->
     non-scalar measurement can only arrive in a hand-built document -- which is
     what the `encode` tests below cover.
     """
-    counts = replace(artifact.measurements, n_clipped_pre=2**31)
+    counts = replace(artifact.measurements, n_clipped_pre=2**31, clipped_any=True)
     with pytest.raises(q.InvalidArtifactError, match="netCDF integer"):
         q.save_artifact(replace(artifact, measurements=counts), tmp_path / "qa.nc")
     assert not (tmp_path / "qa.nc").exists()
@@ -1424,12 +1457,19 @@ def test_an_artifact_without_ghost_regions_still_carries_every_axis(
     four masks lie along `row`/`col` like every other image -- so a ghost-less
     artifact declares the same eleven axes and resolves all eleven. The rest of
     the `replace` is what "no PE axis resolved" means elsewhere in the artifact:
-    the ghost regions, `pe_axis` and the PSF labels go together.
+    the ghost regions, `pe_axis`, `pe_label`, `fwhm_pe`/`fwhm_ro`, and the PSF
+    labels go together.
     """
     without = replace(
         artifact,
         images=replace(artifact.images, ghost=None),
-        measurements=replace(artifact.measurements, pe_axis=None),
+        measurements=replace(
+            artifact.measurements,
+            pe_axis=None,
+            pe_label="?",
+            fwhm_pe=None,
+            fwhm_ro=None,
+        ),
         curves=replace(
             artifact.curves,
             psf=replace(artifact.curves.psf, labels=("axis0", "axis1")),

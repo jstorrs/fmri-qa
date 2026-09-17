@@ -120,6 +120,23 @@ def _validate_parameters(artifact: QAArtifact) -> None:
     # field annotations -- already refuses any other axis, on save and on load
     # alike. Repeating the domain as a literal `(None, 0, 1)` would be a second
     # place to update the day a pipeline measures a third axis.
+    #
+    # What *is* checked is the None-ness of `fwhm_pe`/`fwhm_ro`: they are None
+    # exactly when no axis resolved (`SmoothnessResult.fwhm_pe`), in every build
+    # since schema 1, and no migration touches them -- one fact, stored twice.
+    # `pe_label` looks like the same case and is deliberately not held to
+    # `pe_axis`: builds that predate deriving the label from the axis took it
+    # from the sidecar's own DICOM wording, which could name another axis (a
+    # through-plane `k`, a sidecar contradicting itself) or none. Those archives
+    # keep the value their build recorded, and a reader must not orphan them.
+    _require(
+        (m.fwhm_pe is None) == (m.pe_axis is None),
+        "measurements.fwhm_pe disagrees with measurements.pe_axis",
+    )
+    _require(
+        (m.fwhm_ro is None) == (m.pe_axis is None),
+        "measurements.fwhm_ro disagrees with measurements.pe_axis",
+    )
     _require(p.n_frames > 0, "invalid provenance.n_frames")
     _require(p.n_trimmed is None or p.n_trimmed >= 0, "invalid provenance.n_trimmed")
     _require(p.n_slices is None or p.n_slices > 0, "invalid provenance.n_slices")
@@ -160,6 +177,21 @@ def _validate_parameters(artifact: QAArtifact) -> None:
         all(count is None or count >= 0 for count in counts),
         "invalid clipping counts",
     )
+    # `clipped_any`/`clipped_kept` are properties of the counts in the type that
+    # produces them (`metrics.saturation.SaturationResult.clipped`/
+    # `clipped_kept`), not independent facts -- stored again here only because
+    # the artifact is flat. The all-or-none check above already guarantees that
+    # either every clipping field is None or none is; this `is not None` guard
+    # is only to narrow the counts' type for the arithmetic below.
+    if m.n_clipped_kept is not None and m.n_clipped_pre is not None:
+        _require(
+            m.clipped_kept == (m.n_clipped_kept > 0),
+            "measurements.clipped_kept disagrees with measurements.n_clipped_kept",
+        )
+        _require(
+            m.clipped_any == (m.n_clipped_pre + m.n_clipped_kept > 0),
+            "measurements.clipped_any disagrees with the clipping counts",
+        )
 
 
 def _validate_timeseries(artifact: QAArtifact) -> None:
