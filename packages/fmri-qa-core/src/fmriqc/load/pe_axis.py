@@ -41,11 +41,11 @@ def in_plane(axis: int | None) -> PeAxis | None:
     travel inward as a plain `int` and be re-tested wherever it lands, it is
     narrowed once, here, to the type the rest of the package speaks.
 
-    None means "no in-plane axis to work with", and `preprocess` carries it
-    inward as exactly that. `run_qa` does not treat the two ways of getting
-    there alike, though: an *absent* axis falls through to the Nyquist-ghost
-    estimate, while a scan whose header *named* the through-plane axis is
-    refused by `validate_qa_run`, by name, rather than quietly given an
+    None means "no in-plane axis to work with", and `validate_qa_run`'s return
+    value carries it inward as exactly that. `run_qa` does not treat the two
+    ways of getting there alike, though: an *absent* axis falls through to the
+    Nyquist-ghost estimate, while a scan whose header *named* the through-plane
+    axis is refused by `validate_qa_run`, by name, rather than quietly given an
     estimate. (An explicitly passed axis cannot be through-plane at all: the
     parameter is a `PeAxis`.)
     """

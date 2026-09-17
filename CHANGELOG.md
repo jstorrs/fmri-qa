@@ -704,6 +704,9 @@ versioning when the first stable public interface is released.
 
 ### Removed
 
+- **`QAImages.pe_axis`.** Nothing read it since `validate_qa_run` began
+  returning the resolved axis; the narrowing (`load.pe_axis.in_plane`) still
+  happens, once, in `validate_qa_run`.
 - **`OutlierResult.mean_fraction`.** Nothing read it: the artifact publishes
   the worst frame, `max_fraction` (as `outlier_max_pct`) and `worst_volume`,
   never the mean across frames.

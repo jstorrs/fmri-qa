@@ -16,7 +16,6 @@ from dataclasses import dataclass, replace
 
 from ._arrays import readonly
 from .load.metadata import ScanMeta
-from .load.pe_axis import in_plane
 from .load.scan import QAScan
 from .metrics.artifacts import (
     OutlierResult,
@@ -138,14 +137,6 @@ def preprocess(
         # The value a stored zero reads back as, so a nulled image edge is
         # recognizable under a nonzero intercept (see `edge_valid_mask`).
         zero_value=float(scan.inter),
-        # Narrowed here, at the one door into the pure pipeline: a sidecar may
-        # name the through-plane axis, which nothing downstream can measure on
-        # (see `load.pe_axis.in_plane`). `run_qa` rejects a scan whose sidecar
-        # names the through-plane axis before reaching this -- an explicit
-        # request cannot name one, since it is already typed `PeAxis` -- but
-        # `preprocess` is public and can be called directly, so the narrowing
-        # still has to happen here too.
-        pe_axis=in_plane(scan.pe_axis),
         detrender=detrender,
         # Which plane this is, for the same reason as the trim: once the volume
         # is dropped nothing else can say.

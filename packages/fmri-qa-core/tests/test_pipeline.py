@@ -173,6 +173,15 @@ def test_preprocess_records_which_plane_it_cut(make_scan: MakeScan) -> None:
     assert (images.slice_index, images.n_slices) == (2, 5)  # the middle of five
 
 
+def test_the_images_do_not_carry_a_phase_encode_axis() -> None:
+    """The axis has one home, and the preprocessed images are not it.
+
+    A run resolves it and publishes it off the ghost it measured
+    (`QAMetrics.pe_axis`); a copy here could only agree with that or be a bug.
+    """
+    assert "pe_axis" not in {f.name for f in fields(q.QAImages)}
+
+
 def test_weisskoff_rdc_matches_the_metric(make_scan: MakeScan) -> None:
     result = q.run_qa(make_scan(), roi_size=9)
     assert result.metrics.rdc == result.metrics.weisskoff.rdc

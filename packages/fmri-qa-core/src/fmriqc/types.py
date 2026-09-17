@@ -75,7 +75,8 @@ PE_LABELS: tuple[PeLabel, ...] = get_args(PeLabel)
 # It is deliberately narrower than what the *loader* can read: a BIDS sidecar
 # may name the through-plane axis (`k`), so `QAScan.pe_axis` stays a plain
 # `int | None` and `load.pe_axis.in_plane` is the one place that narrows one to
-# the other. Everything from `preprocess` inward speaks this type.
+# the other. `validation.validate_qa_run` resolves the axis a run measures on
+# and hands it back, and everything inward of that speaks this type.
 PeAxis = Literal[0, 1]
 PE_AXES: tuple[PeAxis, ...] = get_args(PeAxis)
 

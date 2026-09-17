@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from functools import cached_property
 
 from .._arrays import ArrayValue, readonly
-from ..types import BoolArray, FloatArray, PeAxis
+from ..types import BoolArray, FloatArray
 from .detrend import Detrender
 from .imaging import (
     edge_valid_mask,
@@ -58,7 +58,6 @@ class QAImages(ArrayValue):
     tr: float
     n_trimmed: int = 0  # warm-up volumes dropped ahead of `center_slice`
     zero_value: float = 0.0  # image value a stored zero maps to (NIfTI scl_inter)
-    pe_axis: PeAxis | None = None  # in-plane only; see `load.pe_axis.in_plane`
     # The fit behind `fluctuations`, as the one value it is: an order is a
     # degree or a knot count depending on the method (see `Detrender`). None
     # for images assembled from bare arrays, with no fit behind them.
