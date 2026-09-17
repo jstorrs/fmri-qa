@@ -16,7 +16,7 @@ import pytest
 
 import fmriqc as q
 from fmriqc import cli
-from fmriqc.cli import table
+from fmriqc.cli import qa, table
 from fmriqc.cli.record import metric_record
 
 
@@ -534,6 +534,18 @@ def test_main_rejects_invalid_numeric_options(args: list[str], capsys) -> None:
         cli.main([*args, "scan.nii.gz"])
     assert info.value.code == 2
     assert "error:" in capsys.readouterr().err
+
+
+def test_a_bare_command_line_asks_for_the_records_defaults() -> None:
+    """`fmri-qa scan` and `q.analyze(scan)` are the same run.
+
+    The parser reads its defaults off `AnalysisSettings`; a literal spelled
+    beside a flag instead would let the two drift apart unnoticed.
+    """
+    args = qa._parser().parse_args(["scan.nii.gz"])
+    asked = (args.trim_sec, args.detrend, args.center, args.roi_size, args.pe_axis)
+    d = q.AnalysisSettings()
+    assert asked == (d.trim_sec, d.detrend, d.center, d.roi_size, d.pe_axis_override)
 
 
 def test_main_rejects_an_empty_artifact_path(capsys) -> None:

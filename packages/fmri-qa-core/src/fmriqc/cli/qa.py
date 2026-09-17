@@ -46,39 +46,44 @@ def _parser() -> argparse.ArgumentParser:
     # stay as cheap as parsing.
     parser.add_argument("--version", action=PrintVersion, nargs=0)
     parser.add_argument("paths", nargs="+", help="NIfTI (.nii/.nii.gz) QA scans")
+    # Every analysis default is read off the record `main` goes on to build, so
+    # a bare `fmri-qa scan` and a bare `q.analyze(scan)` are the same run and the
+    # help text cannot name a default the command does not use.
+    defaults = q.AnalysisSettings()
     parser.add_argument(
         "--trim-sec",
         type=nonnegative_float,
-        default=5.0,
-        help="Seconds of initial (non-steady-state) volumes to drop (default: 5).",
+        default=defaults.trim_sec,
+        help="Seconds of initial (non-steady-state) volumes to drop "
+        f"(default: {defaults.trim_sec:g}).",
     )
     parser.add_argument(
         "--pe-axis",
         type=int,
         choices=q.PE_AXES,
-        default=None,
+        default=defaults.pe_axis_override,
         help="Override the in-plane phase-encode axis (default: read from the header).",
     )
     parser.add_argument(
         "--detrend",
         choices=q.DETREND_METHODS,
-        default="poly",
-        help="Detrending method (default: poly).",
+        default=defaults.detrend,
+        help=f"Detrending method (default: {defaults.detrend}).",
     )
     parser.add_argument(
         "--center",
         choices=q.ROI_CENTER_MODES,
-        default="image",
+        default=defaults.center,
         help="Slice + ROI localization: 'image' (middle slice + image center, "
-        "Glover) or 'phantom' (largest slice + detected center). Default: image.",
+        "Glover) or 'phantom' (largest slice + detected center). "
+        f"Default: {defaults.center}.",
     )
     parser.add_argument(
         "--roi-size",
         type=positive_int,
-        default=q.FBIRN_ROI_SIZE,
-        help=(
-            f"Fixed summary/Weisskoff ROI side in voxels (default: {q.FBIRN_ROI_SIZE})."
-        ),
+        default=defaults.roi_size,
+        help="Fixed summary/Weisskoff ROI side in voxels "
+        f"(default: {defaults.roi_size}).",
     )
     parser.add_argument(
         "--json",
