@@ -143,7 +143,12 @@ def import_dicom(
 
     destination = Path(destination)
     fresh = not destination.exists()
-    destination.mkdir(parents=True, exist_ok=True)
+    try:
+        destination.mkdir(parents=True, exist_ok=True)
+    except OSError as exc:
+        raise ConversionError(
+            "destination", f"cannot create {destination}: {exc}"
+        ) from exc
     # Inside the destination, so `Path.replace` below is a rename on one
     # filesystem; dot-prefixed so a crashed run leaves nothing a `*.nii.gz`
     # glob would pick up.

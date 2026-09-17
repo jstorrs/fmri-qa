@@ -400,6 +400,20 @@ def test_a_source_that_is_not_a_directory_is_refused_before_anything_runs(
     assert not (tmp_path / "out").exists()
 
 
+def test_a_destination_that_cannot_be_made_is_a_conversion_error_not_a_crash(
+    tmp_path, fake_dcm2niix
+) -> None:
+    """A file already sitting where the destination goes must not raise `OSError`."""
+    binary = fake_dcm2niix({"2_QA": FULL_SIDECAR})
+    blocked = tmp_path / "out"
+    blocked.write_text("not a directory")
+
+    with pytest.raises(q.ConversionError) as excinfo:
+        import_dicom(tmp_path, blocked, binary=binary)
+
+    assert excinfo.value.stage == "destination"
+
+
 # --------------------------------------------------------------------------
 # the real converter, on real DICOM
 # --------------------------------------------------------------------------
@@ -526,6 +540,21 @@ def test_import_main_reports_a_bad_source_without_a_traceback(tmp_path, capsys):
 
     assert rc == 1
     assert "ERROR" in capsys.readouterr().err
+
+
+def test_import_main_reports_a_destination_that_cannot_be_made_without_a_traceback(
+    tmp_path, fake_dcm2niix, capsys
+):
+    binary = fake_dcm2niix({"2_QA": FULL_SIDECAR})
+    blocked = tmp_path / "out"
+    blocked.write_text("not a directory")
+
+    rc = cli.import_main([str(tmp_path), "-o", str(blocked), "--dcm2niix", str(binary)])
+
+    err = capsys.readouterr().err
+    assert rc == 1
+    assert "ERROR" in err
+    assert "Traceback" not in err
 
 
 def test_import_main_fails_when_a_directory_holds_no_dicom(

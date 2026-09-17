@@ -159,6 +159,7 @@ def import_main(argv: Sequence[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     destination = _destination(args.source, args.out)
 
+    result: ImportResult | None = None
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
         try:
@@ -174,11 +175,11 @@ def import_main(argv: Sequence[str] | None = None) -> int:
                 extra=args.passthrough,
                 force=args.force,
             )
-        except q.ConversionError as exc:
+        except Exception as exc:  # noqa: BLE001 - report cleanly and exit non-zero
             print(f"ERROR: {exc}", file=sys.stderr)
-            print_warnings(caught, Path(args.source).name)
-            return 1
     print_warnings(caught, Path(args.source).name)
+    if result is None:
+        return 1
 
     if args.log:
         print(result.log, file=sys.stderr)

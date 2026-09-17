@@ -324,6 +324,13 @@ versioning when the first stable public interface is released.
 
 ### Fixed
 
+- **`fmri-qa-import` no longer prints a traceback when its destination cannot
+  be created.** `import_dicom` called `destination.mkdir(parents=True,
+  exist_ok=True)` unguarded, so a `-o` pointing at an existing regular file
+  raised a bare `FileExistsError` that `import_main` did not catch. The
+  `mkdir` is now wrapped as `ConversionError("destination", ...)`, and
+  `import_main` catches broadly like every other command, so the failure
+  prints one `ERROR: ...` line to stderr and exits 1.
 - **A BIDS sidecar whose `AcquisitionDate` is a JSON number no longer crashes
   the load.** `load.metadata` built the acquisition datetime by joining
   `AcquisitionDate` and `AcquisitionTime` with `" ".join(...)`, converting the
