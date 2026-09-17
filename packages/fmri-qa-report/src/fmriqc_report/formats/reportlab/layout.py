@@ -3,9 +3,16 @@
 Pure measurement, with no canvas in sight — how wide a string renders in a font,
 how many lines a paragraph breaks into, and how many rows of a cover inventory
 or a provenance appendix fit on a page before it has to continue on the next.
-`pages` draws what these functions decide.
+`pages` draws what these functions decide: the cursor functions below give the
+baseline of every line a cover or appendix page draws, so the count that decides
+how many rows fit and the positions they are drawn at are one arithmetic, and a
+row that fits cannot land off the bottom of the sheet. The one thing measured
+from outside the page is the cover's logo, whose drop depends on whether the
+themed file is on disk; deciding that here keeps it from being decided twice.
 """
 
+from dataclasses import dataclass
+from pathlib import Path
 from typing import Literal
 
 from reportlab.lib.utils import simpleSplit
@@ -14,9 +21,14 @@ from reportlab.pdfbase import pdfmetrics
 from ...document import Appendix, Cover
 from ...theme import Theme
 
-# Row pitch (points) of the two paginated lists.
+# Row pitch (points) of the cover inventory: one line per scan.
 COVER_ROW_H = 14.0
-APPENDIX_ROW_H = 33.0
+
+# An appendix row is a name line with a detail line beneath it, so its pitch is
+# the two drops together and the row cannot outgrow its own spacing.
+APPENDIX_NAME_DROP = 13.0
+APPENDIX_DETAIL_DROP = 20.0
+APPENDIX_ROW_H = APPENDIX_NAME_DROP + APPENDIX_DETAIL_DROP
 
 
 def fit_text(text: str, font: str, size: float, width: float) -> str:
@@ -69,32 +81,110 @@ def cover_rows(cover: Cover) -> tuple[CoverRow, ...]:
     return tuple(rows)
 
 
+@dataclass(frozen=True, slots=True)
+class CoverCursors:
+    """The baselines a cover page draws on, top to bottom, and its lowest row.
+
+    `logo` is the image file to draw and the baseline to draw it on, or `None`
+    on a page that carries no logo — the file and its place travel together, so
+    a page cannot reserve the space without having something to put in it. The
+    drop the logo costs is likewise made only when there is one. `floor` is the
+    last baseline a row may occupy.
+    """
+
+    logo: tuple[Path, float] | None
+    title_y: float
+    subtitle_y: float
+    heading_y: float
+    first_row_y: float
+    floor: float
+
+
+def cover_cursors(theme: Theme, *, continuation: bool) -> CoverCursors:
+    """Where a cover page's logo, headings, and first inventory row sit.
+
+    The subtitle's drop is made whether or not a subtitle is drawn, so a cover
+    with one and a cover without paginate alike; the logo's drop is made only
+    where there is a logo to draw, which means a first page whose themed logo
+    file is on disk.
+    """
+    top = theme.page_height - 34.0 if continuation else theme.page_height * 0.70
+    logo = (
+        (theme.logo, top)
+        if not continuation and theme.logo is not None and theme.logo.is_file()
+        else None
+    )
+    title_y = top - 18.0 if logo is not None else top
+    subtitle_y = title_y - (22.0 if continuation else 26.0)
+    heading_y = subtitle_y - (16.0 if continuation else 40.0)
+    return CoverCursors(
+        logo=logo,
+        title_y=title_y,
+        subtitle_y=subtitle_y,
+        heading_y=heading_y,
+        first_row_y=heading_y - 16.0,
+        floor=theme.margin + 10.0,
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class AppendixCursors:
+    """The baselines an appendix page draws on, and its lowest row.
+
+    `version_y` is `None` on a page that draws no version line; the drop it
+    costs is then not made either. `floor` is the last baseline a row may take.
+    """
+
+    title_y: float
+    version_y: float | None
+    first_row_y: float
+    floor: float
+
+
+def appendix_cursors(
+    theme: Theme, *, continuation: bool, has_version: bool
+) -> AppendixCursors:
+    """Where an appendix page's title, version line, and first row sit.
+
+    Only a first page names the package version; a continuation carries the
+    rows straight on under its own title.
+    """
+    title_y = theme.page_height - 34.0
+    below_title = title_y - 20.0
+    shows_version = has_version and not continuation
+    return AppendixCursors(
+        title_y=title_y,
+        version_y=below_title if shows_version else None,
+        first_row_y=below_title - 20.0 if shows_version else below_title,
+        floor=theme.margin + 15.0,
+    )
+
+
+def _capacity(first_row_y: float, floor: float, row_h: float) -> int:
+    """How many rows of pitch `row_h` fit between the first baseline and the floor."""
+    return int((first_row_y - floor) // row_h) + 1
+
+
 def cover_chunks(cover: Cover, theme: Theme) -> list[tuple[CoverRow, ...]]:
     """Paginate a cover inventory for the active page geometry."""
-    y = theme.page_size[1] * 0.70
-    if theme.logo is not None and theme.logo.is_file():
-        y -= 18
-    # The drops `cover_page` makes before the first row: past the title, the
-    # subtitle, and the "Scans (n)" heading.
-    y -= 26
-    y -= 40
-    y -= 16
-    floor = theme.margin + 10
-    first = int((y - floor) // COVER_ROW_H) + 1
-    continuation_y = theme.page_size[1] - 34 - 22 - 16 - 16
-    following = int((continuation_y - floor) // COVER_ROW_H) + 1
-    return _page_chunks(cover_rows(cover), first, following)
+    first = cover_cursors(theme, continuation=False)
+    following = cover_cursors(theme, continuation=True)
+    return _page_chunks(
+        cover_rows(cover),
+        _capacity(first.first_row_y, first.floor, COVER_ROW_H),
+        _capacity(following.first_row_y, following.floor, COVER_ROW_H),
+    )
 
 
 def appendix_chunks(
     appendix: Appendix, theme: Theme
 ) -> list[tuple[tuple[str, str], ...]]:
     """Paginate provenance rows above the running-footer area."""
-    y = theme.page_size[1] - 34 - 20
-    if appendix.version:
-        y -= 20
-    floor = theme.margin + 15
-    first = int((y - floor) // APPENDIX_ROW_H) + 1
-    continuation_y = theme.page_size[1] - 34 - 20
-    following = int((continuation_y - floor) // APPENDIX_ROW_H) + 1
-    return _page_chunks(appendix.rows, first, following)
+    has_version = bool(appendix.version)
+    first = appendix_cursors(theme, continuation=False, has_version=has_version)
+    following = appendix_cursors(theme, continuation=True, has_version=has_version)
+    return _page_chunks(
+        appendix.rows,
+        _capacity(first.first_row_y, first.floor, APPENDIX_ROW_H),
+        _capacity(following.first_row_y, following.floor, APPENDIX_ROW_H),
+    )

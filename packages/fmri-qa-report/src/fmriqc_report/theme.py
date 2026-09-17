@@ -72,9 +72,19 @@ class Theme:
     cover_title: str = "fMRI QA Report"
 
     @property
+    def page_width(self) -> float:
+        """Width of the sheet (points)."""
+        return self.page_size[0]
+
+    @property
+    def page_height(self) -> float:
+        """Height of the sheet (points)."""
+        return self.page_size[1]
+
+    @property
     def content_width(self) -> float:
         """Drawable width between the left and right margins (points)."""
-        return self.page_size[0] - 2 * self.margin
+        return self.page_width - 2 * self.margin
 
     def rc_params(self) -> dict[str, object]:
         """matplotlib rcParams that style the panels to match the page.

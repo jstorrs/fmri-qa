@@ -34,7 +34,16 @@ from ...panels.timeseries import (
 )
 from ...summary import acquisition_line, device_line, provenance_line
 from ...theme import Theme
-from .layout import COVER_ROW_H, CoverRow, fit_text, wrap_text
+from .layout import (
+    APPENDIX_DETAIL_DROP,
+    APPENDIX_NAME_DROP,
+    COVER_ROW_H,
+    CoverRow,
+    appendix_cursors,
+    cover_cursors,
+    fit_text,
+    wrap_text,
+)
 from .svglib_patch import ensure_installed
 
 # A page-part renderer: draw one scan's part onto the canvas (no showPage).
@@ -105,8 +114,7 @@ def _draw_tiles(
 
 def _header(c: canvas.Canvas, artifact: QAArtifact, title: str, theme: Theme) -> float:
     """Draw the scan name, metadata lines, and metric tiles; return the y below."""
-    page_w, page_h = theme.page_size
-    y = page_h - 32
+    y = theme.page_height - 32
     if title:
         c.setFont(theme.font_title, 14)
         c.drawString(theme.margin, y, title)
@@ -114,7 +122,7 @@ def _header(c: canvas.Canvas, artifact: QAArtifact, title: str, theme: Theme) ->
     if device:
         c.setFont(theme.font_body, 9)
         c.setFillGray(theme.text_muted_gray)
-        c.drawRightString(page_w - theme.margin, y, device)
+        c.drawRightString(theme.page_width - theme.margin, y, device)
     if title or device:
         y -= 14
 
@@ -233,10 +241,11 @@ def analysis_page(
 ) -> None:
     """Physics: the same stability curves at full page size."""
     curves, m = artifact.curves, artifact.measurements
-    page_w, page_h = theme.page_size
-    y = page_h - 34
+    y = theme.page_height - 34
     c.setFont(theme.font_title, 13)
-    c.drawCentredString(page_w / 2, y, f"{title} — stability" if title else "stability")
+    c.drawCentredString(
+        theme.page_width / 2, y, f"{title} — stability" if title else "stability"
+    )
     y = _curve_grid(
         c,
         curves,
@@ -253,7 +262,7 @@ def analysis_page(
 
 def _page_title(c: canvas.Canvas, title: str, heading: str, theme: Theme) -> float:
     """Draw a physics page heading ("<title> — <heading>"); return the y below."""
-    y = theme.page_size[1] - 34
+    y = theme.page_height - 34
     c.setFont(theme.font_title, 13)
     label = f"{title} — {heading}" if title else heading
     c.drawString(theme.margin, y, label)
@@ -289,7 +298,7 @@ def characterization_page(
     """
     y = _page_title(c, title, "characterization", theme)
     value_x = theme.margin + 90
-    accept_x = theme.page_size[0] - theme.margin
+    accept_x = theme.page_width - theme.margin
     for doc, value in characterization_rows(artifact.measurements):
         c.setFont(theme.font_title, 9)
         c.setFillGray(theme.text_primary_gray)
@@ -348,9 +357,9 @@ def draw_footer(
     if theme.footer:
         c.drawString(theme.margin, y, theme.footer)
     if note:
-        c.drawCentredString(theme.page_size[0] / 2, y, note)
+        c.drawCentredString(theme.page_width / 2, y, note)
     if total > 1:
-        c.drawRightString(theme.page_size[0] - theme.margin, y, f"{page_no} / {total}")
+        c.drawRightString(theme.page_width - theme.margin, y, f"{page_no} / {total}")
     c.setFillGray(theme.text_primary_gray)
 
 
@@ -368,38 +377,35 @@ def cover_page(
     were omitted ("Scans (3 of 5)"), and the omitted ones follow the list under
     their own heading with the reason each was left out.
     """
-    page_w, page_h = theme.page_size
-    cx = page_w / 2
-    y = page_h - 34 if continuation else page_h * 0.70
-    if not continuation and theme.logo is not None and theme.logo.is_file():
+    cursors = cover_cursors(theme, continuation=continuation)
+    cx = theme.page_width / 2
+    if cursors.logo is not None:
+        logo, logo_y = cursors.logo
         c.drawImage(
-            str(theme.logo),
+            str(logo),
             cx - 60,
-            y,
+            logo_y,
             width=120,
             height=54,
             preserveAspectRatio=True,
             mask="auto",
         )
-        y -= 18
     c.setFillGray(theme.text_primary_gray)
     c.setFont(theme.font_title, 14 if continuation else 22)
     title = "Scan inventory (continued)" if continuation else theme.cover_title
-    c.drawCentredString(cx, y, title)
-    y -= 22 if continuation else 26
+    c.drawCentredString(cx, cursors.title_y, title)
     if not continuation and cover.subtitle:
         c.setFont(theme.font_body, 12)
         c.setFillGray(theme.text_muted_gray)
-        c.drawCentredString(cx, y, cover.subtitle)
-    y -= 16 if continuation else 40
+        c.drawCentredString(cx, cursors.subtitle_y, cover.subtitle)
 
     c.setFillGray(theme.text_primary_gray)
     c.setFont(theme.font_title, 11)
     count = str(len(cover.scans))
     if cover.omitted:
         count += f" of {len(cover.scans) + len(cover.omitted)}"
-    c.drawString(theme.margin, y, f"Scans ({count})")
-    y -= 16
+    c.drawString(theme.margin, cursors.heading_y, f"Scans ({count})")
+    y = cursors.first_row_y
     for kind, text in rows:
         if kind == "heading":
             c.setFont(theme.font_title, 11)
@@ -423,23 +429,26 @@ def appendix_page(
     continuation: bool,
 ) -> None:
     """Draw the provenance appendix: the package version and per-scan rows."""
-    y = theme.page_size[1] - 34
+    cursors = appendix_cursors(
+        theme, continuation=continuation, has_version=bool(appendix.version)
+    )
     c.setFont(theme.font_title, 14)
     title = "Provenance (continued)" if continuation else "Provenance"
-    c.drawString(theme.margin, y, title)
-    y -= 20
-    if appendix.version and not continuation:
+    c.drawString(theme.margin, cursors.title_y, title)
+    if cursors.version_y is not None:
         c.setFont(theme.font_body, 9)
         c.setFillGray(theme.text_muted_gray)
-        c.drawString(theme.margin, y, f"fmri-qa-report {appendix.version}")
+        c.drawString(
+            theme.margin, cursors.version_y, f"fmri-qa-report {appendix.version}"
+        )
         c.setFillGray(theme.text_primary_gray)
-        y -= 20
+    y = cursors.first_row_y
     for name, detail in rows:
         c.setFont(theme.font_title, 10)
         c.drawString(
             theme.margin, y, fit_text(name, theme.font_title, 10, theme.content_width)
         )
-        y -= 13
+        y -= APPENDIX_NAME_DROP
         c.setFont(theme.font_body, 8.5)
         c.setFillGray(theme.text_muted_gray)
         c.drawString(
@@ -448,4 +457,4 @@ def appendix_page(
             fit_text(detail, theme.font_body, 8.5, theme.content_width - 10),
         )
         c.setFillGray(theme.text_primary_gray)
-        y -= 20
+        y -= APPENDIX_DETAIL_DROP

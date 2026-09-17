@@ -13,11 +13,14 @@ import fmriqc_report as report
 from fmriqc_report import content
 from fmriqc_report.formats.reportlab.layout import (
     appendix_chunks,
+    appendix_cursors,
     cover_chunks,
+    cover_cursors,
     cover_rows,
     fit_text,
     wrap_text,
 )
+from fmriqc_report.formats.reportlab.pages import appendix_page, cover_page
 from fmriqc_report.formats.reportlab.svglib_patch import (
     _truncates_image_geometry,
     ensure_installed,
@@ -36,6 +39,181 @@ def test_cover_and_appendix_paginate_without_losing_rows() -> None:
     appendix = appendix_chunks(report.Appendix(rows, "0.1.0"), theme)
     assert len(appendix) > 1
     assert tuple(row for chunk in appendix for row in chunk) == rows
+
+
+SCANS = tuple(f"scan-{i:03d}" for i in range(100))
+APPENDIX_ROWS = tuple((name, f"details for {name}") for name in SCANS)
+
+
+class RecordingCanvas:
+    """A stand-in canvas that remembers where a page renderer put things.
+
+    The renderers only place marks, so recording the baseline of every string
+    and image is enough to read back what a real render would print — and the
+    only way a test can see that the drawer and the measurer agree. The method
+    names are ReportLab's, since that is the API the renderers call.
+    """
+
+    def __init__(self):
+        self.strings = []  # (x, y, text), in the order they were drawn
+        self.images = []  # (path, x, y)
+
+    def setFont(self, font, size):
+        pass
+
+    def setFillGray(self, gray):
+        pass
+
+    def drawString(self, x, y, text):
+        self.strings.append((x, y, text))
+
+    def drawCentredString(self, x, y, text):
+        self.strings.append((x, y, text))
+
+    def drawImage(self, path, x, y, **kwargs):
+        self.images.append((path, x, y))
+
+
+def test_the_default_theme_fits_a_known_number_of_cover_rows_per_page() -> None:
+    """The pagination of the default letter page, pinned against silent drift.
+
+    The cover's first page is short — its title block sits at 70% of the sheet
+    — and its continuations are full.
+    """
+    chunks = cover_chunks(report.Cover(SCANS), report.Theme())
+    assert [len(chunk) for chunk in chunks] == [31, 47, 22]
+
+
+@pytest.mark.parametrize("version", ["", "1.0"])
+def test_the_appendix_version_line_costs_the_default_page_no_row(version: str) -> None:
+    """On letter the version line fits in the slack above the first row's pitch."""
+    chunks = appendix_chunks(report.Appendix(APPENDIX_ROWS, version), report.Theme())
+    assert [len(chunk) for chunk in chunks] == [21, 21, 21, 21, 16]
+
+
+def test_the_default_theme_puts_each_block_at_a_known_height() -> None:
+    """The baselines the cover and appendix draw on, first page and continuation."""
+    theme = report.Theme()
+
+    first = cover_cursors(theme, continuation=False)
+    assert first.logo is None  # the default theme has no logo
+    assert (first.title_y, first.subtitle_y) == pytest.approx((554.4, 528.4))
+    assert (first.heading_y, first.first_row_y) == pytest.approx((488.4, 472.4))
+    following = cover_cursors(theme, continuation=True)
+    assert (following.title_y, following.first_row_y) == pytest.approx((758.0, 704.0))
+    assert first.floor == 50.0
+    assert following.floor == 50.0
+
+    bare = appendix_cursors(theme, continuation=False, has_version=False)
+    assert bare.version_y is None
+    assert (bare.title_y, bare.first_row_y) == pytest.approx((758.0, 738.0))
+    versioned = appendix_cursors(theme, continuation=False, has_version=True)
+    assert versioned.version_y == pytest.approx(738.0)
+    assert versioned.first_row_y == pytest.approx(718.0)
+    # A continuation repeats the title but not the version line.
+    carried = appendix_cursors(theme, continuation=True, has_version=True)
+    assert carried.version_y is None
+    assert carried.first_row_y == pytest.approx(738.0)
+    assert bare.floor == 55.0
+
+
+def test_a_cover_logo_lowers_the_title_block_and_costs_the_first_page_rows(
+    tmp_path,
+) -> None:
+    """A themed logo pushes the first page's inventory down by its own height.
+
+    The drop is taken only for a logo that is really there, so the measurement
+    reads the file system; a theme naming a file that does not exist paginates
+    like a theme naming none.
+    """
+    logo = tmp_path / "logo.png"
+    logo.write_bytes(b"")
+    theme = report.Theme(logo=logo)
+
+    first = cover_cursors(theme, continuation=False)
+    assert first.logo == (logo, pytest.approx(554.4))
+    assert (first.title_y, first.subtitle_y) == pytest.approx((536.4, 510.4))
+    assert (first.heading_y, first.first_row_y) == pytest.approx((470.4, 454.4))
+    assert first.floor == 50.0
+    # Only a first page carries the logo; continuations are as they ever were.
+    following = cover_cursors(theme, continuation=True)
+    assert following.logo is None
+    assert following.first_row_y == pytest.approx(704.0)
+
+    assert [len(chunk) for chunk in cover_chunks(report.Cover(SCANS), theme)] == [
+        29,
+        47,
+        24,
+    ]
+    missing = report.Theme(logo=tmp_path / "absent.png")
+    assert cover_cursors(missing, continuation=False).logo is None
+
+
+@pytest.mark.parametrize("logo", [False, True])
+def test_the_cover_draws_every_row_the_chunker_put_on_the_page(
+    tmp_path, logo: bool
+) -> None:
+    """Every inventory row a page is given lands on it, above the block's floor.
+
+    ReportLab writes below the bottom edge without complaint, so a drawer that
+    started lower than the chunker counted from would push rows off the sheet
+    silently. Driving the real renderer is what says the two still agree.
+    """
+    if logo:
+        (tmp_path / "logo.png").write_bytes(b"")
+    theme = report.Theme(logo=tmp_path / "logo.png" if logo else None)
+    cover = report.Cover(SCANS)
+
+    chunks = cover_chunks(cover, theme)
+    assert len(chunks) > 1  # a single page would prove nothing about continuations
+    for index, chunk in enumerate(chunks):
+        continuation = index > 0
+        cursors = cover_cursors(theme, continuation=continuation)
+        c = RecordingCanvas()
+        cover_page(c, cover, chunk, theme, continuation=continuation)
+
+        # The title and the "Scans (n)" heading, then one line per row.
+        title_y, heading_y, *row_ys = [y for _, y, _ in c.strings]
+        assert title_y == pytest.approx(cursors.title_y)
+        assert heading_y == pytest.approx(cursors.heading_y)
+        assert len(row_ys) == len(chunk)
+        assert row_ys[0] == pytest.approx(cursors.first_row_y)
+        assert min(row_ys) >= cursors.floor
+        assert [y for _, _, y in c.images] == (
+            [pytest.approx(cursors.logo[1])] if cursors.logo else []
+        )
+
+
+@pytest.mark.parametrize("version", ["", "1.0"])
+def test_the_appendix_draws_every_row_the_chunker_put_on_the_page(version: str) -> None:
+    """Every provenance row a page is given lands on it, above the block's floor.
+
+    A row is a name line with its detail line beneath, and the floor bounds the
+    name: the detail hangs below it into the footer's slack by design.
+    """
+    theme = report.Theme()
+    appendix = report.Appendix(APPENDIX_ROWS, version)
+
+    chunks = appendix_chunks(appendix, theme)
+    assert len(chunks) > 1
+    for index, chunk in enumerate(chunks):
+        continuation = index > 0
+        cursors = appendix_cursors(
+            theme, continuation=continuation, has_version=bool(version)
+        )
+        c = RecordingCanvas()
+        appendix_page(c, appendix, chunk, theme, continuation=continuation)
+
+        ys = [y for _, y, _ in c.strings]
+        assert ys[0] == pytest.approx(cursors.title_y)
+        header = 1
+        if cursors.version_y is not None:
+            assert ys[1] == pytest.approx(cursors.version_y)
+            header = 2
+        name_ys = ys[header::2]  # each row draws its name, then its detail
+        assert len(name_ys) == len(chunk)
+        assert name_ys[0] == pytest.approx(cursors.first_row_y)
+        assert min(name_ys) >= cursors.floor
 
 
 def test_the_cover_lists_omitted_scans_under_their_own_heading() -> None:
