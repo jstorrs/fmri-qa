@@ -146,10 +146,7 @@ def preprocess(
         # `preprocess` is public and can be called directly, so the narrowing
         # still has to happen here too.
         pe_axis=in_plane(scan.pe_axis),
-        # Both read off the fit that actually ran, not one from the fit and the
-        # other from this function's argument.
-        detrend_method=detrender.method,
-        detrend_order=detrender.order,
+        detrender=detrender,
         # Which plane this is, for the same reason as the trim: once the volume
         # is dropped nothing else can say.
         slice_index=z,
@@ -265,7 +262,12 @@ def run_qa(
         geom=geom,
         roi=roi,
         metrics=metrics,
-        settings=replace(requested, detrend_order=images.detrend_order),
+        settings=replace(
+            requested,
+            detrend_order=(
+                None if images.detrender is None else images.detrender.order
+            ),
+        ),
         meta=scan.meta,
     )
 

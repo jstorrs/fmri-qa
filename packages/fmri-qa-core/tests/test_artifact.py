@@ -42,7 +42,8 @@ def test_build_artifact_publishes_the_settings_the_result_was_computed_with(
     s = artifact.settings
     assert (s.trim_sec, s.center, s.roi_size) == (0, "phantom", 9)
     assert s.pe_axis_override == 0
-    assert s.detrend_order == result.images.detrend_order  # the resolved value
+    assert result.images.detrender is not None
+    assert s.detrend_order == result.images.detrender.order  # the resolved value
     assert artifact.provenance.n_trimmed == 0
     assert artifact.measurements.pe_label == "row"  # the override, not the sidecar
 

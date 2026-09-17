@@ -8,6 +8,13 @@ versioning when the first stable public interface is released.
 
 ### Changed
 
+- **`QAImages.detrend_method` and `.detrend_order` are one field, `detrender:
+  Detrender | None`.** The pair was one fact split in two — the order means a
+  polynomial degree or an interior-knot count depending on the method, so a
+  `QAImages` could claim a fit that never ran (spline, degree 3 from a poly
+  fit). `preprocess` now sets `detrender` to the exact `Detrender` it applied;
+  `AnalysisSettings.detrend_order`, the published artifact value, is
+  unchanged.
 - **`estimate_motion`, `estimate_center_of_mass` and `estimate_smoothness` take
   a `VoxelSize` instead of a raw `voxel_mm` tuple.** Each rebuilt its own
   `VoxelSize(voxel_mm)` from the same header pair `run_qa` had already sliced,

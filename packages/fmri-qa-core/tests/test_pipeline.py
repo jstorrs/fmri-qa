@@ -105,7 +105,8 @@ def test_preprocess_discards_the_full_volume(make_scan: MakeScan) -> None:
     assert data_ref() is None
     # only the center slice survives: (X, Y, T_trimmed), not the 4-D volume
     assert images.center_slice.ndim == 3
-    assert images.detrend_method == "poly"
+    assert images.detrender is not None
+    assert images.detrender.method == "poly"
     # ...so the trim it counts from has to be recorded here or lost with the scan
     assert images.n_trimmed == 2  # 4 s at TR 2 s
     assert images.n_trimmed + images.center_slice.shape[-1] == 40
@@ -121,7 +122,8 @@ def test_run_qa_records_the_request_it_answered(make_scan: MakeScan) -> None:
     s = result.settings
     assert (s.trim_sec, s.center, s.roi_size) == (0, "phantom", 9)
     assert s.pe_axis_override is None and result.metrics.pe_axis == 1
-    assert s.detrend_order == result.images.detrend_order
+    assert result.images.detrender is not None
+    assert s.detrend_order == result.images.detrender.order
 
 
 def test_an_explicit_pe_axis_overrides_the_header(make_scan: MakeScan) -> None:
