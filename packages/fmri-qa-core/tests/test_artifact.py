@@ -343,3 +343,62 @@ def test_integer_storage_still_answers_the_clipping_question(make_scan) -> None:
     m = artifact.measurements
     assert m.clipped_any is False  # answered, and the answer is "no rail found"
     assert m.n_clipped_kept == 0 and m.n_clipped_pre == 0
+
+
+def test_a_half_answered_clipping_block_cannot_be_constructed(artifact) -> None:
+    """The rail test either ran or it did not; there is no partial answer."""
+    with pytest.raises(ValueError, match="clipping fields disagree"):
+        replace(artifact.measurements, n_clipped_kept=None)
+
+
+def test_a_clipping_flag_that_contradicts_its_count_cannot_be_constructed(
+    artifact,
+) -> None:
+    """`clipped_kept` is a property of `n_clipped_kept`, not a second opinion."""
+    with pytest.raises(ValueError, match="clipped_kept"):
+        replace(artifact.measurements, n_clipped_kept=5)
+
+
+def test_a_fwhm_along_an_axis_nothing_resolved_cannot_be_constructed(artifact) -> None:
+    """A directional FWHM needs a direction to be a measurement of anything."""
+    with pytest.raises(ValueError, match="fwhm_pe"):
+        replace(artifact.measurements, pe_axis=None, pe_label="?")
+
+
+def test_an_unresolved_pe_axis_with_no_directional_fwhm_is_legal(artifact) -> None:
+    """The degradation a flat phantom really produces is a state, not an error."""
+    unnamed = replace(
+        artifact.measurements,
+        pe_axis=None,
+        pe_label="?",
+        fwhm_pe=None,
+        fwhm_ro=None,
+    )
+    assert unnamed.pe_axis is None
+    assert (unnamed.fwhm_pe, unnamed.fwhm_ro) == (None, None)
+
+
+def test_a_fwhm_ro_left_behind_by_a_dropped_axis_cannot_be_constructed(
+    artifact,
+) -> None:
+    """Both directional FWHMs go with the axis, not just the one named first."""
+    with pytest.raises(ValueError, match="fwhm_ro"):
+        replace(artifact.measurements, pe_axis=None, pe_label="?", fwhm_pe=None)
+
+
+def test_a_negative_phantom_contrast_cannot_be_constructed(artifact) -> None:
+    """A ratio of means over a non-negative image has no negative value to take."""
+    with pytest.raises(ValueError, match="phantom_contrast"):
+        replace(artifact.measurements, phantom_contrast=-1.0)
+
+
+def test_an_unrecorded_phantom_contrast_is_legal(artifact) -> None:
+    """NaN is "not recorded": every artifact migrated from schema <= 4 carries it."""
+    unrecorded = replace(artifact.measurements, phantom_contrast=float("nan"))
+    assert np.isnan(unrecorded.phantom_contrast)
+
+
+def test_a_negative_clipping_count_cannot_be_constructed(artifact) -> None:
+    """A count of clipped voxels is a tally; there is no negative tally."""
+    with pytest.raises(ValueError, match="invalid clipping counts"):
+        replace(artifact.measurements, n_clipped_kept=-1, clipped_kept=False)

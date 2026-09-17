@@ -8,6 +8,19 @@ versioning when the first stable public interface is released.
 
 ### Changed
 
+- **A `Measurements` that contradicts itself is now a `ValueError` at
+  construction, not an `InvalidArtifactError` at save.** The record's
+  single-record invariants — a directional `fwhm_pe`/`fwhm_ro` beside a
+  `pe_axis` that resolved, a clipping block answered as a unit, each flag
+  agreeing with its count, a `phantom_contrast` that is non-negative or
+  unrecorded — were checked
+  only by `validate_artifact`, which runs at the archive door; an artifact
+  built in-process and printed or rendered without ever being saved was never
+  checked at all. `Measurements.__post_init__` holds them now, so the illegal
+  record cannot be built. What is refused is unchanged, down to the message
+  text: a stored document that breaks one still fails its load as an
+  `InvalidArtifactError`, and the on-disk layout and
+  `ARTIFACT_SCHEMA_VERSION` are untouched.
 - **`QAImages.detrend_method` and `.detrend_order` are one field, `detrender:
   Detrender | None`.** The pair was one fact split in two — the order means a
   polynomial degree or an interior-knot count depending on the method, so a

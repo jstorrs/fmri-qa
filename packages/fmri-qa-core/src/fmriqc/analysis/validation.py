@@ -1,5 +1,15 @@
 """Validate the published artifact contract at the archive boundary.
 
+Half the contract is not here. An invariant of one record alone is held by that
+value object's own constructor (`Measurements.__post_init__` today), because an
+artifact built in-process and printed or rendered is never saved and so never
+reaches this module: a new single-record invariant added here would go
+unchecked for every consumer but the archive. What is left here is what a
+constructor cannot see — facts that span two records (`displacement_unit`
+against `provenance.voxel_mm`, `outlier_worst_frame` against
+`provenance.n_frames`), the settings and provenance domains, and everything
+about arrays: their dimensions, shapes, and coordinates.
+
 Scalar types follow the value objects; dimensional relationships and numeric
 domains are checked explicitly. NaN/Infinity measurements remain meaningful,
 but coordinates, counts, and analysis settings must be usable.
@@ -14,7 +24,7 @@ from typing import Any, Literal, Union, get_args, get_origin, get_type_hints
 import numpy as np
 
 from ..settings import AnalysisSettings
-from .artifact import Measurements, Provenance, QAArtifact, RoiBox
+from .artifact import Measurements, Provenance, QAArtifact, RoiBox, _require
 
 # The two spellings an optional field's annotation can arrive in. `int | None`
 # evaluates to a `types.UnionType`, but `Literal[0, 1] | None` -- a `typing`
@@ -97,11 +107,6 @@ def validate_document(document: dict[str, Any]) -> None:
         raise ValueError("curves.outlier_qthr must be numeric")
 
 
-def _require(condition: bool, message: str) -> None:
-    if not condition:
-        raise ValueError(message)
-
-
 def validate_artifact(artifact: QAArtifact) -> None:
     """Require coherent settings, dimensions, and coordinates after composition."""
     _validate_parameters(artifact)
@@ -120,23 +125,6 @@ def _validate_parameters(artifact: QAArtifact) -> None:
     # field annotations -- already refuses any other axis, on save and on load
     # alike. Repeating the domain as a literal `(None, 0, 1)` would be a second
     # place to update the day a pipeline measures a third axis.
-    #
-    # What *is* checked is the None-ness of `fwhm_pe`/`fwhm_ro`: they are None
-    # exactly when no axis resolved (`SmoothnessResult.fwhm_pe`), in every build
-    # since schema 1, and no migration touches them -- one fact, stored twice.
-    # `pe_label` looks like the same case and is deliberately not held to
-    # `pe_axis`: builds that predate deriving the label from the axis took it
-    # from the sidecar's own DICOM wording, which could name another axis (a
-    # through-plane `k`, a sidecar contradicting itself) or none. Those archives
-    # keep the value their build recorded, and a reader must not orphan them.
-    _require(
-        (m.fwhm_pe is None) == (m.pe_axis is None),
-        "measurements.fwhm_pe disagrees with measurements.pe_axis",
-    )
-    _require(
-        (m.fwhm_ro is None) == (m.pe_axis is None),
-        "measurements.fwhm_ro disagrees with measurements.pe_axis",
-    )
     _require(p.n_frames > 0, "invalid provenance.n_frames")
     _require(p.n_trimmed is None or p.n_trimmed >= 0, "invalid provenance.n_trimmed")
     _require(p.n_slices is None or p.n_slices > 0, "invalid provenance.n_slices")
@@ -144,10 +132,6 @@ def _validate_parameters(artifact: QAArtifact) -> None:
         p.slice_index is None
         or (p.slice_index >= 0 and (p.n_slices is None or p.slice_index < p.n_slices)),
         "invalid provenance.slice_index",
-    )
-    _require(
-        math.isnan(m.phantom_contrast) or m.phantom_contrast >= 0,
-        "invalid measurements.phantom_contrast",
     )
     _require(math.isfinite(p.tr) and p.tr > 0, "invalid provenance.tr")
     if p.voxel_mm is not None:
@@ -164,34 +148,6 @@ def _validate_parameters(artifact: QAArtifact) -> None:
         "measurements.displacement_unit is mm but provenance.voxel_mm is unknown",
     )
     _require(0 <= m.outlier_worst_frame < p.n_frames, "invalid outlier_worst_frame")
-    # The clipping block is answered as a unit or not at all, so a document
-    # carrying some of it and not the rest is malformed however plausible each
-    # field looks alone.
-    counts = (m.n_clipped_kept, m.n_clipped_pre)
-    clipping = (*counts, m.clipped_any, m.clipped_kept)
-    _require(
-        len({value is None for value in clipping}) == 1,
-        "clipping fields disagree about whether the check ran",
-    )
-    _require(
-        all(count is None or count >= 0 for count in counts),
-        "invalid clipping counts",
-    )
-    # `clipped_any`/`clipped_kept` are properties of the counts in the type that
-    # produces them (`metrics.saturation.SaturationResult.clipped`/
-    # `clipped_kept`), not independent facts -- stored again here only because
-    # the artifact is flat. The all-or-none check above already guarantees that
-    # either every clipping field is None or none is; this `is not None` guard
-    # is only to narrow the counts' type for the arithmetic below.
-    if m.n_clipped_kept is not None and m.n_clipped_pre is not None:
-        _require(
-            m.clipped_kept == (m.n_clipped_kept > 0),
-            "measurements.clipped_kept disagrees with measurements.n_clipped_kept",
-        )
-        _require(
-            m.clipped_any == (m.n_clipped_pre + m.n_clipped_kept > 0),
-            "measurements.clipped_any disagrees with the clipping counts",
-        )
 
 
 def _validate_timeseries(artifact: QAArtifact) -> None:

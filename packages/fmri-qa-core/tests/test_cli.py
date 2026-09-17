@@ -406,7 +406,13 @@ def test_json_record_leaves_an_unnamed_direction_null(tmp_path, write_scan) -> N
     """
     scan = q.QAScan.from_nifti(write_scan(tmp_path))
     artifact = q.analyze(scan, q.AnalysisSettings(roi_size=9))
-    unnamed = replace(artifact.measurements, fwhm_pe=None, fwhm_ro=None)
+    unnamed = replace(
+        artifact.measurements,
+        pe_axis=None,
+        pe_label="?",
+        fwhm_pe=None,
+        fwhm_ro=None,
+    )
     record = metric_record(replace(artifact, measurements=unnamed))
     assert record["fw_pe"] is None
     assert record["fw_ro"] is None
@@ -438,7 +444,13 @@ def test_table_marks_an_unnamed_direction_unknown(tmp_path, write_scan) -> None:
     """The `fwPE`/`fwRO` cells read `?`, not a plausible number from elsewhere."""
     scan = q.QAScan.from_nifti(write_scan(tmp_path))
     artifact = q.analyze(scan, q.AnalysisSettings(roi_size=9))
-    unnamed = replace(artifact.measurements, fwhm_pe=None, fwhm_ro=None)
+    unnamed = replace(
+        artifact.measurements,
+        pe_axis=None,
+        pe_label="?",
+        fwhm_pe=None,
+        fwhm_ro=None,
+    )
     row = table.format_row(replace(artifact, measurements=unnamed))
     assert row.endswith("     ?      ?")
 

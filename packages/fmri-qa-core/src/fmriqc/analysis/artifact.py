@@ -20,6 +20,7 @@ Nothing here imports the metric, prep, or load layers: an artifact is inert data
 `build` projects a `QAResult` into one; `serialize` moves it to and from disk.
 """
 
+import math
 from dataclasses import dataclass
 
 from .._arrays import ArrayValue
@@ -40,6 +41,11 @@ from ..types import BoolArray, FloatArray, LengthUnit, PeAxis, PeLabel
 #    `n_clipped_pre`, `clipped_kept` and `clipped_any` are None together when
 #    the series did not arrive as integers and the rail test could not be run.
 ARTIFACT_SCHEMA_VERSION = 7
+
+
+def _require(condition: bool, message: str) -> None:
+    if not condition:
+        raise ValueError(message)
 
 
 @dataclass(frozen=True, slots=True)
@@ -147,6 +153,12 @@ class Measurements:
     always published these two peaks in voxels regardless of whether the voxel
     size was known, so a migrated artifact's `displacement_unit` is "vox" even
     when its `fwhm_unit` is "mm" (see `serialize.migrate`).
+
+    The pairings above are held by the constructor, not by a reader: a record
+    that breaks one is a `ValueError`, so `replace(m, pe_axis=None)` on its own
+    raises and the directional FWHMs have to travel with the axis. The fields
+    are flat because the archive is, but they are not independent, and a
+    consumer never has to wonder which half of a pair it is looking at.
     """
 
     # fBIRN ROI stability
@@ -190,6 +202,62 @@ class Measurements:
     phantom_contrast: float  # mask interior over background; inf = zero background
     phantom_mask_ok: bool | None  # a phantom: plausible share, real contrast
     roi_inside_phantom: bool | None  # the ROI lies wholly within the phantom
+
+    def __post_init__(self) -> None:
+        # `fwhm_pe`/`fwhm_ro` are None exactly when no axis resolved
+        # (`SmoothnessResult.fwhm_pe`), in every build since schema 1, and no
+        # migration touches them -- one fact, stored twice. `pe_label` looks
+        # like the same case and is deliberately not held to `pe_axis`: builds
+        # that predate deriving the label from the axis took it from the
+        # sidecar's own DICOM wording, which could name another axis (a
+        # through-plane `k`, a sidecar contradicting itself) or none. Those
+        # archives keep the value their build recorded, and a reader must not
+        # orphan them.
+        _require(
+            (self.fwhm_pe is None) == (self.pe_axis is None),
+            "measurements.fwhm_pe disagrees with measurements.pe_axis",
+        )
+        _require(
+            (self.fwhm_ro is None) == (self.pe_axis is None),
+            "measurements.fwhm_ro disagrees with measurements.pe_axis",
+        )
+        _require(
+            math.isnan(self.phantom_contrast) or self.phantom_contrast >= 0,
+            "invalid measurements.phantom_contrast",
+        )
+        self._check_clipping()
+
+    def _check_clipping(self) -> None:
+        """Hold the clipping block to the counts that produced it."""
+        # The block is answered as a unit or not at all, so a record carrying
+        # some of it and not the rest is malformed however plausible each field
+        # looks alone.
+        counts = (self.n_clipped_kept, self.n_clipped_pre)
+        clipping = (*counts, self.clipped_any, self.clipped_kept)
+        _require(
+            len({value is None for value in clipping}) == 1,
+            "clipping fields disagree about whether the check ran",
+        )
+        _require(
+            all(count is None or count >= 0 for count in counts),
+            "invalid clipping counts",
+        )
+        # `clipped_any`/`clipped_kept` are properties of the counts in the type
+        # that produces them (`metrics.saturation.SaturationResult.clipped`/
+        # `clipped_kept`), not independent facts -- stored again here only
+        # because the artifact is flat. The all-or-none check above already
+        # guarantees that either every clipping field is None or none is; the
+        # guard below is only to narrow the counts' type for the arithmetic.
+        if self.n_clipped_kept is None or self.n_clipped_pre is None:
+            return
+        _require(
+            self.clipped_kept == (self.n_clipped_kept > 0),
+            "measurements.clipped_kept disagrees with measurements.n_clipped_kept",
+        )
+        _require(
+            self.clipped_any == (self.n_clipped_pre + self.n_clipped_kept > 0),
+            "measurements.clipped_any disagrees with the clipping counts",
+        )
 
 
 @dataclass(frozen=True, eq=False, slots=True)
