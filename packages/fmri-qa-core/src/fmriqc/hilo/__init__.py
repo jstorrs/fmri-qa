@@ -90,5 +90,11 @@ def run_hilo(
     )  # (core-mean per-voxel SD)**2, per the note
     var_low = float(sd_l[core].mean()) ** 2
     return separate_noise(
-        mean_high, mean_low, var_high, var_low, n_voxels=n, flip_high=fh, flip_low=fl
+        mean_high=mean_high,
+        mean_low=mean_low,
+        var_high=var_high,
+        var_low=var_low,
+        n_voxels=n,
+        flip_high=fh,
+        flip_low=fl,
     )

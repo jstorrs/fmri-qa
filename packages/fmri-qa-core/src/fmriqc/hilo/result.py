@@ -93,6 +93,7 @@ class HiLoResult:
 
 
 def separate_noise(
+    *,
     mean_high: float,
     mean_low: float,
     var_high: float,

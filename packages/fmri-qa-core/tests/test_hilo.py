@@ -14,7 +14,9 @@ def test_separate_noise_recovers_the_planted_variances() -> None:
     thermal, instability0 = 10.0, 5.0
     var_low = thermal + instability0  # 15
     var_high = thermal + m * instability0  # 30
-    res = separate_noise(mean_high, mean_low, var_high, var_low)
+    res = separate_noise(
+        mean_high=mean_high, mean_low=mean_low, var_high=var_high, var_low=var_low
+    )
     assert not res.fell_back
     assert np.isclose(res.thermal_var, thermal)
     assert np.isclose(res.instability_var, m * instability0)
@@ -23,17 +25,19 @@ def test_separate_noise_recovers_the_planted_variances() -> None:
 
 def test_separate_noise_falls_back_when_instability_goes_negative() -> None:
     # measurement noise makes the solved instability variance negative
-    res = separate_noise(200.0, 100.0, var_high=10.0, var_low=15.0)
+    res = separate_noise(mean_high=200.0, mean_low=100.0, var_high=10.0, var_low=15.0)
     assert res.fell_back
     assert np.isclose(res.thermal_var, 15.0)  # falls back to var_low
     assert np.isclose(res.instability_var, 10.0 - 15.0)
 
 
 def test_hilo_fsnr_properties_handle_degenerate_variance() -> None:
-    res = separate_noise(200.0, 100.0, var_high=30.0, var_low=15.0)
+    res = separate_noise(mean_high=200.0, mean_low=100.0, var_high=30.0, var_low=15.0)
     assert np.isclose(res.thermal_fsnr, 200.0 / np.sqrt(res.thermal_var))
     # a non-positive thermal variance yields NaN, not a crash
-    degenerate = separate_noise(100.0, 100.001, var_high=1.0, var_low=1.0)
+    degenerate = separate_noise(
+        mean_high=100.0, mean_low=100.001, var_high=1.0, var_low=1.0
+    )
     assert np.isnan(degenerate.thermal_fsnr) or np.isfinite(degenerate.thermal_fsnr)
 
 
@@ -42,14 +46,18 @@ def test_separate_noise_is_nan_when_signal_does_not_change_with_flip() -> None:
     # divide by m - 1 == 0; it must return NaN variances, not divide by zero.
     with warnings.catch_warnings():
         warnings.simplefilter("error")  # no zero-division warning may escape
-        res = separate_noise(100.0, 100.0, var_high=20.0, var_low=10.0)
+        res = separate_noise(
+            mean_high=100.0, mean_low=100.0, var_high=20.0, var_low=10.0
+        )
     assert np.isnan(res.thermal_var)
     assert np.isnan(res.instability_var)
     assert not res.fell_back
     # a zero low-flip signal is likewise undefined (m -> inf)
     with warnings.catch_warnings():
         warnings.simplefilter("error")
-        zero = separate_noise(100.0, 0.0, var_high=20.0, var_low=10.0)
+        zero = separate_noise(
+            mean_high=100.0, mean_low=0.0, var_high=20.0, var_low=10.0
+        )
     assert np.isnan(zero.thermal_var)
 
 
@@ -60,10 +68,10 @@ def test_m_is_infinite_when_the_low_flip_signal_is_zero() -> None:
     failure into a clean message, so a `ZeroDivisionError` here would surface as
     a traceback on a scan the rest of the run already handled.
     """
-    zero = separate_noise(100.0, 0.0, var_high=20.0, var_low=10.0)
+    zero = separate_noise(mean_high=100.0, mean_low=0.0, var_high=20.0, var_low=10.0)
     assert zero.m == float("inf")
 
 
 def test_instability_fraction_is_share_of_high_variance() -> None:
-    res = separate_noise(200.0, 100.0, var_high=30.0, var_low=15.0)
+    res = separate_noise(mean_high=200.0, mean_low=100.0, var_high=30.0, var_low=15.0)
     assert np.isclose(res.instability_fraction, res.instability_var / res.var_high)

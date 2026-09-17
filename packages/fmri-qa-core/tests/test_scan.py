@@ -254,7 +254,7 @@ def test_loaded_scaling_preserves_clipping_and_dead_edges(
     scan = q.QAScan.from_nifti(path)
     assert (scan.slope, scan.inter) == (slope, inter)
     assert np.array_equal(scan.data, raw.astype(float) * slope + inter)
-    saturation = q.detect_saturation(scan.data, scan.slope, scan.inter)
+    saturation = q.detect_saturation(scan.data, slope=scan.slope, inter=scan.inter)
     assert saturation.n_clipped == 1 and saturation.bits == 12
     assert saturation.ceiling == 4095 * slope + inter
     images = q.preprocess(scan, trim_sec=0)

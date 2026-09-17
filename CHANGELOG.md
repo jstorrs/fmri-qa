@@ -8,6 +8,18 @@ versioning when the first stable public interface is released.
 
 ### Changed
 
+- **`separate_noise` and `detect_saturation` now take their numeric parameters
+  as keyword-only arguments.** `separate_noise(mean_high, mean_low, var_high,
+  var_low, ...)` took four same-typed floats whose order is the entire
+  meaning: swapping the two means type-checked and inverted `M -> 1/M`,
+  producing a negative instability variance and silently taking the
+  documented fallback branch, while swapping the two variances was equally
+  silent. `detect_saturation(data, slope, inter, trim, ...)` took `slope` and
+  `inter` positionally right next to each other — swapped, they still
+  type-checked and made the rail test report a clean series, the exact
+  failure the module's docstring says must not be possible. Both are
+  keyword-only now (arrays and `data` stay positional); every call site
+  names its arguments.
 - **`trim_count` and `trim_initial` now take `tr` and `trim_sec` as keyword-only
   arguments.** Both are durations in seconds, in an order nothing at a call
   site revealed — and the order is the reverse of the division they perform

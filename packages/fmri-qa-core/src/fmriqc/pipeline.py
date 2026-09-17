@@ -300,8 +300,8 @@ def _detect_full_series_saturation(
     """
     return detect_saturation(
         scan.data,
-        scan.slope,
-        scan.inter,
+        slope=scan.slope,
+        inter=scan.inter,
         trim=trim_count(tr=scan.tr, trim_sec=trim_sec),
         stored_integer=scan.stored_integer,
     )

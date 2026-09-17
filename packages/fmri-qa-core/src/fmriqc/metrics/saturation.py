@@ -118,10 +118,10 @@ def _saturation_bits(stored_max: float) -> int | None:
 
 def detect_saturation(
     data: FloatArray,
+    *,
     slope: float = 1.0,
     inter: float = 0.0,
     trim: int = 0,
-    *,
     stored_integer: bool = True,
 ) -> SaturationResult | None:
     """Detect ADC saturation (signal clipped at a `2**n - 1` rail) in a 4-D series.
