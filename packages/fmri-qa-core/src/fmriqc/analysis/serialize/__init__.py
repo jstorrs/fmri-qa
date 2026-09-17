@@ -67,6 +67,20 @@ __all__ = ["load_artifact", "save_artifact"]
 # reader that understands it stay in one file.
 _MAGIC_BYTES = max(len(netcdf.MAGIC), len(npz.MAGIC))
 
+# How a malformed artifact or document fails in decompose, compose, validate or
+# encode: a missing key, a field of the wrong shape or type, a closed-set string
+# from outside its set, an int too large for its container. One set for both
+# directions, because a member added to one side alone would let the other
+# raise past its guard -- and `load_artifact` promises only `InvalidArtifactError`.
+_MALFORMED = (
+    AttributeError,
+    IndexError,
+    KeyError,
+    OverflowError,
+    TypeError,
+    ValueError,
+)
+
 
 def save_artifact(artifact: QAArtifact, path: str | Path) -> Path:
     """Write `artifact` to `path` as a netCDF-4 file. Returns the path.
@@ -113,14 +127,7 @@ def save_artifact(artifact: QAArtifact, path: str | Path) -> Path:
         # plain numbers, and the type check is written against the file.
         validate_document(json.loads(json.dumps(document)))
         content = netcdf.encode(document, arrays)
-    except (
-        AttributeError,
-        IndexError,
-        KeyError,
-        OverflowError,
-        TypeError,
-        ValueError,
-    ) as exc:
+    except _MALFORMED as exc:
         raise InvalidArtifactError(
             out, f"refusing to write an artifact that would not read back: {exc}"
         ) from exc
@@ -213,12 +220,5 @@ def load_artifact(path: str | Path) -> QAArtifact:
         return artifact
     except InvalidArtifactError:
         raise
-    except (
-        KeyError,
-        TypeError,
-        ValueError,
-        IndexError,
-        AttributeError,
-        OverflowError,
-    ) as exc:
+    except _MALFORMED as exc:
         raise InvalidArtifactError(src, f"malformed artifact: {exc}") from exc

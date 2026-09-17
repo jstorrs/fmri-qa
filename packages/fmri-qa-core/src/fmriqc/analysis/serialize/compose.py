@@ -10,9 +10,11 @@ a hand-edited or foreign document fails here instead of reaching a reader that
 switches on the value.
 """
 
+from collections.abc import Mapping
 from typing import Any
 
 import numpy as np
+from numpy.typing import NDArray
 
 from ...settings import AnalysisSettings
 from ...types import LENGTH_UNITS, PE_LABELS, BoolArray, FloatArray
@@ -43,21 +45,21 @@ def _one_of[T: str](value: Any, allowed: tuple[T, ...], field: str) -> T:
     raise ValueError(f"{field} {value!r} is not one of {allowed}")
 
 
-def _floats(arrays: dict[str, Any], key: str) -> FloatArray:
+def _floats(arrays: Mapping[str, NDArray[Any]], key: str) -> FloatArray:
     """A required float array member."""
     if arrays[key].dtype.kind not in "fiu":
         raise ValueError(f"{key} must be a real numeric array")
     return np.asarray(arrays[key], dtype=np.float64)
 
 
-def _bools(arrays: dict[str, Any], key: str) -> BoolArray:
+def _bools(arrays: Mapping[str, NDArray[Any]], key: str) -> BoolArray:
     """A required boolean mask member."""
     if arrays[key].dtype != np.bool_:
         raise ValueError(f"{key} must be a boolean mask")
     return np.asarray(arrays[key], dtype=np.bool_)
 
 
-def compose(document: dict[str, Any], arrays: dict[str, Any]) -> QAArtifact:
+def compose(document: dict[str, Any], arrays: Mapping[str, NDArray[Any]]) -> QAArtifact:
     """Rebuild an artifact from its JSON document and named arrays."""
     provenance = dict(document["provenance"])
     for field in _PROVENANCE_TUPLES:
@@ -81,7 +83,9 @@ def compose(document: dict[str, Any], arrays: dict[str, Any]) -> QAArtifact:
     )
 
 
-def _curves_section(document: dict[str, Any], arrays: dict[str, Any]) -> Curves:
+def _curves_section(
+    document: dict[str, Any], arrays: Mapping[str, NDArray[Any]]
+) -> Curves:
     """Rebuild the curve section."""
     psf = document["psf"]
     labels = tuple(psf["labels"])
@@ -118,7 +122,9 @@ def _curves_section(document: dict[str, Any], arrays: dict[str, Any]) -> Curves:
     )
 
 
-def _images_section(document: dict[str, Any], arrays: dict[str, Any]) -> ArtifactImages:
+def _images_section(
+    document: dict[str, Any], arrays: Mapping[str, NDArray[Any]]
+) -> ArtifactImages:
     """Rebuild the image section."""
     ghost = None
     if document["has_ghost"]:

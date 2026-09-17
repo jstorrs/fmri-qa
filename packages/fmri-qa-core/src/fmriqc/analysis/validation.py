@@ -25,6 +25,7 @@ from typing import Any, Literal, Union, get_args, get_origin, get_type_hints
 import numpy as np
 
 from ..settings import AnalysisSettings
+from ..types import LengthUnit
 from .artifact import Measurements, Provenance, QAArtifact, RoiBox, _require
 
 # The two spellings an optional field's annotation can arrive in. `int | None`
@@ -101,6 +102,7 @@ def validate_document(document: dict[str, Any]) -> None:
         ("labels", tuple[str, str]),
         ("fwhm", tuple[float, float]),
         ("xmax", float),
+        ("unit", LengthUnit),
     ):
         if not _matches(psf[name], annotation):
             raise ValueError(f"curves.psf.{name} has an invalid type or length")

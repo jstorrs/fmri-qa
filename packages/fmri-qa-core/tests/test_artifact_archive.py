@@ -277,6 +277,7 @@ def test_load_rejects_invalid_scalar_records(tmp_path, artifact) -> None:
         ("curves.psf.fwhm", [1]),
         ("curves.psf.xmax", float("inf")),
         ("curves.psf.unit", "vox"),
+        ("curves.psf.unit", "cm"),
     )
     for field, value in edits:
         path = q.save_artifact(artifact, tmp_path / "bad.nc")
