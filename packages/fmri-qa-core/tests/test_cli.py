@@ -434,13 +434,43 @@ def test_json_record_carries_the_displacement_unit(tmp_path, write_scan) -> None
     assert record["displacement_unit"] == "mm"  # the fixture's voxel size is known
 
 
-def test_table_marks_an_unnamed_direction_unknown(tmp_path, write_scan, capsys) -> None:
+def test_table_marks_an_unnamed_direction_unknown(tmp_path, write_scan) -> None:
     """The `fwPE`/`fwRO` cells read `?`, not a plausible number from elsewhere."""
     scan = q.QAScan.from_nifti(write_scan(tmp_path))
     artifact = q.analyze(scan, q.AnalysisSettings(roi_size=9))
     unnamed = replace(artifact.measurements, fwhm_pe=None, fwhm_ro=None)
-    table.print_row(replace(artifact, measurements=unnamed))
-    assert capsys.readouterr().out.rstrip("\n").endswith("     ?      ?")
+    row = table.format_row(replace(artifact, measurements=unnamed))
+    assert row.endswith("     ?      ?")
+
+
+def test_the_table_header_is_the_one_operators_read() -> None:
+    """The header is printed output, so its every character is an interface.
+
+    Pinned as a literal: a column renamed, resized or reordered has to be
+    changed here too, on purpose, rather than drifting in unnoticed.
+    """
+    header, rule = table.header_lines()
+    assert header == (
+        "scan                                      PE      loc       SNR "
+        "     SFNR      RDC   drift%   ghost%     ghT%      RO%    ACRg%"
+        "   outl%   tcOut  spcOut   clip  clipPre    motn    scl%    shr%"
+        "    com   fwPE   fwRO"
+    )
+    assert rule == "-" * len(header)
+
+
+def test_a_table_row_lines_up_under_the_header(tmp_path, write_scan) -> None:
+    """The column widths are spelled in the header and again in the row.
+
+    Nothing else holds the two together: a column added or resized in one and
+    not the other would misalign the table without failing anything.
+    """
+    scan = q.QAScan.from_nifti(write_scan(tmp_path))
+    artifact = q.analyze(scan, q.AnalysisSettings(roi_size=9), name="scan.nii.gz")
+    header, _ = table.header_lines()
+    row = table.format_row(artifact)
+    assert len(row) == len(header)
+    assert len(row.split()) == len(header.split())
 
 
 def _reject_json_constant(value: str) -> None:

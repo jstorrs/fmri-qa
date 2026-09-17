@@ -30,7 +30,7 @@ from .destinations import (
     write_artifact,
 )
 from .record import JSON_SCHEMA_VERSION, config_record, metric_record
-from .table import print_header, print_row
+from .table import format_row, header_lines
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -136,7 +136,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         file=info,
     )
     if not args.json:
-        print_header()
+        header, rule = header_lines()
+        print(header)
+        print(rule)
 
     # Every per-scan failure, kept as well as printed: the JSON document lists
     # them beside the scans that ran, so a consumer holding only the output can
@@ -162,7 +164,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         if args.json:
             records.append(metric_record(artifact))
         else:
-            print_row(artifact)
+            print(format_row(artifact))
         if args.artifact:
             problem = write_artifact(artifact, destinations[path], info)
             if problem:

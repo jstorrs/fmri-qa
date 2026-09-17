@@ -55,8 +55,8 @@ def clip_cell(count: int | None, *, flag: bool = False) -> str:
     return "?" if count is None else f"{count}{'!' if flag else ''}"
 
 
-def print_header() -> None:
-    """Print the fixed-width table header and its rule."""
+def header_lines() -> tuple[str, str]:
+    """The fixed-width table header and its rule, as literal strings."""
     header = (
         f"{'scan':40s} {'PE':>3s} {'loc':>8s} "
         f"{'SNR':>9s} {'SFNR':>9s} {'RDC':>8s} {'drift%':>8s} "
@@ -65,12 +65,11 @@ def print_header() -> None:
         f"{'clip':>6s} {'clipPre':>8s} {'motn':>7s} {'scl%':>7s} {'shr%':>7s} "
         f"{'com':>6s} {'fwPE':>6s} {'fwRO':>6s}"
     )
-    print(header)
-    print("-" * len(header))
+    return header, "-" * len(header)
 
 
-def print_row(artifact: q.QAArtifact) -> None:
-    """Print one fixed-width metrics row for the human table."""
+def format_row(artifact: q.QAArtifact) -> str:
+    """Format one fixed-width metrics row for the human table."""
     m = artifact.measurements
     # loc: whether the phantom mask and the summary ROI landed where they must.
     # "ok", or MASK/ROI naming what failed -- in which case every mask-based
@@ -106,7 +105,7 @@ def print_row(artifact: q.QAArtifact) -> None:
     # the RDC smoothness confound; PE/RO asymmetry is anisotropic smoothing.
     # "?" where no PE axis resolved, so neither direction has a name (the
     # combined FWHM is not substituted -- see `fwhm_cell`).
-    print(
+    return (
         f"{artifact.provenance.scan:40s} {m.pe_label:>3s} "
         f"{localization_flag(m):>8s} "
         f"{m.snr:>9.1f} {m.sfnr:>9.1f} {m.rdc:>8.3f} "
