@@ -70,6 +70,11 @@ class Provenance:
     validated artifact cannot exist without them. The rest is acquisition
     metadata copied from the BIDS sidecar and NIfTI header, every field of it
     optional because a scan without a sidecar still analyzes.
+
+    The domains above are held by the constructor, not by a reader: a series
+    with no frames, a non-positive TR, a slice index outside the volume it
+    names, or a voxel with no size is a `ValueError`, so holding a `Provenance`
+    means the run it describes is one that could have happened.
     """
 
     scan: str
@@ -95,6 +100,30 @@ class Provenance:
     software: str | None = None
     datetime: str | None = None
     series: str | None = None
+
+    def __post_init__(self) -> None:
+        _require(self.n_frames > 0, "invalid provenance.n_frames")
+        _require(
+            self.n_trimmed is None or self.n_trimmed >= 0,
+            "invalid provenance.n_trimmed",
+        )
+        _require(
+            self.n_slices is None or self.n_slices > 0, "invalid provenance.n_slices"
+        )
+        _require(
+            self.slice_index is None
+            or (
+                self.slice_index >= 0
+                and (self.n_slices is None or self.slice_index < self.n_slices)
+            ),
+            "invalid provenance.slice_index",
+        )
+        _require(math.isfinite(self.tr) and self.tr > 0, "invalid provenance.tr")
+        if self.voxel_mm is not None:
+            _require(
+                all(math.isfinite(v) and v > 0 for v in self.voxel_mm),
+                "invalid provenance.voxel_mm",
+            )
 
 
 @dataclass(frozen=True, slots=True)
@@ -331,12 +360,29 @@ class Curves(ArrayValue):
 
 @dataclass(frozen=True, slots=True)
 class RoiBox:
-    """The summary ROI as plain half-open bounds, in array (row, col) order."""
+    """The summary ROI as plain half-open bounds, in array (row, col) order.
+
+    The box is square and has a positive side, held by the constructor, so
+    `size` is the one side both axes have and not the first of two numbers that
+    might differ. Whether it also lies inside the image is a fact about the
+    image, which a box alone does not carry; `validation` holds that half.
+    """
 
     row0: int
     row1: int
     col0: int
     col1: int
+
+    def __post_init__(self) -> None:
+        # The same message the image-shape half carries, because a reader of a
+        # refused artifact is told which box is wrong, not which of the two
+        # places looked at it.
+        _require(
+            0 <= self.row0 < self.row1
+            and 0 <= self.col0 < self.col1
+            and self.row1 - self.row0 == self.col1 - self.col0,
+            "images.roi must be square and inside the image",
+        )
 
     @property
     def size(self) -> int:

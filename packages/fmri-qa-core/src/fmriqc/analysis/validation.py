@@ -1,14 +1,15 @@
 """Validate the published artifact contract at the archive boundary.
 
 Half the contract is not here. An invariant of one record alone is held by that
-value object's own constructor (`Measurements.__post_init__` today), because an
-artifact built in-process and printed or rendered is never saved and so never
-reaches this module: a new single-record invariant added here would go
-unchecked for every consumer but the archive. What is left here is what a
-constructor cannot see — facts that span two records (`displacement_unit`
-against `provenance.voxel_mm`, `outlier_worst_frame` against
-`provenance.n_frames`), the settings and provenance domains, and everything
-about arrays: their dimensions, shapes, and coordinates.
+value object's own constructor (`Provenance`, `Measurements` and `RoiBox`
+hold their own today), because an artifact built in-process and printed or
+rendered is never saved and so never reaches this module: a new single-record
+invariant added here would go unchecked for every consumer but the archive.
+What is left here is what a constructor cannot see — facts that span two
+records (`displacement_unit` against `provenance.voxel_mm`,
+`outlier_worst_frame` against `provenance.n_frames`, the ROI box against the
+image it sits on), the settings domains, and everything about arrays: their
+dimensions, shapes, and coordinates.
 
 Scalar types follow the value objects; dimensional relationships and numeric
 domains are checked explicitly. NaN/Infinity measurements remain meaningful,
@@ -125,20 +126,6 @@ def _validate_parameters(artifact: QAArtifact) -> None:
     # field annotations -- already refuses any other axis, on save and on load
     # alike. Repeating the domain as a literal `(None, 0, 1)` would be a second
     # place to update the day a pipeline measures a third axis.
-    _require(p.n_frames > 0, "invalid provenance.n_frames")
-    _require(p.n_trimmed is None or p.n_trimmed >= 0, "invalid provenance.n_trimmed")
-    _require(p.n_slices is None or p.n_slices > 0, "invalid provenance.n_slices")
-    _require(
-        p.slice_index is None
-        or (p.slice_index >= 0 and (p.n_slices is None or p.slice_index < p.n_slices)),
-        "invalid provenance.slice_index",
-    )
-    _require(math.isfinite(p.tr) and p.tr > 0, "invalid provenance.tr")
-    if p.voxel_mm is not None:
-        _require(
-            all(math.isfinite(v) and v > 0 for v in p.voxel_mm),
-            "invalid provenance.voxel_mm",
-        )
     # The converse does not hold: a migrated (schema <= 5) artifact can carry a
     # known voxel size with `displacement_unit` still "vox", because the old
     # peaks were always voxels regardless (see `serialize.migrate`). "mm"
@@ -211,10 +198,10 @@ def _validate_images(artifact: QAArtifact) -> None:
                 f"images.ghost.{name} shape mismatch",
             )
     roi = images.roi
+    # `RoiBox.__post_init__` has already held the box to being square and
+    # positive; what is left is the half that needs the image it sits on.
     _require(
-        0 <= roi.row0 < roi.row1 <= shape[0]
-        and 0 <= roi.col0 < roi.col1 <= shape[1]
-        and roi.size == roi.col1 - roi.col0,
+        roi.row1 <= shape[0] and roi.col1 <= shape[1],
         "images.roi must be square and inside the image",
     )
     _require(

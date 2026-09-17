@@ -87,12 +87,36 @@ def test_save_refuses_an_artifact_the_reader_would_reject(tmp_path, artifact) ->
     assert not (tmp_path / "qa.nc").exists()
 
 
+def test_save_refuses_an_roi_box_that_is_square_but_off_the_image(
+    tmp_path, artifact
+) -> None:
+    """A legal box is still wrong if it is drawn where the image is not.
+
+    `RoiBox` holds itself to being square with a positive side, which it can see
+    on its own; that the box lies inside the image it annotates is a fact about
+    the image, so it is the archive boundary that holds it.
+    """
+    roi = artifact.images.roi
+    offset = artifact.images.signal.shape[0]
+    moved = replace(
+        roi,
+        row0=roi.row0 + offset,
+        row1=roi.row1 + offset,
+        col0=roi.col0 + offset,
+        col1=roi.col1 + offset,
+    )
+    broken = replace(artifact, images=replace(artifact.images, roi=moved))
+    with pytest.raises(q.InvalidArtifactError, match="inside the image"):
+        q.save_artifact(broken, tmp_path / "qa.nc")
+    assert not (tmp_path / "qa.nc").exists()
+
+
 def test_a_refused_save_preserves_the_archive_already_there(tmp_path, artifact) -> None:
     """A rejected write leaves the valid file it would have replaced untouched."""
     path = q.save_artifact(artifact, tmp_path / "qa.nc")
     before = path.read_bytes()
-    broken = replace(artifact, provenance=replace(artifact.provenance, n_frames=0))
-    with pytest.raises(q.InvalidArtifactError, match="n_frames"):
+    broken = replace(artifact, provenance=replace(artifact.provenance, te="0.03"))
+    with pytest.raises(q.InvalidArtifactError, match=r"provenance\.te"):
         q.save_artifact(broken, path)
     assert path.read_bytes() == before
     assert not list(tmp_path.glob(".*.tmp"))  # and no temporary beside it

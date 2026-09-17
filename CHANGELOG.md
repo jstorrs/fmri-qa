@@ -8,6 +8,15 @@ versioning when the first stable public interface is released.
 
 ### Changed
 
+- **An impossible `Provenance` or `RoiBox` is now a `ValueError` at
+  construction too.** The same, for the two records that describe the run and
+  the ROI box: a series with no frames, a non-positive or non-finite `tr`, a
+  `slice_index` past the `n_slices` beside it, a voxel with no size, and a ROI
+  box that is not square or whose bounds run backwards are refused by
+  `Provenance.__post_init__` and `RoiBox.__post_init__`. `validate_artifact`
+  keeps only what it alone can see — that the box also lies inside the image it
+  is drawn on. Messages, the on-disk layout, and `ARTIFACT_SCHEMA_VERSION` are
+  unchanged.
 - **A `Measurements` that contradicts itself is now a `ValueError` at
   construction, not an `InvalidArtifactError` at save.** The record's
   single-record invariants — a directional `fwhm_pe`/`fwhm_ro` beside a

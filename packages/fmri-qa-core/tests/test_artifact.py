@@ -402,3 +402,83 @@ def test_a_negative_clipping_count_cannot_be_constructed(artifact) -> None:
     """A count of clipped voxels is a tally; there is no negative tally."""
     with pytest.raises(ValueError, match="invalid clipping counts"):
         replace(artifact.measurements, n_clipped_kept=-1, clipped_kept=False)
+
+
+def test_a_series_with_no_frames_cannot_be_constructed(artifact) -> None:
+    """A run has to have been acquired; nothing downstream indexes zero frames."""
+    with pytest.raises(ValueError, match=r"invalid provenance\.n_frames"):
+        replace(artifact.provenance, n_frames=0)
+
+
+def test_a_negative_trim_count_cannot_be_constructed(artifact) -> None:
+    """The warm-up trim dropped some volumes or none; it cannot have added any."""
+    with pytest.raises(ValueError, match=r"invalid provenance\.n_trimmed"):
+        replace(artifact.provenance, n_trimmed=-1)
+
+
+def test_a_volume_with_no_planes_cannot_be_constructed(artifact) -> None:
+    """The analyzed slice came from somewhere, so the volume has planes to pick."""
+    with pytest.raises(ValueError, match=r"invalid provenance\.n_slices"):
+        replace(artifact.provenance, n_slices=0, slice_index=None)
+
+
+def test_a_slice_index_outside_the_volume_it_names_cannot_be_constructed(
+    artifact,
+) -> None:
+    """Both halves are recorded, so a plane past the last one is a contradiction."""
+    n_slices = artifact.provenance.n_slices
+    assert n_slices is not None  # the fixture really does record the volume
+    with pytest.raises(ValueError, match=r"invalid provenance\.slice_index"):
+        replace(artifact.provenance, slice_index=n_slices)
+
+
+def test_a_tr_no_series_could_have_been_sampled_at_cannot_be_constructed(
+    artifact,
+) -> None:
+    """Every frame time and spectrum bin is a multiple of the TR."""
+    for tr in (0.0, -2.0, float("inf"), float("nan")):
+        with pytest.raises(ValueError, match=r"invalid provenance\.tr"):
+            replace(artifact.provenance, tr=tr)
+
+
+def test_a_voxel_with_no_size_cannot_be_constructed(artifact) -> None:
+    """A known voxel size is what converts voxels to mm; a zero edge converts to 0."""
+    with pytest.raises(ValueError, match=r"invalid provenance\.voxel_mm"):
+        replace(artifact.provenance, voxel_mm=(3.0, 0.0, 3.0))
+
+
+def test_a_provenance_that_recorded_no_acquisition_metadata_is_legal(artifact) -> None:
+    """A scan with no sidecar still analyzes: every optional field is "unknown"."""
+    bare = replace(
+        artifact.provenance,
+        n_trimmed=None,
+        slice_index=None,
+        n_slices=None,
+        voxel_mm=None,
+    )
+    assert bare.voxel_mm is None
+    assert (bare.n_trimmed, bare.slice_index, bare.n_slices) == (None, None, None)
+
+
+def test_an_roi_box_that_is_not_square_cannot_be_constructed(artifact) -> None:
+    """`RoiBox.size` is the one side both axes have, not the first of two."""
+    with pytest.raises(ValueError, match=r"images\.roi must be square"):
+        replace(artifact.images.roi, row1=artifact.images.roi.row1 + 1)
+
+
+def test_an_roi_box_with_its_bounds_the_wrong_way_round_cannot_be_constructed(
+    artifact,
+) -> None:
+    """The bounds are half-open and ordered; a reversed pair is a negative side."""
+    roi = artifact.images.roi
+    with pytest.raises(ValueError, match=r"images\.roi must be square"):
+        replace(roi, row0=roi.row1, row1=roi.row0)
+
+
+def test_an_roi_box_that_starts_outside_the_image_cannot_be_constructed(
+    artifact,
+) -> None:
+    """A negative origin indexes from the far edge in numpy; it is not a box."""
+    roi = artifact.images.roi
+    with pytest.raises(ValueError, match=r"images\.roi must be square"):
+        replace(roi, row0=-1, col0=-1)
