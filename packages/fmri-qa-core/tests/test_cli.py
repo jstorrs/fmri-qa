@@ -117,6 +117,25 @@ def test_main_refuses_a_batch_whose_artifacts_would_collide(
     assert not out.exists()  # refused before analyzing, so nothing was written
 
 
+def test_main_refuses_the_same_scan_named_twice_with_an_artifact_directory(
+    tmp_path, write_scan, capsys
+) -> None:
+    """One scan named twice is two requests for one destination, and is refused.
+
+    It is the collision a batch of same-named scans makes, reached by a shorter
+    road, so it gets the same answer rather than being analyzed twice over.
+    """
+    scan = write_scan(tmp_path)
+    out = tmp_path / "artifacts"
+
+    rc = cli.main([scan, scan, "--roi-size", "9", "--artifact", str(out)])
+
+    assert rc == 1
+    err = capsys.readouterr().err
+    assert "would both be saved as" in err
+    assert not out.exists()  # refused before analyzing, so nothing was written
+
+
 def test_main_refuses_an_artifact_that_would_overwrite_the_scan(
     tmp_path, write_scan, capsys, monkeypatch
 ) -> None:

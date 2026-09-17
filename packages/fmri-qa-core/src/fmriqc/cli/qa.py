@@ -25,6 +25,7 @@ from .arguments import (
 )
 from .destinations import (
     ARTIFACT_SUFFIX,
+    artifact_destinations,
     report_destination_problems,
     write_artifact,
 )
@@ -104,12 +105,20 @@ def main(argv: Sequence[str] | None = None) -> int:
     # Before anything counts the scans: on Windows the wildcard is still here.
     args.paths = expand_globs(args.paths)
 
-    batch = len(args.paths) > 1
-    # Refuse before analyzing anything: a destination that lands on an input or
-    # on another scan's artifact would silently discard a completed analysis or
-    # the data it came from, so it is a usage error, not a per-scan failure.
-    if args.artifact and report_destination_problems(args.artifact, args.paths):
-        return 1
+    # Resolved once, up front: the check that clears a destination and the
+    # write that uses it are handed the same `Path`, so they cannot disagree.
+    # A duplicated input maps to one destination here, but such a run has
+    # already been refused below, so nothing is lost collapsing it.
+    destinations: dict[str, Path] = {}
+    if args.artifact:
+        pairs = artifact_destinations(args.artifact, args.paths)
+        # Refuse before analyzing anything: a destination that lands on an
+        # input or on another scan's artifact would silently discard a
+        # completed analysis or the data it came from, so it is a usage
+        # error, not a per-scan failure.
+        if report_destination_problems(pairs):
+            return 1
+        destinations = dict(pairs)
 
     settings = q.AnalysisSettings(
         trim_sec=args.trim_sec,
@@ -155,7 +164,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         else:
             print_row(artifact)
         if args.artifact:
-            problem = write_artifact(artifact, args.artifact, path, batch, info)
+            problem = write_artifact(artifact, destinations[path], info)
             if problem:
                 errors.append({"scan": name, "source": str(path), "error": problem})
 

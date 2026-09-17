@@ -23,8 +23,8 @@ from fmriqc.load.paths import nifti_stem, same_file, sidecar_path
 ARTIFACT_SUFFIX = ".qa.nc"
 
 
-def artifact_path(base: str, path: str, batch: bool) -> Path:
-    """Where one scan's artifact is written under `--artifact BASE`.
+def artifact_destinations(base: str, paths: Sequence[str]) -> list[tuple[str, Path]]:
+    """`(input, destination)` pairs for every requested scan, in order.
 
     A batch cannot share one file, so `BASE` is a directory and each scan gets
     `<scan stem>.qa.nc` inside it. A single-scan run writes exactly `BASE` --
@@ -38,13 +38,23 @@ def artifact_path(base: str, path: str, batch: bool) -> Path:
     directory -- `[WinError 5] Access is denied` on Windows, `IsADirectoryError`
     elsewhere, neither of which names the actual mistake. A file and a directory
     cannot share a name, so preferring the directory is never ambiguous.
+
+    An input named twice keeps both pairs -- collapsing them would silently
+    forgive `fmri-qa a.nii.gz a.nii.gz --artifact out/`, which `artifact_collisions`
+    below must instead refuse.
     """
+    batch = len(paths) > 1
     if batch or Path(base).is_dir():
-        return Path(base) / f"{nifti_stem(path)}{ARTIFACT_SUFFIX}"
-    return Path(base)
+        return [
+            (path, Path(base) / f"{nifti_stem(path)}{ARTIFACT_SUFFIX}")
+            for path in paths
+        ]
+    return [(path, Path(base)) for path in paths]
 
 
-def overwritten_inputs(base: str, paths: Sequence[str]) -> list[tuple[Path, str]]:
+def overwritten_inputs(
+    destinations: Sequence[tuple[str, Path]],
+) -> list[tuple[Path, str]]:
     """`(destination, input)` pairs where an artifact would replace an input.
 
     An artifact is written by moving a finished file over its destination, and
@@ -53,14 +63,14 @@ def overwritten_inputs(base: str, paths: Sequence[str]) -> list[tuple[Path, str]
     was. Every destination is checked against every input file, not only its
     own scan's: in a batch, one scan's artifact can land on another's file.
     """
-    destinations = [artifact_path(base, path, batch=len(paths) > 1) for path in paths]
-    inputs = [str(f) for path in paths for f in (path, sidecar_path(path))]
-    return [
-        (dest, src) for dest in destinations for src in inputs if same_file(dest, src)
-    ]
+    dests = [dest for _, dest in destinations]
+    inputs = [str(f) for path, _ in destinations for f in (path, sidecar_path(path))]
+    return [(dest, src) for dest in dests for src in inputs if same_file(dest, src)]
 
 
-def artifact_collisions(base: str, paths: Sequence[str]) -> dict[Path, list[str]]:
+def artifact_collisions(
+    destinations: Sequence[tuple[str, Path]],
+) -> dict[Path, list[str]]:
     """Destinations that more than one input scan would be written to.
 
     A batch names each artifact by the scan's stem, so inputs from different
@@ -70,13 +80,13 @@ def artifact_collisions(base: str, paths: Sequence[str]) -> dict[Path, list[str]
     would render a packet quietly missing scans. `main` checks this up front and
     refuses rather than analyze work it cannot keep.
     """
-    destinations: dict[Path, list[str]] = {}
-    for path in paths:
-        destinations.setdefault(artifact_path(base, path, batch=True), []).append(path)
-    return {dest: srcs for dest, srcs in destinations.items() if len(srcs) > 1}
+    by_dest: dict[Path, list[str]] = {}
+    for path, dest in destinations:
+        by_dest.setdefault(dest, []).append(path)
+    return {dest: srcs for dest, srcs in by_dest.items() if len(srcs) > 1}
 
 
-def report_destination_problems(base: str, paths: Sequence[str]) -> bool:
+def report_destination_problems(destinations: Sequence[tuple[str, Path]]) -> bool:
     """Print every `--artifact` destination problem; True if the run must stop.
 
     Both checks are made against the paths alone, before a single scan is read,
@@ -85,7 +95,7 @@ def report_destination_problems(base: str, paths: Sequence[str]) -> bool:
     one file holding the last analysis and silently drop the rest.
     """
     stop = False
-    for destination, source in overwritten_inputs(base, paths):
+    for destination, source in overwritten_inputs(destinations):
         print(
             f"ERROR: --artifact {destination} would overwrite the input {source}",
             file=sys.stderr,
@@ -93,7 +103,7 @@ def report_destination_problems(base: str, paths: Sequence[str]) -> bool:
         stop = True
     if stop:  # a destination that eats an input is fatal on its own
         return True
-    collisions = artifact_collisions(base, paths) if len(paths) > 1 else {}
+    collisions = artifact_collisions(destinations)
     for destination, sources in sorted(collisions.items()):
         print(
             f"ERROR: {' and '.join(sources)} would both be saved as {destination}",
@@ -109,11 +119,8 @@ def report_destination_problems(base: str, paths: Sequence[str]) -> bool:
     return bool(collisions)
 
 
-def write_artifact(
-    artifact: q.QAArtifact, base: str, path: str, batch: bool, info: TextIO
-) -> str | None:
+def write_artifact(artifact: q.QAArtifact, out: Path, info: TextIO) -> str | None:
     """Write one artifact. Returns None if written, else the error as reported."""
-    out = artifact_path(base, path, batch)
     try:
         q.save_artifact(artifact, out)
     except (OSError, q.InvalidArtifactError) as exc:
