@@ -16,14 +16,16 @@ from .types import FBIRN_ROI_SIZE, DetrendMethod, PeAxis, RoiCenter
 class AnalysisSettings:
     """The analysis knobs: what the run was asked for, and what that resolved to.
 
-    The first five fields are the request — exactly the parameters `run_qa` and
-    `analyze` accept, so re-running with these settings reproduces the result.
+    The first five fields are the request — this record is what `run_qa`,
+    `preprocess` and `analyze` take, so re-running with it reproduces the result.
     `roi_size` is the side *asked for*; the side actually analyzed (the same,
     unless the image is smaller) is the ROI the result carries. `detrend_order`
     is the one *resolved* value (the polynomial degree or the spline
     interior-knot count the detrender chose for this series length), recorded
     because it is a run parameter a reader must be able to report but only the
-    pipeline knows.
+    pipeline knows. A request handed in already carrying one — a published
+    record fed back to reproduce its run — is accepted, and the order the new
+    run resolves overwrites it.
 
     `run_qa` writes this record onto its `QAResult`, so an artifact built from
     a result publishes the settings that result was computed with — never a

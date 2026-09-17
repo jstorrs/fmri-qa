@@ -6,6 +6,7 @@ from .exceptions import InvalidScanError
 from .load.pe_axis import in_plane
 from .load.scan import QAScan
 from .prep.imaging import trim_count
+from .settings import AnalysisSettings
 from .types import PeAxis
 
 MIN_ANALYSIS_FRAMES = 4
@@ -52,21 +53,22 @@ def _frames_after_trim(scan: QAScan, trim_sec: float) -> int:
     return int(scan.data.shape[-1]) - trim_count(tr=scan.tr, trim_sec=trim_sec)
 
 
-def validate_qa_run(
-    scan: QAScan, *, trim_sec: float, roi_size: int, pe_axis: PeAxis | None
-) -> PeAxis | None:
-    """Validate parameters required by the single-slice QA pipeline.
+def validate_qa_run(scan: QAScan, settings: AnalysisSettings) -> PeAxis | None:
+    """Validate a scan against the request the single-slice QA pipeline got.
 
     Returns the axis the request and the header settle on between them --
-    `pe_axis` if given, else `scan.pe_axis` narrowed to in-plane -- or None
-    when neither names one. This is the one place that precedence is decided;
-    `run_qa` falls back to the Nyquist-ghost estimate only when the return here
-    is None.
+    `settings.pe_axis_override` if given, else `scan.pe_axis` narrowed to
+    in-plane -- or None when neither names one. This is the one place that
+    precedence is decided; `run_qa` falls back to the Nyquist-ghost estimate only
+    when the return here is None.
     """
     validate_scan(scan)
+    trim_sec = settings.trim_sec
     _validate_trim_sec(trim_sec)
-    if roi_size <= 0:
-        raise InvalidScanError("roi_size", roi_size, "expected a positive integer")
+    if settings.roi_size <= 0:
+        raise InvalidScanError(
+            "roi_size", settings.roi_size, "expected a positive integer"
+        )
 
     remaining = _frames_after_trim(scan, trim_sec)
     if remaining < MIN_ANALYSIS_FRAMES:
@@ -77,13 +79,14 @@ def validate_qa_run(
             f"at least {MIN_ANALYSIS_FRAMES} are required",
         )
 
-    candidate = scan.pe_axis if pe_axis is None else pe_axis
+    override = settings.pe_axis_override
+    candidate = scan.pe_axis if override is None else override
     if candidate is None:
         return None
-    # `pe_axis` is already a `PeAxis`, so only `scan.pe_axis` -- the header's own
-    # answer, read when no explicit axis is given -- can still name the
-    # through-plane axis here. That scan is refused by name rather than quietly
-    # analyzed on an axis estimated from the Nyquist ghost.
+    # `pe_axis_override` is already a `PeAxis`, so only `scan.pe_axis` -- the
+    # header's own answer, read when no explicit axis is given -- can still name
+    # the through-plane axis here. That scan is refused by name rather than
+    # quietly analyzed on an axis estimated from the Nyquist ghost.
     resolved = in_plane(candidate)
     if resolved is None:
         raise InvalidScanError(

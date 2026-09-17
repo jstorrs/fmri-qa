@@ -48,7 +48,7 @@ from .prep.images import QAImages
 from .prep.imaging import select_slice, trim_count, trim_initial
 from .prep.scale import UNKNOWN_VOXEL_SIZE, VoxelSize
 from .settings import AnalysisSettings
-from .types import FBIRN_ROI_SIZE, BoolArray, DetrendMethod, PeAxis, RoiCenter
+from .types import BoolArray, PeAxis, RoiCenter
 from .validation import validate_qa_run
 
 
@@ -108,23 +108,23 @@ class QAResult:
     meta: ScanMeta | None = None
 
 
-def preprocess(
-    scan: QAScan,
-    trim_sec: float = 5.0,
-    detrend: DetrendMethod = "poly",
-    center: RoiCenter = "image",
-) -> QAImages:
+def preprocess(scan: QAScan, settings: AnalysisSettings | None = None) -> QAImages:
     """Trim, select the QA slice, and compute the FBIRN summary images.
 
     Returns `QAImages` (center slice, detrended fluctuations, and derived summary
-    images); the caller can discard `scan.data` afterwards. `detrend` selects the
-    detrending method ("poly"/"spline"); `center` selects the slice — "image" for
-    the middle slice (Glover), "phantom" for the largest phantom cross-section.
+    images); the caller can discard `scan.data` afterwards. It reads three fields
+    of the request: `trim_sec`, `detrend` (the detrending method,
+    "poly"/"spline") and `center`, which selects the slice — "image" for the
+    middle slice (Glover), "phantom" for the largest phantom cross-section. The
+    ROI and axis fields belong to stages further in; it takes the whole record
+    anyway because that record is the *run's* request rather than this function's
+    parameter list, and so is the one definition of every analysis default.
     """
-    data = trim_initial(scan.data, tr=scan.tr, trim_sec=trim_sec)
-    z, phantom_mask = select_slice(data, center)
+    settings = AnalysisSettings() if settings is None else settings
+    data = trim_initial(scan.data, tr=scan.tr, trim_sec=settings.trim_sec)
+    z, phantom_mask = select_slice(data, settings.center)
     center_slice = data[:, :, z, :]
-    detrender = Detrender.for_series(center_slice, scan.tr, detrend)
+    detrender = Detrender.for_series(center_slice, scan.tr, settings.detrend)
     fluctuations = detrender(center_slice)
     images = QAImages(
         center_slice=center_slice,
@@ -133,7 +133,7 @@ def preprocess(
         # Recorded here because this is where it happens: everything downstream
         # indexes the trimmed series, and once `scan.data` is dropped nothing
         # else can say which acquired volume frame 0 was.
-        n_trimmed=trim_count(tr=scan.tr, trim_sec=trim_sec),
+        n_trimmed=trim_count(tr=scan.tr, trim_sec=settings.trim_sec),
         # The value a stored zero reads back as, so a nulled image edge is
         # recognizable under a nonzero intercept (see `edge_valid_mask`).
         zero_value=float(scan.inter),
@@ -170,50 +170,36 @@ def _prime_phantom_mask_cache(images: QAImages, mask: BoolArray) -> None:
     images.__dict__["phantom_mask"] = readonly(mask)
 
 
-def run_qa(
-    scan: QAScan,
-    trim_sec: float = 5.0,
-    pe_axis: PeAxis | None = None,
-    detrend: DetrendMethod = "poly",
-    center: RoiCenter = "image",
-    roi_size: int = FBIRN_ROI_SIZE,
-) -> QAResult:
+def run_qa(scan: QAScan, settings: AnalysisSettings | None = None) -> QAResult:
     """Full pipeline: scan -> preprocess -> phantom -> Weisskoff/RDC + ghost ratio.
 
-    `pe_axis=None` takes the axis from the scan's metadata, and failing that
-    estimates it from the ghost regions of the analyzed slice — the one place
-    that estimate is made. If the ghost resolves neither axis the run continues
-    with `metrics.ghost` None and a warning, since every ghost statistic is
-    defined relative to an axis.
+    `settings` is the request; the result carries it back with the detrend order
+    the run resolved. Its fields:
+    `pe_axis_override`: None takes the axis from the scan's metadata, and failing
+    that estimates it from the ghost regions of the analyzed slice — the one
+    place that estimate is made. If the ghost resolves neither axis the run
+    continues with `metrics.ghost` None and a warning, since every ghost
+    statistic is defined relative to an axis.
     `detrend` selects the detrending method ("poly" or "spline").
     `center` localizes both the QA slice and the ROI: "image" (middle slice +
     image-center ROI, Glover) or "phantom" (largest slice + detected center).
-    `roi_size` is the fixed summary/Weisskoff ROI side (default 21, fBIRN).
+    `roi_size` is the fixed summary/Weisskoff ROI side (fBIRN's
+    `FBIRN_ROI_SIZE` unless asked otherwise).
     """
-    named_pe = validate_qa_run(
-        scan, trim_sec=trim_sec, roi_size=roi_size, pe_axis=pe_axis
-    )
-    # The request, recorded as it was made: `pe_axis` here is the caller's
-    # argument, not the axis the run goes on to measure along.
-    requested = AnalysisSettings(
-        trim_sec=trim_sec,
-        detrend=detrend,
-        center=center,
-        roi_size=roi_size,
-        pe_axis_override=pe_axis,
-    )
+    settings = AnalysisSettings() if settings is None else settings
+    named_pe = validate_qa_run(scan, settings)
 
-    saturation = _detect_full_series_saturation(scan, trim_sec)
+    saturation = _detect_full_series_saturation(scan, settings.trim_sec)
 
-    images = preprocess(scan, trim_sec=trim_sec, detrend=detrend, center=center)
+    images = preprocess(scan, settings)
     geom = detect_phantom(images)
 
     voxel = VoxelSize.in_plane(scan.meta.voxel_mm) if scan.meta else UNKNOWN_VOXEL_SIZE
     motion = _estimate_phantom_motion(images, geom, voxel)
     com = _estimate_intensity_centroid(images, voxel)
 
-    roi = resolve_roi(images, geom, roi_size, center)
-    _warn_if_roi_does_not_fit(geom, roi, center)
+    roi = resolve_roi(images, geom, settings.roi_size, settings.center)
+    _warn_if_roi_does_not_fit(geom, roi, settings.center)
 
     wk = weisskoff(images, roi)
     resolved_pe = (
@@ -253,8 +239,10 @@ def run_qa(
         geom=geom,
         roi=roi,
         metrics=metrics,
+        # `detrend_order` is the one field only the run can fill;
+        # `pe_axis_override` stays the caller's word, not the axis measured along.
         settings=replace(
-            requested,
+            settings,
             detrend_order=(
                 None if images.detrender is None else images.detrender.order
             ),
@@ -349,7 +337,8 @@ def _build_ghost_family(
         warnings.warn(
             "no phase-encode axis: absent from the header and the Nyquist ghost "
             "resolves neither in-plane axis, so the ghost metrics are undefined. "
-            "Pass pe_axis explicitly if the acquisition's direction is known.",
+            "Pass --pe-axis (AnalysisSettings.pe_axis_override) if the "
+            "acquisition's direction is known.",
             stacklevel=3,  # one frame in from `run_qa`: report at run_qa's caller
         )
         return None

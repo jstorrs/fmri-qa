@@ -269,7 +269,7 @@ def test_loaded_scaling_preserves_clipping_and_dead_edges(
     saturation = q.detect_saturation(scan.data, slope=scan.slope, inter=scan.inter)
     assert saturation.n_clipped == 1 and saturation.bits == 12
     assert saturation.ceiling == 4095 * slope + inter
-    images = q.preprocess(scan, trim_sec=0)
+    images = q.preprocess(scan, q.AnalysisSettings(trim_sec=0))
     assert not images.valid_mask[0].any()
     assert images.valid_mask[1:].all()
 

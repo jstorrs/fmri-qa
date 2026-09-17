@@ -51,20 +51,11 @@ def analyze(
     """Run the QA pipeline on one series and publish the artifact.
 
     The calculation half's entry point: `scan` in, `QAArtifact` out, with the
-    heavy intermediates discarded. `settings` are the analysis knobs (defaults
-    match `run_qa`); `name` and `source` are recorded as provenance — the display
-    name and the path the series was read from.
+    heavy intermediates discarded. `settings` is the analysis request, whose own
+    fields carry the defaults; `name` and `source` are recorded as provenance —
+    the display name and the path the series was read from.
     """
-    settings = settings or AnalysisSettings()
-    result = run_qa(
-        scan,
-        trim_sec=settings.trim_sec,
-        pe_axis=settings.pe_axis_override,
-        detrend=settings.detrend,
-        center=settings.center,
-        roi_size=settings.roi_size,
-    )
-    return build_artifact(result, name=name, source=source)
+    return build_artifact(run_qa(scan, settings), name=name, source=source)
 
 
 def build_artifact(result: QAResult, *, name: str = "", source: str = "") -> QAArtifact:
@@ -72,8 +63,8 @@ def build_artifact(result: QAResult, *, name: str = "", source: str = "") -> QAA
 
     Separate from `analyze` so an existing result — one already in hand from
     `run_qa`, with its images still live — can be published without recomputing.
-    The settings published are the ones the result carries, which `run_qa`
-    wrote from its own arguments: there is nothing to pass and nothing to
+    The settings published are the ones the result carries, which `run_qa` wrote
+    from the request it was handed: there is nothing to pass and nothing to
     disagree with it.
     """
     return QAArtifact(

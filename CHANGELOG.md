@@ -8,6 +8,18 @@ versioning when the first stable public interface is released.
 
 ### Changed
 
+- **`run_qa` and `preprocess` take an `AnalysisSettings` record instead of loose
+  knobs.** The five request knobs and every one of their defaults were spelled
+  in `AnalysisSettings`, again in `run_qa`'s signature, and three of them a
+  third time in `preprocess`'s, with `analyze` unpacking the record it held back
+  into keyword arguments; a default edited in one spelling alone left
+  `analyze(scan)` and `run_qa(scan)` disagreeing about what an unqualified run
+  is. `AnalysisSettings` is now the library's single definition of every
+  analysis default, and the record a run answered is the record it publishes. A breaking change to
+  a pre-release API: `q.run_qa(scan, roi_size=9)` becomes
+  `q.run_qa(scan, q.AnalysisSettings(roi_size=9))`, and `pe_axis` is the
+  record's `pe_axis_override`. The CLI, its flags and the on-disk artifact are
+  unchanged.
 - **`phantom_plausible` now takes `fraction` and `contrast` as keyword-only
   arguments.** The two are same-typed floats on different scales — a share of
   the frame in [0, 1] and a phantom/background intensity ratio typically well

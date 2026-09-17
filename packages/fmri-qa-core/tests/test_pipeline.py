@@ -5,9 +5,8 @@ fixture builds (no file I/O), so the whole functional core runs deterministicall
 """
 
 import gc
-import inspect
 import weakref
-from dataclasses import fields
+from dataclasses import fields, replace
 
 import numpy as np
 import pytest
@@ -33,7 +32,7 @@ def _scan_with_ghost_on_axis1(seed: int = 0) -> q.QAScan:
 
 
 def test_run_qa_returns_finite_core_metrics(make_scan: MakeScan) -> None:
-    result = q.run_qa(make_scan(), roi_size=9)
+    result = q.run_qa(make_scan(), q.AnalysisSettings(roi_size=9))
     m = result.metrics
     assert isinstance(result, q.QAResult)
     assert m.snr > 0 and np.isfinite(m.snr)
@@ -50,7 +49,7 @@ def test_run_qa_resolves_the_ghost_on_a_separable_phantom(make_scan: MakeScan) -
     every ghost percentage into a silent NaN, so finite values here say the mask
     separated phantom from background.
     """
-    ghost = q.run_qa(make_scan(), roi_size=9).metrics.ghost
+    ghost = q.run_qa(make_scan(), q.AnalysisSettings(roi_size=9)).metrics.ghost
     assert ghost is not None
     assert np.isfinite(ghost.ghost_pct)
     assert np.isfinite(ghost.ghost_top_pct)
@@ -65,7 +64,7 @@ def test_the_ghost_masks_are_built_once_for_both_axes(make_scan: MakeScan) -> No
     they cannot drift apart: each ghost patch is its signal patch rolled half the
     FOV, and the axis it names is the axis the run resolved.
     """
-    m = q.run_qa(make_scan(), roi_size=9).metrics
+    m = q.run_qa(make_scan(), q.AnalysisSettings(roi_size=9)).metrics
     ghost = m.ghost
     assert ghost is not None
     assert ghost.pe_axis == m.pe_axis == 1
@@ -82,15 +81,15 @@ def test_run_qa_estimates_the_pe_axis_from_the_ghost() -> None:
     nowhere. Everything downstream (the masks, the four percentages, the PE/RO
     smoothness labels) hangs off the answer.
     """
-    m = q.run_qa(_scan_with_ghost_on_axis1(), roi_size=9).metrics
+    m = q.run_qa(_scan_with_ghost_on_axis1(), q.AnalysisSettings(roi_size=9)).metrics
     assert m.pe_axis == 1
     assert m.ghost is not None
     assert m.ghost.pe_axis == 1
 
 
 def test_run_qa_is_deterministic(make_scan: MakeScan) -> None:
-    a = q.run_qa(make_scan(seed=1), roi_size=9).metrics
-    b = q.run_qa(make_scan(seed=1), roi_size=9).metrics
+    a = q.run_qa(make_scan(seed=1), q.AnalysisSettings(roi_size=9)).metrics
+    b = q.run_qa(make_scan(seed=1), q.AnalysisSettings(roi_size=9)).metrics
     assert a.snr == b.snr
     assert a.sfnr == b.sfnr
     assert a.rdc == b.rdc
@@ -99,7 +98,7 @@ def test_run_qa_is_deterministic(make_scan: MakeScan) -> None:
 def test_preprocess_discards_the_full_volume(make_scan: MakeScan) -> None:
     scan = make_scan()
     data_ref = weakref.ref(scan.data)
-    images = q.preprocess(scan, trim_sec=4.0)
+    images = q.preprocess(scan, q.AnalysisSettings(trim_sec=4.0))
     assert not np.shares_memory(images.center_slice, scan.data)
     del scan
     gc.collect()
@@ -119,7 +118,9 @@ def test_run_qa_records_the_request_it_answered(make_scan: MakeScan) -> None:
     `pe_axis_override` is the argument as given, not the axis the run resolved:
     the two differ exactly when the override was left to the metadata.
     """
-    result = q.run_qa(make_scan(), trim_sec=0, center="phantom", roi_size=9)
+    result = q.run_qa(
+        make_scan(), q.AnalysisSettings(trim_sec=0, center="phantom", roi_size=9)
+    )
     s = result.settings
     assert (s.trim_sec, s.center, s.roi_size) == (0, "phantom", 9)
     assert s.pe_axis_override is None and result.metrics.pe_axis == 1
@@ -127,43 +128,23 @@ def test_run_qa_records_the_request_it_answered(make_scan: MakeScan) -> None:
     assert s.detrend_order == result.images.detrender.order
 
 
-def test_the_pipeline_defaults_are_the_settings_defaults() -> None:
-    """`run_qa` and `preprocess` spell defaults that `AnalysisSettings` also holds.
-
-    `analyze(scan)` runs on the record's defaults and `run_qa(scan)` on its own,
-    so one edited alone makes the two entry points disagree about what an
-    unqualified run is. Indexed, not looked up, so a renamed knob fails here
-    too. This goes the day `run_qa` takes the settings record itself.
-    """
-    knobs = {
-        q.run_qa: {
-            "trim_sec": "trim_sec",
-            "detrend": "detrend",
-            "center": "center",
-            "roi_size": "roi_size",
-            "pe_axis": "pe_axis_override",
-        },
-        q.preprocess: {
-            "trim_sec": "trim_sec",
-            "detrend": "detrend",
-            "center": "center",
-        },
-    }
-    settings = q.AnalysisSettings()
-    for function, names in knobs.items():
-        parameters = inspect.signature(function).parameters
-        for parameter, attribute in names.items():
-            assert parameters[parameter].default == getattr(settings, attribute)
+def test_a_request_carrying_a_stale_detrend_order_is_re_resolved(
+    make_scan: MakeScan,
+) -> None:
+    """A record fed back reproduces the run, which rewrites `detrend_order` itself."""
+    first = q.run_qa(make_scan(), q.AnalysisSettings(roi_size=9)).settings
+    again = q.run_qa(make_scan(), replace(first, detrend_order=99)).settings
+    assert again == first
 
 
 def test_an_explicit_pe_axis_overrides_the_header(make_scan: MakeScan) -> None:
     """An explicit override wins over a header axis that names a different one.
 
     `make_scan` sets the header's own axis to 1 (see `conftest.make_scan`), so
-    passing `pe_axis=0` only proves the override took if the resolved axis is 0,
-    not 1.
+    passing `pe_axis_override=0` only proves the override took if the resolved
+    axis is 0, not 1.
     """
-    result = q.run_qa(make_scan(), roi_size=9, pe_axis=0)
+    result = q.run_qa(make_scan(), q.AnalysisSettings(roi_size=9, pe_axis_override=0))
     assert result.settings.pe_axis_override == 0
     assert result.metrics.pe_axis == 0
 
@@ -183,7 +164,7 @@ def test_the_images_do_not_carry_a_phase_encode_axis() -> None:
 
 
 def test_weisskoff_rdc_matches_the_metric(make_scan: MakeScan) -> None:
-    result = q.run_qa(make_scan(), roi_size=9)
+    result = q.run_qa(make_scan(), q.AnalysisSettings(roi_size=9))
     assert result.metrics.rdc == result.metrics.weisskoff.rdc
 
 
@@ -195,7 +176,7 @@ def test_phantom_centering_localizes_slice_and_roi(make_scan: MakeScan) -> None:
     slice, and centers the ROI on the detected phantom center rather than the
     image center.
     """
-    result = q.run_qa(make_scan(), roi_size=9, center="phantom")
+    result = q.run_qa(make_scan(), q.AnalysisSettings(roi_size=9, center="phantom"))
     assert result.roi.size == 9
     assert q.roi_fits(result.geom.phantom_mask, result.roi.index)
     assert np.isfinite(result.metrics.snr) and result.metrics.snr > 0
@@ -209,8 +190,8 @@ def test_both_centering_modes_agree_on_a_centered_phantom(make_scan: MakeScan) -
     the ROI and show up as a mismatch.
     """
     scan = make_scan()
-    by_image = q.run_qa(scan, roi_size=9, center="image").roi
-    by_phantom = q.run_qa(scan, roi_size=9, center="phantom").roi
+    by_image = q.run_qa(scan, q.AnalysisSettings(roi_size=9, center="image")).roi
+    by_phantom = q.run_qa(scan, q.AnalysisSettings(roi_size=9, center="phantom")).roi
     assert np.array_equal(by_image.center, by_phantom.center)
     assert by_image.size == by_phantom.size
 
@@ -226,12 +207,13 @@ def test_the_roi_warning_suggests_the_other_centering_mode(make_scan: MakeScan) 
     scan = make_scan()
     for center, suggested in (("image", "phantom"), ("phantom", "image")):
         with pytest.warns(UserWarning, match=f"center='{suggested}'"):
-            q.run_qa(scan, roi_size=31, center=center)
+            q.run_qa(scan, q.AnalysisSettings(roi_size=31, center=center))
 
 
 def test_unknown_centering_mode_is_rejected(make_scan: MakeScan) -> None:
+    settings = q.AnalysisSettings(center="middle")  # type: ignore[arg-type]
     with pytest.raises(q.InvalidChoiceError):
-        q.run_qa(make_scan(), center="middle")  # type: ignore[arg-type]
+        q.run_qa(make_scan(), settings)
 
 
 def test_an_unresolvable_pe_axis_leaves_the_ghost_metrics_undefined() -> None:
@@ -246,7 +228,7 @@ def test_an_unresolvable_pe_axis_leaves_the_ghost_metrics_undefined() -> None:
     flat = q.QAScan(data=np.ones((16, 16, 3, 8)), tr=2.0)
 
     with pytest.warns(UserWarning, match="no phase-encode axis"):
-        m = q.run_qa(flat, trim_sec=0.0, roi_size=5).metrics
+        m = q.run_qa(flat, q.AnalysisSettings(trim_sec=0.0, roi_size=5)).metrics
 
     assert m.pe_axis is None
     assert m.ghost is None
@@ -267,6 +249,6 @@ def test_metrics_pe_axis_is_read_off_the_ghost_it_was_measured_with(
     """
     assert "pe_axis" not in {f.name for f in fields(q.QAMetrics)}
 
-    m = q.run_qa(make_scan(), roi_size=9).metrics
+    m = q.run_qa(make_scan(), q.AnalysisSettings(roi_size=9)).metrics
     assert m.ghost is not None
     assert m.pe_axis == m.ghost.pe_axis

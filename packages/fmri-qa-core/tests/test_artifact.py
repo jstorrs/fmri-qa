@@ -37,7 +37,12 @@ def test_build_artifact_publishes_the_settings_the_result_was_computed_with(
     PE axis was published as a 5 s trim, image centering, and no override --
     while `n_trimmed` in the same file said 0.
     """
-    result = q.run_qa(make_scan(), trim_sec=0, center="phantom", roi_size=9, pe_axis=0)
+    result = q.run_qa(
+        make_scan(),
+        q.AnalysisSettings(
+            trim_sec=0, center="phantom", roi_size=9, pe_axis_override=0
+        ),
+    )
     artifact = q.build_artifact(result)
     s = artifact.settings
     assert (s.trim_sec, s.center, s.roi_size) == (0, "phantom", 9)
@@ -53,7 +58,9 @@ def test_settings_keep_the_requested_roi_size_and_the_images_the_resolved_one(
 ) -> None:
     """The request and what it clamped to are two different facts."""
     with pytest.warns(UserWarning, match="not fully inside the phantom"):
-        artifact = q.build_artifact(q.run_qa(make_scan(), roi_size=99))
+        artifact = q.build_artifact(
+            q.run_qa(make_scan(), q.AnalysisSettings(roi_size=99))
+        )
     assert artifact.settings.roi_size == 99
     assert artifact.images.roi.size == 32  # clamped to the 32x32 image
 
@@ -67,8 +74,12 @@ def test_provenance_records_the_plane_analyzed(make_scan) -> None:
     from a single-slice acquisition.
     """
     scan = make_scan(z=5)
-    by_image = q.build_artifact(q.run_qa(scan, roi_size=9)).provenance
-    by_phantom = q.build_artifact(q.run_qa(scan, roi_size=9, center="phantom"))
+    by_image = q.build_artifact(
+        q.run_qa(scan, q.AnalysisSettings(roi_size=9))
+    ).provenance
+    by_phantom = q.build_artifact(
+        q.run_qa(scan, q.AnalysisSettings(roi_size=9, center="phantom"))
+    )
     assert (by_image.slice_index, by_image.n_slices) == (2, 5)
     assert by_phantom.provenance.n_slices == 5
     assert 0 <= by_phantom.provenance.slice_index < 5
@@ -146,7 +157,9 @@ def test_displacement_reports_mm_with_a_known_voxel_size_else_voxels(
     assert known.displacement_unit == "mm"
     assert known.fwhm_unit == "mm"
 
-    unmetered = q.build_artifact(q.run_qa(make_scan(), roi_size=9)).measurements
+    unmetered = q.build_artifact(
+        q.run_qa(make_scan(), q.AnalysisSettings(roi_size=9))
+    ).measurements
     assert unmetered.displacement_unit == "vox"
     assert unmetered.fwhm_unit == "vox"
 

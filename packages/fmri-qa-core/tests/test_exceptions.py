@@ -111,20 +111,24 @@ def test_run_hilo_validates_parameters_before_processing(
 
 
 @pytest.mark.parametrize(
-    ("shape", "kwargs", "field"),
+    ("shape", "settings_kwargs", "field"),
     [
         ((16, 16, 3, 3), {}, "frame count"),
         ((16, 16, 3, 20), {"roi_size": 0}, "roi_size"),
         ((16, 16, 3, 20), {"trim_sec": 1_000.0}, "trim_sec"),
-        ((16, 16, 3, 20), {"pe_axis": 2}, "phase-encode axis"),
+        ((16, 16, 3, 20), {"pe_axis_override": 2}, "phase-encode axis"),
     ],
 )
 def test_run_qa_rejects_invalid_inputs(
-    shape: tuple[int, int, int, int], kwargs: dict[str, object], field: str
+    shape: tuple[int, int, int, int], settings_kwargs: dict[str, object], field: str
 ) -> None:
     scan = _flat_scan(shape=shape)
+    # Built outside the `raises` block so the refusal has to come from `run_qa`:
+    # a record that refused the value itself would satisfy `raises` without the
+    # pipeline ever having checked it.
+    settings = q.AnalysisSettings(**settings_kwargs)  # type: ignore[arg-type]
     with pytest.raises(q.InvalidScanError) as info:
-        q.run_qa(scan, **kwargs)  # type: ignore[arg-type]
+        q.run_qa(scan, settings)
     assert info.value.field == field
 
 
@@ -152,7 +156,8 @@ def test_an_explicit_pe_axis_is_not_refused_for_the_header_it_overrides() -> Non
     and ignored when an explicit axis has already replaced it.
     """
     scan = q.QAScan(data=_flat_scan().data, tr=2.0, pe_axis=2)
-    assert q.run_qa(scan, roi_size=5, pe_axis=0).metrics.pe_axis == 0
+    settings = q.AnalysisSettings(roi_size=5, pe_axis_override=0)
+    assert q.run_qa(scan, settings).metrics.pe_axis == 0
 
 
 def _flat_scan(shape: tuple[int, int, int, int] = (16, 16, 3, 20)) -> q.QAScan:
