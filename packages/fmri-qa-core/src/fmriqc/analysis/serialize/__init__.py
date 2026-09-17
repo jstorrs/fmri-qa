@@ -53,7 +53,7 @@ from typing import Any
 from numpy.typing import NDArray
 
 from ...exceptions import InvalidArtifactError
-from ..artifact import QAArtifact
+from ..artifact import ARTIFACT_SCHEMA_VERSION, QAArtifact
 from ..validation import validate_artifact, validate_document
 from . import netcdf, npz
 from .compose import compose
@@ -94,15 +94,33 @@ def save_artifact(artifact: QAArtifact, path: str | Path) -> Path:
             written, and an existing file at `path` is left as it was.
     """
     out = Path(path)
-    document, arrays = decompose(artifact)
     try:
+        document, arrays = decompose(artifact)
+        # `migrated` is the only thing standing between a stored `schema_version`
+        # and the reader's contract, and it never runs on a document this build
+        # just wrote itself -- a document is only ever migrated on the way in.
+        # So the writer checks the one field the reader checks first, here,
+        # rather than let a bad version out the door to be refused a load later.
+        version = document.get("schema_version")
+        if type(version) is not int or version != ARTIFACT_SCHEMA_VERSION:
+            raise ValueError(
+                f"schema version {version!r}, not the {ARTIFACT_SCHEMA_VERSION} "
+                f"this build writes"
+            )
         validate_artifact(artifact)
         # Through JSON and back, because that is what the reader will see: the
         # in-memory document still holds numpy scalars where the file will hold
         # plain numbers, and the type check is written against the file.
         validate_document(json.loads(json.dumps(document)))
         content = netcdf.encode(document, arrays)
-    except (ValueError, TypeError, KeyError) as exc:
+    except (
+        AttributeError,
+        IndexError,
+        KeyError,
+        OverflowError,
+        TypeError,
+        ValueError,
+    ) as exc:
         raise InvalidArtifactError(
             out, f"refusing to write an artifact that would not read back: {exc}"
         ) from exc

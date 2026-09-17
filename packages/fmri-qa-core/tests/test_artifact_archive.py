@@ -98,6 +98,27 @@ def test_a_refused_save_preserves_the_archive_already_there(tmp_path, artifact) 
     assert not list(tmp_path.glob(".*.tmp"))  # and no temporary beside it
 
 
+@pytest.mark.parametrize("version", [99, 0, 4.0, "7", True])
+def test_save_refuses_an_artifact_whose_schema_version_is_not_the_current_one(
+    tmp_path, artifact, version
+) -> None:
+    """The writer holds itself to the one check the reader applies first.
+
+    `load_artifact` refuses any `schema_version` but the exact current one
+    (migrating older ones forward); `save_artifact` used to write such a value
+    without complaint, so the archive was refused only when something later
+    tried to read it back.
+    """
+    path = tmp_path / "qa.nc"
+    q.save_artifact(artifact, path)
+    before = path.read_bytes()
+    broken = replace(artifact, schema_version=version)
+    with pytest.raises(q.InvalidArtifactError, match="schema version"):
+        q.save_artifact(broken, path)
+    assert path.read_bytes() == before
+    assert not list(tmp_path.glob(".*.tmp"))
+
+
 def test_a_failed_save_leaves_neither_a_file_nor_a_temporary(
     tmp_path, artifact, monkeypatch
 ) -> None:

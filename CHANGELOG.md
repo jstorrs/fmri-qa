@@ -268,6 +268,14 @@ versioning when the first stable public interface is released.
 
 ### Fixed
 
+- **`save_artifact` now checks the one field `load_artifact` checks first.**
+  It already held a written artifact to the reader's other checks, but let any
+  `schema_version` through uncaught — 99, 0, a float, a string, even `True` —
+  so a bad value was written successfully, replaced whatever valid archive
+  already stood at the path, and was refused only when something later tried
+  to read it back. A `schema_version` that is not exactly the version this
+  build writes is now refused before anything is written, the same way every
+  other mismatch between the artifact and the reader's contract already was.
 - The report's metric catalog (the physics tier's characterization and methods
   pages) describes the calculations as implemented. SFNR is the ROI average
   of voxelwise temporal-mean over detrended-SD ratios, not the ratio of the
