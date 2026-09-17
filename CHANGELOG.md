@@ -8,6 +8,11 @@ versioning when the first stable public interface is released.
 
 ### Changed
 
+- **`Provenance`'s six identity fields — `scan`, `source`, `created`,
+  `core_version`, `tr`, and `n_frames` — are required.** They defaulted to
+  `""` and `0`, values the artifact validator rejects outright — so
+  `Provenance()` built an object nothing downstream could use. Every real
+  constructor already supplied all six; only the useless default is gone.
 - **`separate_noise` and `detect_saturation` now take their numeric parameters
   as keyword-only arguments.** `separate_noise(mean_high, mean_low, var_high,
   var_low, ...)` took four same-typed floats whose order is the entire

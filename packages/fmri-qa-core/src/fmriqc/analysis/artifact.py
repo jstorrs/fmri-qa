@@ -59,17 +59,19 @@ class Provenance:
     `center="phantom"` — without which two artifacts of one series cannot be
     told apart. `None` on any of these means *not recorded* — an artifact
     migrated from a schema that predates the field, where the trim or the slice
-    choice happened but nothing wrote it down. The rest is acquisition metadata
-    copied from the BIDS sidecar and NIfTI header; every field is optional
-    because a scan without a sidecar still analyzes.
+    choice happened but nothing wrote it down. `scan`, `source`, `created`,
+    `core_version`, `tr`, and `n_frames` identify the run and are required — a
+    validated artifact cannot exist without them. The rest is acquisition
+    metadata copied from the BIDS sidecar and NIfTI header, every field of it
+    optional because a scan without a sidecar still analyzes.
     """
 
-    scan: str = ""
-    source: str = ""
-    created: str = ""
-    core_version: str = ""
-    tr: float = 0.0
-    n_frames: int = 0
+    scan: str
+    source: str
+    created: str
+    core_version: str
+    tr: float
+    n_frames: int
     n_trimmed: int | None = None  # warm-up volumes dropped; None = not recorded
     slice_index: int | None = None  # plane analyzed, 0-based; None = not recorded
     n_slices: int | None = None  # planes in the volume; None = not recorded
