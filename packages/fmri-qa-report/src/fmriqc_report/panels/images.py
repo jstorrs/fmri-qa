@@ -20,6 +20,11 @@ _RO_SRC_RGB = (0.45, 1.0, 0.35)  # RO signal source region (green)
 _RO_GHOST_RGB = (1.0, 0.72, 0.15)  # RO ghost region (amber)
 _INVALID_RGB = (1.0, 0.15, 0.90)  # zeroed image edge, excluded from stats (magenta)
 
+_PANEL_ASPECT = 1.15  # image panel figure height / width
+_ROI_LW = 1.3  # ROI outline stroke width, in points
+_HULL_LW = 1.0  # phantom hull outline stroke width, in points
+_HULL_COLOR = "tab:cyan"  # phantom hull outline color
+
 
 def _data_per_point(ax: Axes) -> float:
     """Length of one typographic point (1/72 in) in axes data units.
@@ -34,17 +39,17 @@ def _data_per_point(ax: Axes) -> float:
     return float((ax.figure.dpi / 72.0) / abs(x1 - x0))
 
 
-def _draw_roi(ax: Axes, roi: RoiBox, *, lw: float = 1.3) -> None:
+def _draw_roi(ax: Axes, roi: RoiBox) -> None:
     """Outline the ROI just outside its pixels so the stroke doesn't cover them.
 
     The ROI's outer boundary in imshow coordinates runs from `start - 0.5` to
     `stop - 0.5`. The stroke is centered on the path, so drawing on that boundary
     spills half the line width inward and hides the edge ROI pixels. Pad outward
-    by exactly half the line width -- converted from points to data units via the
-    axes scale -- so the stroke's inner edge lands back on the boundary and every
-    ROI pixel stays visible.
+    by exactly half `_ROI_LW` -- converted from points to data units via the axes
+    scale -- so the stroke's inner edge lands back on the boundary and every ROI
+    pixel stays visible.
     """
-    pad = 0.5 * lw * _data_per_point(ax)
+    pad = 0.5 * _ROI_LW * _data_per_point(ax)
     ax.add_patch(
         Rectangle(
             (roi.col0 - 0.5 - pad, roi.row0 - 0.5 - pad),
@@ -52,14 +57,12 @@ def _draw_roi(ax: Axes, roi: RoiBox, *, lw: float = 1.3) -> None:
             (roi.row1 - roi.row0) + 2 * pad,
             edgecolor="red",
             facecolor="none",
-            lw=lw,
+            lw=_ROI_LW,
         )
     )
 
 
-def _draw_hull(
-    ax: Axes, hull: FloatArray, *, color: str = "tab:cyan", lw: float = 1.0
-) -> None:
+def _draw_hull(ax: Axes, hull: FloatArray) -> None:
     """Stroke the phantom's convex outline, a closed (x, y) polygon from the artifact.
 
     The hull smooths the ragged phantom-mask boundary into a clean convex
@@ -69,7 +72,7 @@ def _draw_hull(
     """
     if hull.shape[0] < 3:
         return
-    ax.plot(hull[:, 0], hull[:, 1], color=color, lw=lw)
+    ax.plot(hull[:, 0], hull[:, 1], color=_HULL_COLOR, lw=_HULL_LW)
 
 
 def _panel_fig(
@@ -79,10 +82,9 @@ def _panel_fig(
     hull: FloatArray | None = None,
     roi: RoiBox | None = None,
     log: bool = False,
-    aspect: float = 1.15,
 ) -> Figure:
     """A single labelled image panel as a square-ish figure."""
-    fig = Figure(figsize=(2.0, 2.0 * aspect))
+    fig = Figure(figsize=(2.0, 2.0 * _PANEL_ASPECT))
     ax = fig.add_subplot(111)
     data = np.log(np.clip(img, 1e-9, None)) if log else img
     finite = data[np.isfinite(data)]
@@ -95,7 +97,7 @@ def _panel_fig(
     # scale (see `_draw_roi`/`_data_per_point`), which subplots_adjust finalizes.
     fig.subplots_adjust(left=0.02, right=0.98, bottom=0.02, top=0.90)
     if hull is not None:
-        _draw_hull(ax, hull, lw=1.0)
+        _draw_hull(ax, hull)
     if roi is not None:
         _draw_roi(ax, roi)
     ax.set_title(title, fontsize=9)
@@ -111,7 +113,7 @@ def _overlay(
     ax.imshow(rgba, interpolation="nearest")
 
 
-def _ghost_panel_fig(images: ArtifactImages, *, aspect: float = 1.15) -> Figure:
+def _ghost_panel_fig(images: ArtifactImages) -> Figure:
     """Mean image with the region-matched ghost/signal masks for both axes.
 
     Draws the exact masks the ghost metrics averaged: for each in-plane axis, the
@@ -123,7 +125,7 @@ def _ghost_panel_fig(images: ArtifactImages, *, aspect: float = 1.15) -> Figure:
     edge dropped from the statistics (magenta) is marked when present. The ghost
     pairs are absent from the artifact, and so blank here, if the PE axis is unknown.
     """
-    fig = Figure(figsize=(2.0, 2.0 * aspect))
+    fig = Figure(figsize=(2.0, 2.0 * _PANEL_ASPECT))
     ax = fig.add_subplot(111)
     ax.imshow(
         images.signal,

@@ -137,7 +137,10 @@ def _panel_row(
     """Draw the panels in one row across the content width; return the y below."""
     n = len(figs)
     pw = (theme.content_width - (n - 1) * gap) / n
-    ph = pw * 1.15
+    # The box takes its aspect from the figures it holds, so a panel drawn taller
+    # or shorter is still boxed to match and the rows below start where it ends.
+    aspect = max(fig.get_figheight() / fig.get_figwidth() for fig in figs)
+    ph = pw * aspect
     for i, fig in enumerate(figs):
         _draw_fig(c, fig, theme.margin + i * (pw + gap), top, pw, ph)
     return top - ph
