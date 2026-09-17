@@ -10,6 +10,11 @@ appropriate" (see style/exceptions.md).
 
 from collections.abc import Sequence
 from pathlib import Path
+from typing import Literal
+
+# The step of an import that can refuse. Declared here rather than with the
+# other closed sets in `types`, which imports numpy: this module stays a leaf.
+ConversionStage = Literal["dcm2niix", "source", "destination"]
 
 
 class FmriqcError(Exception):
@@ -96,12 +101,12 @@ class ConversionError(FmriqcError, RuntimeError):
     `RuntimeError` — the failure is in the environment or the external tool, not
     in an argument's value, so `ValueError` would be the wrong stdlib kin.
 
-    ``stage`` names the step that refused (`"dcm2niix"`, `"source"`,
-    `"destination"`) and ``reason`` states what was wrong, so a caller can
-    branch on the stage instead of matching the message.
+    ``stage`` names the step that refused, one of `ConversionStage`, and
+    ``reason`` states what was wrong, so a caller can branch on the stage
+    instead of matching the message.
     """
 
-    def __init__(self, stage: str, reason: str) -> None:
+    def __init__(self, stage: ConversionStage, reason: str) -> None:
         super().__init__(f"{stage}: {reason}")
         self.stage = stage
         self.reason = reason
