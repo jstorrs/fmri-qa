@@ -30,6 +30,16 @@ APPENDIX_NAME_DROP = 13.0
 APPENDIX_DETAIL_DROP = 20.0
 APPENDIX_ROW_H = APPENDIX_NAME_DROP + APPENDIX_DETAIL_DROP
 
+# How far below the top edge a page's title sits. One drop for every titled
+# page -- a continuation cover, the appendix, and the pages `pages` heads for
+# itself -- so that the titles of a packet line up from sheet to sheet.
+TITLE_DROP = 34.0
+
+
+def title_baseline(theme: Theme) -> float:
+    """The top baseline a titled page's heading is drawn on."""
+    return theme.page_height - TITLE_DROP
+
 
 def fit_text(text: str, font: str, size: float, width: float) -> str:
     """Truncate one-line report text to ``width``, preserving an ellipsis."""
@@ -108,7 +118,7 @@ def cover_cursors(theme: Theme, *, continuation: bool) -> CoverCursors:
     where there is a logo to draw, which means a first page whose themed logo
     file is on disk.
     """
-    top = theme.page_height - 34.0 if continuation else theme.page_height * 0.70
+    top = title_baseline(theme) if continuation else theme.page_height * 0.70
     logo = (
         (theme.logo, top)
         if not continuation and theme.logo is not None and theme.logo.is_file()
@@ -149,7 +159,7 @@ def appendix_cursors(
     Only a first page names the package version; a continuation carries the
     rows straight on under its own title.
     """
-    title_y = theme.page_height - 34.0
+    title_y = title_baseline(theme)
     below_title = title_y - 20.0
     shows_version = has_version and not continuation
     return AppendixCursors(

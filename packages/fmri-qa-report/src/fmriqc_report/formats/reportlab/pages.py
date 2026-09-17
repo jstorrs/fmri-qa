@@ -42,6 +42,7 @@ from .layout import (
     appendix_cursors,
     cover_cursors,
     fit_text,
+    title_baseline,
     wrap_text,
 )
 from .svglib_patch import ensure_installed
@@ -241,7 +242,7 @@ def analysis_page(
 ) -> None:
     """Physics: the same stability curves at full page size."""
     curves, m = artifact.curves, artifact.measurements
-    y = theme.page_height - 34
+    y = title_baseline(theme)
     c.setFont(theme.font_title, 13)
     c.drawCentredString(
         theme.page_width / 2, y, f"{title} — stability" if title else "stability"
@@ -262,7 +263,7 @@ def analysis_page(
 
 def _page_title(c: canvas.Canvas, title: str, heading: str, theme: Theme) -> float:
     """Draw a physics page heading ("<title> — <heading>"); return the y below."""
-    y = theme.page_height - 34
+    y = title_baseline(theme)
     c.setFont(theme.font_title, 13)
     label = f"{title} — {heading}" if title else heading
     c.drawString(theme.margin, y, label)
