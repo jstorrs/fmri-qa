@@ -10,11 +10,15 @@ a group rebrands by instantiating or subclassing it.
 See `notes/report_redesign.md` for the design.
 """
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from cycler import cycler
 from reportlab.lib.pagesizes import letter
+
+if TYPE_CHECKING:
+    from matplotlib.typing import RcKeyType
 
 # matplotlib's default categorical cycle; the theme accent replaces its first
 # entry so a themed primary series recolours while the semantic tab10 colours
@@ -44,7 +48,7 @@ class Theme:
     """
 
     # Page geometry (points).
-    page_size: tuple[float, float] = field(default_factory=lambda: letter)
+    page_size: tuple[float, float] = letter
     margin: float = 40.0
 
     # Typography: names of fonts registered with ReportLab.
@@ -86,7 +90,7 @@ class Theme:
         """Drawable width between the left and right margins (points)."""
         return self.page_width - 2 * self.margin
 
-    def rc_params(self) -> dict[str, object]:
+    def rc_params(self) -> "dict[RcKeyType, object]":
         """matplotlib rcParams that style the panels to match the page.
 
         A driver activates these with `matplotlib.rc_context` around the figure
@@ -94,7 +98,7 @@ class Theme:
         font follow the theme. The default theme returns matplotlib's own
         defaults (gray images, the tab10 cycle), so panels are unchanged.
         """
-        rc: dict[str, object] = {
+        rc: dict[RcKeyType, object] = {
             "image.cmap": self.panel_cmap,
             "axes.prop_cycle": cycler(color=[self.panel_accent, *_MPL_TAB10[1:]]),
         }

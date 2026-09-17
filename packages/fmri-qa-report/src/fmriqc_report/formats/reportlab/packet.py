@@ -10,7 +10,6 @@ import os
 import tempfile
 from collections.abc import Callable, Iterable, Sequence
 from pathlib import Path
-from typing import Any, cast
 
 import matplotlib
 from reportlab.pdfgen import canvas
@@ -36,9 +35,7 @@ def _draw_parts(
     `after_part` runs on each page before `showPage`, numbered from 1, which is
     where a packet draws its footer and a bare `add_report_pages` draws nothing.
     """
-    # cast: rc_context's stub keys are a Literal union, not str; the values are
-    # valid rc keys built by the theme.
-    with matplotlib.rc_context(cast("Any", theme.rc_params())):
+    with matplotlib.rc_context(theme.rc_params()):
         for index, part in enumerate(section.parts, start=1):
             PART_RENDERERS[part](c, section.artifact, section.title, theme)
             after_part(index)
