@@ -194,6 +194,9 @@ versioning when the first stable public interface is released.
 
 ### Added
 
+- **`fmri-qa-hilo --version` now works.** `fmri-qa` and `fmri-qa-import` each
+  carried their own copy of the flag and `fmri-qa-hilo` had none, so asking it
+  for its version was a usage error. All three now share one, and answer alike.
 - **`fmri-qa-import`: DICOM in, QA-ready NIfTI out.** Point it at a directory and
   it runs [dcm2niix](https://github.com/rordenlab/dcm2niix), pinning the flags a
   QA conversion cannot be left to chance on — above all `-l o`, which keeps the

@@ -1,10 +1,11 @@
-"""Argument types and diagnostics both commands share.
+"""Argument types and diagnostics all three commands share.
 
 The `argparse` `type=` callables that reject an out-of-range value at parse
 time — so a bad flag is a usage error with a clear message rather than a
-traceback deep in the pipeline — the warning reprinter both commands route
-their captured warnings through, and the wildcard expansion that makes one
-documented command line work in a shell that does not expand its own.
+traceback deep in the pipeline — the warning reprinter all three commands route
+their captured warnings through, the wildcard expansion that makes one
+documented command line work in a shell that does not expand its own, and the
+shared `--version` action.
 """
 
 import argparse
@@ -16,8 +17,26 @@ import warnings
 from collections.abc import Iterable, Sequence
 from pathlib import Path
 
+import fmriqc as q
+
 # The characters that make an argument a pattern rather than a name.
 _WILDCARD = re.compile(r"[*?\[]")
+
+
+class PrintVersion(argparse.Action):
+    """`--version`, resolved on use rather than when the parser is built."""
+
+    def __call__(
+        self,
+        parser: argparse.ArgumentParser,
+        namespace: argparse.Namespace,
+        values: object,
+        option_string: str | None = None,
+    ) -> None:
+        # stdout, and only then exit: `parser.exit(message=...)` would send it
+        # to stderr, where argparse's own `action="version"` never put it.
+        print(f"{parser.prog} {q.core_version()}")
+        parser.exit()
 
 
 def expand_globs(paths: Sequence[str]) -> list[str]:

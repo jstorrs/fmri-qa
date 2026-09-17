@@ -16,6 +16,7 @@ from pathlib import Path
 import fmriqc as q
 
 from .arguments import (
+    PrintVersion,
     expand_globs,
     nonnegative_float,
     positive_int,
@@ -30,22 +31,6 @@ from .record import JSON_SCHEMA_VERSION, config_record, metric_record
 from .table import print_header, print_row
 
 
-class _PrintVersion(argparse.Action):
-    """`--version`, resolved on use rather than when the parser is built."""
-
-    def __call__(
-        self,
-        parser: argparse.ArgumentParser,
-        namespace: argparse.Namespace,
-        values: object,
-        option_string: str | None = None,
-    ) -> None:
-        # stdout, and only then exit: `parser.exit(message=...)` would send it
-        # to stderr, where argparse's own `action="version"` never put it.
-        print(f"{parser.prog} {q.core_version()}")
-        parser.exit()
-
-
 def _parser() -> argparse.ArgumentParser:
     """The command line this command accepts."""
     parser = argparse.ArgumentParser(
@@ -57,7 +42,7 @@ def _parser() -> argparse.ArgumentParser:
     # argparse has looked at a single flag (see `fmriqc.__init__`). Resolve it
     # when the flag is actually used instead, so `--help` and a usage error
     # stay as cheap as parsing.
-    parser.add_argument("--version", action=_PrintVersion, nargs=0)
+    parser.add_argument("--version", action=PrintVersion, nargs=0)
     parser.add_argument("paths", nargs="+", help="NIfTI (.nii/.nii.gz) QA scans")
     parser.add_argument(
         "--trim-sec",

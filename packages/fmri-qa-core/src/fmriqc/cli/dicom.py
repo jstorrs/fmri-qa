@@ -23,21 +23,7 @@ import fmriqc as q
 from fmriqc.convert.dcm2niix import DEFAULT_TEMPLATE
 from fmriqc.convert.session import ImportResult, import_dicom
 
-from .arguments import positive_int, print_warnings
-
-
-class _PrintVersion(argparse.Action):
-    """`--version`, resolved on use rather than when the parser is built."""
-
-    def __call__(
-        self,
-        parser: argparse.ArgumentParser,
-        namespace: argparse.Namespace,
-        values: object,
-        option_string: str | None = None,
-    ) -> None:
-        print(f"{parser.prog} {q.core_version()}")
-        parser.exit()
+from .arguments import PrintVersion, positive_int, print_warnings
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -126,7 +112,7 @@ def _parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Print everything dcm2niix said, not just the summary.",
     )
-    parser.add_argument("--version", action=_PrintVersion, nargs=0)
+    parser.add_argument("--version", action=PrintVersion, nargs=0)
     return parser
 
 

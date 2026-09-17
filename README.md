@@ -193,6 +193,7 @@ Options:
 | `--dcm2niix-arg` | — | extra argument, repeatable, passed last so it wins |
 | `--force` | — | overwrite files already in the output directory |
 | `--log` | — | print everything dcm2niix said |
+| `--version` | — | print the version and exit |
 
 The import is all-or-nothing: it converts into a staging directory and moves the
 result into place only once every file has a name and none would overwrite
@@ -256,6 +257,8 @@ uv run fmri-qa-hilo HIGH_flip.nii.gz LOW_flip.nii.gz
 Pass the high-flip scan first. `--trim-sec`, `--detrend`, and `--erode` mirror
 the main command. This is a pair-level diagnostic, kept apart from the per-scan
 batch table, and it writes no artifact.
+
+`--version` prints the version and exits.
 
 ### Saving an artifact
 

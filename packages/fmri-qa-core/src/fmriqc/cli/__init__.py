@@ -6,9 +6,10 @@ noise separation; `dicom` (`fmri-qa-import`) converts a DICOM directory into the
 NIfTI the other two read. The pieces the analyzing two report through sit beside
 them — `table` and
 `record` are the two output forms of a QA run, `destinations` decides where
-`--artifact` writes, and `arguments` holds what both commands parse and warn
-with. Rendering an artifact into a PDF is the separate `fmri-qa-report`
-distribution's job, so nothing here imports matplotlib or ReportLab.
+`--artifact` writes, and `arguments` holds what all three parse and warn with,
+and the `--version` they share. Rendering an artifact into a PDF is the separate
+`fmri-qa-report` distribution's job, so nothing here imports matplotlib or
+ReportLab.
 """
 
 from .dicom import import_main

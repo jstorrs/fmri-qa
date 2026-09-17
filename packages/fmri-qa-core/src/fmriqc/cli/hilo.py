@@ -13,7 +13,7 @@ from pathlib import Path
 
 import fmriqc as q
 
-from .arguments import nonnegative_float, nonnegative_int, print_warnings
+from .arguments import PrintVersion, nonnegative_float, nonnegative_int, print_warnings
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -23,6 +23,7 @@ def _parser() -> argparse.ArgumentParser:
         description="High/low flip-angle phantom QA: separate thermal from "
         "instability noise (Greve). Pass the HIGH-flip scan first.",
     )
+    parser.add_argument("--version", action=PrintVersion, nargs=0)
     parser.add_argument("high", help="High-flip-angle NIfTI (.nii/.nii.gz) QA scan")
     parser.add_argument("low", help="Low-flip-angle NIfTI (.nii/.nii.gz) QA scan")
     parser.add_argument(

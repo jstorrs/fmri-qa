@@ -465,13 +465,6 @@ def test_json_lists_failed_scans_in_an_error_inventory(
     assert "1 of 2 scan(s) failed: missing.nii.gz" in captured.err
 
 
-def test_version_flag_prints_and_exits(capsys) -> None:
-    with pytest.raises(SystemExit) as info:
-        cli.main(["--version"])
-    assert info.value.code == 0
-    assert "fmri-qa" in capsys.readouterr().out
-
-
 @pytest.mark.parametrize(
     "args", [["--roi-size", "0"], ["--trim-sec", "-1"], ["--pe-axis", "2"]]
 )
@@ -503,6 +496,24 @@ def test_hilo_main_rejects_invalid_numeric_options(args: list[str], capsys) -> N
         cli.hilo_main([*args, "high.nii.gz", "low.nii.gz"])
     assert info.value.code == 2
     assert "error:" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize(
+    ("entry", "prog"),
+    [
+        (cli.main, "fmri-qa"),
+        (cli.hilo_main, "fmri-qa-hilo"),
+        (cli.import_main, "fmri-qa-import"),
+    ],
+    ids=["qa", "hilo", "import"],
+)
+def test_version_flag_prints_and_exits(entry, prog, capsys) -> None:
+    with pytest.raises(SystemExit) as info:
+        entry(["--version"])
+    assert info.value.code == 0
+    out = capsys.readouterr().out
+    assert prog in out
+    assert q.core_version() in out
 
 
 @pytest.mark.parametrize(
