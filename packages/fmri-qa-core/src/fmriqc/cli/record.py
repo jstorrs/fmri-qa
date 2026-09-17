@@ -12,7 +12,6 @@ renaming a field is a deliberate edit here and a bump there.
 # `--help` or a usage error from paying for numpy, scipy and nibabel.
 from __future__ import annotations
 
-import argparse
 import math
 
 import fmriqc as q
@@ -99,13 +98,13 @@ def metric_record(artifact: q.QAArtifact) -> dict[str, object]:
     }
 
 
-def config_record(args: argparse.Namespace) -> dict[str, object]:
+def config_record(settings: q.AnalysisSettings) -> dict[str, object]:
     """The run parameters echoed into the JSON document's header."""
     return {
         "version": q.core_version(),
-        "detrend": args.detrend,
-        "trim_sec": args.trim_sec,
-        "center": args.center,
-        "roi_size": args.roi_size,
-        "pe_axis_override": args.pe_axis,
+        "detrend": settings.detrend,
+        "trim_sec": settings.trim_sec,
+        "center": settings.center,
+        "roi_size": settings.roi_size,
+        "pe_axis_override": settings.pe_axis_override,
     }

@@ -284,7 +284,7 @@ layout, the recipes, and the version rules.
 ### JSON on stdout
 
 With `--json`, stdout carries a single versioned JSON document —
-`{"schema_version": 5, "config": {...}, "requested": [...], "scans": [...],
+`{"schema_version": 6, "config": {...}, "requested": [...], "scans": [...],
 "errors": [...]}`, one record per scan
 with the table's columns as raw numbers. A metric that cannot be computed for a
 scan is JSON `null` (for example, a ghost ratio with no clear ghost region),

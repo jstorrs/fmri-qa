@@ -135,8 +135,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     # table, and save notices go to stderr so a consumer can pipe stdout cleanly.
     info = sys.stderr if args.json else sys.stdout
     print(
-        f"# detrend={args.detrend}  trim_sec={args.trim_sec}  "
-        f"center={args.center}  roi_size={args.roi_size}",
+        f"# detrend={settings.detrend}  trim_sec={settings.trim_sec}  "
+        f"center={settings.center}  roi_size={settings.roi_size}",
         file=info,
     )
     if not args.json:
@@ -175,7 +175,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.json:
         document = {
             "schema_version": JSON_SCHEMA_VERSION,
-            "config": config_record(args),
+            "config": config_record(settings),
             "requested": list(args.paths),
             "scans": records,
             "errors": errors,
