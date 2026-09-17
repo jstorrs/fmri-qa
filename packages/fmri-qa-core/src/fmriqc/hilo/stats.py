@@ -18,7 +18,7 @@ def hilo_stats(
     on the per-voxel detrended residual (poly degree scaled to this scan's own run
     length, as elsewhere). The core mask comes from the mean map.
     """
-    data = trim_initial(scan.data, scan.tr, trim_sec)  # (X, Y, Z, T)
+    data = trim_initial(scan.data, tr=scan.tr, trim_sec=trim_sec)  # (X, Y, Z, T)
     mean_map = data.mean(axis=-1)
     detrender = Detrender.for_series(data, scan.tr, detrend)
     sd_map = fluctuation_noise(detrender(data))

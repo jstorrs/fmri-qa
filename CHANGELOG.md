@@ -8,6 +8,13 @@ versioning when the first stable public interface is released.
 
 ### Changed
 
+- **`trim_count` and `trim_initial` now take `tr` and `trim_sec` as keyword-only
+  arguments.** Both are durations in seconds, in an order nothing at a call
+  site revealed — and the order is the reverse of the division they perform
+  (`trim_sec / tr`). A swap type-checked and returned a plausible wrong frame
+  count (with `tr=2.0, trim_sec=5.0` the correct answer is 2, the swapped one
+  0), silently shifting every downstream metric and the published `n_trimmed`.
+  Keyword-only closes that off; every call site now names both arguments.
 - **`ghost_masks`, `ghost_ratio` and `estimate_center_of_mass` no longer invent
   the mask or the axis a caller did not pass.** `ghost_masks` fell back to an
   all-valid mask and `estimate_center_of_mass` to `edge_valid_mask` at its own

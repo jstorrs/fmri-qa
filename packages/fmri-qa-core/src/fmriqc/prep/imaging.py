@@ -34,13 +34,13 @@ DEGENERATE_PHANTOM_MAX = 0.95
 MIN_PHANTOM_CONTRAST = 4.0
 
 
-def trim_count(tr: float, trim_sec: float) -> int:
+def trim_count(*, tr: float, trim_sec: float) -> int:
     """Number of initial (non-steady-state) volumes dropped for `trim_sec`."""
     return max(round(trim_sec / tr), 0)
 
 
-def trim_initial(data: FloatArray, tr: float, trim_sec: float) -> FloatArray:
-    return data[..., trim_count(tr, trim_sec) :]
+def trim_initial(data: FloatArray, *, tr: float, trim_sec: float) -> FloatArray:
+    return data[..., trim_count(tr=tr, trim_sec=trim_sec) :]
 
 
 def segment_phantom(image: FloatArray) -> BoolArray:

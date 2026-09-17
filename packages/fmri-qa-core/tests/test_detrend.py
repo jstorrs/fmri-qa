@@ -100,4 +100,4 @@ def test_poly_degree1_removes_any_affine_trend(a: float, b: float) -> None:
     trim_sec=st.floats(0.0, 60.0, allow_nan=False),
 )
 def test_trim_count_is_nonnegative_rounded_ratio(tr: float, trim_sec: float) -> None:
-    assert trim_count(tr, trim_sec) == max(round(trim_sec / tr), 0)
+    assert trim_count(tr=tr, trim_sec=trim_sec) == max(round(trim_sec / tr), 0)

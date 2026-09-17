@@ -144,7 +144,7 @@ def preprocess(
     detrending method ("poly"/"spline"); `center` selects the slice — "image" for
     the middle slice (Glover), "phantom" for the largest phantom cross-section.
     """
-    data = trim_initial(scan.data, scan.tr, trim_sec)
+    data = trim_initial(scan.data, tr=scan.tr, trim_sec=trim_sec)
     z, phantom_mask = select_slice(data, center)
     center_slice = data[:, :, z, :]
     detrender = Detrender.for_series(center_slice, scan.tr, detrend)
@@ -156,7 +156,7 @@ def preprocess(
         # Recorded here because this is where it happens: everything downstream
         # indexes the trimmed series, and once `scan.data` is dropped nothing
         # else can say which acquired volume frame 0 was.
-        n_trimmed=trim_count(scan.tr, trim_sec),
+        n_trimmed=trim_count(tr=scan.tr, trim_sec=trim_sec),
         # The value a stored zero reads back as, so a nulled image edge is
         # recognizable under a nonzero intercept (see `edge_valid_mask`).
         zero_value=float(scan.inter),
@@ -302,7 +302,7 @@ def _detect_full_series_saturation(
         scan.data,
         scan.slope,
         scan.inter,
-        trim=trim_count(scan.tr, trim_sec),
+        trim=trim_count(tr=scan.tr, trim_sec=trim_sec),
         stored_integer=scan.stored_integer,
     )
 

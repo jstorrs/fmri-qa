@@ -49,7 +49,7 @@ def _validate_trim_sec(trim_sec: float) -> None:
 
 def _frames_after_trim(scan: QAScan, trim_sec: float) -> int:
     """How many frames a `trim_sec` warm-up trim would leave of `scan`."""
-    return int(scan.data.shape[-1]) - trim_count(scan.tr, trim_sec)
+    return int(scan.data.shape[-1]) - trim_count(tr=scan.tr, trim_sec=trim_sec)
 
 
 def validate_qa_run(
