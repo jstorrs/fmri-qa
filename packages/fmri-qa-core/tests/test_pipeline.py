@@ -124,6 +124,18 @@ def test_run_qa_records_the_request_it_answered(make_scan: MakeScan) -> None:
     assert s.detrend_order == result.images.detrend_order
 
 
+def test_an_explicit_pe_axis_overrides_the_header(make_scan: MakeScan) -> None:
+    """An explicit override wins over a header axis that names a different one.
+
+    `make_scan` sets the header's own axis to 1 (see `conftest.make_scan`), so
+    passing `pe_axis=0` only proves the override took if the resolved axis is 0,
+    not 1.
+    """
+    result = q.run_qa(make_scan(), roi_size=9, pe_axis=0)
+    assert result.settings.pe_axis_override == 0
+    assert result.metrics.pe_axis == 0
+
+
 def test_preprocess_records_which_plane_it_cut(make_scan: MakeScan) -> None:
     images = q.preprocess(make_scan(z=5))
     assert (images.slice_index, images.n_slices) == (2, 5)  # the middle of five

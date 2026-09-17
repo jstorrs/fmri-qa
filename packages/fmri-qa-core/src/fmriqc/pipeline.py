@@ -201,9 +201,11 @@ def run_qa(
     image-center ROI, Glover) or "phantom" (largest slice + detected center).
     `roi_size` is the fixed summary/Weisskoff ROI side (default 21, fBIRN).
     """
-    validate_qa_run(scan, trim_sec=trim_sec, roi_size=roi_size, pe_axis=pe_axis)
-    # The request, written down before anything is resolved -- `pe_axis` in
-    # particular is rebound below to the axis the ghost masks used.
+    named_pe = validate_qa_run(
+        scan, trim_sec=trim_sec, roi_size=roi_size, pe_axis=pe_axis
+    )
+    # The request, recorded as it was made: `pe_axis` here is the caller's
+    # argument, not the axis the run goes on to measure along.
     requested = AnalysisSettings(
         trim_sec=trim_sec,
         detrend=detrend,
@@ -225,15 +227,21 @@ def run_qa(
     _warn_if_roi_does_not_fit(geom, roi, center)
 
     wk = weisskoff(images, roi)
-    pe_axis = _resolve_pe_axis(pe_axis, images, geom)
-    ghost = _build_ghost_family(pe_axis, images, geom)
+    resolved_pe = (
+        named_pe
+        if named_pe is not None
+        else estimate_pe_axis(
+            images.mean_image, geom.phantom_mask, valid_mask=images.valid_mask
+        )
+    )
+    ghost = _build_ghost_family(resolved_pe, images, geom)
 
     # Directional spatial smoothness (AFNI 3dFWHMx): the Gaussian FWHM of the
     # detrended noise field along PE and RO, plus the point-spread curves -- the
     # correlation-length confound the guide warns the Weisskoff RDC is measured
-    # against. Computed here so the resolved `pe_axis` labels the directions.
+    # against. Computed here so `resolved_pe` labels the directions.
     smoothness = estimate_smoothness(
-        images.fluctuations, geom.phantom_mask, voxel_mm=voxel_mm, pe_axis=pe_axis
+        images.fluctuations, geom.phantom_mask, voxel_mm=voxel_mm, pe_axis=resolved_pe
     )
 
     metrics = QAMetrics(
@@ -327,24 +335,6 @@ def _warn_if_roi_does_not_fit(
         f"{roi.size}x{roi.size} ROI ({center} center) is not fully inside the "
         f"phantom; reduce roi_size or try center={other!r}.",
         stacklevel=3,  # one frame in from `run_qa`: report at run_qa's caller
-    )
-
-
-def _resolve_pe_axis(
-    pe_axis: PeAxis | None, images: QAImages, geom: PhantomGeometry
-) -> PeAxis | None:
-    """Resolve the phase-encode axis: explicit override -> scan metadata -> ghost.
-
-    `pe_axis=None` takes the axis from the scan's metadata, and failing that
-    estimates it from the ghost regions of the analyzed slice -- the one place
-    that estimate is made.
-    """
-    if pe_axis is not None:
-        return pe_axis
-    if images.pe_axis is not None:
-        return images.pe_axis
-    return estimate_pe_axis(
-        images.mean_image, geom.phantom_mask, valid_mask=images.valid_mask
     )
 
 

@@ -145,6 +145,16 @@ def test_run_qa_rejects_through_plane_pe_from_scan() -> None:
         q.run_qa(scan)
 
 
+def test_an_explicit_pe_axis_is_not_refused_for_the_header_it_overrides() -> None:
+    """Only the axis the run would measure on is held to in-plane.
+
+    A header naming the through-plane axis is refused when it is the answer,
+    and ignored when an explicit axis has already replaced it.
+    """
+    scan = q.QAScan(data=_flat_scan().data, tr=2.0, pe_axis=2)
+    assert q.run_qa(scan, roi_size=5, pe_axis=0).metrics.pe_axis == 0
+
+
 def _flat_scan(shape: tuple[int, int, int, int] = (16, 16, 3, 20)) -> q.QAScan:
     """A minimal scan with a bright central block, built without file I/O."""
     x, y = shape[0], shape[1]

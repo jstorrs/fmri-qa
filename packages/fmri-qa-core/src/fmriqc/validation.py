@@ -54,8 +54,15 @@ def _frames_after_trim(scan: QAScan, trim_sec: float) -> int:
 
 def validate_qa_run(
     scan: QAScan, *, trim_sec: float, roi_size: int, pe_axis: PeAxis | None
-) -> None:
-    """Validate parameters required by the single-slice QA pipeline."""
+) -> PeAxis | None:
+    """Validate parameters required by the single-slice QA pipeline.
+
+    Returns the axis the request and the header settle on between them --
+    `pe_axis` if given, else `scan.pe_axis` narrowed to in-plane -- or None
+    when neither names one. This is the one place that precedence is decided;
+    `run_qa` falls back to the Nyquist-ghost estimate only when the return here
+    is None.
+    """
     validate_scan(scan, minimum_frames=MIN_ANALYSIS_FRAMES)
     _validate_trim_sec(trim_sec)
     if roi_size <= 0:
@@ -70,17 +77,21 @@ def validate_qa_run(
             f"at least {MIN_ANALYSIS_FRAMES} are required",
         )
 
-    resolved_pe = scan.pe_axis if pe_axis is None else pe_axis
+    candidate = scan.pe_axis if pe_axis is None else pe_axis
+    if candidate is None:
+        return None
     # `pe_axis` is already a `PeAxis`, so only `scan.pe_axis` -- the header's own
     # answer, read when no explicit axis is given -- can still name the
     # through-plane axis here. That scan is refused by name rather than quietly
     # analyzed on an axis estimated from the Nyquist ghost.
-    if resolved_pe is not None and in_plane(resolved_pe) is None:
+    resolved = in_plane(candidate)
+    if resolved is None:
         raise InvalidScanError(
             "phase-encode axis",
-            resolved_pe,
+            candidate,
             "the single-slice metrics support only in-plane axes 0 and 1",
         )
+    return resolved
 
 
 def validate_hilo_run(
