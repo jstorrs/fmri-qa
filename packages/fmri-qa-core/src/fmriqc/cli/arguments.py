@@ -85,6 +85,12 @@ def positive_int(value: str) -> int:
     return parsed
 
 
+def nonempty(value: str) -> str:
+    if not value:
+        raise argparse.ArgumentTypeError("expected a non-empty path")
+    return value
+
+
 def nonnegative_int(value: str) -> int:
     parsed = int(value)
     if parsed < 0:

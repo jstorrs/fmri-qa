@@ -324,6 +324,13 @@ versioning when the first stable public interface is released.
 
 ### Fixed
 
+- **`fmri-qa --artifact ''` is now a usage error instead of a silent no-op.**
+  `qa.py` only ever tested `args.artifact` by truthiness, so an empty string
+  passed both `if` checks as false: the whole analysis ran, nothing was
+  written, and the command exited 0 as if `--artifact` had never been given.
+  `--artifact` now carries `arguments.nonempty` as its `type`, so an empty
+  value is rejected at parse time with a usage error naming `--artifact`,
+  before any scan is read; a run without the flag is unaffected.
 - **`fmri-qa-import` no longer prints a traceback when its destination cannot
   be created.** `import_dicom` called `destination.mkdir(parents=True,
   exist_ok=True)` unguarded, so a `-o` pointing at an existing regular file

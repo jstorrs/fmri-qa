@@ -475,6 +475,13 @@ def test_main_rejects_invalid_numeric_options(args: list[str], capsys) -> None:
     assert "error:" in capsys.readouterr().err
 
 
+def test_main_rejects_an_empty_artifact_path(capsys) -> None:
+    with pytest.raises(SystemExit) as info:
+        cli.main(["scan.nii.gz", "--artifact", ""])
+    assert info.value.code == 2
+    assert "--artifact" in capsys.readouterr().err
+
+
 def test_hilo_main_succeeds_on_a_pair(tmp_path, write_scan, capsys) -> None:
     high = write_scan(tmp_path, name="high", seed=1, flip=77)
     low = write_scan(tmp_path, name="low", seed=2, flip=10)

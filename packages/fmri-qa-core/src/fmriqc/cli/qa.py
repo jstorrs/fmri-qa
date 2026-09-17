@@ -18,6 +18,7 @@ import fmriqc as q
 from .arguments import (
     PrintVersion,
     expand_globs,
+    nonempty,
     nonnegative_float,
     positive_int,
     print_warnings,
@@ -86,6 +87,7 @@ def _parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--artifact",
+        type=nonempty,
         metavar="PATH",
         default=None,
         help="Save the full analysis artifact (settings, provenance, curves, "
