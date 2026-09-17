@@ -39,7 +39,7 @@ class WeisskoffResult(ArrayValue):
 
 
 def _roi_cv(
-    fluctuations: FloatArray, mean_image: FloatArray, roi_center: IntArray, k: int
+    *, fluctuations: FloatArray, mean_image: FloatArray, roi_center: IntArray, k: int
 ) -> float:
     """CV over a k x k ROI: RMS of the ROI-mean fluctuation / ROI-mean signal.
 
@@ -61,7 +61,11 @@ def _roi_cv(
 
 
 def _roi_cv1(
-    fluctuation_noise: FloatArray, mean_image: FloatArray, roi_center: IntArray, k: int
+    *,
+    fluctuation_noise: FloatArray,
+    mean_image: FloatArray,
+    roi_center: IntArray,
+    k: int,
 ) -> float:
     """Single-voxel CV pooled over a k x k ROI: RMS(noise) / ROI mean signal.
 
@@ -90,9 +94,27 @@ def weisskoff(images: QAImages, roi: ROI) -> WeisskoffResult:
     # (Friedman & Glover 2006); cv[-1] is at the full ROI the pooled cv1 spans
     roi_sizes = np.arange(1, roi.size + 1)
     cv = np.array(
-        [_roi_cv(fluctuations, mean_image, roi.center, int(k)) for k in roi_sizes]
+        [
+            _roi_cv(
+                fluctuations=fluctuations,
+                mean_image=mean_image,
+                roi_center=roi.center,
+                k=int(k),
+            )
+            for k in roi_sizes
+        ]
     )
-    cv1 = np.array([_roi_cv1(noise, mean_image, roi.center, int(k)) for k in roi_sizes])
+    cv1 = np.array(
+        [
+            _roi_cv1(
+                fluctuation_noise=noise,
+                mean_image=mean_image,
+                roi_center=roi.center,
+                k=int(k),
+            )
+            for k in roi_sizes
+        ]
+    )
     # cv1[-1] is _roi_cv1 at k = roi.size, which is exactly the pooled CV over
     # the full ROI: reuse it rather than recomputing the same ratio inline,
     # which would bypass the helper's zero-signal guard and re-open the warning

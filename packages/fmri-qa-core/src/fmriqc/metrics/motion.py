@@ -104,6 +104,7 @@ class MotionResult(ArrayValue):
 
 def _register_norotate(
     moving: FloatArray,
+    *,
     reference: FloatArray,
     rr: FloatArray,
     cc: FloatArray,
@@ -186,7 +187,14 @@ def estimate_motion(
     params = np.zeros((nt, 5))
     for t in range(nt):
         params[t] = _register_norotate(
-            center_slice[..., t], reference, rr, cc, center, mask, max_iter, tol
+            center_slice[..., t],
+            reference=reference,
+            rr=rr,
+            cc=cc,
+            center=center,
+            mask=mask,
+            max_iter=max_iter,
+            tol=tol,
         )
     result = MotionResult(params=params, voxel=VoxelSize(voxel_mm))
     failed = int((~result.converged).sum())
