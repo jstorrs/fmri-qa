@@ -3,8 +3,10 @@
 import numpy as np
 
 from .exceptions import InvalidScanError
+from .load.pe_axis import in_plane
 from .load.scan import QAScan
-from .types import PE_AXES
+from .prep.imaging import trim_count
+from .types import PeAxis
 
 MIN_ANALYSIS_FRAMES = 4
 
@@ -47,11 +49,11 @@ def _validate_trim_sec(trim_sec: float) -> None:
 
 def _frames_after_trim(scan: QAScan, trim_sec: float) -> int:
     """How many frames a `trim_sec` warm-up trim would leave of `scan`."""
-    return int(scan.data.shape[-1]) - round(trim_sec / scan.tr)
+    return int(scan.data.shape[-1]) - trim_count(scan.tr, trim_sec)
 
 
 def validate_qa_run(
-    scan: QAScan, *, trim_sec: float, roi_size: int, pe_axis: int | None
+    scan: QAScan, *, trim_sec: float, roi_size: int, pe_axis: PeAxis | None
 ) -> None:
     """Validate parameters required by the single-slice QA pipeline."""
     validate_scan(scan, minimum_frames=MIN_ANALYSIS_FRAMES)
@@ -69,7 +71,11 @@ def validate_qa_run(
         )
 
     resolved_pe = scan.pe_axis if pe_axis is None else pe_axis
-    if resolved_pe is not None and resolved_pe not in PE_AXES:
+    # `pe_axis` is already a `PeAxis`, so only `scan.pe_axis` -- the header's own
+    # answer, read when no explicit axis is given -- can still name the
+    # through-plane axis here. That scan is refused by name rather than quietly
+    # analyzed on an axis estimated from the Nyquist ghost.
+    if resolved_pe is not None and in_plane(resolved_pe) is None:
         raise InvalidScanError(
             "phase-encode axis",
             resolved_pe,

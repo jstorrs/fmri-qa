@@ -162,8 +162,11 @@ def preprocess(
         zero_value=float(scan.inter),
         # Narrowed here, at the one door into the pure pipeline: a sidecar may
         # name the through-plane axis, which nothing downstream can measure on
-        # (see `load.pe_axis.in_plane`). `run_qa` rejects an explicitly
-        # *requested* through-plane axis outright, before reaching this.
+        # (see `load.pe_axis.in_plane`). `run_qa` rejects a scan whose sidecar
+        # names the through-plane axis before reaching this -- an explicit
+        # request cannot name one, since it is already typed `PeAxis` -- but
+        # `preprocess` is public and can be called directly, so the narrowing
+        # still has to happen here too.
         pe_axis=in_plane(scan.pe_axis),
         # Both read off the fit that actually ran, not one from the fit and the
         # other from this function's argument.
