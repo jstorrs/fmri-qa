@@ -101,7 +101,9 @@ def test_hilo_accepts_small_affine_roundoff() -> None:
     require_compatible_scans(high, low)
 
 
-@pytest.mark.parametrize("kwargs", [{"erode": -1}, {"trim_sec": 1_000.0}])
+@pytest.mark.parametrize(
+    "kwargs", [{"erode": -1}, {"trim_sec": -1.0}, {"trim_sec": 1_000.0}]
+)
 def test_run_hilo_validates_parameters_before_processing(
     kwargs: dict[str, object],
 ) -> None:
@@ -114,7 +116,6 @@ def test_run_hilo_validates_parameters_before_processing(
     ("shape", "settings_kwargs", "field"),
     [
         ((16, 16, 3, 3), {}, "frame count"),
-        ((16, 16, 3, 20), {"roi_size": 0}, "roi_size"),
         ((16, 16, 3, 20), {"trim_sec": 1_000.0}, "trim_sec"),
         ((16, 16, 3, 20), {"pe_axis_override": 2}, "phase-encode axis"),
     ],
@@ -130,6 +131,45 @@ def test_run_qa_rejects_invalid_inputs(
     with pytest.raises(q.InvalidScanError) as info:
         q.run_qa(scan, settings)
     assert info.value.field == field
+
+
+@pytest.mark.parametrize("trim_sec", [float("nan"), float("inf"), -1.0])
+def test_a_trim_that_names_no_real_duration_cannot_be_constructed(
+    trim_sec: float,
+) -> None:
+    """The warm-up trim is a span of seconds to drop, not an arbitrary float."""
+    with pytest.raises(q.InvalidScanError) as info:
+        q.AnalysisSettings(trim_sec=trim_sec)
+    assert info.value.field == "trim_sec"
+
+
+@pytest.mark.parametrize("roi_size", [0, -1])
+def test_an_roi_with_no_positive_side_cannot_be_constructed(roi_size: int) -> None:
+    """The summary and Weisskoff ROIs are squares of this side; zero has none."""
+    with pytest.raises(q.InvalidScanError) as info:
+        q.AnalysisSettings(roi_size=roi_size)
+    assert info.value.field == "roi_size"
+
+
+def test_a_negative_detrend_order_cannot_be_constructed() -> None:
+    """The order is a polynomial degree or a knot count; neither runs negative."""
+    with pytest.raises(q.InvalidScanError) as info:
+        q.AnalysisSettings(detrend_order=-1)
+    assert info.value.field == "detrend_order"
+
+
+def test_an_unresolved_or_constant_detrend_order_is_legal() -> None:
+    """None is "the run has not resolved one yet"; 0 is a constant fit."""
+    assert q.AnalysisSettings(detrend_order=None).detrend_order is None
+    assert q.AnalysisSettings(detrend_order=0).detrend_order == 0
+
+
+def test_a_valid_request_cannot_be_edited_into_an_impossible_one() -> None:
+    """`replace` builds a new record, so the frozen copy is held to the same domain."""
+    settings = q.AnalysisSettings(roi_size=9)
+    with pytest.raises(q.InvalidScanError) as info:
+        replace(settings, roi_size=0)
+    assert info.value.field == "roi_size"
 
 
 def test_run_qa_rejects_nonfinite_data_and_tr() -> None:

@@ -7,8 +7,10 @@ load the pipeline to name a type. Here it costs nothing but the shared
 vocabulary.
 """
 
+import math
 from dataclasses import dataclass
 
+from .exceptions import InvalidScanError
 from .types import FBIRN_ROI_SIZE, DetrendMethod, PeAxis, RoiCenter
 
 
@@ -30,6 +32,14 @@ class AnalysisSettings:
     `run_qa` writes this record onto its `QAResult`, so an artifact built from
     a result publishes the settings that result was computed with — never a
     default filled in afterwards.
+
+    The knob domains are held by the constructor, not by a validator: a trim
+    that names a real duration, a positive ROI side, and a detrend order that is
+    absent or non-negative are an `InvalidScanError` when they are not, so
+    holding an `AnalysisSettings` means the run it asks for is one that could be
+    honoured. `run_qa`'s `replace(settings, detrend_order=...)` passes through
+    the same door, so the order a run resolves is held to the same domain as one
+    a caller hands in.
     """
 
     trim_sec: float = 5.0
@@ -38,3 +48,21 @@ class AnalysisSettings:
     roi_size: int = FBIRN_ROI_SIZE
     pe_axis_override: PeAxis | None = None
     detrend_order: int | None = None
+
+    def __post_init__(self) -> None:
+        if not math.isfinite(self.trim_sec) or self.trim_sec < 0:
+            raise InvalidScanError(
+                "trim_sec",
+                self.trim_sec,
+                "expected a finite value greater than or equal to zero",
+            )
+        if self.roi_size <= 0:
+            raise InvalidScanError(
+                "roi_size", self.roi_size, "expected a positive integer"
+            )
+        if self.detrend_order is not None and self.detrend_order < 0:
+            raise InvalidScanError(
+                "detrend_order",
+                self.detrend_order,
+                "expected an integer greater than or equal to zero",
+            )

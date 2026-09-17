@@ -8,6 +8,20 @@ versioning when the first stable public interface is released.
 
 ### Changed
 
+- **An `AnalysisSettings` with an impossible knob is now an `InvalidScanError`
+  at construction.** The record that is the run's request held none of its own
+  domains: a non-finite or negative `trim_sec`, a `roi_size` of zero or less,
+  and a negative `detrend_order` were checked by `validate_qa_run` for a run and
+  again, in a second spelling, by `validate_artifact` at the archive door, so a
+  record built for either and used for neither carried a knob nothing could
+  honour. `AnalysisSettings.__post_init__` holds all three now, as the three
+  artifact records above hold theirs, and both validators keep only what they
+  alone can see — for `validate_qa_run`, what the request means for *this* scan.
+  `InvalidScanError` rather than the `ValueError` those records raise, because
+  it is the error the pipeline already refused these values with and it carries
+  the field and value; it is a `ValueError` too, so a stored document that
+  breaks a domain still fails its load as an `InvalidArtifactError`. The
+  on-disk layout, `ARTIFACT_SCHEMA_VERSION` and the CLI are untouched.
 - **`run_qa` and `preprocess` take an `AnalysisSettings` record instead of loose
   knobs.** The five request knobs and every one of their defaults were spelled
   in `AnalysisSettings`, again in `run_qa`'s signature, and three of them a

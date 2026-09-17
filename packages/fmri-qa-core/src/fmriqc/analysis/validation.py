@@ -1,19 +1,19 @@
 """Validate the published artifact contract at the archive boundary.
 
 Half the contract is not here. An invariant of one record alone is held by that
-value object's own constructor (`Provenance`, `Measurements` and `RoiBox`
-hold their own today), because an artifact built in-process and printed or
-rendered is never saved and so never reaches this module: a new single-record
-invariant added here would go unchecked for every consumer but the archive.
-What is left here is what a constructor cannot see — facts that span two
-records (`displacement_unit` against `provenance.voxel_mm`,
+value object's own constructor (`AnalysisSettings`, `Provenance`,
+`Measurements` and `RoiBox` hold their own today), because an artifact built
+in-process and printed or rendered is never saved and so never reaches this
+module: a new single-record invariant added here would go unchecked for every
+consumer but the archive. What is left here is what a constructor cannot see —
+facts that span two records (`displacement_unit` against `provenance.voxel_mm`,
 `outlier_worst_frame` against `provenance.n_frames`, the ROI box against the
-image it sits on), the settings domains, and everything about arrays: their
-dimensions, shapes, and coordinates.
+image it sits on), and everything about arrays: their dimensions, shapes, and
+coordinates.
 
 Scalar types follow the value objects; dimensional relationships and numeric
 domains are checked explicitly. NaN/Infinity measurements remain meaningful,
-but coordinates, counts, and analysis settings must be usable.
+but coordinates and counts must be usable.
 """
 
 import math
@@ -119,10 +119,7 @@ def validate_artifact(artifact: QAArtifact) -> None:
 
 
 def _validate_parameters(artifact: QAArtifact) -> None:
-    s, p, m = artifact.settings, artifact.provenance, artifact.measurements
-    _require(math.isfinite(s.trim_sec) and s.trim_sec >= 0, "invalid settings.trim_sec")
-    _require(s.roi_size > 0, "invalid settings.roi_size")
-    _require(s.detrend_order is None or s.detrend_order >= 0, "invalid detrend_order")
+    p, m = artifact.provenance, artifact.measurements
     # `settings.pe_axis_override` and `measurements.pe_axis` are not checked
     # here: both are `PeAxis | None`, so `validate_document` -- which reads the
     # field annotations -- already refuses any other axis, on save and on load

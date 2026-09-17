@@ -1,4 +1,11 @@
-"""Validation at the boundary between loaded scans and numerical metrics."""
+"""Validation at the boundary between loaded scans and numerical metrics.
+
+The parameter domains are not here. `AnalysisSettings` holds its own knobs to
+theirs, so a request that reaches this module is already one that could be
+honoured by some scan; what is left is everything that is only true relative to
+*this* scan -- its shape and samples, how many frames the trim leaves it, and
+which axis the request and the header settle on between them.
+"""
 
 import numpy as np
 
@@ -39,7 +46,12 @@ def validate_scan(scan: QAScan) -> None:
 
 
 def _validate_trim_sec(trim_sec: float) -> None:
-    """Require a warm-up trim that names a real duration."""
+    """Require a warm-up trim that names a real duration: the high/low path's copy.
+
+    The single-slice path takes its trim inside an `AnalysisSettings`, which
+    holds this domain itself; `run_hilo` takes a loose `trim_sec`, so this is
+    the only place that trim is held to being a duration.
+    """
     if not np.isfinite(trim_sec) or trim_sec < 0:
         raise InvalidScanError(
             "trim_sec",
@@ -56,6 +68,11 @@ def _frames_after_trim(scan: QAScan, trim_sec: float) -> int:
 def validate_qa_run(scan: QAScan, settings: AnalysisSettings) -> PeAxis | None:
     """Validate a scan against the request the single-slice QA pipeline got.
 
+    The knobs themselves are already in their domains -- `AnalysisSettings`
+    refuses a request that is not -- so what is checked here is what only the
+    scan can answer: that the series is analyzable, and that the trim leaves
+    enough of it behind.
+
     Returns the axis the request and the header settle on between them --
     `settings.pe_axis_override` if given, else `scan.pe_axis` narrowed to
     in-plane -- or None when neither names one. This is the one place that
@@ -64,12 +81,6 @@ def validate_qa_run(scan: QAScan, settings: AnalysisSettings) -> PeAxis | None:
     """
     validate_scan(scan)
     trim_sec = settings.trim_sec
-    _validate_trim_sec(trim_sec)
-    if settings.roi_size <= 0:
-        raise InvalidScanError(
-            "roi_size", settings.roi_size, "expected a positive integer"
-        )
-
     remaining = _frames_after_trim(scan, trim_sec)
     if remaining < MIN_ANALYSIS_FRAMES:
         raise InvalidScanError(
