@@ -44,11 +44,6 @@ class OutlierResult(ArrayValue):
         return float(self.fraction.max())
 
     @property
-    def mean_fraction(self) -> float:
-        """Mean outlier fraction across frames."""
-        return float(self.fraction.mean())
-
-    @property
     def worst_volume(self) -> int:
         """Frame index (within the analyzed series) with the most outliers."""
         return int(np.argmax(self.fraction))

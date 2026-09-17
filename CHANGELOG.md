@@ -696,6 +696,9 @@ versioning when the first stable public interface is released.
 
 ### Removed
 
+- **`OutlierResult.mean_fraction`.** Nothing read it: the artifact publishes
+  the worst frame, `max_fraction` (as `outlier_max_pct`) and `worst_volume`,
+  never the mean across frames.
 - `MissingSidecarError`: a missing sidecar is a warning now, not an error.
 - `ghost_top_ratio`, `acr_ghosting_ratio`, and `phase_encode_axis`; their
   measurements come from `GhostResult`, and `QAMetrics` carries that result
