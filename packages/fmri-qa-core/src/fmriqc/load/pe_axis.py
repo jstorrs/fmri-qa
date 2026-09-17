@@ -16,7 +16,7 @@ the `PeAxis` the pipeline measures on.
 from typing import Any
 
 from ..exceptions import InvalidScanError
-from ..types import PE_AXES, PeAxis, PeLabel
+from ..types import PE_AXES, PeAxis, PeLabel, Sidecar
 
 # DICOM in-plane phase-encode axis -> row/col: NIfTI i (axis 0) is the DICOM
 # row direction, j (axis 1) the column direction (verified against dcm2niix
@@ -76,7 +76,7 @@ _BIDS_AXES: dict[str, int] = {"i": 0, "i-": 0, "j": 1, "j-": 1, "k": 2, "k-": 2}
 _SIDECAR_PE_FIELDS = ("PhaseEncodingDirection", "PhaseEncodingAxis")
 
 
-def _pe_axis_from_sidecar(sidecar: dict[str, Any]) -> int | None:
+def _pe_axis_from_sidecar(sidecar: Sidecar) -> int | None:
     """PE axis (0/1/2) from the sidecar, or None if it carries no PE field.
 
     dcm2niix's two BIDS answers are tried in turn, then

@@ -15,6 +15,8 @@ import warnings
 from pathlib import Path
 from typing import Any
 
+from ..types import Sidecar
+
 # NIfTI `xyzt_units` time codes, as nibabel spells them, in seconds. An unknown
 # unit is read as seconds: that is what an unlabelled pixdim has always meant in
 # practice, and it leaves a well-formed file untouched.
@@ -39,7 +41,7 @@ def _positive_seconds(value: object) -> float | None:
     return float(value) if math.isfinite(value) and value > 0 else None
 
 
-def _repetition_time(header: Any, sidecar: dict[str, Any], path: str | Path) -> float:
+def _repetition_time(header: Any, sidecar: Sidecar, path: str | Path) -> float:
     """The TR in seconds, preferring the sidecar over a converted pixdim[4].
 
     The sidecar `RepetitionTime` is authoritative when it is a positive, finite

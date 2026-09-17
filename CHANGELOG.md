@@ -324,6 +324,15 @@ versioning when the first stable public interface is released.
 
 ### Fixed
 
+- **A BIDS sidecar whose `AcquisitionDate` is a JSON number no longer crashes
+  the load.** `load.metadata` built the acquisition datetime by joining
+  `AcquisitionDate` and `AcquisitionTime` with `" ".join(...)`, converting the
+  time to text first but not the date — so a sidecar with `"AcquisitionDate":
+  20260909` (unquoted, as some writers emit it) raised a bare
+  `TypeError: sequence item 0: expected str instance, int found` instead of
+  loading. The date is now converted the same way its neighbour already is;
+  a sidecar value that comes through unquoted is still parsed, the same
+  latitude `_optional_text` already gives a numeric serial number.
 - **Importing `fmriqc_report` no longer switches the matplotlib backend to
   `Agg`.** The package called `matplotlib.use("Agg")` at import time, silently
   overriding whatever backend the importing process — a notebook's inline

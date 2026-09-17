@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Any
 
 from ..exceptions import InvalidScanError
+from ..types import Sidecar
 from .paths import sidecar_path
 from .pe_axis import PE_ROWCOL, in_plane
 
@@ -51,7 +52,7 @@ class ScanMeta:
     series: str | None = None
 
 
-def _load_sidecar(path: str | Path) -> dict[str, Any]:
+def _load_sidecar(path: str | Path) -> dict[str, object]:
     """Parse the BIDS JSON sidecar beside `path` (.nii/.nii.gz -> .json).
 
     dcm2niix writes one alongside every NIfTI it converts, but a scanner export
@@ -90,7 +91,7 @@ def _load_sidecar(path: str | Path) -> dict[str, Any]:
     return {str(key): value for key, value in parsed.items()}
 
 
-def _acq_datetime(sidecar: dict[str, Any]) -> str | None:
+def _acq_datetime(sidecar: Sidecar) -> str | None:
     """Acquisition date/time from the sidecar, seconds-precision; None if absent.
 
     Siemens often anonymizes the date away, leaving only `AcquisitionTime`.
@@ -98,6 +99,7 @@ def _acq_datetime(sidecar: dict[str, Any]) -> str | None:
     if dt := sidecar.get("AcquisitionDateTime"):
         return str(dt).split(".")[0].replace("T", " ")
     date, time = sidecar.get("AcquisitionDate"), sidecar.get("AcquisitionTime")
+    date = str(date) if date else None
     time = str(time).split(".")[0] if time else None
     return " ".join(x for x in (date, time) if x) or None
 
@@ -117,7 +119,7 @@ def _malformed(key: str, value: object, expected: str) -> None:
     )
 
 
-def _optional_number(sidecar: dict[str, Any], key: str) -> float | None:
+def _optional_number(sidecar: Sidecar, key: str) -> float | None:
     """A finite number from the sidecar, or None if absent or malformed."""
     value = sidecar.get(key)
     if value is None:
@@ -131,7 +133,7 @@ def _optional_number(sidecar: dict[str, Any], key: str) -> float | None:
     return float(value)
 
 
-def _optional_text(sidecar: dict[str, Any], key: str) -> str | None:
+def _optional_text(sidecar: Sidecar, key: str) -> str | None:
     """A text field from the sidecar, or None if absent or malformed.
 
     A number is kept as its text (a serial number written unquoted is still a
@@ -169,9 +171,7 @@ def _pe_direction(pe_axis: int | None) -> str | None:
     return None if axis is None else PE_ROWCOL[axis]
 
 
-def _scan_meta(
-    img: Any, sidecar: dict[str, Any], pe_axis: int | None, tr: float
-) -> ScanMeta:
+def _scan_meta(img: Any, sidecar: Sidecar, pe_axis: int | None, tr: float) -> ScanMeta:
     """Assemble `ScanMeta` from the NIfTI header and (optional) BIDS sidecar.
 
     `tr` is handed in already resolved rather than re-read from pixdim[4], so

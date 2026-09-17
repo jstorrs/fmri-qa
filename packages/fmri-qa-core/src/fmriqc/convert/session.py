@@ -30,7 +30,7 @@ from typing import assert_never
 
 from ..exceptions import ConversionError, InvalidChoiceError
 from ..load.paths import NIFTI_SUFFIXES, nifti_stem, sidecar_path
-from ..types import ANONYMIZE_MODES, NAME_STYLES, Anonymize, NameStyle
+from ..types import ANONYMIZE_MODES, NAME_STYLES, Anonymize, NameStyle, Sidecar
 from . import naming
 from .dcm2niix import DEFAULT_TEMPLATE, build_args, find_dcm2niix, run, version
 
@@ -62,7 +62,7 @@ class ImportResult:
     log: str
 
 
-def _read_sidecar(path: Path) -> naming.Sidecar | None:
+def _read_sidecar(path: Path) -> Sidecar | None:
     """The BIDS sidecar beside `path`, or None if it is missing or unreadable.
 
     An unreadable sidecar is not fatal: it costs the series its QA name (the
@@ -238,7 +238,7 @@ def _refuse_existing(
 
 
 def _describe(
-    path: Path, sidecar: naming.Sidecar, *, renamed_from: str | None
+    path: Path, sidecar: Sidecar, *, renamed_from: str | None
 ) -> ImportedSeries:
     """One filed series, with the sidecar fields worth showing in a listing."""
     number = sidecar.get("SeriesNumber")

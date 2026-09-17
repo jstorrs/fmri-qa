@@ -34,6 +34,8 @@ import re
 from collections import Counter
 from collections.abc import Mapping
 
+from ..types import Sidecar
+
 # What a name may contain. Everything else — spaces, parentheses, slashes, the
 # `*` a Siemens protocol name can carry — collapses to a single underscore, so
 # the result needs no quoting in a shell and no escaping in a glob.
@@ -42,10 +44,6 @@ _UNSAFE = re.compile(r"[^A-Za-z0-9]+")
 # Longest description kept. Protocol descriptions run long and the informative
 # part is at the front; a name is for recognizing a series, not for storing it.
 DESCRIPTION_LIMIT = 40
-
-# A sidecar value, as `json.load` hands it over: the sidecar is written by an
-# external tool, so nothing here assumes a field has the type it usually has.
-Sidecar = Mapping[str, object]
 
 
 def sanitize(text: str, limit: int = DESCRIPTION_LIMIT) -> str:

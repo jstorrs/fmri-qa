@@ -1,13 +1,14 @@
-"""Shared type vocabulary: array dtypes, closed-set Literals, and the ROI size.
+"""Shared type vocabulary: array dtypes, Literals, the sidecar, and the ROI size.
 
-The type primitives every layer speaks in — the three numpy array aliases and
-the `Literal` sets whose values are passed and published as options. Kept
-central (not scattered to the operation modules) precisely because they are the
-cross-cutting vocabulary: nearly every module annotates against them, and a
-closed option set defined once is a set that can't drift. The one constant here
-is here for the same reason: `FBIRN_ROI_SIZE` is spoken by the layer that
-resolves an ROI and by the artifact that records the one a run asked for, and
-the artifact may not import the prep layer to learn it.
+The type primitives every layer speaks in — the three numpy array aliases,
+the `Literal` sets whose values are passed and published as options, and the
+`Sidecar` mapping type. Kept central (not scattered to the operation modules)
+precisely because they are the cross-cutting vocabulary: nearly every module
+annotates against them, and a closed option set defined once is a set that
+can't drift. The one constant here is here for the same reason: `FBIRN_ROI_SIZE`
+is spoken by the layer that resolves an ROI and by the artifact that records
+the one a run asked for, and the artifact may not import the prep layer to
+learn it.
 
 `readout_axis` is the one function, and it is here rather than in an operation
 module because it is the sole *operation on* a closed set defined here: the
@@ -22,6 +23,7 @@ the operation that produces them (`ls` the package): `QAImages` in
 aggregate `QAMetrics`/`QAResult` in `pipeline`.
 """
 
+from collections.abc import Mapping
 from typing import Literal, get_args
 
 import numpy as np
@@ -35,6 +37,10 @@ from numpy.typing import NDArray
 FloatArray = NDArray[np.float64]
 BoolArray = NDArray[np.bool_]
 IntArray = NDArray[np.intp]
+
+# A sidecar value, as `json.load` hands it over: the sidecar is written by an
+# external tool, so nothing here assumes a field has the type it usually has.
+Sidecar = Mapping[str, object]
 
 # Closed sets of option strings, modeled as Literal so a bad value is a type
 # error at the call site (see style/architecture.md). The runtime tuple each CLI

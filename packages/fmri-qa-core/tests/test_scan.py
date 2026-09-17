@@ -204,6 +204,18 @@ def test_a_numeric_serial_number_is_kept_as_text(tmp_path) -> None:
     assert scan.meta.te == 0.03
 
 
+def test_a_numeric_acquisition_date_is_kept_as_text(tmp_path) -> None:
+    """A date written unquoted is still a date; it must not crash the join."""
+    nifti = _write_scan(
+        tmp_path, {"AcquisitionDate": 20260909, "AcquisitionTime": "14:30:12.500000"}
+    )
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")  # nothing here is malformed
+        scan = q.QAScan.from_nifti(nifti)
+    assert scan.meta is not None
+    assert scan.meta.datetime == "20260909 14:30:12"
+
+
 def test_missing_nifti_fails_on_the_nifti_not_the_sidecar(tmp_path) -> None:
     # The sidecar warning would be noise when the image itself is not there.
     with warnings.catch_warnings():
