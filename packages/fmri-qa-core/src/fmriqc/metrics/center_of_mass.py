@@ -32,7 +32,7 @@ class CenterOfMassResult(ArrayValue):
     first-moment complement to `MotionResult` (registration-based deformation).
 
     `shape` is the in-plane array size `(N0, N1)` — the wrap periods, so
-    displacements respect the periodic boundary; `voxel_mm` lets lengths be
+    displacements respect the periodic boundary; `voxel` lets lengths be
     reported in mm.
     """
 
@@ -88,7 +88,7 @@ def estimate_center_of_mass(
     center_slice: FloatArray,
     *,
     valid_mask: BoolArray,
-    voxel_mm: tuple[float, float] | None = None,
+    voxel: VoxelSize = UNKNOWN_VOXEL_SIZE,
 ) -> CenterOfMassResult:
     """Per-volume intensity-weighted center of mass of the phantom (circular).
 
@@ -136,7 +136,7 @@ def estimate_center_of_mass(
     tracks where the signal actually sits over time. Complements `estimate_motion`
     (registration-based deformation) with a cheap first-moment centroid.
 
-    `center_slice` is (X, Y, T); `voxel_mm` (in-plane, from the header) is carried
+    `center_slice` is (X, Y, T); `voxel` (in-plane, from the header) is carried
     so displacements can be reported in mm.
     """
     shape = (int(center_slice.shape[0]), int(center_slice.shape[1]))
@@ -162,4 +162,4 @@ def estimate_center_of_mass(
         ang = np.arctan2(np.sin(theta) @ W, np.cos(theta) @ W)
         com[good, axis] = (ang[good] % (2.0 * np.pi)) * shape[axis] / (2.0 * np.pi)
 
-    return CenterOfMassResult(com=com, shape=shape, voxel=VoxelSize(voxel_mm))
+    return CenterOfMassResult(com=com, shape=shape, voxel=voxel)

@@ -47,6 +47,7 @@ from .prep.geometry import (
 )
 from .prep.images import QAImages
 from .prep.imaging import select_slice, trim_count, trim_initial
+from .prep.scale import UNKNOWN_VOXEL_SIZE, VoxelSize
 from .settings import AnalysisSettings
 from .types import FBIRN_ROI_SIZE, BoolArray, DetrendMethod, PeAxis, RoiCenter
 from .validation import validate_qa_run
@@ -219,9 +220,9 @@ def run_qa(
     images = preprocess(scan, trim_sec=trim_sec, detrend=detrend, center=center)
     geom = detect_phantom(images)
 
-    voxel_mm = scan.meta.voxel_mm[:2] if scan.meta else None
-    motion = _estimate_phantom_motion(images, geom, voxel_mm)
-    com = _estimate_intensity_centroid(images, voxel_mm)
+    voxel = VoxelSize.in_plane(scan.meta.voxel_mm) if scan.meta else UNKNOWN_VOXEL_SIZE
+    motion = _estimate_phantom_motion(images, geom, voxel)
+    com = _estimate_intensity_centroid(images, voxel)
 
     roi = resolve_roi(images, geom, roi_size, center)
     _warn_if_roi_does_not_fit(geom, roi, center)
@@ -241,7 +242,7 @@ def run_qa(
     # correlation-length confound the guide warns the Weisskoff RDC is measured
     # against. Computed here so `resolved_pe` labels the directions.
     smoothness = estimate_smoothness(
-        images.fluctuations, geom.phantom_mask, voxel_mm=voxel_mm, pe_axis=resolved_pe
+        images.fluctuations, geom.phantom_mask, voxel=voxel, pe_axis=resolved_pe
     )
 
     metrics = QAMetrics(
@@ -293,7 +294,7 @@ def _detect_full_series_saturation(
 
 
 def _estimate_phantom_motion(
-    images: QAImages, geom: PhantomGeometry, voxel_mm: tuple[float, float] | None
+    images: QAImages, geom: PhantomGeometry, voxel: VoxelSize
 ) -> MotionResult:
     """3dvolreg-style per-volume registration of the phantom to its temporal mean.
 
@@ -301,11 +302,11 @@ def _estimate_phantom_motion(
     gradient-heating deformation. The analyzed series is NOT resampled from
     this fit, so the FBIRN metrics stay measured on the acquired data.
     """
-    return estimate_motion(images.center_slice, geom.phantom_mask, voxel_mm=voxel_mm)
+    return estimate_motion(images.center_slice, geom.phantom_mask, voxel=voxel)
 
 
 def _estimate_intensity_centroid(
-    images: QAImages, voxel_mm: tuple[float, float] | None
+    images: QAImages, voxel: VoxelSize
 ) -> CenterOfMassResult:
     """Per-volume intensity centroid (bxh volmeasures), a cheap first-moment trace.
 
@@ -315,7 +316,7 @@ def _estimate_intensity_centroid(
     The valid mask only heals missing data (a Siemens zeroed edge).
     """
     return estimate_center_of_mass(
-        images.center_slice, valid_mask=images.valid_mask, voxel_mm=voxel_mm
+        images.center_slice, valid_mask=images.valid_mask, voxel=voxel
     )
 
 

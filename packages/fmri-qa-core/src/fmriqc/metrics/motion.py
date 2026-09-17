@@ -157,7 +157,7 @@ def _register_norotate(
 def estimate_motion(
     center_slice: FloatArray,
     mask: BoolArray,
-    voxel_mm: tuple[float, float] | None = None,
+    voxel: VoxelSize = UNKNOWN_VOXEL_SIZE,
     max_iter: int = MOTION_MAX_ITER,
     tol: float = MOTION_TOL,
 ) -> MotionResult:
@@ -170,8 +170,8 @@ def estimate_motion(
     of `center_slice` (X, Y, T) is aligned to the temporal-mean image by
     forward-additive Lucas-Kanade over `mask` (the phantom), pivoting the strain
     at the phantom centroid so translation and deformation stay separable.
-    Returns the per-frame `[dr, dc, sr, sc, shear]`; `voxel_mm` (in-plane, from
-    the header) is carried through so displacements can be reported in mm.
+    Returns the per-frame `[dr, dc, sr, sc, shear]`; `voxel` (in-plane, from the
+    header) is carried through so displacements can be reported in mm.
     """
     reference = center_slice.mean(axis=-1)
     r_idx, c_idx = np.nonzero(mask)
@@ -196,7 +196,7 @@ def estimate_motion(
             max_iter=max_iter,
             tol=tol,
         )
-    result = MotionResult(params=params, voxel=VoxelSize(voxel_mm))
+    result = MotionResult(params=params, voxel=voxel)
     failed = int((~result.converged).sum())
     if failed:
         warnings.warn(

@@ -140,7 +140,7 @@ class Measurements:
 
     `displacement_unit` governs both `max_translation` and
     `max_com_displacement`: one field, not two, because both estimators are
-    handed the same in-plane `voxel_mm` by `run_qa` and so are always in the
+    handed the same in-plane `VoxelSize` by `run_qa` and so are always in the
     same unit for any artifact this build produces — a second field could only
     ever agree with the first, or drift from it by a bug. A migrated artifact
     is the one place they can legitimately differ from `fwhm_unit`: schema <= 5

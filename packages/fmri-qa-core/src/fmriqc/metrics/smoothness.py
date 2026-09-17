@@ -111,10 +111,7 @@ class SmoothnessResult(ArrayValue):
         voxels: it promises millimetres in its name, so an unknown voxel size
         has no answer to give.
         """
-        mm = self.voxel.mm
-        if mm is None:
-            return None
-        return (self.fwhm_vox[0] * mm[0], self.fwhm_vox[1] * mm[1])
+        return None if self.voxel.mm is None else (self.fwhm_axis(0), self.fwhm_axis(1))
 
     @property
     def fwhm_combined_vox(self) -> float:
@@ -219,7 +216,7 @@ def _directional_acf(scaled: FloatArray, mask: BoolArray, max_lag: int) -> Float
 def estimate_smoothness(
     fluctuations: FloatArray,
     mask: BoolArray,
-    voxel_mm: tuple[float, float] | None = None,
+    voxel: VoxelSize = UNKNOWN_VOXEL_SIZE,
     pe_axis: PeAxis | None = None,
     max_lag: int = SMOOTHNESS_MAX_LAG,
 ) -> SmoothnessResult:
@@ -235,7 +232,7 @@ def estimate_smoothness(
     aggregated across frames by geometric mean (AFNI `-geom`); the empirical
     spatial autocorrelation (`_directional_acf`) is collected over the same lags
     for the point-spread curves. `pe_axis` labels the axes as phase-encode /
-    readout; `voxel_mm` (in-plane, from the header) lets lengths be reported in
+    readout; `voxel` (in-plane, from the header) lets lengths be reported in
     mm. `fluctuations` is (X, Y, T) -- `QAImages.fluctuations`, the same
     Legendre-detrended residual the noise metrics are measured on.
     """
@@ -256,6 +253,6 @@ def estimate_smoothness(
         fwhm_vox=fwhm_vox,
         lags=lags,
         acf=acf,
-        voxel=VoxelSize(voxel_mm),
+        voxel=voxel,
         pe_axis=pe_axis,
     )

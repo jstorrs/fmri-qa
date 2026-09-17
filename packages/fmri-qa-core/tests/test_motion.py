@@ -11,6 +11,7 @@ from scipy.ndimage import affine_transform
 from scipy.ndimage import shift as ndi_shift
 
 from fmriqc.metrics.motion import estimate_motion
+from fmriqc.prep.scale import VoxelSize
 
 
 def _blob(n: int = 24) -> np.ndarray:
@@ -57,7 +58,7 @@ def test_estimate_motion_reports_max_translation_in_mm_when_voxel_size_is_known(
     dr, dc = 0.7, -0.4
     series[:, :, 10] = ndi_shift(blob, [dr, dc], order=1, mode="nearest")
 
-    res = estimate_motion(series, blob > 0.1, voxel_mm=(2.0, 2.0))
+    res = estimate_motion(series, blob > 0.1, voxel=VoxelSize((2.0, 2.0)))
     assert res.converged.all()
     assert np.isclose(res.max_translation, 2.0 * np.hypot(dr, dc), atol=0.2)
 

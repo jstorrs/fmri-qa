@@ -20,6 +20,7 @@ closed set is vocabulary, the code that acts on it is an operation.
 """
 
 from dataclasses import dataclass
+from typing import Self
 
 import numpy as np
 
@@ -51,6 +52,16 @@ class VoxelSize:
     def __post_init__(self) -> None:
         if self.mm is not None:
             object.__setattr__(self, "mm", (float(self.mm[0]), float(self.mm[1])))
+
+    @classmethod
+    def in_plane(cls, voxel_mm: tuple[float, float, float]) -> Self:
+        """The in-plane size, from a header's (row, col, slice spacing) triple.
+
+        The one place the row/col pair is taken off the triple `ScanMeta.voxel_mm`
+        carries: a caller that sliced it for itself could as easily take the
+        slice spacing, and both would type-check as a pair of floats.
+        """
+        return cls((voxel_mm[0], voxel_mm[1]))
 
     @property
     def unit(self) -> LengthUnit:

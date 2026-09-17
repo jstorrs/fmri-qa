@@ -59,7 +59,7 @@ def test_estimate_smoothness_recovers_the_smoothed_direction() -> None:
     smoothed = gaussian_filter1d(noise, sigma=2.0, axis=0)
     mask = np.ones((24, 24), dtype=bool)
 
-    res = estimate_smoothness(smoothed, mask, voxel_mm=(1.0, 1.0), pe_axis=0)
+    res = estimate_smoothness(smoothed, mask, voxel=VoxelSize((1.0, 1.0)), pe_axis=0)
     assert res.fwhm_vox[0] > res.fwhm_vox[1]
     assert res.fwhm_pe is not None and res.fwhm_ro is not None
     assert res.fwhm_pe > res.fwhm_ro  # pe_axis=0 is the smoothed axis

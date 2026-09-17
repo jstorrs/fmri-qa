@@ -8,6 +8,14 @@ versioning when the first stable public interface is released.
 
 ### Changed
 
+- **`estimate_motion`, `estimate_center_of_mass` and `estimate_smoothness` take
+  a `VoxelSize` instead of a raw `voxel_mm` tuple.** Each rebuilt its own
+  `VoxelSize(voxel_mm)` from the same header pair `run_qa` had already sliced,
+  the type whose whole purpose is to be the one answer to "is the size known,
+  what is it on this axis" -- three separate rebuilds of an answer already
+  settled once. The parameter is now `voxel: VoxelSize = UNKNOWN_VOXEL_SIZE`,
+  and the header triple is sliced exactly once, by the new
+  `VoxelSize.in_plane(voxel_mm)` classmethod, and threaded through from there.
 - **Reading or rendering an artifact no longer loads the calculation stack.**
   `fmriqc.analysis` re-exported `analyze` and `build_artifact` eagerly, so
   importing anything from the artifact facade — `load_artifact`, or any of the

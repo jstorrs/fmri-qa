@@ -18,6 +18,15 @@ def test_unit_follows_from_whether_the_size_is_known() -> None:
     assert UNKNOWN_VOXEL_SIZE.mm is None
 
 
+def test_in_plane_drops_the_through_plane_element() -> None:
+    """A header's voxel size is a triple; the single-slice metrics measure in two.
+
+    `in_plane` is the one place the row/col pair is taken off it, so no caller
+    slices the triple for itself and gets the slice spacing by mistake.
+    """
+    assert VoxelSize.in_plane((2.0, 4.0, 6.0)) == VoxelSize((2.0, 4.0))
+
+
 def test_a_numpy_voxel_size_is_stored_as_plain_floats() -> None:
     """The header hands these over as numpy scalars; the stored pair is floats.
 
