@@ -5,12 +5,15 @@ driver decides before it draws anything — how much fits on a page, and that th
 embedded-image alignment fix is installed and still needed.
 """
 
+from typing import get_args
+
 import pytest
 from reportlab.pdfbase import pdfmetrics
 from svglib import svglib as _svglib
 
 import fmriqc_report as report
 from fmriqc_report import content
+from fmriqc_report.document import Part
 from fmriqc_report.formats.reportlab.layout import (
     appendix_chunks,
     appendix_cursors,
@@ -20,7 +23,11 @@ from fmriqc_report.formats.reportlab.layout import (
     fit_text,
     wrap_text,
 )
-from fmriqc_report.formats.reportlab.pages import appendix_page, cover_page
+from fmriqc_report.formats.reportlab.pages import (
+    PART_RENDERERS,
+    appendix_page,
+    cover_page,
+)
 from fmriqc_report.formats.reportlab.svglib_patch import (
     _truncates_image_geometry,
     ensure_installed,
@@ -241,6 +248,17 @@ def test_report_text_is_truncated_to_the_available_width() -> None:
     fitted = fit_text("a very long scan name" * 20, "Helvetica", 10, 100)
     assert fitted.endswith("...")
     assert pdfmetrics.stringWidth(fitted, "Helvetica", 10) <= 100
+
+
+def test_every_page_part_has_a_renderer() -> None:
+    """The renderer table covers exactly the parts a document can name.
+
+    `PART_RENDERERS` is a `dict[Part, PageRenderer]`, but that annotation does
+    not enforce totality: neither mypy nor pyright flags a missing Literal key.
+    A `Part` added without a renderer would be a `KeyError` at render time, and
+    a stale key left in the table would be a renderer nothing reaches.
+    """
+    assert set(PART_RENDERERS) == set(get_args(Part))
 
 
 def test_svglib_converter_preserves_fractional_image_geometry() -> None:
