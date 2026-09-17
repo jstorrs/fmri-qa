@@ -11,7 +11,7 @@ from .types import PeAxis
 MIN_ANALYSIS_FRAMES = 4
 
 
-def validate_scan(scan: QAScan, *, minimum_frames: int = 1) -> None:
+def validate_scan(scan: QAScan) -> None:
     """Validate the structure shared by the main and high/low pipelines."""
     if scan.data.ndim != 4:
         raise InvalidScanError(
@@ -21,11 +21,11 @@ def validate_scan(scan: QAScan, *, minimum_frames: int = 1) -> None:
         raise InvalidScanError(
             "spatial shape", scan.data.shape[:3], "every spatial axis must be non-empty"
         )
-    if scan.data.shape[-1] < minimum_frames:
+    if scan.data.shape[-1] < MIN_ANALYSIS_FRAMES:
         raise InvalidScanError(
             "frame count",
             scan.data.shape[-1],
-            f"expected at least {minimum_frames} frame(s)",
+            f"expected at least {MIN_ANALYSIS_FRAMES} frame(s)",
         )
     if not np.isfinite(scan.tr) or scan.tr <= 0:
         raise InvalidScanError(
@@ -63,7 +63,7 @@ def validate_qa_run(
     `run_qa` falls back to the Nyquist-ghost estimate only when the return here
     is None.
     """
-    validate_scan(scan, minimum_frames=MIN_ANALYSIS_FRAMES)
+    validate_scan(scan)
     _validate_trim_sec(trim_sec)
     if roi_size <= 0:
         raise InvalidScanError("roi_size", roi_size, "expected a positive integer")
@@ -98,8 +98,8 @@ def validate_hilo_run(
     high: QAScan, low: QAScan, *, trim_sec: float, erode: int
 ) -> None:
     """Validate parameters shared by both sides of a high/low analysis."""
-    validate_scan(high, minimum_frames=MIN_ANALYSIS_FRAMES)
-    validate_scan(low, minimum_frames=MIN_ANALYSIS_FRAMES)
+    validate_scan(high)
+    validate_scan(low)
     _validate_trim_sec(trim_sec)
     if erode < 0:
         raise InvalidScanError(
