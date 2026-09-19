@@ -22,6 +22,8 @@ puzzle rather than as an error.
 
 import json
 import os
+import stat
+import sys
 import warnings
 from dataclasses import asdict, replace
 
@@ -120,6 +122,17 @@ def test_save_refuses_an_roi_box_that_is_square_but_off_the_image(
     with pytest.raises(q.InvalidArtifactError, match="inside the image"):
         q.save_artifact(broken, tmp_path / "qa.nc")
     assert not (tmp_path / "qa.nc").exists()
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX permission bits only")
+def test_a_saved_archive_respects_the_umask(tmp_path, artifact) -> None:
+    """An archive is handed to colleagues, so it must not come out owner-only."""
+    old_umask = os.umask(0o022)
+    try:
+        path = q.save_artifact(artifact, tmp_path / "qa.nc")
+    finally:
+        os.umask(old_umask)
+    assert stat.S_IMODE(path.stat().st_mode) == 0o644
 
 
 def test_a_refused_save_preserves_the_archive_already_there(tmp_path, artifact) -> None:

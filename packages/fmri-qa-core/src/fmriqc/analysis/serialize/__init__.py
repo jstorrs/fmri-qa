@@ -46,7 +46,7 @@ rather than flattened.
 
 import json
 import os
-import tempfile
+import secrets
 from pathlib import Path
 from typing import Any
 
@@ -134,12 +134,15 @@ def save_artifact(artifact: QAArtifact, path: str | Path) -> Path:
     out.parent.mkdir(parents=True, exist_ok=True)
     # In the destination's own directory: a move is only atomic within a single
     # filesystem, and the system temporary directory is often on another.
-    fd, name = tempfile.mkstemp(dir=out.parent, prefix=f".{out.name}.", suffix=".tmp")
-    # The netCDF writer opens the path itself, so the descriptor `mkstemp`
-    # returns is closed immediately; what it is wanted for is the unique name it
-    # reserved, and the writer overwrites the empty file it left behind.
-    os.close(fd)
-    tmp = Path(name)
+    tmp = out.parent / f".{out.name}.{secrets.token_hex(8)}.tmp"
+    # Not `tempfile.mkstemp`: that creates the file `0600` whatever the umask,
+    # which is right for private scratch and wrong for an archive a colleague
+    # is meant to open. Mode `0o666` leaves the permissions to the umask, and
+    # `O_EXCL` keeps the name from colliding with a concurrent writer. The
+    # netCDF writer opens the path itself, so the descriptor is closed at once;
+    # what it is wanted for is the name it reserved, and the writer overwrites
+    # the empty file it left behind.
+    os.close(os.open(tmp, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o666))
     try:
         netcdf.write(content, tmp)
         with tmp.open("r+b") as fh:

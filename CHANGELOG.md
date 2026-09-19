@@ -462,6 +462,12 @@ versioning when the first stable public interface is released.
   writes. Nothing about the atomic-write guarantees changed: a reader never
   observes a partial file, and a failed render or write never disturbs an
   existing destination.
+- **A saved `.qa.nc` archive no longer comes out `0600` regardless of the
+  umask.** `save_artifact` reserved its temporary name with `tempfile.mkstemp`,
+  so the archive kept that private mode while the NIfTI and sidecar beside it
+  did not, and a colleague on a shared drive could open the scan but not its
+  results. The temporary is now created with the umask-filtered default; the
+  write is as atomic and as durable as before.
 - Undefined circular centroids, including uniform positive frames, are now
   excluded per axis from the reference position. Near-zero temporal resultants
   also remain undefined, so cancellation roundoff cannot fabricate displacement.
