@@ -41,26 +41,32 @@ FULL_SIDECAR = {
 def fake_dcm2niix(tmp_path):
     """Build a stub dcm2niix that writes the outputs a test asks for.
 
-    Takes `{stem: sidecar-or-None}` and writes `<stem>.nii.gz` containing the
+    Takes `{stem: sidecar-or-None}` and writes a NIfTI containing the
     encoded stem for each, plus `<stem>.json` where a sidecar was given, into
     whatever directory the `-o` argument names. Prints dcm2niix's real banner
     line so the version parser has something true to read.
     """
 
-    def build(outputs, returncode=0, name="dcm2niix"):
+    def build(
+        outputs, returncode=0, name="dcm2niix", *, suffix=".nii.gz", companions=None
+    ):
         script = tmp_path / name
         script.write_text(
             "#!/usr/bin/env python3\n"
             "import json, sys\n"
             "from pathlib import Path\n"
             f"outputs = {outputs!r}\n"
+            f"companions = {companions or {}!r}\n"
+            f"suffix = {suffix!r}\n"
             "args = sys.argv[1:]\n"
             "out = Path(args[args.index('-o') + 1])\n"
             'print("Chris Rorden\'s dcm2niiX version v1.0.20260724 (JP2:OpenJPEG)")\n'
             "for stem, sidecar in outputs.items():\n"
-            "    (out / f'{stem}.nii.gz').write_bytes(stem.encode())\n"
+            "    (out / f'{stem}{suffix}').write_bytes(stem.encode())\n"
             "    if sidecar is not None:\n"
             "        (out / f'{stem}.json').write_text(json.dumps(sidecar))\n"
+            "for filename, content in companions.items():\n"
+            "    (out / filename).write_bytes(content)\n"
             f"sys.exit({returncode})\n"
         )
         script.chmod(script.stat().st_mode | stat.S_IXUSR)
@@ -390,6 +396,92 @@ def test_the_sidecar_travels_with_the_nifti_it_describes(
     stem = "20260909_143012_s002_QA_EPI_ISO"
     assert (out / f"{stem}.nii.gz").exists()
     assert json.loads((out / f"{stem}.json").read_text())["SeriesNumber"] == 2
+
+
+@pytest.mark.parametrize("stems", [("scan", "scan.repeat"), ("x", "x.nii")])
+@pytest.mark.parametrize("suffix", [".nii", ".nii.gz"])
+@pytest.mark.parametrize("names", ["qa", "dcm2niix"])
+def test_overlapping_stems_keep_each_nifti_and_its_own_companions(
+    tmp_path, fake_dcm2niix, stems, suffix, names
+) -> None:
+    outputs = {stem: {"SeriesNumber": number} for number, stem in enumerate(stems, 1)}
+    companions = {
+        f"{stem}{extension}": f"{stem}{extension}".encode()
+        for stem in stems
+        for extension in (".bval", ".bvec", ".trace.txt")
+    }
+    binary = fake_dcm2niix(outputs, suffix=suffix, companions=companions)
+    out = tmp_path / "nifti"
+
+    result = import_dicom(tmp_path, out, binary=binary, names=names)
+
+    expected_files = {}
+    expected_niftis = {}
+    for number, stem in enumerate(stems, 1):
+        target = f"s{number:03d}" if names == "qa" else stem
+        expected_niftis[f"{target}{suffix}"] = stem.encode()
+        expected_files[f"{target}{suffix}"] = stem.encode()
+        expected_files[f"{target}.json"] = json.dumps(outputs[stem]).encode()
+        for extension in (".bval", ".bvec", ".trace.txt"):
+            expected_files[f"{target}{extension}"] = companions[f"{stem}{extension}"]
+    assert {entry.path.name: entry.path.read_bytes() for entry in result.series} == (
+        expected_niftis
+    )
+    assert {path.name: path.read_bytes() for path in out.iterdir()} == expected_files
+
+
+@pytest.mark.parametrize("force", [False, True])
+def test_a_collision_between_companions_is_refused_before_any_file_moves(
+    tmp_path, fake_dcm2niix, force
+) -> None:
+    """Unique series names can still map two companions to `a.b.json`."""
+    binary = fake_dcm2niix(
+        {"x": {"SeriesDescription": "a"}, "a.b": {}},
+        companions={"x.b.json": b"companion of x"},
+    )
+    out = tmp_path / "nifti"
+    out.mkdir()
+    existing = out / "a.b.json"
+    existing.write_bytes(b"an earlier import")
+
+    with pytest.raises(q.ConversionError, match="would share destinations") as excinfo:
+        import_dicom(tmp_path, out, binary=binary, force=force)
+
+    assert excinfo.value.stage == "destination"
+    assert "a.b.json" in str(excinfo.value)
+    assert {path.name: path.read_bytes() for path in out.iterdir()} == {
+        "a.b.json": b"an earlier import"
+    }
+
+
+@pytest.mark.parametrize("force", [False, True])
+def test_existing_companions_are_checked_at_their_own_series_destination(
+    tmp_path, fake_dcm2niix, force
+) -> None:
+    binary = fake_dcm2niix(
+        {"scan": {"SeriesNumber": 1}, "scan.repeat": {"SeriesNumber": 2}},
+        companions={"scan.repeat.trace.txt": b"new companion"},
+    )
+    out = tmp_path / "nifti"
+    out.mkdir()
+    existing = out / "s002.trace.txt"
+    existing.write_bytes(b"an earlier import")
+
+    if force:
+        result = import_dicom(tmp_path, out, binary=binary, force=True)
+        assert existing.read_bytes() == b"new companion"
+        assert {
+            entry.path.name: entry.path.read_bytes() for entry in result.series
+        } == {
+            "s001.nii.gz": b"scan",
+            "s002.nii.gz": b"scan.repeat",
+        }
+    else:
+        with pytest.raises(q.ConversionError, match=r"s002\.trace\.txt"):
+            import_dicom(tmp_path, out, binary=binary)
+        assert {path.name: path.read_bytes() for path in out.iterdir()} == {
+            "s002.trace.txt": b"an earlier import"
+        }
 
 
 def test_nothing_of_the_staging_directory_survives_a_successful_import(

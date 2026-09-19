@@ -23,6 +23,7 @@ succeeds.
 import json
 import shutil
 import tempfile
+from collections import Counter
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -81,20 +82,34 @@ def _refiled(name: str, stem: str, target: str) -> str:
     """`name` with its leading `stem` swapped for `target`.
 
     A slice rather than `str.replace`, which would also rewrite a later
-    occurrence: `_companions` matches on `stem + "."`, so the stem is always a
+    occurrence: `_plan_files` matches on `stem + "."`, so the stem is always a
     prefix and this is exact.
     """
     return target + name[len(stem) :]
 
 
-def _companions(staging: Path, stem: str) -> list[Path]:
-    """Every staged file belonging to `stem` — the NIfTI, its sidecar, and any more.
+def _plan_files(
+    staged: Sequence[Path], destination: Path, chosen: dict[str, str]
+) -> list[tuple[Path, Path]]:
+    """Assign each NIfTI and companion one destination before any file moves.
 
-    Matched on `stem + "."` rather than a suffix list so nothing dcm2niix writes
-    is left behind in staging and deleted: the trailing dot is what keeps stem
-    `2` from also claiming `22.json`.
+    NIfTIs belong to their parsed stem: `x.nii.gz` belongs to `x` even when
+    another series has stem `x.nii`. Other files belong to the longest matching
+    stem, so `scan.repeat.json` travels with `scan.repeat`, never `scan`.
     """
-    return sorted(p for p in staging.iterdir() if p.name.startswith(f"{stem}."))
+    stems = sorted(chosen, key=len, reverse=True)
+    planned = []
+    for path in staged:
+        if path.name.endswith(NIFTI_SUFFIXES):
+            stem: str | None = nifti_stem(path)
+        else:
+            stem = next(
+                (stem for stem in stems if path.name.startswith(f"{stem}.")), None
+            )
+        if stem is not None:
+            target = destination / _refiled(path.name, stem, chosen[stem])
+            planned.append((path, target))
+    return planned
 
 
 def import_dicom(
@@ -120,9 +135,10 @@ def import_dicom(
         InvalidChoiceError: If `names` is not one of `NAME_STYLES` or
             `anonymize` is not one of `ANONYMIZE_MODES`.
         ConversionError: If `source` is not a directory, if no dcm2niix can be
-            found or it exits non-zero, or if the import would overwrite files
-            already in `destination` and `force` is not set. In the last case
-            nothing has been moved and the destination is untouched.
+            found or it exits non-zero, if imported files would share a
+            destination, or if the import would overwrite files already in
+            `destination` and `force` is not set. Both destination checks
+            happen before any file moves.
     """
     # Guarded up front so an untyped caller still gets the named error, then
     # matched exhaustively: `assert_never` is unreachable for a `NameStyle`, so
@@ -187,9 +203,8 @@ def _file_series(
     staging: Path, destination: Path, names: NameStyle, force: bool
 ) -> tuple[ImportedSeries, ...]:
     """Name everything in `staging` and move it into `destination`."""
-    produced = sorted(
-        path for path in staging.iterdir() if path.name.endswith(NIFTI_SUFFIXES)
-    )
+    staged = sorted(staging.iterdir())
+    produced = [path for path in staged if path.name.endswith(NIFTI_SUFFIXES)]
     sidecars = {nifti_stem(path): _read_sidecar(path) for path in produced}
     match names:
         case "qa":
@@ -198,14 +213,15 @@ def _file_series(
             chosen = {stem: stem for stem in sidecars}
         case _:
             assert_never(names)
-    _refuse_existing(staging, destination, chosen, force)
+    planned = _plan_files(staged, destination, chosen)
+    _refuse_collisions(planned, destination, force)
+    for source, target in planned:
+        source.replace(target)
 
     filed = []
     for path in produced:
         stem = nifti_stem(path)
         target = chosen[stem]
-        for companion in _companions(staging, stem):
-            companion.replace(destination / _refiled(companion.name, stem, target))
         filed.append(
             _describe(
                 destination / _refiled(path.name, stem, target),
@@ -216,24 +232,27 @@ def _file_series(
     return tuple(sorted(filed, key=lambda entry: entry.path.name))
 
 
-def _refuse_existing(
-    staging: Path, destination: Path, chosen: dict[str, str], force: bool
+def _refuse_collisions(
+    planned: Sequence[tuple[Path, Path]], destination: Path, force: bool
 ) -> None:
-    """Refuse the whole import if any file it would write already exists.
+    """Refuse duplicate destinations, and existing files unless forced.
 
     Checked across every file of every series before a single one moves, so the
     destination is either updated completely or not at all — a half-moved import
     is the state that is hardest to reason about afterwards, and the one a
     physicist would have to unpick by hand.
     """
+    counts = Counter(target for _, target in planned)
+    duplicates = sorted(path.name for path, count in counts.items() if count > 1)
+    if duplicates:
+        raise ConversionError(
+            "destination",
+            f"imported files would share destinations in {destination}: "
+            f"{', '.join(duplicates)}; --force cannot resolve this collision",
+        )
     if force:
         return
-    clashes = sorted(
-        _refiled(companion.name, stem, target)
-        for stem, target in chosen.items()
-        for companion in _companions(staging, stem)
-        if (destination / _refiled(companion.name, stem, target)).exists()
-    )
+    clashes = sorted(target.name for _, target in planned if target.exists())
     if clashes:
         raise ConversionError(
             "destination",

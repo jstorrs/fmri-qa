@@ -400,6 +400,9 @@ versioning when the first stable public interface is released.
 
 ### Fixed
 
+- **Imported companions stay with their own series when stems overlap.** NIfTIs
+  keep their parsed stems; other companions use the longest matching series stem.
+  File destination collisions are refused before any move, even with `--force`.
 - **Imported series names stay unique even when a QA name matches a retained
   dcm2niix name.** Colliding series fall back to their original names until all
   collisions are resolved, preventing one scan from silently replacing another.
