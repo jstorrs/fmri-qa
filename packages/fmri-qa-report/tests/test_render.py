@@ -148,6 +148,25 @@ def test_motion_panel_marks_unresolved_frames(artifact, failed) -> None:
     )
 
 
+def test_outlier_panel_shows_measured_percentages_without_a_chance_line(
+    artifact,
+) -> None:
+    from matplotlib.figure import Figure
+
+    from fmriqc_report.panels.timeseries import plot_outliers
+
+    fractions = np.linspace(0.0, 0.02, artifact.curves.time.size)
+    curves = replace(artifact.curves, outlier_fraction=fractions)
+    ax = Figure().add_subplot(111)
+    plot_outliers(ax, curves)
+
+    assert len(ax.lines) == 1
+    np.testing.assert_array_equal(ax.lines[0].get_xdata(), curves.time)
+    np.testing.assert_array_equal(ax.lines[0].get_ydata(), 100.0 * fractions)
+    assert ax.get_legend() is None
+    assert ax.get_ylabel() == "outliers (%)"
+
+
 def test_write_report_honours_a_custom_theme(tmp_path, artifact) -> None:
     from reportlab.lib.pagesizes import A4
 

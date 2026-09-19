@@ -23,31 +23,31 @@ detrended residuals $r_v(t)$. (`3dToutcount` detrends first as well;
 `afni_proc.py` recommends detrending before outlier classification. Its fit is
 L1 where this package's is L2, a minor difference for a stable phantom.)
 
-For each masked voxel the robust spread of its residual is taken from the
-median absolute deviation,
+For each masked voxel the implemented threshold scale is taken from the
+median absolute residual,
 
 $$\sigma_v = \sqrt{\tfrac{\pi}{2}}\; \operatorname{median}_t
 \lvert r_v(t) \rvert$$
 
-the factor being what makes the MAD a consistent estimator of the standard
-deviation for normal data. A frame counts as an outlier for that voxel when
+A frame counts as an outlier for that voxel when
 
 $$\lvert r_v(t) \rvert > \alpha\,\sigma_v, \qquad
 \alpha = Q^{-1}\!\left(\frac{q_{\text{thr}}}{N}\right)$$
 
-with $Q^{-1}$ the normal upper-tail quantile and $q_{\text{thr}} = 0.001$, so a
-clean voxel flags a frame with probability $q_{\text{thr}}$ — the Bonferroni
-correction over $N$ frames is what keeps a long run from flagging on length
-alone. A constant voxel ($\operatorname{MAD} = 0$) never flags.
+with $Q^{-1}$ the normal upper-tail quantile, $N$ the number of analyzed
+frames, and $q_{\text{thr}} = 0.001$ by default. The parameter tunes the
+threshold through $q_{\text{thr}}/N$; increasing the run length raises the
+threshold for a fixed residual scale. It is not an expected per-frame outlier
+fraction. A constant voxel ($\operatorname{MAD} = 0$) never flags.
 
 The published trace is the share of masked voxels flagged at each frame,
 
 $$\text{outlier fraction}(t) = \frac{1}{|P|}
 \sum_{v \in P} \mathbb{1}\big[\lvert r_v(t)\rvert > \alpha \sigma_v\big]$$
 
-so a stable run hovers near the 0.1% chance level and a frame standing well
-above it marks a bad volume. The scalar `outl %` is the worst frame's fraction
-as a percentage, and the index of that frame is published beside it — counted
+so a peak identifies a frame with an elevated share of flagged voxels. The
+scalar `outl %` is the worst frame's fraction as a percentage, and the index
+of that frame is published beside it — counted
 from the *analyzed* series, so adding `provenance.n_trimmed` gives the acquired
 volume number. An empty mask gives an all-NaN trace rather than a division by
 zero.
@@ -78,7 +78,7 @@ dominates. Either is NaN for an empty series or one with no spread at all.
 
 ```{eval-rst}
 .. plot::
-   :caption: Per-frame outlier-voxel fraction, against the per-voxel chance level.
+   :caption: Per-frame outlier-voxel fraction, with the worst frame marked.
    :filename-prefix: outliers-fraction
 
    import matplotlib.pyplot as plt
@@ -91,13 +91,6 @@ dominates. Either is NaN for an empty series or one with no spread at all.
 
    fig, axes = plt.subplots(figsize=(6.6, 3.2), layout="constrained")
    axes.plot(curves.time, 100 * curves.outlier_fraction, lw=0.9)
-   axes.axhline(
-       100 * curves.outlier_qthr,
-       ls="--",
-       lw=0.9,
-       color="0.4",
-       label=f"chance level ({100 * curves.outlier_qthr:g}%)",
-   )
    worst = measurements.outlier_worst_frame
    axes.plot(
        curves.time[worst],
@@ -113,9 +106,8 @@ dominates. Either is NaN for an empty series or one with no spread at all.
    axes.legend(fontsize="small")
 ```
 
-The phantom has no injected transient, so the trace wanders around the chance
-level and the marked worst frame is simply the largest of those wanderings —
-which is what a clean run is supposed to look like.
+The phantom has no injected transient. The marker identifies the frame with
+the largest measured fraction; the plot supplies no calibrated chance baseline.
 
 ## What it contributes to the artifact
 
@@ -126,9 +118,9 @@ which is what a clean run is supposed to look like.
 | `measurements.tc_outlier` | attribute, double | temporal spike score, peak over robust spread |
 | `measurements.spec_outlier` | attribute, double | spectral spike score, on the DC-dropped residual spectrum |
 | `curves.outlier_fraction` | variable `(frame)`, 1 | fraction (not percent) of masked voxels flagged in each frame |
-| `curves.outlier_qthr` | attribute, double | the per-voxel chance level, the reference line the trace is read against |
+| `curves.outlier_qthr` | attribute, double | threshold tuning parameter, used as $q_{\text{thr}}/N$ in the normal upper-tail quantile |
 
-The chance level is not an array, so it is an attribute rather than a variable.
+The threshold parameter is a scalar, so it is an attribute rather than a variable.
 The two spike scores are computed on the residual and spectrum
 the [stability](stability.md) page publishes; this analysis adds no second copy
 of either.

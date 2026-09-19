@@ -19,8 +19,8 @@ from ..types import BoolArray, FloatArray
 # of the SD for normal data. cran-fmriqa's spike scores divide by this MAD.
 MAD_SCALE = 1.4826
 
-# Per-voxel tail probability for the outlier test (3dToutcount default): a clean
-# voxel flags a sample this often by chance, so ~qthr is the expected fraction.
+# Threshold tuning parameter (3dToutcount default), used as qthr / n_t in the
+# normal upper-tail quantile; it is not an expected per-frame outlier fraction.
 OUTLIER_QTHR = 0.001
 
 
@@ -30,13 +30,13 @@ class OutlierResult(ArrayValue):
 
     `fraction[t]` is the share of masked voxels whose detrended residual is a
     statistical outlier at frame `t` -- a temporal-stability trace that spikes on
-    a bad volume. `qthr` is the per-voxel chance level, so a clean run hovers
-    near `qthr` and a spike stands well above it.
+    a bad volume. `qthr` tunes the threshold through `Q^-1(qthr / n_t)`;
+    it is not an expected per-frame outlier fraction.
     """
 
     fraction: FloatArray  # (n_t,) outlier-voxel fraction per frame
     n_voxels: int  # masked voxels (the fraction denominator)
-    qthr: float  # per-voxel tail probability (expected chance fraction)
+    qthr: float  # threshold tuning parameter
 
     @property
     def max_fraction(self) -> float:
@@ -82,9 +82,10 @@ def outlier_fraction(
     For each masked voxel the robust spread of its detrended residual is
     `sigma = sqrt(pi/2) * MAD` (MAD = median |residual|); a frame is an outlier
     for that voxel when `|residual| > alpha * sigma`, with
-    `alpha = Q^-1(qthr / n_t)` the normal upper-tail quantile that makes a clean
-    voxel flag a frame with probability `qthr`. `fraction[t]` is the share of
-    masked voxels flagged at frame `t`. Constant voxels (`MAD = 0`) never flag.
+    `alpha = Q^-1(qthr / n_t)` the normal upper-tail quantile. `qthr` tunes
+    this length-dependent threshold, not an expected per-frame fraction.
+    `fraction[t]` is the share of masked voxels flagged at frame `t`.
+    Constant voxels (`MAD = 0`) never flag.
 
     `fluctuations` is the per-voxel *detrended* residual (3dToutcount detrends
     first); passing `QAImages.fluctuations` reuses the pipeline's Legendre

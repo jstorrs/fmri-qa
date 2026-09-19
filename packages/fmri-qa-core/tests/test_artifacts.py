@@ -7,6 +7,7 @@ wiring onto the ROI-mean residual and its DC-dropped spectrum.
 """
 
 import numpy as np
+import pytest
 
 from fmriqc.metrics.artifacts import (
     MAD_SCALE,
@@ -40,6 +41,31 @@ def test_outlier_fraction_clean_run_flags_nothing() -> None:
     res = outlier_fraction(fluct, np.ones((4, 4), dtype=bool))
     assert res.n_voxels == 16
     assert res.max_fraction == 0.0
+    assert res.qthr == 0.001
+
+
+@pytest.mark.parametrize(
+    ("n_frames", "qthr", "expected_fraction"),
+    [(20, 0.001, 0.75), (200, 0.001, 0.25), (200, 0.01, 0.75)],
+)
+def test_outlier_fraction_threshold_depends_on_length_and_qthr(
+    n_frames: int, qthr: float, expected_fraction: float
+) -> None:
+    # All nonconstant voxels have median |residual| = 1. At qthr=0.001,
+    # a +/-5.2 spike exceeds the threshold for 20 frames but not 200;
+    # an 8.0 spike flags in both, and the constant voxel stays in the denominator.
+    fluct = np.tile([1.0, -1.0], n_frames // 2) * np.ones((2, 2, 1))
+    fluct[:, :, 7] = [[5.2, -5.2], [8.0, 0.0]]
+    fluct[1, 1, :] = 0.0
+    result = outlier_fraction(fluct, np.ones((2, 2), dtype=bool), qthr=qthr)
+
+    expected = np.zeros(n_frames)
+    expected[7] = expected_fraction
+    np.testing.assert_array_equal(result.fraction, expected)
+    assert result.n_voxels == 4
+    assert result.qthr == qthr
+    assert result.max_fraction == expected_fraction
+    assert result.worst_volume == 7
 
 
 def test_outlier_fraction_flags_the_spiked_frame() -> None:

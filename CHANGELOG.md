@@ -8,6 +8,12 @@ versioning when the first stable public interface is released.
 
 ### Changed
 
+- **Outlier plots no longer show `qthr` as a chance fraction.** The threshold
+  uses `Q^-1(qthr / n_frames)`, so `qthr` is a tuning parameter, not an expected
+  per-frame outlier fraction. Report and analysis documentation now describe
+  that distinction, and the misleading reference line is removed. The
+  estimator, default, numeric results, and stored `outlier_qthr` field are
+  unchanged.
 - **An `AnalysisSettings` with an impossible knob is now an `InvalidScanError`
   at construction.** The record that is the run's request held none of its own
   domains: a non-finite or negative `trim_sec`, a `roi_size` of zero or less,

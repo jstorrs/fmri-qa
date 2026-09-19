@@ -106,19 +106,11 @@ def plot_residual(
 
 
 def plot_outliers(ax: Axes, curves: Curves, fs: int = 9) -> None:
-    """Per-TR outlier-voxel fraction (3dToutcount) with the chance-level line.
-
-    A clean run hovers near `outlier_qthr` (the per-voxel chance fraction,
-    dashed); a frame standing well above it flags a bad volume.
-    """
+    """Per-TR outlier-voxel fraction (3dToutcount), displayed as a percentage."""
     ax.plot(curves.time, 100.0 * curves.outlier_fraction, lw=0.7)
-    ax.axhline(
-        100.0 * curves.outlier_qthr, color="gray", ls="--", lw=0.6, label="chance"
-    )
     ax.set_xlabel("time (s)")
     ax.set_ylabel("outliers (%)")
     ax.set_title("outlier fraction", fontsize=fs)
-    ax.legend(fontsize=fs - 2)
 
 
 def plot_motion(ax: Axes, curves: Curves, fs: int = 9) -> None:

@@ -85,8 +85,8 @@ def format_row(artifact: q.QAArtifact) -> str:
     # and is why it is not shown as 0 (see `Measurements`).
     clip = clip_cell(m.n_clipped_kept, flag=bool(m.clipped_kept))
     clip_pre = clip_cell(m.n_clipped_pre)
-    # outl%: worst single-frame outlier-voxel fraction (3dToutcount); a clean
-    # run sits near the per-voxel chance level (qthr, ~0.1%).
+    # outl%: worst single-frame outlier-voxel fraction (3dToutcount), using a
+    # threshold tuned by qthr and the number of analyzed frames.
     # motn/scl%/shr%: peak per-volume in-plane phantom motion vs the temporal
     # mean (3dvolreg-style, rotation dropped) -- translation (mm when the voxel
     # size is known, else voxels; same convention as fwPE/fwRO), and the

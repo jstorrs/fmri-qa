@@ -347,7 +347,7 @@ class Curves(ArrayValue):
     roi_trend: FloatArray  # (T,) fitted low-frequency trend
     roi_residual: FloatArray  # (T,) detrended residual
     outlier_fraction: FloatArray  # (T,) fraction of outlier voxels per frame
-    outlier_qthr: float  # per-voxel chance level (the reference line)
+    outlier_qthr: float  # threshold tuning parameter, used as qthr / n_frames
     spectrum_hz: FloatArray  # (F,) DC dropped
     spectrum_magnitude: FloatArray  # (F,)
     translation: FloatArray  # (T, 2) voxels

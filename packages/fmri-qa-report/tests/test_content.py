@@ -35,6 +35,13 @@ def test_every_metric_doc_is_documented(artifact) -> None:
         assert doc.fmt(m)  # the formatter returns a non-empty string
 
 
+def test_outlier_method_describes_threshold_tuning() -> None:
+    method = next(doc.method for doc in content.METRIC_DOCS if doc.label == "outl")
+    assert "qthr tunes a length-dependent threshold" in method
+    assert "not an expected per-frame outlier fraction" in method
+    assert "chance level" not in method
+
+
 def test_motn_and_com_tiles_carry_the_displacement_unit(
     artifact, bare_artifact
 ) -> None:

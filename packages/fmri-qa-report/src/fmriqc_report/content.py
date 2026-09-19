@@ -111,7 +111,8 @@ METRIC_DOCS: tuple[MetricDoc, ...] = (
     MetricDoc(
         "outl",
         "Worst single-frame outlier-voxel fraction.",
-        "AFNI 3dToutcount; a clean run sits near the per-voxel chance level.",
+        "AFNI 3dToutcount; qthr tunes a length-dependent threshold, "
+        "not an expected per-frame outlier fraction.",
         lambda m: f"{m.outlier_max_pct:.2f}%",
     ),
     MetricDoc(
