@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>$title · fMRI QA</title>
+  <link rel="stylesheet" href="../../assets/report.css">
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to report content</a>
+  <header class="page-header">
+    <div class="shell">
+      <p class="eyebrow">fMRI QA run report</p>
+      <h1>$title</h1>
+      <nav aria-label="Report sections">
+        <a href="#overview">Overview</a>
+        <a href="#metrics">Metrics</a>
+        <a href="#acquisition">Acquisition</a>
+        <a href="#figures">Figures</a>
+        <a href="#methods">Definitions and methods</a>
+        <a href="#provenance">Provenance</a>
+        <a href="../../index.html">Report index</a>
+      </nav>
+    </div>
+  </header>
+  <main id="main" class="shell">
+    <section id="overview" aria-labelledby="overview-heading">
+      <h2 id="overview-heading">Overview</h2>
+      <dl class="metadata">$overview</dl>
+      <div class="notices">$warning</div>
+    </section>
+    <section id="metrics" aria-labelledby="metrics-heading">
+      <h2 id="metrics-heading">Metrics</h2>
+      <p>Each metric is reported with its recorded unit. Values that the analysis could not resolve are shown as unavailable.</p>
+      <div class="metric-grid">$metrics</div>
+    </section>
+    <section id="acquisition" aria-labelledby="acquisition-heading">
+      <h2 id="acquisition-heading">Acquisition and analysis settings</h2>
+      <dl class="metadata">$acquisition</dl>
+    </section>
+    <section id="figures" aria-labelledby="figures-heading">
+      <h2 id="figures-heading">Figures</h2>
+      <p>Open any figure for a larger SVG view.</p>
+      $figures
+    </section>
+    <section id="methods" aria-labelledby="methods-heading">
+      <h2 id="methods-heading">Definitions and methods</h2>
+      $methods
+    </section>
+    <section id="provenance" aria-labelledby="provenance-heading">
+      <h2 id="provenance-heading">Source and provenance</h2>
+      <dl class="metadata">$provenance</dl>
+    </section>
+  </main>
+</body>
+</html>

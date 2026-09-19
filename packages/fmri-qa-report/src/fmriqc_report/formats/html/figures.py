@@ -203,8 +203,8 @@ def write_figures(
     destination = Path(output_dir)
     destination.mkdir(parents=True, exist_ok=True)
     assets = _assets(destination)
-    rc_params = {**theme.rc_params(), "svg.image_inline": True}
-    with matplotlib.rc_context(rc_params):
+    with matplotlib.rc_context(theme.rc_params()):
+        matplotlib.rcParams["svg.image_inline"] = True
         figures = _build_figures(artifact)
         try:
             for asset, figure in zip(assets, figures, strict=True):
