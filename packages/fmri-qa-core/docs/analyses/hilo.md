@@ -76,6 +76,11 @@ what the algebra assumes it means.
 The pair must match in array geometry, frame count, affine, voxel size, TR, and
 TE where recorded; an incompatibility is rejected before either scan is
 processed, so differently sampled acquisitions cannot be pooled by array index.
+The loader converts both voxel sizes and affine world coordinates (including
+translation) to millimeters, so equivalent geometry encoded in meters,
+millimeters, or microns can be paired. An unknown spatial unit is assumed to be
+millimeters with one warning per loaded scan. Callers constructing `QAScan`
+directly must also supply its affine in millimeters.
 Pass the high-flip scan first — a warning fires if the recorded flip angles say
 otherwise.
 

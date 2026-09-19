@@ -8,6 +8,11 @@ versioning when the first stable public interface is released.
 
 ### Changed
 
+- **Loaded scan affines now use millimeters, matching their voxel sizes.**
+  Equivalent NIfTI geometry encoded in meters, millimeters, or microns can now
+  be paired for high/low analysis. Conversion includes affine translation;
+  unknown spatial units assume millimeters with one warning per scan. Direct
+  `QAScan` callers must supply affines in millimeters too.
 - **Outlier plots no longer show `qthr` as a chance fraction.** The threshold
   uses `Q^-1(qthr / n_frames)`, so `qthr` is a tuning parameter, not an expected
   per-frame outlier fraction. Report and analysis documentation now describe

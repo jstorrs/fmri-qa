@@ -1,4 +1,4 @@
-"""The NIfTI loader's contract: TR units, and the optional BIDS sidecar.
+"""The NIfTI loader's contract: spatial/TR units, and the optional BIDS sidecar.
 
 Both concerns are file-I/O boundaries, so these go through real files on disk.
 The TR cases matter because pixdim[4] carries no unit of its own — a scan whose
@@ -21,6 +21,7 @@ import numpy as np
 import pytest
 
 import fmriqc as q
+from fmriqc.hilo.compatibility import require_compatible_scans
 
 
 def _write_scan(
@@ -274,32 +275,84 @@ def test_loaded_scaling_preserves_clipping_and_dead_edges(
     assert images.valid_mask[1:].all()
 
 
-@pytest.mark.parametrize("unit,zoom", [("mm", 3), ("meter", 0.003), ("micron", 3000)])
-def test_spatial_units_are_converted_to_mm(tmp_path, unit, zoom) -> None:
-    path = _write_scan(tmp_path, {})
-    img = nib.load(path)
-    img.header.set_zooms((zoom, zoom, zoom, 2))
+def _spatial_affine_mm() -> np.ndarray:
+    """A rotated, translated grid with unequal voxel sizes of 2, 3, and 4 mm."""
+    return np.array(
+        [
+            [1.2, -2.4, 0, 12.5],
+            [1.6, 1.8, 0, -7.25],
+            [0, 0, 4, 25],
+            [0, 0, 0, 1],
+        ]
+    )
+
+
+def _write_spatial_scan(path: Path, affine_mm: np.ndarray, unit: str) -> Path:
+    """Encode matching zooms and world coordinates in the declared unit."""
+    factor = {"mm": 1, "meter": 1000, "micron": 0.001, "unknown": 1}[unit]
+    affine = affine_mm.copy()
+    affine[:3, :] /= factor
+    data = np.arange(8 * 8 * 2 * 6, dtype=np.uint16).reshape((8, 8, 2, 6))
+    img = nib.Nifti1Image(data, affine)
+    img.header.set_zooms((*img.header.get_zooms()[:3], 2))
     img.header.set_xyzt_units(unit, "sec")
-    # Write a different file: the loaded image may still reference path's proxy.
-    target = tmp_path / "units.nii"
-    nib.save(img, target)
-    target.with_suffix(".json").write_text("{}")
-    scan = q.QAScan.from_nifti(target)
-    assert scan.meta.voxel_mm == pytest.approx((3, 3, 3))
+    nib.save(img, path)
+    path.with_suffix(".json").write_text('{"PhaseEncodingDirection": "j"}')
+    return path
+
+
+@pytest.mark.parametrize("unit", ["mm", "meter", "micron"])
+def test_spatial_units_are_converted_to_mm(tmp_path, unit) -> None:
+    affine_mm = _spatial_affine_mm()
+    path = _write_spatial_scan(tmp_path / "units.nii", affine_mm, unit)
+    reference_path = _write_spatial_scan(tmp_path / "reference.nii", affine_mm, "mm")
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        scan = q.QAScan.from_nifti(path)
+        reference = q.QAScan.from_nifti(reference_path)
+
+    assert scan.meta.voxel_mm == pytest.approx((2, 3, 4))
+    np.testing.assert_allclose(scan.affine, affine_mm, rtol=1e-6, atol=1e-6)
+    np.testing.assert_array_equal(scan.affine[3], [0, 0, 0, 1])
+    np.testing.assert_array_equal(scan.data, reference.data)
+    assert scan.tr == reference.tr == 2
+    require_compatible_scans(scan, reference)
+    if unit == "mm":
+        np.testing.assert_array_equal(scan.affine, nib.load(path).affine)
+
+
+@pytest.mark.parametrize("unit", ["mm", "meter", "micron"])
+@pytest.mark.parametrize("difference", ["translation", "orientation"])
+def test_converted_spatial_units_still_reject_different_geometry(
+    tmp_path, unit, difference
+) -> None:
+    affine_mm = _spatial_affine_mm()
+    high_path = _write_spatial_scan(tmp_path / "high.nii", affine_mm, "mm")
+    if difference == "translation":
+        affine_mm[0, 3] += 1
+    else:
+        affine_mm[:3, 0] *= -1
+    low_path = _write_spatial_scan(tmp_path / "low.nii", affine_mm, unit)
+    high = q.QAScan.from_nifti(high_path)
+    low = q.QAScan.from_nifti(low_path)
+
+    assert low.meta.voxel_mm == pytest.approx(high.meta.voxel_mm)
+    with pytest.raises(q.IncompatibleScansError) as info:
+        require_compatible_scans(high, low)
+    assert info.value.field == "affine"
 
 
 def test_unknown_spatial_units_warn_and_assume_mm(tmp_path) -> None:
-    path = _write_scan(tmp_path, {})
-    img = nib.load(path)
-    img.header.set_xyzt_units("unknown", "sec")
-    target = tmp_path / "unknown.nii"
-    nib.save(img, target)
-    target.with_suffix(".json").write_text("{}")
+    affine_mm = _spatial_affine_mm()
+    path = _write_spatial_scan(tmp_path / "unknown.nii", affine_mm, "unknown")
     with pytest.warns(
         UserWarning, match="spatial unit is unknown; assuming millimeters"
-    ):
-        scan = q.QAScan.from_nifti(target)
-    assert scan.meta.voxel_mm == (3, 3, 3)
+    ) as caught:
+        scan = q.QAScan.from_nifti(path)
+    assert len(caught) == 1
+    assert scan.meta.voxel_mm == pytest.approx((2, 3, 4))
+    np.testing.assert_array_equal(scan.affine, nib.load(path).affine)
+    np.testing.assert_allclose(scan.affine, affine_mm, rtol=1e-6, atol=1e-6)
 
 
 def test_float_storage_warns_and_is_recorded_on_the_scan(tmp_path) -> None:

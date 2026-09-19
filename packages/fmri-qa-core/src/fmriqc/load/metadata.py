@@ -171,25 +171,26 @@ def _pe_direction(pe_axis: int | None) -> str | None:
     return None if axis is None else PE_ROWCOL[axis]
 
 
-def _scan_meta(img: Any, sidecar: Sidecar, pe_axis: int | None, tr: float) -> ScanMeta:
+def _scan_meta(
+    img: Any,
+    sidecar: Sidecar,
+    pe_axis: int | None,
+    tr: float,
+    *,
+    spatial_scale_mm: float,
+) -> ScanMeta:
     """Assemble `ScanMeta` from the NIfTI header and (optional) BIDS sidecar.
 
     `tr` is handed in already resolved rather than re-read from pixdim[4], so
-    the TR the report shows is the one the pipeline ran on. The sidecar's
+    the TR the report shows is the one the pipeline ran on. `spatial_scale_mm`
+    is the same resolved unit conversion used for the scan's affine. The sidecar's
     optional fields are held to the type each one promises here, at the
     boundary, so that a malformed value is diagnosed against the file it came
     from rather than surfacing as an unreadable artifact months later; one
     that fails is recorded as unknown, with a warning.
     """
     zooms = img.header.get_zooms()
-    unit, _ = img.header.get_xyzt_units()
-    if unit == "unknown":
-        warnings.warn(
-            "NIfTI spatial unit is unknown; assuming millimeters for voxel sizes",
-            stacklevel=3,
-        )
-    factor = {"meter": 1000.0, "mm": 1.0, "micron": 0.001, "unknown": 1.0}[unit]
-    voxel_mm = tuple(float(z) * factor for z in zooms[:3])
+    voxel_mm = tuple(float(z) * spatial_scale_mm for z in zooms[:3])
     if not all(math.isfinite(z) and z > 0 for z in voxel_mm):
         raise InvalidScanError("voxel size", voxel_mm, "expected positive finite sizes")
     return ScanMeta(

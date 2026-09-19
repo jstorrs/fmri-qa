@@ -22,6 +22,17 @@ from .pe_axis import _pe_axis_from_header, _pe_axis_from_sidecar
 from .repetition_time import _repetition_time
 
 
+def _spatial_scale_mm(unit: str) -> float:
+    """Resolve the header's spatial unit once for voxel sizes and the affine."""
+    if unit == "unknown":
+        warnings.warn(
+            "NIfTI spatial unit is unknown; assuming millimeters for voxel sizes "
+            "and affine",
+            stacklevel=3,
+        )
+    return {"meter": 1000.0, "mm": 1.0, "micron": 0.001, "unknown": 1.0}[unit]
+
+
 @dataclass(frozen=True, eq=False, slots=True)
 class QAScan:
     """A raw QA acquisition plus the header metadata the pipeline needs.
@@ -37,6 +48,11 @@ class QAScan:
     `meta` holds the human-readable acquisition metadata for the report; the
     BIDS JSON sidecar it comes from is optional, and its fields are `None` when
     no sidecar sits beside the NIfTI.
+
+    `affine`, when present, maps voxel indices to world coordinates in
+    millimeters, including its translation. Direct callers must supply it in
+    millimeters; `from_nifti` converts it and the header voxel sizes together,
+    assuming millimeters with a warning when the spatial unit is unknown.
 
     `stored_integer` says whether the file held the scanner's integer samples,
     which is the precondition for the ADC-saturation check: that test asks
@@ -98,12 +114,18 @@ class QAScan:
             )
 
         tr = _repetition_time(img.header, sidecar, path)
+        unit, _ = img.header.get_xyzt_units()
+        spatial_scale_mm = _spatial_scale_mm(unit)
+        affine = img.affine.copy()
+        affine[:3, :] *= spatial_scale_mm
         return cls(
             data=data,
             tr=tr,
-            affine=img.affine,
+            affine=affine,
             pe_axis=pe_axis,
-            meta=_scan_meta(img, sidecar, pe_axis, tr),
+            meta=_scan_meta(
+                img, sidecar, pe_axis, tr, spatial_scale_mm=spatial_scale_mm
+            ),
             slope=float(slope),
             inter=float(inter),
             stored_integer=stored_integer,
