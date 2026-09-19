@@ -1,4 +1,5 @@
-"""`fmri-qa-report`: render saved analysis artifacts into a PDF packet.
+"""`fmri-qa-report`: render saved analysis artifacts into a PDF packet or a
+single-file HTML report.
 
 The presentation half's entry point. It reads the `.qa.nc` artifacts written by
 `fmri-qa --artifact` — never a NIfTI series — so reporting is a separate step
@@ -13,9 +14,8 @@ from pathlib import Path
 
 from fmriqc.analysis import InvalidArtifactError, QAArtifact, load_artifact
 
-from . import write_report
 from .cli_shared import _expand_globs
-from .document import TIERS
+from .document import TIERS, Tier
 from .summary import package_version
 
 
@@ -46,7 +46,8 @@ def _parser() -> argparse.ArgumentParser:
     """The command line this command accepts."""
     parser = argparse.ArgumentParser(
         prog="fmri-qa-report",
-        description="Render fmri-qa analysis artifacts (.qa.nc) into a PDF report.",
+        description="Render fmri-qa analysis artifacts (.qa.nc) into a PDF "
+        "report or a single-file HTML report.",
     )
     parser.add_argument(
         "--version", action="version", version=f"%(prog)s {package_version()}"
@@ -57,44 +58,70 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--pdf",
         metavar="FILE",
-        required=True,
         help="Write the PDF report to FILE.",
+    )
+    parser.add_argument(
+        "--html",
+        metavar="FILE",
+        help="Write one self-contained HTML report for one artifact to FILE.",
     )
     parser.add_argument(
         "--tier",
         choices=TIERS,
-        default="dashboard",
+        default=None,
         help="Report depth per scan: 'dashboard' (condensed overview) or 'physics' "
         "(adds a full-size stability page, a per-metric characterization table, "
-        "and a methods page) (default: dashboard).",
+        "and a methods page) (default: dashboard). Applies only to --pdf.",
     )
     parser.add_argument(
         "--cover",
         action="store_true",
-        help="Prepend a cover page listing the scans in the packet.",
+        default=None,
+        help="Prepend a cover page listing the scans in the packet. Applies only "
+        "to --pdf.",
     )
     parser.add_argument(
         "--appendix",
         action="store_true",
-        help="Append a provenance page (per-scan metadata + version).",
+        default=None,
+        help="Append a provenance page (per-scan metadata + version). Applies "
+        "only to --pdf.",
     )
     return parser
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    args = _parser().parse_args(argv)
+    parser = _parser()
+    args = parser.parse_args(argv)
+    if not args.pdf and not args.html:
+        parser.error("one of --pdf or --html is required")
+
+    pdf_only = [
+        flag
+        for flag, value in (
+            ("--tier", args.tier),
+            ("--cover", args.cover),
+            ("--appendix", args.appendix),
+        )
+        if value is not None
+    ]
+    if args.html and not args.pdf and pdf_only:
+        parser.error(f"{', '.join(pdf_only)} only apply to --pdf")
+    tier: Tier = "dashboard" if args.tier is None else args.tier
+    cover = bool(args.cover)
+    appendix = bool(args.appendix)
+
     # Before the overwrite check counts them: on Windows the wildcard is here.
     args.artifacts = _expand_globs(args.artifacts)
 
+    if args.html and len(args.artifacts) != 1:
+        parser.error(
+            "--html renders one artifact to one file; use fmri-qa-site for several"
+        )
+
     # Refuse before reading anything: an output that names an input is a usage
     # error, and one that must be caught while the input is still intact.
-    overwritten = [a for a in args.artifacts if _same_file(args.pdf, a)]
-    if overwritten:
-        for path in overwritten:
-            print(
-                f"ERROR: --pdf {args.pdf} would overwrite the input {path}",
-                file=sys.stderr,
-            )
+    if _refuse_overwrites(args.pdf, args.html, args.artifacts):
         return 1
 
     items = []
@@ -115,19 +142,34 @@ def main(argv: Sequence[str] | None = None) -> int:
         print("ERROR: no artifacts could be read; nothing to render", file=sys.stderr)
         return 1
 
-    try:
-        pages = write_report(
-            items,
-            args.pdf,
-            tier=args.tier,
-            cover=args.cover,
-            appendix=args.appendix,
-            omitted=omitted,
-        )
-    except Exception as exc:  # noqa: BLE001 - CLI boundary reports cleanly
-        print(f"ERROR: could not write PDF {args.pdf}: {exc}", file=sys.stderr)
-        return 1
-    print(f"# wrote {args.pdf} ({len(items)} scan(s), {pages} pages)")
+    if args.pdf:
+        from . import write_report
+
+        try:
+            pages = write_report(
+                items,
+                args.pdf,
+                tier=tier,
+                cover=cover,
+                appendix=appendix,
+                omitted=omitted,
+            )
+        except Exception as exc:  # noqa: BLE001 - CLI boundary reports cleanly
+            print(f"ERROR: could not write PDF {args.pdf}: {exc}", file=sys.stderr)
+            return 1
+        print(f"# wrote {args.pdf} ({len(items)} scan(s), {pages} pages)")
+
+    if args.html:
+        from .formats.html import write_run_page
+
+        title, artifact = items[0]
+        try:
+            write_run_page(artifact, args.html, title=title, site=None)
+        except Exception as exc:  # noqa: BLE001 - CLI boundary reports cleanly
+            print(f"ERROR: could not write HTML {args.html}: {exc}", file=sys.stderr)
+            return 1
+        print(f"# wrote {args.html} (1 scan)")
+
     if omitted:
         print(
             f"# {len(omitted)} of {len(args.artifacts)} artifact(s) could not be "
@@ -135,6 +177,30 @@ def main(argv: Sequence[str] | None = None) -> int:
             file=sys.stderr,
         )
     return 1 if omitted else 0
+
+
+def _refuse_overwrites(
+    pdf: str | None, html: str | None, artifacts: Sequence[str]
+) -> bool:
+    """Print and report any output that would overwrite an input or its twin."""
+    refused = False
+    for flag, output in (("--pdf", pdf), ("--html", html)):
+        if not output:
+            continue
+        for path in artifacts:
+            if _same_file(output, path):
+                print(
+                    f"ERROR: {flag} {output} would overwrite the input {path}",
+                    file=sys.stderr,
+                )
+                refused = True
+    if pdf and html and _same_file(pdf, html):
+        print(
+            f"ERROR: --pdf {pdf} and --html {html} would overwrite each other",
+            file=sys.stderr,
+        )
+        refused = True
+    return refused
 
 
 if __name__ == "__main__":

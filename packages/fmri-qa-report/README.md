@@ -7,6 +7,7 @@ sites, and multi-page PDF packets rendered from a `fmriqc.analysis.QAArtifact`.
 $ fmri-qa scan.nii.gz --artifact qa.nc
 $ fmri-qa-site qa.nc --output qa-site
 $ fmri-qa-report qa.nc --pdf report.pdf --tier physics
+$ fmri-qa-report qa.nc --html report.html
 ```
 
 The artifact is the only input. Every number, curve, mask, and image it draws is
@@ -29,13 +30,24 @@ requests share a page while retaining every source-file alias. If any request
 cannot load or render, the site records that omission and the command exits
 non-zero; an all-failed request still publishes a failure-only inventory.
 
+Each run page is a single self-contained file — stylesheet inlined, every
+figure embedded as a `data:` URI — that can be moved, emailed, or dropped into
+another site on its own; only the index depends on `assets/report.css`.
+`fmri-qa-report ARTIFACT --html FILE` renders that same page standalone, for
+one artifact: a PDF alternative that opens by double-click with no network and
+no sibling file, and carries no JavaScript, so an embedding site's
+Content-Security-Policy only needs `style-src 'unsafe-inline'` (or a hash) and
+`img-src data:`. Each figure has an Enlarge link that fills the viewport
+through CSS alone, no script involved; dark mode follows the reader's OS
+setting (figures stay on a white plate so plotted data keeps its colors); and
+the page is print-ready.
+
 ```text
 qa-site/
   index.html
   summary.json
   assets/report.css
   runs/<sha256>/index.html
-  runs/<sha256>/figures/*.svg
 ```
 
 ## Web summary schema

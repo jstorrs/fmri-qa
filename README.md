@@ -326,10 +326,15 @@ uv run fmri-qa-report artifacts/*.qa.nc --pdf qa.pdf
 
 | Flag | Default | Meaning |
 | --- | --- | --- |
-| `--pdf` | required | write the PDF report to this file |
-| `--tier` | `dashboard` | `dashboard` (condensed overview) or `physics` (adds stability, characterization, and methods pages) per scan |
-| `--cover` | — | prepend a cover page listing the scans in the packet |
-| `--appendix` | — | append a provenance page (per-scan metadata + version) |
+| `--pdf` | — | write the PDF report to this file |
+| `--html` | — | write one self-contained HTML report for one artifact to this file |
+| `--tier` | `dashboard` | `dashboard` (condensed overview) or `physics` (adds stability, characterization, and methods pages) per scan — applies only to `--pdf` |
+| `--cover` | — | prepend a cover page listing the scans in the packet — applies only to `--pdf` |
+| `--appendix` | — | append a provenance page (per-scan metadata + version) — applies only to `--pdf` |
+
+At least one of `--pdf` or `--html` is required; both may be given together to
+write both from one run. `--tier`/`--cover`/`--appendix` shape the PDF only, so
+passing one of them with `--html` alone (no `--pdf`) is a usage error.
 
 An artifact that cannot be read is reported on stderr, skipped, and the run
 exits non-zero — but the packet is still written, and it says what it is
@@ -353,6 +358,22 @@ the scan inventory and `--appendix` appends a provenance page, and a running
 footer carries page numbers once the packet spans pages. The cover
 title, logo, footer text, fonts, and colours all come from a `report.Theme`, so
 a group brands every packet it issues from one object (see the library section).
+
+### Single-file HTML report
+
+`--html FILE` renders one artifact to one self-contained HTML file — the same
+report page `fmri-qa-site` publishes per run, handed out on its own as a PDF
+alternative:
+
+```bash
+uv run fmri-qa-report scan.qa.nc --html report.html
+```
+
+It opens by double-click with no network and no sibling file, so it is safe to
+email, attach to a QA record, or drop as-is into an existing website. It
+contains no JavaScript, so an embedding site's Content-Security-Policy only
+needs `style-src 'unsafe-inline'` (or a hash) and `img-src data:`. `--html`
+takes exactly one artifact; use `fmri-qa-site` for several.
 
 ## Offline web report
 
@@ -395,7 +416,6 @@ expanded by the command when the shell leaves them unexpanded.
 Open `qa-site/index.html` in a browser. No server, JavaScript, or CDN is needed.
 The index links to each run's metrics, warnings, acquisition metadata, analysis
 settings, diagnostic figures, and expandable metric definitions and methods.
-Click a figure to open its full-size SVG.
 
 The generated directory has this layout:
 
@@ -405,12 +425,16 @@ qa-site/
   summary.json
   assets/report.css
   runs/<sha256>/index.html
-  runs/<sha256>/figures/*.svg
 ```
 
 Share the whole directory, or upload its contents to a static web host while
-preserving the directory structure. The HTML pages use relative links to their
-figures and stylesheet.
+preserving the directory structure. Each run page is a single self-contained
+file — stylesheet inlined, every figure embedded as a `data:` URI — that can be
+moved, emailed, or dropped into another site on its own; only the index
+depends on `assets/report.css`. Each figure has an Enlarge link that fills the
+viewport through CSS alone, no script involved; dark mode follows the reader's
+OS setting (figures stay on a white plate so plotted data keeps its colors);
+and the page is print-ready.
 
 The output path must not already exist, including as a file or symlink. To
 rebuild or add scans, pass all desired artifacts again and choose a new output

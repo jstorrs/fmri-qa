@@ -8,6 +8,32 @@ versioning when the first stable public interface is released.
 
 ### Changed
 
+- **A published run report is one self-contained HTML file.** `fmri-qa-site`
+  no longer writes a `runs/<sha256>/figures/` directory: `write_run_page`
+  inlines the stylesheet in a `<style>` block and embeds all fourteen figures
+  as `data:image/svg+xml;base64,...` sources, so the page opens from `file://`
+  with no sibling asset and no network access — a PDF alternative a physicist
+  can double-click, email, or drop into their own site. `render_run` is
+  replaced by `render_run_page`/`write_run_page`, which take an artifact
+  directly rather than a run directory whose figures were written by a
+  separate step; a page published inside a site now carries a `SiteContext`
+  (its index route, and whether the site is incomplete) instead of loose
+  `incomplete`/directory arguments, and a standalone page takes no `site` at
+  all and carries no link out. Only the site index still depends on
+  `assets/report.css`. `FigureAsset` no longer carries a `path`: figures are
+  values rendered in memory, not files, so a disk location was never theirs to
+  hold. `render_figures` and `RenderedFigure` are new, and are what every HTML
+  page now builds on; `write_figures`, which wrote the same SVGs to files
+  nothing in `src` called any more, is removed in favour of `render_figures`.
+- **The HTML report and site have a new look.** Both pages are restyled to a
+  denser, more legible layout: a masthead with an identity block, metric and
+  count tiles, hairline key/value tables, and grouped figure panels. Dark mode
+  now follows the OS setting (figures stay on a white plate so plotted data
+  keeps its colors); a print stylesheet lays the report out for paper; a
+  figure enlarges to fill the viewport through a CSS-only `:target` toggle,
+  with no JavaScript; and the site index's run table now shows each run's
+  headline metrics (SNR, SFNR, ghost, drift, fluct) alongside its link, not
+  just a bare list.
 - **Loaded scan affines now use millimeters, matching their voxel sizes.**
   Equivalent NIfTI geometry encoded in meters, millimeters, or microns can now
   be paired for high/low analysis. Conversion includes affine translation;
@@ -298,6 +324,14 @@ versioning when the first stable public interface is released.
 
 ### Added
 
+- **`fmri-qa-report` can now write a single-file HTML report.** `--html FILE`
+  renders one artifact to one self-contained page — the same page
+  `fmri-qa-site` publishes per run — as a PDF alternative that opens by
+  double-click with no network and no sibling file, and carries no JavaScript.
+  `--pdf` is no longer required on its own; at least one of `--pdf` or `--html`
+  must be given, and both may be given together to write both from one run.
+  `--html` takes exactly one artifact; several scans still go through
+  `fmri-qa-site`.
 - **`fmri-qa-site` publishes saved artifacts as an offline static report.**
   It creates a fresh directory with an index, per-artifact pages, assets, and a
   versioned `summary.json` inventory; incomplete requests are published and
@@ -415,6 +449,19 @@ versioning when the first stable public interface is released.
 
 ### Fixed
 
+- **Published HTML reports, sites, and PDFs no longer come out `0600`/`0700`
+  regardless of the umask.** `write_run_page`, `write_site`, and the PDF
+  writer atomically wrote through `tempfile.mkstemp`/`tempfile.mkdtemp`, whose
+  results are always private-mode by design (they are meant for a process's
+  own scratch files, not something handed to a reader); a run page, a
+  published site directory, and a PDF inherited that private mode instead of
+  the caller's own umask-filtered default. All three now share one
+  `fmriqc_report.atomic.atomic_file` context manager (and a matching
+  uniquely-named sibling `Path.mkdir()` for the site's staging directory) that
+  lets the kernel apply the umask, same as every other file this project
+  writes. Nothing about the atomic-write guarantees changed: a reader never
+  observes a partial file, and a failed render or write never disturbs an
+  existing destination.
 - Undefined circular centroids, including uniform positive frames, are now
   excluded per axis from the reference position. Near-zero temporal resultants
   also remain undefined, so cancellation roundoff cannot fabricate displacement.

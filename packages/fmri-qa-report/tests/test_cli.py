@@ -1,4 +1,4 @@
-"""The `fmri-qa-report` command line: artifacts on disk in, a PDF out."""
+"""The `fmri-qa-report` command line: artifacts on disk in, a PDF or HTML out."""
 
 import inspect
 from pathlib import Path
@@ -105,6 +105,116 @@ def test_main_creates_the_pdf_destination_directory(tmp_path, saved) -> None:
     assert pdf.is_file()
 
 
+def test_main_writes_a_single_file_html_report(tmp_path, saved, capsys) -> None:
+    """The one real end-to-end HTML render in this module; every other HTML
+    test below stubs `write_run_page` to stay fast."""
+    html = tmp_path / "qa.html"
+    rc = cli.main([saved, "--html", str(html)])
+    captured = capsys.readouterr()
+    assert rc == 0
+    assert "# wrote" in captured.out
+    text = html.read_text(encoding="utf-8")
+    assert "data:image/svg+xml;base64," in text
+    assert "<style" in text
+    assert "<link" not in text
+    assert "<script" not in text
+
+
+def test_html_refuses_more_than_one_artifact(tmp_path, saved, capsys) -> None:
+    html = tmp_path / "qa.html"
+    with pytest.raises(SystemExit) as info:
+        cli.main([saved, saved, "--html", str(html)])
+    assert info.value.code == 2
+    err = capsys.readouterr().err
+    assert "--html renders one artifact to one file" in err
+    assert "fmri-qa-site" in err
+    assert not html.exists()
+
+
+def test_html_refuses_to_overwrite_an_input(
+    tmp_path, saved, capsys, monkeypatch
+) -> None:
+    archive = Path(saved)
+    before = archive.read_bytes()
+    monkeypatch.chdir(tmp_path)
+    rc = cli.main([saved, "--html", f"./{archive.name}"])
+    assert rc == 1
+    assert "would overwrite the input" in capsys.readouterr().err
+    assert archive.read_bytes() == before
+
+
+def test_html_and_pdf_refuse_to_share_one_destination(tmp_path, saved, capsys) -> None:
+    shared = tmp_path / "qa.out"
+    rc = cli.main([saved, "--pdf", str(shared), "--html", f"{tmp_path}/./qa.out"])
+    assert rc == 1
+    assert "would overwrite each other" in capsys.readouterr().err
+    assert not shared.exists()
+
+
+@pytest.mark.parametrize(
+    ("flag", "value"),
+    [("--tier", "physics"), ("--cover", None), ("--appendix", None)],
+)
+def test_html_alone_refuses_a_pdf_only_option(
+    tmp_path, saved, capsys, flag, value
+) -> None:
+    html = tmp_path / "qa.html"
+    argv = [saved, "--html", str(html), flag]
+    if value is not None:
+        argv.append(value)
+    with pytest.raises(SystemExit) as info:
+        cli.main(argv)
+    assert info.value.code == 2
+    err = capsys.readouterr().err
+    assert flag in err and "only apply to --pdf" in err
+    assert not html.exists()
+
+
+def test_html_with_pdf_still_accepts_pdf_only_options(tmp_path, saved) -> None:
+    pdf = tmp_path / "qa.pdf"
+    html = tmp_path / "qa.html"
+    rc = cli.main(
+        [saved, "--pdf", str(pdf), "--html", str(html), "--cover", "--appendix"]
+    )
+    assert rc == 0
+    assert pdf.read_bytes().startswith(b"%PDF")
+
+
+def test_html_skips_an_unreadable_artifact(tmp_path, capsys) -> None:
+    html = tmp_path / "qa.html"
+    rc = cli.main([str(tmp_path / "missing.nc"), "--html", str(html)])
+    captured = capsys.readouterr()
+    assert rc == 1
+    assert "ERROR" in captured.err
+    assert not html.exists()
+
+
+def test_html_and_pdf_together_write_both(tmp_path, saved, capsys, monkeypatch) -> None:
+    """Stub the expensive HTML render; the PDF path already has its own
+    real-render coverage above."""
+    written: list[Path] = []
+
+    def fake_write_run_page(artifact, path, *, title=None, site=None, **_kw):
+        assert site is None
+        Path(path).write_text("<html><style></style></html>", encoding="utf-8")
+        written.append(Path(path))
+        return Path(path)
+
+    from fmriqc_report.formats import html as html_module
+
+    monkeypatch.setattr(html_module, "write_run_page", fake_write_run_page)
+
+    pdf = tmp_path / "qa.pdf"
+    html = tmp_path / "qa.html"
+    rc = cli.main([saved, "--pdf", str(pdf), "--html", str(html)])
+    captured = capsys.readouterr()
+    assert rc == 0
+    assert pdf.read_bytes().startswith(b"%PDF")
+    assert html.read_text(encoding="utf-8") == "<html><style></style></html>"
+    assert "# wrote" in captured.out
+    assert written == [html]
+
+
 def test_main_titles_a_section_from_the_artifact_provenance(tmp_path, artifact) -> None:
     """The recorded scan name is the section title, whatever the file is called."""
     path = q.save_artifact(artifact, tmp_path / "unrelated-name.nc")
@@ -128,11 +238,13 @@ def test_version_flag_prints_and_exits(capsys) -> None:
     assert "fmri-qa-report" in capsys.readouterr().out
 
 
-def test_pdf_is_required(capsys) -> None:
+def test_pdf_or_html_is_required(capsys) -> None:
     with pytest.raises(SystemExit) as info:
         cli.main(["scan.qa.nc"])
     assert info.value.code == 2
-    assert "error:" in capsys.readouterr().err
+    err = capsys.readouterr().err
+    assert "error:" in err
+    assert "--pdf or --html" in err
 
 
 def test_help_renders(capsys) -> None:
