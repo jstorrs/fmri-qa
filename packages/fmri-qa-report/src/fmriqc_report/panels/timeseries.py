@@ -19,7 +19,11 @@ from fmriqc.types import FloatArray
 def plot_fig(draw: Callable[[Axes], object], figsize: tuple[float, float]) -> Figure:
     """Run an ax-drawing callback on a fresh constrained-layout figure."""
     fig = Figure(figsize=figsize, layout="constrained")
-    draw(fig.add_subplot(111))
+    try:
+        draw(fig.add_subplot(111))
+    except Exception:
+        fig.clear()
+        raise
     return fig
 
 
