@@ -356,25 +356,81 @@ a group brands every packet it issues from one object (see the library section).
 
 ## Offline web report
 
-The same artifacts can be published as a static directory for local browsing or
-distribution; it needs no server, JavaScript, or CDN:
+`fmri-qa-site` publishes saved analysis artifacts as a static website. It is
+included in `fmri-qa-report`; in this repository, install the workspace with
+`uv sync --all-packages`. If you installed the package with pip, run the same
+commands below without the `uv run` prefix.
+
+Calculate an artifact, then build a report from it:
+
+```bash
+uv run fmri-qa scan.nii.gz --artifact scan.qa.nc
+uv run fmri-qa-site scan.qa.nc --output qa-site/
+```
+
+For several scans, save their artifacts to a directory and build one site:
 
 ```bash
 uv run fmri-qa data/*_fMRI_*.nii.gz --artifact artifacts/
-uv run fmri-qa-site artifacts/*.qa.nc --output qa-site/
+uv run fmri-qa-site "artifacts/*.qa.nc" --output qa-batch/
 ```
 
-Open `qa-site/index.html` locally and distribute the whole directory. The
-destination must be fresh; the command never replaces an existing directory or
-symlink. It writes `index.html`, `assets/`, one `runs/<sha256>/` directory per
-distinct artifact, and `summary.json`. The version-1 summary records numeric
-units and provenance for later trend work. Its SHA-256 routes identify exact
-artifact bytes only, never an acquisition, session, or logical analysis ID.
-Duplicate byte-identical artifact requests share one run page and retain all
-requested file names. A missing or unreadable artifact still produces an
-incomplete inventory and makes the command exit non-zero; an all-failed request
-produces a failure-only site. Multi-test QA programs and trend analysis are
-future consumers of this published inventory.
+You can also list artifact paths explicitly:
+
+```bash
+uv run fmri-qa-site first.qa.nc second.qa.nc --output qa-comparison/
+```
+
+The command reads the computed artifacts, so rebuilding a report needs no
+original NIfTI data and does not rerun the analysis. Wildcard patterns are
+expanded by the command when the shell leaves them unexpanded.
+
+| Argument or flag | Meaning |
+| --- | --- |
+| `ARTIFACT...` | one or more saved analysis artifacts; wildcard patterns are accepted |
+| `--output DIRECTORY` | required; publish the site to a new directory |
+| `-h`, `--help` | show usage and available options |
+| `--version` | show the report package version |
+
+Open `qa-site/index.html` in a browser. No server, JavaScript, or CDN is needed.
+The index links to each run's metrics, warnings, acquisition metadata, analysis
+settings, diagnostic figures, and expandable metric definitions and methods.
+Click a figure to open its full-size SVG.
+
+The generated directory has this layout:
+
+```text
+qa-site/
+  index.html
+  summary.json
+  assets/report.css
+  runs/<sha256>/index.html
+  runs/<sha256>/figures/*.svg
+```
+
+Share the whole directory, or upload its contents to a static web host while
+preserving the directory structure. The HTML pages use relative links to their
+figures and stylesheet.
+
+The output path must not already exist, including as a file or symlink. To
+rebuild or add scans, pass all desired artifacts again and choose a new output
+directory, such as `--output qa-site-v2/`; the command does not update an
+existing site. Byte-identical inputs share one run page while retaining every
+requested file name in the inventory. The SHA-256 paths identify exact artifact
+bytes, rather than acquisitions or sessions.
+
+A successful build exits with status `0`. If an input cannot be read or
+rendered, the command publishes the successful runs, lists the omitted inputs
+and reasons in the index, marks every run page as incomplete, and exits with
+status `1`. If all inputs fail, it still publishes a failure-only inventory.
+An existing output path or a failure to publish also returns `1`. Build notices
+and errors go to stderr; the site data is written to files, not stdout.
+
+`summary.json` contains the version-1 inventory, numeric metrics with units and
+availability, and provenance. See the
+[web summary schema](packages/fmri-qa-report/README.md#web-summary-schema) for
+its fields. The current site presents individual runs; trend reports and
+integrated multi-test QA-program views are future consumers of this summary.
 
 ## Library
 
