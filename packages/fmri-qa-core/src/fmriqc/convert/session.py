@@ -215,8 +215,8 @@ def _file_series(
             assert_never(names)
     planned = _plan_files(staged, destination, chosen)
     _refuse_collisions(planned, destination, force)
-    for source, target in planned:
-        source.replace(target)
+    for source, target_path in planned:
+        source.replace(target_path)
 
     filed = []
     for path in produced:
