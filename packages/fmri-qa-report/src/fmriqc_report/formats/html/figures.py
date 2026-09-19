@@ -1,19 +1,15 @@
-"""Self-contained SVG figure assets for one rendered QA run.
+"""Self-contained SVG figures for one rendered QA run.
 
-``write_figures`` consumes a completed :class:`fmriqc.analysis.QAArtifact` and
-writes the fixed image and stability figure set for a future HTML report.  It
-only draws values already present in the artifact; it neither loads inputs nor
-recomputes measurements.
-
-If a write raises, files successfully written before the failure remain in
-``output_dir`` and the failed target may be partial.  The later site publisher
-owns staging and cleanup, while this small asset writer makes no attempt to
-remove pre-existing or partial output.
+``render_figures`` consumes a completed :class:`fmriqc.analysis.QAArtifact` and
+renders the fixed image and stability figure set as standalone SVG documents
+in memory: a run page embeds every one as a ``data:`` URI, so nothing here
+ever writes a figure to disk. Rendering only draws values already present in
+the artifact; it neither loads inputs nor recomputes measurements.
 """
 
+import io
 from collections.abc import Callable
 from dataclasses import dataclass
-from pathlib import Path
 
 import matplotlib
 from matplotlib.axes import Axes
@@ -36,26 +32,42 @@ from ...panels.timeseries import (
 )
 from ...theme import DEFAULT_THEME, Theme
 
-__all__ = ["FIGURE_ASSETS", "FigureAsset", "write_figures"]
+__all__ = [
+    "FIGURE_ASSETS",
+    "FigureAsset",
+    "RenderedFigure",
+    "render_figures",
+]
 
 
 _PLOT_FIGSIZE = (6.4, 4.0)
 _PLOT_FONT_SIZE = 11
+_SVG_HASHSALT = "fmriqc-report"
 
 
 @dataclass(frozen=True, slots=True)
 class FigureAsset:
-    """One fixed SVG asset and the text a future HTML renderer can expose."""
+    """One fixed figure's stable identity and the text a renderer can expose."""
 
     name: str
     title: str
     description: str
-    path: Path
 
 
-def _assets(output_dir: Path) -> tuple[FigureAsset, ...]:
-    """Return the stable figure inventory rooted at ``output_dir``."""
-    records = (
+@dataclass(frozen=True, slots=True)
+class RenderedFigure:
+    """One figure's identity together with its complete standalone SVG document."""
+
+    asset: FigureAsset
+    svg: bytes
+
+
+# The stable figure inventory: names, titles, and descriptions in render order.
+# Keeping this vocabulary at module scope means the HTML composer can use it
+# without duplicating its fourteen figure identities.
+FIGURE_ASSETS: tuple[FigureAsset, ...] = tuple(
+    FigureAsset(name, title, description)
+    for name, title, description in (
         (
             "signal",
             "Signal",
@@ -133,16 +145,7 @@ def _assets(output_dir: Path) -> tuple[FigureAsset, ...]:
             ("Empirical and Gaussian directional point-spread profiles."),
         ),
     )
-    return tuple(
-        FigureAsset(name, title, description, output_dir / f"{name}.svg")
-        for name, title, description in records
-    )
-
-
-# The same fixed inventory without a run-specific destination.  Keeping names,
-# titles, and descriptions here means the HTML composer can use this vocabulary
-# without duplicating its fourteen figure identities.
-FIGURE_ASSETS = _assets(Path())
+)
 
 
 def _build_figures(artifact: QAArtifact) -> list[Figure]:
@@ -182,34 +185,31 @@ def _build_figures(artifact: QAArtifact) -> list[Figure]:
     return figures
 
 
-def _save_svg(figure: Figure, path: Path) -> None:
-    """Save one figure as an SVG without a creation timestamp."""
-    figure.savefig(path, format="svg", metadata={"Date": None})
+def _save_svg(figure: Figure, buffer: io.BytesIO) -> None:
+    """Save one figure as SVG bytes without a creation timestamp."""
+    figure.savefig(buffer, format="svg", metadata={"Date": None})
 
 
-def write_figures(
-    artifact: QAArtifact,
-    output_dir: Path | str,
-    *,
-    theme: Theme = DEFAULT_THEME,
-) -> tuple[FigureAsset, ...]:
-    """Write the fixed self-contained SVG inventory for ``artifact``.
+def render_figures(
+    artifact: QAArtifact, *, theme: Theme = DEFAULT_THEME
+) -> tuple[RenderedFigure, ...]:
+    """Render the fixed inventory as self-contained SVG documents, in order.
 
-    The returned assets have absolute or caller-relative paths rooted at the
-    supplied ``output_dir``.  Rendering happens inside a local matplotlib
-    ``rc_context`` and figures are cleared in a ``finally`` block, including
-    when a save fails; this driver neither selects a backend nor uses pyplot.
+    Rendering happens inside a local matplotlib ``rc_context`` and figures are
+    cleared in a ``finally`` block, including when a save fails; this driver
+    neither selects a backend nor uses pyplot.
     """
-    destination = Path(output_dir)
-    destination.mkdir(parents=True, exist_ok=True)
-    assets = _assets(destination)
     with matplotlib.rc_context(theme.rc_params()):
         matplotlib.rcParams["svg.image_inline"] = True
+        matplotlib.rcParams["svg.hashsalt"] = _SVG_HASHSALT
         figures = _build_figures(artifact)
         try:
-            for asset, figure in zip(assets, figures, strict=True):
-                _save_svg(figure, asset.path)
+            rendered = []
+            for asset, figure in zip(FIGURE_ASSETS, figures, strict=True):
+                buffer = io.BytesIO()
+                _save_svg(figure, buffer)
+                rendered.append(RenderedFigure(asset, buffer.getvalue()))
         finally:
             for figure in figures:
                 figure.clear()
-    return assets
+    return tuple(rendered)

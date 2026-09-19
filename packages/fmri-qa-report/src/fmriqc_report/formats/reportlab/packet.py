@@ -6,8 +6,6 @@ renderers in `pages`, counts the pages up front so the running footer can say
 public entry point; `add_report_pages` is the per-scan primitive beneath it.
 """
 
-import os
-import tempfile
 from collections.abc import Callable, Iterable, Sequence
 from pathlib import Path
 
@@ -16,6 +14,7 @@ from reportlab.pdfgen import canvas
 
 from fmriqc.analysis import QAArtifact
 
+from ...atomic import atomic_file
 from ...document import Appendix, Block, Cover, ScanSection, Tier, compose, parts_for
 from ...theme import DEFAULT_THEME, Theme
 from .layout import appendix_chunks, cover_chunks
@@ -142,12 +141,7 @@ def write_report(
     # on the temporary file, whose name is an implementation detail of the
     # atomic write and has no business appearing in a user-facing error.
     target.parent.mkdir(parents=True, exist_ok=True)
-    fd, temporary_name = tempfile.mkstemp(
-        prefix=f".{target.name}.", suffix=".tmp", dir=target.parent
-    )
-    os.close(fd)
-    temporary = Path(temporary_name)
-    try:
+    with atomic_file(target) as temporary:
         c = canvas.Canvas(str(temporary), pagesize=theme.page_size)
         c.setTitle(theme.cover_title)
         c.setSubject(subject)
@@ -155,7 +149,4 @@ def write_report(
         for block in blocks:
             page_no = _render_block(c, block, theme, page_no, total, note)
         c.save()
-        temporary.replace(target)
-    finally:
-        temporary.unlink(missing_ok=True)
     return total

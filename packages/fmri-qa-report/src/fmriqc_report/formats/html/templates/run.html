@@ -1,56 +1,94 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>$title · fMRI QA</title>
-  <link rel="stylesheet" href="../../assets/report.css">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>$title · fMRI QA</title>
+<style>$stylesheet</style>
 </head>
 <body>
-  <a class="skip-link" href="#main">Skip to report content</a>
-  <header class="page-header">
-    <div class="shell">
-      <p class="eyebrow">fMRI QA run report</p>
+<a class="skip-link" href="#main">Skip to report content</a>
+<div class="wrap">
+  <header class="mast">
+    <div>
+      <p class="eyebrow">fMRI QA · run report</p>
       <h1>$title</h1>
-      <nav aria-label="Report sections">
-        <a href="#overview">Overview</a>
-        <a href="#metrics">Metrics</a>
-        <a href="#acquisition">Acquisition</a>
-        <a href="#figures">Figures</a>
-        <a href="#methods">Definitions and methods</a>
-        <a href="#provenance">Provenance</a>
-        <a href="../../index.html">Report index</a>
-      </nav>
+      <p class="sub">$subline</p>
     </div>
+    <dl class="idblock">$idblock</dl>
   </header>
-  <main id="main" class="shell">
-    <section id="overview" aria-labelledby="overview-heading">
-      <h2 id="overview-heading">Overview</h2>
-      <dl class="metadata">$overview</dl>
-      <div class="notices">$warning</div>
+
+  <nav class="secnav" aria-label="Report sections">
+    $nav
+  </nav>
+
+  <main id="main">
+    <section id="metrics" aria-labelledby="metrics-h">
+      <div class="phead">
+        <h2 id="metrics-h">Metrics</h2>
+        <p>Each metric is reported with its recorded unit. These values are descriptive. This report applies no acceptance thresholds.</p>
+      </div>
+      <div class="tiles">$metrics</div>
     </section>
-    <section id="metrics" aria-labelledby="metrics-heading">
-      <h2 id="metrics-heading">Metrics</h2>
-      <p>Each metric is reported with its recorded unit. Values that the analysis could not resolve are shown as unavailable.</p>
-      <div class="metric-grid">$metrics</div>
+
+    <div class="notes">$notices</div>
+
+    <section id="acquisition" class="panel" aria-labelledby="acquisition-h">
+      <div class="phead">
+        <h2 id="acquisition-h">Acquisition and analysis settings</h2>
+        <p>What was acquired, and how this analysis was configured.</p>
+      </div>
+      <div class="scroller">
+        <table class="kv">
+          <tbody>$acquisition</tbody>
+        </table>
+      </div>
     </section>
-    <section id="acquisition" aria-labelledby="acquisition-heading">
-      <h2 id="acquisition-heading">Acquisition and analysis settings</h2>
-      <dl class="metadata">$acquisition</dl>
+
+    <section id="figures" aria-labelledby="figures-h">
+      <h2 id="figures-h" class="visually-hidden">Figures</h2>
+
+      <section id="figures-image" class="panel" aria-labelledby="figures-image-h">
+        <div class="phead">
+          <h3 id="figures-image-h">Image diagnostics</h3>
+          <p>Per-frame and static spatial views of the phantom, noise, and ghost regions.</p>
+        </div>
+        <div class="figs">$figures_image</div>
+      </section>
+
+      <section id="figures-stability" class="panel" aria-labelledby="figures-stability-h">
+        <div class="phead">
+          <h3 id="figures-stability-h">Temporal and spatial diagnostics</h3>
+          <p>Time-series stability, motion, and spatial-resolution diagnostics across the run.</p>
+        </div>
+        <div class="figs">$figures_stability</div>
+      </section>
     </section>
-    <section id="figures" aria-labelledby="figures-heading">
-      <h2 id="figures-heading">Figures</h2>
-      <p>Open any figure for a larger SVG view.</p>
-      $figures
-    </section>
-    <section id="methods" aria-labelledby="methods-heading">
-      <h2 id="methods-heading">Definitions and methods</h2>
+
+    <section id="methods" class="panel" aria-labelledby="methods-h">
+      <div class="phead">
+        <h2 id="methods-h">Definitions and methods</h2>
+        <p>What each metric means and how it is computed.</p>
+      </div>
       $methods
     </section>
-    <section id="provenance" aria-labelledby="provenance-heading">
-      <h2 id="provenance-heading">Source and provenance</h2>
-      <dl class="metadata">$provenance</dl>
+
+    <section id="provenance" class="panel" aria-labelledby="provenance-h">
+      <div class="phead">
+        <h2 id="provenance-h">Source and provenance</h2>
+        <p>Where this report came from and which software produced it.</p>
+      </div>
+      <div class="scroller">
+        <table class="kv">
+          <tbody>$provenance</tbody>
+        </table>
+      </div>
     </section>
   </main>
+
+  <footer class="foot">
+    <p>Rendered by fmri-qa-report $version. Descriptive report; no acceptance thresholds are applied.</p>
+  </footer>
+</div>
 </body>
 </html>

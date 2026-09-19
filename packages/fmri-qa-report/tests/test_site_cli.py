@@ -10,14 +10,14 @@ import pytest
 import fmriqc as q
 from fmriqc_report import site_cli
 from fmriqc_report.formats.html import site
-from fmriqc_report.formats.html.figures import FIGURE_ASSETS
+from fmriqc_report.formats.html.run import SiteContext
 
 
-def _tiny_figures(_artifact, output: Path) -> None:
+def _tiny_page(_artifact, path: Path, *, site: SiteContext, **_kwargs) -> Path:
     """Keep command tests focused on loading and publication bookkeeping."""
-    output.mkdir(parents=True)
-    for asset in FIGURE_ASSETS:
-        (output / f"{asset.name}.svg").write_text("<svg></svg>", encoding="utf-8")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(f"incomplete={site.incomplete}", encoding="utf-8")
+    return path
 
 
 @pytest.fixture
@@ -29,7 +29,7 @@ def saved(tmp_path, artifact) -> Path:
 def test_main_publishes_a_site_and_reports_actual_counts(
     tmp_path, saved, monkeypatch, capsys
 ) -> None:
-    monkeypatch.setattr(site, "write_figures", _tiny_figures)
+    monkeypatch.setattr(site, "write_run_page", _tiny_page)
     output = tmp_path / "site"
 
     assert site_cli.main([str(saved), "--output", str(output)]) == 0
@@ -51,7 +51,7 @@ def test_main_publishes_a_site_and_reports_actual_counts(
 def test_main_groups_duplicate_requests_and_keeps_their_aliases(
     tmp_path, saved, monkeypatch, capsys
 ) -> None:
-    monkeypatch.setattr(site, "write_figures", _tiny_figures)
+    monkeypatch.setattr(site, "write_run_page", _tiny_page)
     output = tmp_path / "site"
 
     assert site_cli.main([str(saved), str(saved), "--output", str(output)]) == 0
@@ -65,7 +65,7 @@ def test_main_groups_duplicate_requests_and_keeps_their_aliases(
 def test_main_publishes_an_incomplete_site_for_a_missing_artifact(
     tmp_path, saved, monkeypatch, capsys
 ) -> None:
-    monkeypatch.setattr(site, "write_figures", _tiny_figures)
+    monkeypatch.setattr(site, "write_run_page", _tiny_page)
     output = tmp_path / "site"
     missing = tmp_path / "missing.qa.nc"
 
@@ -80,7 +80,7 @@ def test_main_publishes_an_incomplete_site_for_a_missing_artifact(
 def test_main_publishes_a_failure_only_site_when_every_input_is_bad(
     tmp_path, monkeypatch
 ) -> None:
-    monkeypatch.setattr(site, "write_figures", _tiny_figures)
+    monkeypatch.setattr(site, "write_run_page", _tiny_page)
     output = tmp_path / "site"
 
     assert (
@@ -110,7 +110,7 @@ def test_main_refuses_an_existing_destination_before_reading_inputs(
 def test_main_handles_snapshot_read_errors_as_omissions(
     tmp_path, saved, monkeypatch, capsys
 ) -> None:
-    monkeypatch.setattr(site, "write_figures", _tiny_figures)
+    monkeypatch.setattr(site, "write_run_page", _tiny_page)
 
     def denied(_path: str, _directory: Path) -> tuple[str, object]:
         raise OSError("read denied")
@@ -140,7 +140,7 @@ def test_snapshot_loads_the_same_bytes_it_hashed_when_the_input_is_replaced(
         return original_loader(snapshot)
 
     monkeypatch.setattr(site_cli, "load_artifact", replace_before_load)
-    monkeypatch.setattr(site, "write_figures", _tiny_figures)
+    monkeypatch.setattr(site, "write_run_page", _tiny_page)
     output = tmp_path / "site"
 
     assert site_cli.main([str(saved), "--output", str(output)]) == 0

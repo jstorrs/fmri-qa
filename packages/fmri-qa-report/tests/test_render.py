@@ -6,6 +6,7 @@ guarantees around writing the file itself.
 """
 
 import os
+import stat
 import subprocess
 import sys
 from dataclasses import replace
@@ -52,6 +53,18 @@ def test_dashboard_renders_one_page_per_scan(tmp_path, artifact) -> None:
     pages = report.write_report([("scan", artifact)], pdf)
     assert pages == 1
     assert pdf.read_bytes().startswith(b"%PDF")
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX permission bits only")
+def test_write_report_output_respects_the_umask(tmp_path, artifact) -> None:
+    pdf = tmp_path / "qa.pdf"
+    old_umask = os.umask(0o022)
+    try:
+        report.write_report([("scan", artifact)], pdf)
+    finally:
+        os.umask(old_umask)
+
+    assert stat.S_IMODE(pdf.stat().st_mode) == 0o644
 
 
 def test_physics_tier_renders_every_part(tmp_path, artifact) -> None:

@@ -1,14 +1,16 @@
 """Static HTML site publication keeps each requested input accountable."""
 
 import json
+import os
+import stat
+import sys
 from dataclasses import replace
-from importlib.resources import files
 from pathlib import Path
 
 import pytest
 
-from fmriqc_report.formats.html import site
-from fmriqc_report.formats.html.figures import FIGURE_ASSETS
+from fmriqc_report.formats.html import resources, site
+from fmriqc_report.formats.html.run import SiteContext
 from fmriqc_report.web_summary import OmittedInput, RenderedRun
 
 
@@ -16,22 +18,16 @@ def _run(digest: str, artifact, *names: str) -> RenderedRun:
     return RenderedRun(digest * 64, artifact, names)
 
 
-def _tiny_figures(_artifact, output: Path) -> None:
-    output.mkdir(parents=True)
-    for asset in FIGURE_ASSETS:
-        (output / f"{asset.name}.svg").write_text("<svg></svg>", encoding="utf-8")
-
-
-def _tiny_page(_artifact, directory: Path, *, incomplete: bool, **_kwargs) -> Path:
-    page = directory / "index.html"
-    page.write_text(f"incomplete={incomplete}", encoding="utf-8")
-    return page
+def _tiny_page(_artifact, path: Path, *, site: SiteContext, **_kwargs) -> Path:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(f"incomplete={site.incomplete}", encoding="utf-8")
+    return path
 
 
 def test_write_site_publishes_a_complete_offline_inventory(
     tmp_path, artifact, monkeypatch
 ) -> None:
-    monkeypatch.setattr(site, "write_figures", _tiny_figures)
+    monkeypatch.setattr(site, "write_run_page", _tiny_page)
     destination = tmp_path / "site"
 
     result = site.write_site(
@@ -53,18 +49,51 @@ def test_write_site_publishes_a_complete_offline_inventory(
     }
     assert (destination / "assets" / "report.css").is_file()
     assert 'href="runs/' + "a" * 64 + '/index.html"' in result.index.read_text()
-    assert all(
-        f"figures/{asset.name}.svg" in page
-        and (run_directory / "figures" / f"{asset.name}.svg").is_file()
-        for asset in FIGURE_ASSETS
+    assert page == "incomplete=False"
+
+
+def test_write_site_writes_no_figure_directory(tmp_path, artifact) -> None:
+    """One real publish, with no figure-related stub, so this exercises the
+    actual embedded-figure path rather than a fixture standing in for it."""
+    destination = tmp_path / "site"
+
+    result = site.write_site(
+        [_run("a", artifact, "/inputs/scan.qa.nc")], destination, report_version="test"
     )
+
+    run_directory = destination / "runs" / ("a" * 64)
+    page = (run_directory / "index.html").read_text()
+    assert result.status is site.SiteStatus.COMPLETE
+    assert not (run_directory / "figures").exists()
+    assert "data:image/svg+xml;base64," in page
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX permission bits only")
+def test_write_site_output_respects_the_umask(tmp_path, artifact, monkeypatch) -> None:
+    monkeypatch.setattr(
+        "fmriqc_report.formats.html.run.render_figures",
+        lambda _artifact, **_kwargs: (),
+    )
+    destination = tmp_path / "site"
+    old_umask = os.umask(0o022)
+    try:
+        result = site.write_site(
+            [_run("a", artifact, "/inputs/scan.qa.nc")],
+            destination,
+            report_version="test",
+        )
+    finally:
+        os.umask(old_umask)
+
+    assert stat.S_IMODE(result.output.stat().st_mode) == 0o755
+    run_page = result.output / "runs" / ("a" * 64) / "index.html"
+    assert stat.S_IMODE(run_page.stat().st_mode) == 0o644
 
 
 def test_write_site_deduplicates_digests_and_sorts_routes_and_aliases(
     tmp_path, artifact, monkeypatch
 ) -> None:
-    monkeypatch.setattr(site, "write_figures", _tiny_figures)
-    monkeypatch.setattr(site, "render_run", _tiny_page)
+    monkeypatch.setattr(site, "write_run_page", _tiny_page)
     first = [
         _run("b", artifact, "/input/zeta.qa.nc"),
         _run("a", artifact, "/input/beta.qa.nc"),
@@ -89,8 +118,7 @@ def test_write_site_deduplicates_digests_and_sorts_routes_and_aliases(
 def test_write_site_escapes_root_inventory_metadata_names_and_omissions(
     tmp_path, artifact, monkeypatch
 ) -> None:
-    monkeypatch.setattr(site, "write_figures", _tiny_figures)
-    monkeypatch.setattr(site, "render_run", _tiny_page)
+    monkeypatch.setattr(site, "write_run_page", _tiny_page)
     hostile = '<script>alert("x")</script>'
     changed = replace(artifact, provenance=replace(artifact.provenance, scan=hostile))
 
@@ -107,16 +135,15 @@ def test_write_site_escapes_root_inventory_metadata_names_and_omissions(
     assert result.status is site.SiteStatus.INCOMPLETE
 
 
-def test_figure_failure_omits_every_alias_and_removes_partial_run(
+def test_run_render_failure_omits_every_alias_and_removes_partial_run(
     tmp_path, artifact, monkeypatch
 ) -> None:
-    def fail_figures(_artifact, output: Path) -> None:
-        output.mkdir(parents=True)
-        (output / "partial.svg").write_text("partial", encoding="utf-8")
-        raise RuntimeError("figure failure")
+    def fail_page(_artifact, path: Path, *, site: SiteContext, **_kwargs) -> Path:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        (path.parent / "partial.html").write_text("partial", encoding="utf-8")
+        raise RuntimeError("render failure")
 
-    monkeypatch.setattr(site, "write_figures", fail_figures)
-    monkeypatch.setattr(site, "render_run", _tiny_page)
+    monkeypatch.setattr(site, "write_run_page", fail_page)
     result = site.write_site(
         [_run("a", artifact, "/input/one.qa.nc", "/input/two.qa.nc")],
         tmp_path / "site",
@@ -136,17 +163,16 @@ def test_figure_failure_omits_every_alias_and_removes_partial_run(
 def test_late_page_failure_rerenders_every_survivor_as_incomplete(
     tmp_path, artifact, monkeypatch
 ) -> None:
-    monkeypatch.setattr(site, "write_figures", _tiny_figures)
     calls: list[tuple[str, bool]] = []
 
-    def render(_artifact, directory: Path, *, incomplete: bool, **_kwargs) -> Path:
-        digest = directory.name
-        calls.append((digest, incomplete))
-        if digest == "b" * 64 and not incomplete:
+    def render(_artifact, path: Path, *, site: SiteContext, **_kwargs) -> Path:
+        digest = path.parent.name
+        calls.append((digest, site.incomplete))
+        if digest == "b" * 64 and not site.incomplete:
             raise RuntimeError("page failure")
-        return _tiny_page(_artifact, directory, incomplete=incomplete)
+        return _tiny_page(_artifact, path, site=site)
 
-    monkeypatch.setattr(site, "render_run", render)
+    monkeypatch.setattr(site, "write_run_page", render)
     result = site.write_site(
         [_run("a", artifact, "one.qa.nc"), _run("b", artifact, "two.qa.nc")],
         tmp_path / "site",
@@ -162,7 +188,7 @@ def test_late_page_failure_rerenders_every_survivor_as_incomplete(
 
 @pytest.mark.parametrize("kind", ["file", "directory", "dangling-link"])
 def test_write_site_refuses_existing_targets_without_touching_them(
-    tmp_path, artifact, monkeypatch, kind: str
+    tmp_path, artifact, kind: str
 ) -> None:
     destination = tmp_path / "site"
     if kind == "file":
@@ -172,7 +198,6 @@ def test_write_site_refuses_existing_targets_without_touching_them(
         (destination / "keep").write_text("keep", encoding="utf-8")
     else:
         destination.symlink_to(tmp_path / "missing")
-    monkeypatch.setattr(site, "write_figures", _tiny_figures)
 
     with pytest.raises(FileExistsError, match="refusing to replace"):
         site.write_site([_run("a", artifact, "scan.qa.nc")], destination)
@@ -203,30 +228,19 @@ def test_fatal_staging_failure_cleans_the_unpublished_directory(
 def test_missing_shared_run_template_stops_publication_before_rendering(
     tmp_path, artifact, monkeypatch
 ) -> None:
-    class Resource:
-        def __init__(self, text: str | None) -> None:
-            self.text = text
-
-        def read_text(self, *, encoding: str) -> str:
-            assert encoding == "utf-8"
-            if self.text is None:
-                raise FileNotFoundError("missing run template")
-            return self.text
-
-    class Resources:
-        def joinpath(self, path: str) -> Resource:
-            return {
-                "assets/report.css": Resource("body {}"),
-                "templates/run.html": Resource(None),
-            }[path]
+    def read_resource(name: str) -> str:
+        if name == resources.RUN_TEMPLATE:
+            raise FileNotFoundError("missing run template")
+        return "body {}"
 
     calls: list[Path] = []
 
-    def record_figures(_artifact, path: Path) -> None:
+    def record_page(_artifact, path: Path, **_kwargs) -> Path:
         calls.append(path)
+        return path
 
-    monkeypatch.setattr(site, "files", lambda _package: Resources())
-    monkeypatch.setattr(site, "write_figures", record_figures)
+    monkeypatch.setattr(resources, "read_resource", read_resource)
+    monkeypatch.setattr(site, "write_run_page", record_page)
 
     with pytest.raises(FileNotFoundError, match="missing run template"):
         site.write_site([_run("a", artifact, "scan.qa.nc")], tmp_path / "site")
@@ -236,17 +250,100 @@ def test_missing_shared_run_template_stops_publication_before_rendering(
     assert not list(tmp_path.glob(".site.*"))
 
 
+def test_a_corrupt_packaged_stylesheet_fails_publication_before_any_run_renders(
+    tmp_path, artifact, monkeypatch
+) -> None:
+    original_read_resource = resources.read_resource
+
+    def hostile_resource(name: str) -> str:
+        if name == resources.STYLESHEET:
+            return "body {} </style><script>alert(1)</script>"
+        return original_read_resource(name)
+
+    calls: list[Path] = []
+
+    def record_page(_artifact, path: Path, **_kwargs) -> Path:
+        calls.append(path)
+        return path
+
+    monkeypatch.setattr(resources, "read_resource", hostile_resource)
+    monkeypatch.setattr(site, "write_run_page", record_page)
+
+    with pytest.raises(ValueError, match="style"):
+        site.write_site([_run("a", artifact, "scan.qa.nc")], tmp_path / "site")
+
+    assert not calls
+    assert not (tmp_path / "site").exists()
+    assert not list(tmp_path.glob(".site.*"))
+
+
+def test_index_lists_one_table_row_per_run_with_headline_metrics(
+    tmp_path, artifact, monkeypatch
+) -> None:
+    monkeypatch.setattr(site, "write_run_page", _tiny_page)
+    first = replace(
+        artifact, provenance=replace(artifact.provenance, scan="run-one.nii.gz")
+    )
+    second = replace(
+        artifact, provenance=replace(artifact.provenance, scan="run-two.nii.gz")
+    )
+
+    result = site.write_site(
+        [_run("a", first, "one.qa.nc"), _run("b", second, "two.qa.nc")],
+        tmp_path / "site",
+        report_version="test",
+    )
+
+    page = result.index.read_text()
+    assert page.count('<th scope="row">') == 2
+    assert 'href="runs/' + "a" * 64 + '/index.html"' in page
+    assert 'href="runs/' + "b" * 64 + '/index.html"' in page
+    for doc in site._HEADLINE_METRICS:
+        assert f'<th scope="col" class="num">{doc.label}</th>' in page
+
+
+def test_index_counts_appear_as_tiles(tmp_path, artifact, monkeypatch) -> None:
+    monkeypatch.setattr(site, "write_run_page", _tiny_page)
+
+    result = site.write_site(
+        [_run("a", artifact, "one.qa.nc"), _run("b", artifact, "two.qa.nc")],
+        tmp_path / "site",
+        omitted=[OmittedInput("three.qa.nc", "boom")],
+    )
+
+    page = result.index.read_text()
+    assert '<span class="k">Requested inputs</span><span class="v num">3</span>' in page
+    assert (
+        '<span class="k">Distinct run reports</span><span class="v num">2</span>'
+        in page
+    )
+    assert '<span class="k">Duplicate inputs</span><span class="v num">0</span>' in page
+    assert (
+        '<span class="k">Omitted inputs</span><span class="v num">1</span>'
+        '<span class="n"><span class="pill warn">incomplete</span></span>' in page
+    )
+    assert "Status</dt><dd>Incomplete" in page
+    assert result.status is site.SiteStatus.INCOMPLETE
+
+
+def test_index_empty_state_strings(tmp_path) -> None:
+    result = site.write_site([], tmp_path / "site")
+
+    page = result.index.read_text()
+    assert "No run reports were rendered." in page
+    assert "No requested inputs were omitted." in page
+
+
 def test_write_site_preserves_a_target_created_while_rendering(
     tmp_path, artifact, monkeypatch
 ) -> None:
     destination = tmp_path / "site"
-    monkeypatch.setattr(site, "write_figures", _tiny_figures)
 
-    def create_target(_artifact, directory: Path, **kwargs) -> Path:
+    def create_target(_artifact, path: Path, *, site: SiteContext, **_kwargs) -> Path:
         destination.write_text("another publisher", encoding="utf-8")
-        return _tiny_page(_artifact, directory, **kwargs)
+        return _tiny_page(_artifact, path, site=site)
 
-    monkeypatch.setattr(site, "render_run", create_target)
+    monkeypatch.setattr(site, "write_run_page", create_target)
 
     with pytest.raises(FileExistsError, match="refusing to replace"):
         site.write_site([_run("a", artifact, "scan.qa.nc")], destination)
@@ -256,5 +353,4 @@ def test_write_site_preserves_a_target_created_while_rendering(
 
 
 def test_index_template_is_packaged_resource() -> None:
-    package = files("fmriqc_report.formats.html")
-    assert package.joinpath("templates/index.html").is_file()
+    assert resources.read_resource(resources.INDEX_TEMPLATE)

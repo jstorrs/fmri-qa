@@ -1,7 +1,6 @@
-"""SVG assets written for the future static HTML report."""
+"""SVG figures rendered for the offline static HTML report."""
 
 from dataclasses import replace
-from pathlib import Path
 from xml.etree import ElementTree
 
 import matplotlib
@@ -10,13 +9,11 @@ import pytest
 from matplotlib.figure import Figure
 
 from fmriqc_report.formats.html import figures
-from fmriqc_report.panels.images import panel_figs
 from fmriqc_report.panels.timeseries import plot_fig
 
 
-def _hrefs(svg: Path) -> list[str]:
-    # The test parses only SVG files this writer just created, never user input.
-    root = ElementTree.parse(svg).getroot()  # noqa: S314
+def _hrefs_bytes(svg: bytes) -> list[str]:
+    root = ElementTree.fromstring(svg)  # noqa: S314
     return [
         value
         for element in root.iter()
@@ -25,10 +22,13 @@ def _hrefs(svg: Path) -> list[str]:
     ]
 
 
-def test_write_figures_writes_the_complete_valid_svg_inventory(
-    tmp_path, artifact
-) -> None:
-    assets = figures.write_figures(artifact, tmp_path)
+@pytest.fixture(scope="module")
+def rendered(artifact):
+    """One real rendering of the fixed figure inventory, reused across tests."""
+    return figures.render_figures(artifact)
+
+
+def test_render_figures_returns_standalone_svg_documents(rendered) -> None:
     expected_names = (
         "signal",
         "sfnr",
@@ -45,35 +45,19 @@ def test_write_figures_writes_the_complete_valid_svg_inventory(
         "center_of_mass",
         "psf",
     )
-
     assert tuple(asset.name for asset in figures.FIGURE_ASSETS) == expected_names
-    assert tuple(asset.name for asset in assets) == expected_names
-    assert len(assets) == 14
-    image_figures = panel_figs(artifact)
-    for asset in assets:
-        assert asset.path == tmp_path / f"{asset.name}.svg"
-        assert asset.path.is_file()
+    assert len(rendered) == 14
+    assert tuple(item.asset for item in rendered) == figures.FIGURE_ASSETS
+    for item in rendered:
+        assert item.svg.startswith(b"<?xml")
+        ElementTree.fromstring(item.svg)  # noqa: S314
         assert all(
             href.startswith(("#", "data:image/", "http://www.w3.org/"))
-            for href in _hrefs(asset.path)
+            for href in _hrefs_bytes(item.svg)
         )
-    try:
-        for asset, figure in zip(assets[:5], image_figures, strict=True):
-            root = ElementTree.parse(asset.path).getroot()  # noqa: S314
-            *_, width, height = (
-                float(value) for value in root.attrib["viewBox"].split()
-            )
-            assert (width, height) == pytest.approx(
-                (72 * figure.get_figwidth(), 72 * figure.get_figheight())
-            )
-    finally:
-        for figure in image_figures:
-            figure.clear()
 
 
-def test_write_figures_renders_unknown_ghost_and_unresolved_values(
-    tmp_path, artifact
-) -> None:
+def test_render_figures_renders_unknown_ghost_and_unresolved_values(artifact) -> None:
     curves = artifact.curves
     unresolved = replace(
         curves,
@@ -92,39 +76,43 @@ def test_write_figures_renders_unknown_ghost_and_unresolved_values(
         measurements=replace(artifact.measurements, rdc=float("nan")),
     )
 
-    assets = figures.write_figures(changed, tmp_path)
+    rendered = figures.render_figures(changed)
 
-    assert all(
-        asset.path.is_file() and asset.path.stat().st_size > 0 for asset in assets
-    )
+    assert all(len(item.svg) > 0 for item in rendered)
 
 
-def test_write_figures_keeps_matplotlib_configuration_local(tmp_path, artifact) -> None:
+def test_render_figures_is_byte_reproducible(artifact) -> None:
+    first = figures.render_figures(artifact)
+    second = figures.render_figures(artifact)
+
+    assert tuple(item.svg for item in first) == tuple(item.svg for item in second)
+
+
+def test_render_figures_keeps_matplotlib_configuration_local(artifact) -> None:
     before_backend = matplotlib.get_backend()
     before_rc = matplotlib.rcParams.copy()
 
-    figures.write_figures(artifact, tmp_path)
+    figures.render_figures(artifact)
 
     assert matplotlib.get_backend() == before_backend
     assert matplotlib.rcParams == before_rc
 
 
-def test_write_figures_forces_inline_images_without_leaking_configuration(
-    tmp_path, artifact
+def test_render_figures_forces_inline_images_without_leaking_configuration(
+    artifact,
 ) -> None:
     with matplotlib.rc_context({"svg.image_inline": False}):
-        assets = figures.write_figures(artifact, tmp_path)
+        rendered = figures.render_figures(artifact)
         assert matplotlib.rcParams["svg.image_inline"] is False
 
-    assert not list(tmp_path.glob("*.png"))
     assert all(
-        any(href.startswith("data:image/") for href in _hrefs(asset.path))
-        for asset in assets[:5]
+        any(href.startswith("data:image/") for href in _hrefs_bytes(item.svg))
+        for item in rendered[:5]
     )
 
 
-def test_write_figures_clears_every_figure_when_saving_fails(
-    tmp_path, artifact, monkeypatch
+def test_render_figures_clears_every_figure_when_saving_fails(
+    artifact, monkeypatch
 ) -> None:
     built = [Figure().add_subplot(111).figure for _ in figures.FIGURE_ASSETS]
 
@@ -136,7 +124,7 @@ def test_write_figures_clears_every_figure_when_saving_fails(
     monkeypatch.setattr(figures, "_save_svg", fail_save)
 
     with pytest.raises(OSError, match="disk full"):
-        figures.write_figures(artifact, tmp_path)
+        figures.render_figures(artifact)
 
     assert all(not figure.axes for figure in built)
 

@@ -1,39 +1,54 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>fMRI QA report inventory</title>
-  <link rel="stylesheet" href="assets/report.css">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>fMRI QA report inventory</title>
+<link rel="stylesheet" href="assets/report.css">
 </head>
 <body>
-  <a class="skip-link" href="#main">Skip to report content</a>
-  <header class="page-header">
-    <div class="shell">
-      <p class="eyebrow">fMRI QA static report</p>
+<a class="skip-link" href="#main">Skip to report content</a>
+<div class="wrap">
+  <header class="mast">
+    <div>
+      <p class="eyebrow">fMRI QA · static report</p>
       <h1>Report inventory</h1>
-      <nav aria-label="Report sections">
-        <a href="#runs">Run reports</a>
-        <a href="#omissions">Omitted inputs</a>
-        <a href="summary.json">Summary JSON</a>
-      </nav>
+      <p class="sub">$summary</p>
     </div>
+    <dl class="idblock">$idblock</dl>
   </header>
-  <main id="main" class="shell">
-    <section aria-labelledby="summary-heading">
-      <h2 id="summary-heading">Inventory summary</h2>
-      <p>$summary</p>
-      $site_status
-      <p>These reports are descriptive and do not apply acceptance thresholds.</p>
+
+  <nav class="secnav" aria-label="Report sections">
+    <a href="#runs">Run reports</a>
+    <a href="#omissions">Omitted inputs</a>
+    <a href="summary.json">Summary JSON</a>
+  </nav>
+
+  <main id="main">
+    <section class="tiles" aria-label="Inventory counts">$tiles</section>
+
+    $site_status
+
+    <section id="runs" class="panel" aria-labelledby="runs-h">
+      <div class="phead">
+        <h2 id="runs-h">Run reports</h2>
+        <p>One row per distinct artifact. Byte-identical inputs share one report.</p>
+      </div>
+      $runs
     </section>
-    <section id="runs" aria-labelledby="runs-heading">
-      <h2 id="runs-heading">Run reports</h2>
-      <ul class="inventory-list">$runs</ul>
-    </section>
-    <section id="omissions" aria-labelledby="omissions-heading">
-      <h2 id="omissions-heading">Omitted inputs</h2>
-      <ul class="inventory-list">$omissions</ul>
+
+    <section id="omissions" class="panel" aria-labelledby="omissions-h">
+      <div class="phead">
+        <h2 id="omissions-h">Omitted inputs</h2>
+        <p>Requested inputs that are not in this site, and why.</p>
+      </div>
+      $omissions
     </section>
   </main>
+
+  <footer class="foot">
+    <p>Rendered by fmri-qa-report $version. Descriptive report; no acceptance thresholds are applied.</p>
+  </footer>
+</div>
 </body>
 </html>
