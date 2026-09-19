@@ -4,7 +4,7 @@ Phantom fMRI quality-assurance metrics, following the Glover/fBIRN stability
 protocol (Friedman & Glover, 2006). Given a 4-D phantom time series it reports
 SNR, SFNR, the Weisskoff radius of decorrelation (RDC), drift, temporal
 fluctuation, and two Nyquist-ghost measures (fBIRN percent ghost and the
-ACR/AAPM ghosting ratio), and can render a PDF report per scan.
+ACR/AAPM ghosting ratio), and can render offline web or PDF reports per scan.
 
 ## Two halves
 
@@ -14,7 +14,7 @@ calculating a result, and presenting one:
 | Package | Import | Does | Needs |
 | --- | --- | --- | --- |
 | **`fmri-qa-core`** | `fmriqc` | the metrics, the pipeline, and the **analysis artifact** they are published as | numpy, scipy, nibabel, scikit-image, netCDF4 |
-| **`fmri-qa-report`** | `fmriqc_report` | plots and multi-page PDF packets, built from an artifact | matplotlib, reportlab, svglib (+ core) |
+| **`fmri-qa-report`** | `fmriqc_report` | plots and offline web sites or multi-page PDF packets, built from an artifact | matplotlib, reportlab, svglib (+ core) |
 
 A `QAArtifact` is the only thing that crosses: the run's settings, provenance,
 scalar measurements, stability curves, and the four fBIRN summary images —
@@ -23,6 +23,7 @@ netCDF-4 file, so calculation and reporting are separate steps:
 
 ```bash
 uv run fmri-qa scan.nii.gz --artifact qa.nc      # calculate once
+uv run fmri-qa-site qa.nc --output qa-site/       # browse the offline site
 uv run fmri-qa-report qa.nc --pdf report.pdf     # render as often as you like
 ```
 
@@ -69,7 +70,7 @@ Downstream, install whichever half you need — `fmri-qa-report` pulls in
 
 ```bash
 pip install fmri-qa-core      # metrics and artifacts only
-pip install fmri-qa-report    # + plots and PDF packets
+pip install fmri-qa-report    # + plots, offline sites, and PDF packets
 ```
 
 `fmri-qa-import` needs a dcm2niix, and `fmri-qa-core` depends on one: the
@@ -352,6 +353,28 @@ the scan inventory and `--appendix` appends a provenance page, and a running
 footer carries page numbers once the packet spans pages. The cover
 title, logo, footer text, fonts, and colours all come from a `report.Theme`, so
 a group brands every packet it issues from one object (see the library section).
+
+## Offline web report
+
+The same artifacts can be published as a static directory for local browsing or
+distribution; it needs no server, JavaScript, or CDN:
+
+```bash
+uv run fmri-qa data/*_fMRI_*.nii.gz --artifact artifacts/
+uv run fmri-qa-site artifacts/*.qa.nc --output qa-site/
+```
+
+Open `qa-site/index.html` locally and distribute the whole directory. The
+destination must be fresh; the command never replaces an existing directory or
+symlink. It writes `index.html`, `assets/`, one `runs/<sha256>/` directory per
+distinct artifact, and `summary.json`. The version-1 summary records numeric
+units and provenance for later trend work. Its SHA-256 routes identify exact
+artifact bytes only, never an acquisition, session, or logical analysis ID.
+Duplicate byte-identical artifact requests share one run page and retain all
+requested file names. A missing or unreadable artifact still produces an
+incomplete inventory and makes the command exit non-zero; an all-failed request
+produces a failure-only site. Multi-test QA programs and trend analysis are
+future consumers of this published inventory.
 
 ## Library
 

@@ -298,6 +298,10 @@ versioning when the first stable public interface is released.
 
 ### Added
 
+- **`fmri-qa-site` publishes saved artifacts as an offline static report.**
+  It creates a fresh directory with an index, per-artifact pages, assets, and a
+  versioned `summary.json` inventory; incomplete requests are published and
+  return a non-zero status.
 - **`InvalidArtifactError` is now reachable from `fmriqc.analysis`.** It is the
   one error `load_artifact` raises, and it was previously only reachable
   through `fmriqc.exceptions` — off limits to `fmri-qa-report`, which may

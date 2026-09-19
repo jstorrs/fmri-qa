@@ -70,6 +70,18 @@ loaded = sorted(
 print(loaded)
 """
 
+_SITE_PROBE = f"""
+import sys
+import fmriqc_report.site_cli
+forbidden = {_CALCULATION_ONLY + _PDF_ONLY!r}
+loaded = sorted(
+    m
+    for m in sys.modules
+    if any(m == item or m.startswith(item + ".") for item in forbidden)
+)
+print(loaded)
+"""
+
 _REPORT_IMPORT_PROBE = f"""
 import importlib
 import sys
@@ -147,6 +159,20 @@ def test_importing_the_report_cli_does_not_load_the_calculation_stack() -> None:
     )
     assert result.stdout.strip() == "[]", (
         f"importing the report CLI loaded the calculation stack: {result.stdout}\n"
+        f"{result.stderr}"
+    )
+
+
+def test_importing_the_site_cli_loads_neither_pipeline_nor_pdf_driver() -> None:
+    """The static publisher stays independently importable from PDF output."""
+    result = subprocess.run(  # noqa: S603 - fixed literal script, not untrusted input
+        [sys.executable, "-c", _SITE_PROBE],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    assert result.stdout.strip() == "[]", (
+        f"importing the site CLI loaded a forbidden stack: {result.stdout}\n"
         f"{result.stderr}"
     )
 

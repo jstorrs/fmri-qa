@@ -1,10 +1,11 @@
 # fmri-qa-report
 
-The presentation half of [fmri-qa](../../README.md): plots and multi-page PDF
-packets rendered from a `fmriqc.analysis.QAArtifact`.
+The presentation half of [fmri-qa](../../README.md): plots, offline static
+sites, and multi-page PDF packets rendered from a `fmriqc.analysis.QAArtifact`.
 
 ```console
 $ fmri-qa scan.nii.gz --artifact qa.nc
+$ fmri-qa-site qa.nc --output qa-site
 $ fmri-qa-report qa.nc --pdf report.pdf --tier physics
 ```
 
@@ -16,6 +17,26 @@ an artifact read back from disk renders exactly like one just computed.
 Inside, content is split from format: `summary` and `content` build the text,
 `panels` the matplotlib figures, and `formats/` holds one driver per output
 format. Adding a format is a new file in `formats/`.
+
+`fmri-qa-site ARTIFACT... --output DIRECTORY` writes a complete offline site to
+a fresh directory. Open its `index.html` locally or distribute the directory;
+it has no server, JavaScript, or CDN dependency. The directory contains the
+index, `assets/`, one `runs/<sha256>/` page per distinct artifact, and the
+version-1 `summary.json` inventory. Its numeric values carry units and its
+provenance supports later trend work. Digest routes name exact artifact bytes,
+not acquisitions, sessions, or logical analysis IDs. Duplicate byte-identical
+requests share a page while retaining every source-file alias. If any request
+cannot load or render, the site records that omission and the command exits
+non-zero; an all-failed request still publishes a failure-only inventory.
+
+```text
+qa-site/
+  index.html
+  summary.json
+  assets/report.css
+  runs/<sha256>/index.html
+  runs/<sha256>/figures/*.svg
+```
 
 ## Web summary schema
 

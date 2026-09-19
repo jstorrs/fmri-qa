@@ -1,7 +1,7 @@
 [project]
 name = "fmri-qa-report"
 version = "0.1.0"
-description = "PDF reports and plots for fmri-qa phantom QA analysis artifacts"
+description = "Offline web and PDF reports for fmri-qa phantom QA analysis artifacts"
 readme = "README.md"
 requires-python = ">=3.13"
 license = "MIT"
@@ -41,6 +41,7 @@ dependencies = [
 
 [project.scripts]
 fmri-qa-report = "fmriqc_report.cli:main"
+fmri-qa-site = "fmriqc_report.site_cli:main"
 
 [tool.uv.sources]
 fmri-qa-core = { workspace = true }

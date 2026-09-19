@@ -102,6 +102,7 @@ ignore = [
 "**/tests/**" = ["S101", "PLR2004", "ARG"]
 # Output belongs to the binary (see style/logging.md).
 "**/cli.py" = ["T201"]
+"**/site_cli.py" = ["T201"]
 "**/cli/*.py" = ["T201"]
 "**/__main__.py" = ["T201"]
 # The report renders human-facing text with intentional typography (× ° —), and
