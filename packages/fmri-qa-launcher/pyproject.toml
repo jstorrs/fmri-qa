@@ -1,0 +1,43 @@
+[project]
+name = "fmri-qa-launcher"
+version = "0.1.0"
+description = "Application shell that runs fmri-qa end to end: DICOM directory in, one report directory per series out"
+readme = "README.md"
+requires-python = ">=3.13"
+license = "MIT"
+# A per-package copy of the root LICENSE. A path reaching out of the package
+# root (../../LICENSE) is not portable: hatchling drops it from the wheel
+# entirely and writes an unusable `../../` member into the sdist. `make check`
+# proves the copy is byte-identical to the root LICENSE.
+license-files = ["LICENSE"]
+authors = [
+    { name = "Judd Storrs", email = "jstorrs@gmail.com" },
+]
+keywords = ["fMRI", "MRI", "phantom", "quality assurance", "launcher"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Healthcare Industry",
+    "Intended Audience :: Science/Research",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.13",
+    "Typing :: Typed",
+]
+# The launcher only orchestrates fmri-qa-core (conversion and analysis) and
+# fmri-qa-report (rendering); it adds no third-party dependency of its own.
+# Its desktop panel is built on tkinter, which ships with the standard library.
+dependencies = [
+    "fmri-qa-core==0.1.0",
+    "fmri-qa-report==0.1.0",
+]
+
+[tool.uv.sources]
+fmri-qa-core = { workspace = true }
+fmri-qa-report = { workspace = true }
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/fmriqc_launcher"]

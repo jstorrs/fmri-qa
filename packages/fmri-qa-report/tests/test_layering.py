@@ -143,6 +143,18 @@ def test_the_check_would_catch_a_pipeline_import() -> None:
     assert _fmriqc_imports(tree) - ALLOWED == {"fmriqc", "fmriqc.pipeline"}
 
 
+def test_presentation_never_imports_the_launcher() -> None:
+    """The application shell depends on `fmriqc_report`, never the other way around."""
+    offenders = [
+        path.relative_to(_SOURCE_ROOT).as_posix()
+        for path in _modules()
+        if "fmriqc_launcher" in path.read_text()
+    ]
+    assert not offenders, (
+        f"the report half must never import fmriqc_launcher: {offenders}"
+    )
+
+
 def test_importing_the_report_cli_does_not_load_the_calculation_stack() -> None:
     """The seam at runtime, which the static scan above cannot speak to.
 

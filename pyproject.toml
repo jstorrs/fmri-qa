@@ -1,12 +1,14 @@
-# uv workspace root for fmri-qa. The project ships as two distributions:
+# uv workspace root for fmri-qa. The project ships as three distributions:
 #
-#   packages/fmri-qa-core    the calculation half -- metrics, pipeline, and the
-#                            QAArtifact it publishes (`fmri-qa`, `fmri-qa-hilo`)
-#   packages/fmri-qa-report  the presentation half -- plots and PDF packets built
-#                            from an artifact (`fmri-qa-report`)
+#   packages/fmri-qa-core     the calculation half -- metrics, pipeline, and the
+#                             QAArtifact it publishes (`fmri-qa`, `fmri-qa-hilo`)
+#   packages/fmri-qa-report   the presentation half -- plots and PDF packets built
+#                             from an artifact (`fmri-qa-report`)
+#   packages/fmri-qa-launcher the application shell -- a one-step DICOM-directory-in,
+#                             report-directory-out pipeline over the two above
 #
 # This root is virtual: it builds nothing of its own and only holds the shared
-# development environment and the tool configuration both members are checked
+# development environment and the tool configuration all members are checked
 # against. See style/architecture.md and notes/analysis_report_split.md.
 
 [tool.uv.workspace]
@@ -64,7 +66,11 @@ default-groups = ["dev"]
 [tool.ruff]
 line-length = 88
 target-version = "py313"
-src = ["packages/fmri-qa-core/src", "packages/fmri-qa-report/src"]
+src = [
+    "packages/fmri-qa-core/src",
+    "packages/fmri-qa-report/src",
+    "packages/fmri-qa-launcher/src",
+]
 # Reference notebooks and standalone repro scripts are exploratory scratch, not
 # maintained code — skip them.
 extend-exclude = ["notebooks", "packages/fmri-qa-report/examples"]
@@ -115,14 +121,18 @@ ignore = [
 "stubs/**" = ["A001", "A002"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["fmriqc", "fmriqc_report"]
+known-first-party = ["fmriqc", "fmriqc_report", "fmriqc_launcher"]
 
 [tool.mypy]
 python_version = "3.13"
 strict = true
 warn_unused_ignores = true
 warn_return_any = true
-files = ["packages/fmri-qa-core/src", "packages/fmri-qa-report/src"]
+files = [
+    "packages/fmri-qa-core/src",
+    "packages/fmri-qa-report/src",
+    "packages/fmri-qa-launcher/src",
+]
 # Local partial stubs (see stubs/) fix the return types nibabel and scipy ship
 # imprecisely; both type checkers read them first (pyright via tool.pyright.stubPath).
 mypy_path = "stubs"
@@ -142,13 +152,21 @@ ignore_missing_imports = true
 follow_imports = "skip"
 
 [tool.pyright]
-include = ["packages/fmri-qa-core/src", "packages/fmri-qa-report/src"]
+include = [
+    "packages/fmri-qa-core/src",
+    "packages/fmri-qa-report/src",
+    "packages/fmri-qa-launcher/src",
+]
 stubPath = "stubs"
 pythonVersion = "3.13"
 typeCheckingMode = "standard"
 
 [tool.pytest.ini_options]
-testpaths = ["packages/fmri-qa-core/tests", "packages/fmri-qa-report/tests"]
+testpaths = [
+    "packages/fmri-qa-core/tests",
+    "packages/fmri-qa-report/tests",
+    "packages/fmri-qa-launcher/tests",
+]
 python_files = ["test_*.py"]
 python_functions = ["test_*"]
 # Coverage is opt-in (the `check` gate passes --cov) so a bare `pytest` on one
@@ -158,7 +176,11 @@ python_functions = ["test_*"]
 addopts = "-v --tb=short --import-mode=importlib"
 
 [tool.coverage.run]
-source = ["packages/fmri-qa-core/src/fmriqc", "packages/fmri-qa-report/src/fmriqc_report"]
+source = [
+    "packages/fmri-qa-core/src/fmriqc",
+    "packages/fmri-qa-report/src/fmriqc_report",
+    "packages/fmri-qa-launcher/src/fmriqc_launcher",
+]
 branch = true
 
 [tool.coverage.report]

@@ -139,3 +139,15 @@ def test_the_check_would_catch_an_upward_import() -> None:
     rel = ("load", "paths")  # load/paths.py, rank 1
     assert _import_targets(tree, rel) == {("metrics", "ghost")}
     assert RANKS["load"] < RANKS["metrics"]
+
+
+def test_calculation_never_imports_the_launcher() -> None:
+    """The application shell depends on `fmriqc`, never the other way around."""
+    offenders = [
+        path.relative_to(_SOURCE_ROOT).as_posix()
+        for path in _modules()
+        if "fmriqc_launcher" in path.read_text()
+    ]
+    assert not offenders, (
+        f"the calculation half must never import fmriqc_launcher: {offenders}"
+    )

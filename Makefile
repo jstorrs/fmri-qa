@@ -56,6 +56,7 @@ test:
 license:
 	cmp LICENSE packages/fmri-qa-core/LICENSE
 	cmp LICENSE packages/fmri-qa-report/LICENSE
+	cmp LICENSE packages/fmri-qa-launcher/LICENSE
 
 build:
 	uv build --all-packages
