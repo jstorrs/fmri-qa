@@ -78,6 +78,55 @@ def test_a_reloaded_artifact_renders_identically(tmp_path, artifact) -> None:
     assert (tmp_path / "disk.pdf").read_bytes().startswith(b"%PDF")
 
 
+@pytest.mark.parametrize("tier", ["dashboard", "physics"])
+def test_blank_scan_with_unresolved_rdc_renders_after_reload(tmp_path, tier) -> None:
+    artifact = q.analyze(
+        q.QAScan(data=np.zeros((16, 16, 1, 10)), tr=2.0, pe_axis=1),
+        q.AnalysisSettings(roi_size=3, trim_sec=0, detrend_order=0),
+    )
+    reloaded = q.load_artifact(q.save_artifact(artifact, tmp_path / "blank.nc"))
+    assert not np.isfinite(reloaded.curves.weisskoff.rdc).any()
+    pdf = tmp_path / "blank.pdf"
+    pages = report.write_report([("blank", reloaded)], pdf, tier=tier)
+    assert pages == len(report.parts_for(tier))
+    assert pdf.read_bytes().startswith(b"%PDF")
+
+
+@pytest.mark.parametrize(
+    ("values", "maximum", "upper", "unresolved"),
+    [
+        pytest.param([np.nan, np.nan, np.nan], None, 4.5, 3, id="nan-only"),
+        pytest.param([np.inf, -np.inf, np.inf], None, 4.5, 3, id="inf-only"),
+        pytest.param([2.0, np.nan, np.inf], 2.0, 3.0, 2, id="mixed"),
+        pytest.param([0.0, 0.0, 0.0], 0.0, 4.5, 0, id="zero"),
+        pytest.param([1.0, 2.0, 3.0], 3.0, 4.5, 0, id="ordinary"),
+    ],
+)
+def test_rdc_panel_uses_finite_limits(values, maximum, upper, unresolved) -> None:
+    from matplotlib.figure import Figure
+
+    from fmriqc.analysis import WeisskoffCurve
+    from fmriqc_report.panels.timeseries import plot_rdc
+
+    widths = np.arange(1.0, 4.0)
+    rdc = np.array(values)
+    wk = WeisskoffCurve(roi_sizes=widths, cv=rdc, cv_ideal=widths, rdc=rdc)
+    ax = Figure().add_subplot(111)
+    plot_rdc(ax, wk)
+
+    assert ax.get_ylim() == (0.0, upper)
+    np.testing.assert_array_equal(ax.lines[0].get_ydata(), rdc)
+    np.testing.assert_array_equal(ax.lines[1].get_ydata(), widths)
+    if maximum is None:
+        assert len(ax.lines) == 2
+    else:
+        assert len(ax.lines) == 3
+        np.testing.assert_array_equal(ax.lines[2].get_ydata(), [maximum, maximum])
+    assert [t.get_text() for t in ax.texts] == (
+        [f"{unresolved}/3 points unresolved"] if unresolved else []
+    )
+
+
 @pytest.mark.parametrize("failed", [0, 1, 38])
 def test_motion_panel_marks_unresolved_frames(artifact, failed) -> None:
     from matplotlib.figure import Figure

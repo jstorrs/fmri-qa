@@ -400,6 +400,10 @@ versioning when the first stable public interface is released.
 
 ### Fixed
 
+- RDC panels use finite measurements for plot limits and mark unresolved points.
+  Blank scans and curves containing NaN or infinity now render in dashboard and
+  physics reports; all-zero curves retain a usable plot range.
+
 - Dashboard reports wrap acquisition metadata and warning notes, and size metric
   tiles to fit their values across multiple rows. Plot heights share the remaining
   space so combined clipping, phantom-mask, and ROI warnings remain visible on a

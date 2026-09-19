@@ -55,8 +55,22 @@ def plot_rdc(ax: Axes, wk: WeisskoffCurve, fs: int = 9) -> None:
     # legend; the ideal reference is a gray dashed line beneath it.
     ax.plot(r, rdc, "o-", ms=3, label="measured", zorder=3)
     ax.plot(r, r, "--", color="gray", label="ideal (RDC = width)", zorder=2)
-    ax.axhline(float(rdc.max()), ls="--", color="gray", lw=0.8, zorder=1)
-    ax.set_ylim(0, 1.5 * float(rdc.max()))
+    valid = np.isfinite(rdc)
+    maximum = float(rdc[valid].max()) if valid.any() else 0.0
+    if valid.any():
+        ax.axhline(maximum, ls="--", color="gray", lw=0.8, zorder=1)
+    scale = maximum if maximum > 0 else max(1.0, float(r.max()))
+    ax.set_ylim(0, min(1.5 * scale, np.finfo(float).max))
+    if not valid.all():
+        ax.text(
+            0.98,
+            0.02,
+            f"{int((~valid).sum())}/{rdc.size} points unresolved",
+            transform=ax.transAxes,
+            ha="right",
+            va="bottom",
+            fontsize=fs - 2,
+        )
     ax.set_xlabel("ROI width (voxels)")
     ax.set_ylabel("RDC")
     ax.set_title("RDC vs ROI size", fontsize=fs)
