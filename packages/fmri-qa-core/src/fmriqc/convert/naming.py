@@ -136,21 +136,30 @@ def plan(sidecars: Mapping[str, Sidecar | None]) -> dict[str, str]:
     — NIfTI, sidecar, and anything else dcm2niix wrote beside them — under one
     decision.
 
-    A stem keeps its dcm2niix name in two cases: when the sidecar cannot name
-    the series at all, and when two series would be given the *same* QA name.
-    The second is the one worth stating: a multi-echo or magnitude/phase series
-    produces several files that agree on date, time, series number and
+    Every final stem is unique. A series keeps its dcm2niix name when its
+    sidecar cannot name it or its chosen name collides with another series'
+    chosen name, including a retained original name. The whole colliding group
+    falls back to its original stems; any collisions those fallbacks introduce
+    are resolved the same way. Unambiguous QA names are preserved, independent
+    of input order.
+
+    For example, a multi-echo or magnitude/phase series produces several files
+    that agree on date, time, series number and
     description and differ only in the postfix dcm2niix appended (`_e2`, `_ph`).
     Renaming them all to one name would silently keep whichever moved last, so
     the whole colliding group keeps the names dcm2niix already guaranteed to be
     unique. Nothing is invented and nothing is lost; the caller reports it.
     """
-    proposed = {
-        stem: qa_stem(sidecar) if sidecar is not None else None
+    chosen = {
+        stem: (qa_stem(sidecar) or stem) if sidecar is not None else stem
         for stem, sidecar in sidecars.items()
     }
-    taken = Counter(name for name in proposed.values() if name is not None)
-    return {
-        stem: name if name is not None and taken[name] == 1 else stem
-        for stem, name in proposed.items()
-    }
+    while True:
+        taken = Counter(chosen.values())
+        if len(taken) == len(chosen):
+            return chosen
+        # Every collision retires at least one rename. Original stems are
+        # unique, so falling back can only move toward a collision-free map.
+        chosen = {
+            stem: stem if taken[name] > 1 else name for stem, name in chosen.items()
+        }

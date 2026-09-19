@@ -13,7 +13,7 @@ import json
 import shutil
 import stat
 import sys
-from itertools import pairwise
+from itertools import pairwise, permutations
 from pathlib import Path
 
 import pytest
@@ -23,6 +23,7 @@ from fmriqc import cli
 from fmriqc.convert import naming
 from fmriqc.convert.dcm2niix import PINNED, build_args, find_dcm2niix, run, version
 from fmriqc.convert.session import import_dicom
+from fmriqc.types import Sidecar
 
 FIXTURE_STUDY = Path(__file__).parent / "fixtures" / "dicom"
 
@@ -40,10 +41,10 @@ FULL_SIDECAR = {
 def fake_dcm2niix(tmp_path):
     """Build a stub dcm2niix that writes the outputs a test asks for.
 
-    Takes `{stem: sidecar-or-None}` and writes `<stem>.nii.gz` for each, plus
-    `<stem>.json` where a sidecar was given, into whatever directory the `-o`
-    argument names. Prints dcm2niix's real banner line so the version parser has
-    something true to read.
+    Takes `{stem: sidecar-or-None}` and writes `<stem>.nii.gz` containing the
+    encoded stem for each, plus `<stem>.json` where a sidecar was given, into
+    whatever directory the `-o` argument names. Prints dcm2niix's real banner
+    line so the version parser has something true to read.
     """
 
     def build(outputs, returncode=0, name="dcm2niix"):
@@ -57,7 +58,7 @@ def fake_dcm2niix(tmp_path):
             "out = Path(args[args.index('-o') + 1])\n"
             'print("Chris Rorden\'s dcm2niiX version v1.0.20260724 (JP2:OpenJPEG)")\n'
             "for stem, sidecar in outputs.items():\n"
-            "    (out / f'{stem}.nii.gz').write_bytes(b'')\n"
+            "    (out / f'{stem}.nii.gz').write_bytes(stem.encode())\n"
             "    if sidecar is not None:\n"
             "        (out / f'{stem}.json').write_text(json.dumps(sidecar))\n"
             f"sys.exit({returncode})\n"
@@ -162,6 +163,57 @@ def test_two_series_that_would_share_a_name_both_keep_dcm2niix_s() -> None:
     chosen = naming.plan({"2_QA_e1": FULL_SIDECAR, "2_QA_e2": dict(FULL_SIDECAR)})
 
     assert chosen == {"2_QA_e1": "2_QA_e1", "2_QA_e2": "2_QA_e2"}
+
+
+@pytest.mark.parametrize("retained_sidecar", [None, {}, {"SeriesNumber": 2}])
+def test_a_qa_name_cannot_replace_a_retained_original_name(retained_sidecar) -> None:
+    chosen = naming.plan({"raw": {"SeriesNumber": 2}, "s002": retained_sidecar})
+
+    assert chosen == {"raw": "raw", "s002": "s002"}
+
+
+def test_fallback_collisions_are_resolved_until_every_name_is_unique() -> None:
+    sidecars: dict[str, Sidecar | None] = {
+        "s001": {"SeriesNumber": 2},
+        "s002": {"SeriesNumber": 3},
+        "s003": None,
+        "raw": {"SeriesNumber": 1},
+        "unambiguous": {"SeriesNumber": 4},
+    }
+    expected = {
+        "s001": "s001",
+        "s002": "s002",
+        "s003": "s003",
+        "raw": "raw",
+        "unambiguous": "s004",
+    }
+
+    for ordered in permutations(sidecars.items()):
+        assert naming.plan(dict(ordered)) == expected
+
+
+def test_duplicate_proposals_can_introduce_a_further_collision() -> None:
+    chosen = naming.plan(
+        {
+            "s001": {"SeriesNumber": 2},
+            "duplicate": {"SeriesNumber": 2},
+            "raw": {"SeriesNumber": 1},
+            "unambiguous": {"SeriesNumber": 3},
+        }
+    )
+
+    assert chosen == {
+        "s001": "s001",
+        "duplicate": "duplicate",
+        "raw": "raw",
+        "unambiguous": "s003",
+    }
+
+
+def test_original_names_do_not_block_unambiguous_qa_renames() -> None:
+    chosen = naming.plan({"s001": {"SeriesNumber": 2}, "s002": {"SeriesNumber": 1}})
+
+    assert chosen == {"s001": "s002", "s002": "s001"}
 
 
 # --------------------------------------------------------------------------
@@ -305,6 +357,27 @@ def test_a_boolean_series_number_is_not_read_as_one(tmp_path, fake_dcm2niix) -> 
     assert result.series[0].series is None
 
 
+def test_an_import_preserves_both_scans_when_a_qa_name_is_already_retained(
+    tmp_path, fake_dcm2niix
+) -> None:
+    binary = fake_dcm2niix({"raw": {"SeriesNumber": 2}, "s002": None})
+    out = tmp_path / "nifti"
+
+    result = import_dicom(tmp_path, out, binary=binary)
+
+    assert [entry.path.name for entry in result.series] == [
+        "raw.nii.gz",
+        "s002.nii.gz",
+    ]
+    assert {entry.path.name: entry.path.read_bytes() for entry in result.series} == {
+        "raw.nii.gz": b"raw",
+        "s002.nii.gz": b"s002",
+    }
+    assert all(entry.renamed_from is None for entry in result.series)
+    assert json.loads((out / "raw.json").read_text()) == {"SeriesNumber": 2}
+    assert not (out / "s002.json").exists()
+
+
 def test_the_sidecar_travels_with_the_nifti_it_describes(
     tmp_path, fake_dcm2niix
 ) -> None:
@@ -372,7 +445,7 @@ def test_force_overwrites_what_the_refusal_protects(tmp_path, fake_dcm2niix) -> 
 
     import_dicom(tmp_path, out, binary=binary, force=True)
 
-    assert existing.read_bytes() == b""
+    assert existing.read_bytes() == b"2_QA"
 
 
 def test_dcm2niix_names_are_kept_verbatim_when_asked_for(

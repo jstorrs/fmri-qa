@@ -400,6 +400,9 @@ versioning when the first stable public interface is released.
 
 ### Fixed
 
+- **Imported series names stay unique even when a QA name matches a retained
+  dcm2niix name.** Colliding series fall back to their original names until all
+  collisions are resolved, preventing one scan from silently replacing another.
 - **`fmri-qa --artifact ''` is now a usage error instead of a silent no-op.**
   `qa.py` only ever tested `args.artifact` by truthiness, so an empty string
   passed both `if` checks as false: the whole analysis ran, nothing was
