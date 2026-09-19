@@ -95,10 +95,23 @@ the circular mean of the per-frame centroids, and the published deviation is
 wrapped into $(-N_a/2,\, N_a/2]$ so a centroid that crosses the periodic
 boundary reads as a small displacement rather than a full-FOV jump.
 
+An axis has a defined centroid only when its sine/cosine resultant norm exceeds
+$10^{-12}$ times the total positive above-pedestal intensity. This relative
+numerical tolerance rejects cancellation roundoff regardless of brightness:
+a uniform positive frame has no centroid even when it has nonzero total
+intensity. An unresolved coordinate is NaN and does not enter that axis's
+temporal reference; the other coordinate can still resolve. The reference uses
+the same tolerance relative to the number of resolved coordinates on each axis.
+It is NaN when none resolve or their unit vectors cancel, as with balanced
+antipodal centroids.
+
 `com` is the peak of that deviation's magnitude, in the same unit as the
 registration's translation. It is a first-moment measure, so it is blind to any
 deformation that preserves the centroid — which is exactly why it is published
-beside the registration rather than instead of it.
+beside the registration rather than instead of it. Each magnitude requires both
+centroid coordinates and both reference axes to resolve. The peak ignores
+missing magnitudes and is NaN when no complete displacement is available,
+including when an axis of the temporal reference is ambiguous.
 
 ## What it looks like
 
@@ -166,7 +179,7 @@ converge, and the failed frames are all-NaN rows in `curves.translation`,
 `curves.scale_pct` and `curves.shear_pct` — so a consumer can tell which frames
 were lost, and how many, without recomputing anything. The centroid trace is
 independent of that failure: it has no fit to fail, and a NaN there means only
-that the frame carried no usable data.
+that the coordinate or its temporal reference has no resolved circular direction.
 
 One unit caveat survives migration. Schema 5 and earlier always published these
 two peaks in voxels regardless of whether the voxel size was known, so a

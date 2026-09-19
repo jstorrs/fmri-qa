@@ -400,6 +400,10 @@ versioning when the first stable public interface is released.
 
 ### Fixed
 
+- Undefined circular centroids, including uniform positive frames, are now
+  excluded per axis from the reference position. Near-zero temporal resultants
+  also remain undefined, so cancellation roundoff cannot fabricate displacement.
+
 - RDC panels use finite measurements for plot limits and mark unresolved points.
   Blank scans and curves containing NaN or infinity now render in dashboard and
   physics reports; all-zero curves retain a usable plot range.

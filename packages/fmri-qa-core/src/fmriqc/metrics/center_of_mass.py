@@ -6,7 +6,6 @@ the whole grid, which needs no phantom mask because a uniform background and the
 data (a vendor-nulled edge) is healed first. A cheap complement to `motion`.
 """
 
-import warnings
 from dataclasses import dataclass
 
 import numpy as np
@@ -14,6 +13,20 @@ import numpy as np
 from .._arrays import ArrayValue
 from ..prep.scale import UNKNOWN_VOXEL_SIZE, VoxelSize
 from ..types import BoolArray, FloatArray
+
+
+def _resolved_angle(
+    sine: FloatArray, cosine: FloatArray, total: FloatArray
+) -> FloatArray:
+    """Angles whose resultant exceeds 1e-12 of the total positive weight.
+
+    This relative numerical tolerance rejects cancellation roundoff without
+    depending on image brightness or the number of temporal samples.
+    """
+    resolved = (total > 0) & (np.hypot(sine, cosine) > 1e-12 * total)
+    angle = np.full_like(sine, np.nan, dtype=np.float64)
+    angle[resolved] = np.arctan2(sine[resolved], cosine[resolved])
+    return angle
 
 
 @dataclass(frozen=True, eq=False, slots=True)
@@ -31,25 +44,30 @@ class CenterOfMassResult(ArrayValue):
     a spike, or gross instability the ROI-only GSQAP summaries miss. A cheap
     first-moment complement to `MotionResult` (registration-based deformation).
 
+    An axis whose circular resultant is numerically zero has a NaN coordinate;
+    the other axis can still resolve. Missing coordinates do not contribute to
+    the temporal reference, which is itself NaN on any axis with a numerically
+    zero resultant (including balanced antipodal centroids).
+
     `shape` is the in-plane array size `(N0, N1)` — the wrap periods, so
     displacements respect the periodic boundary; `voxel` lets lengths be
     reported in mm.
     """
 
-    com: FloatArray  # (n_t, 2) per-frame circular COM (voxels, [0, N))
+    com: FloatArray  # (n_t, 2) per-frame circular COM (voxels, [0, N) or NaN)
     shape: tuple[int, int]  # in-plane (N0, N1): the axis wrap periods
     voxel: VoxelSize = UNKNOWN_VOXEL_SIZE  # mm/voxel, and the unit it implies
 
     @property
     def reference(self) -> FloatArray:
-        """(2,) temporal-mean centroid: the circular mean of the per-frame COM."""
+        """(2,) circular mean of resolved COM coordinates; ambiguous axes are NaN."""
         n = np.asarray(self.shape, dtype=float)
         theta = self.com * (2.0 * np.pi / n)
-        with warnings.catch_warnings():  # all-NaN axis -> NaN, not a warning
-            warnings.simplefilter("ignore", RuntimeWarning)
-            mean_theta = np.arctan2(
-                np.nanmean(np.sin(theta), axis=0), np.nanmean(np.cos(theta), axis=0)
-            )
+        mean_theta = _resolved_angle(
+            np.nansum(np.sin(theta), axis=0),
+            np.nansum(np.cos(theta), axis=0),
+            np.asarray(np.isfinite(theta).sum(axis=0), dtype=np.float64),
+        )
         return np.asarray(
             (mean_theta % (2.0 * np.pi)) * n / (2.0 * np.pi), dtype=np.float64
         )
@@ -75,10 +93,10 @@ class CenterOfMassResult(ArrayValue):
         """Peak per-volume centroid displacement, in `voxel.unit`.
 
         The peak of `displacement`, so it shares that property's unit. Uses
-        `nanmax`, not `max`: unlike `MotionResult` (a registration that either
-        converges or fails as a whole frame), a blank frame here only means "no
-        above-floor signal that frame" -- it says nothing about the frames that
-        did resolve, so it is NaN only when *no* frame ever produced a centroid.
+        `nanmax`, not `max`: an unresolved centroid says nothing about frames
+        that did resolve. A displacement needs both coordinates and both
+        reference axes, so the peak is NaN when no complete displacement is
+        available, including when the temporal reference is ambiguous.
         """
         d = self.displacement
         return float(np.nanmax(d)) if np.isfinite(d).any() else float("nan")
@@ -136,6 +154,13 @@ def estimate_center_of_mass(
     tracks where the signal actually sits over time. Complements `estimate_motion`
     (registration-based deformation) with a cheap first-moment centroid.
 
+    Each axis requires a resultant norm greater than `1e-12` times the total
+    positive weight. This scale-relative numerical tolerance rejects roundoff
+    from cancellation: a uniform positive frame, for example, has no defined
+    centroid even if its total weight is nonzero. Unresolved coordinates are
+    NaN and excluded independently from each axis of the temporal reference,
+    which uses the same tolerance on its unit-vector sums.
+
     `center_slice` is (X, Y, T); `voxel` (in-plane, from the header) is carried
     so displacements can be reported in mm.
     """
@@ -155,11 +180,10 @@ def estimate_center_of_mass(
 
     idx = np.indices(shape).reshape(2, -1)  # (2, npix): full periodic grid
     total = W.sum(axis=0)  # (n_t,)
-    good = total > 0  # blank frames -> NaN centroid
     com = np.full((nt, 2), np.nan)
     for axis in (0, 1):
         theta = idx[axis] * (2.0 * np.pi / shape[axis])
-        ang = np.arctan2(np.sin(theta) @ W, np.cos(theta) @ W)
-        com[good, axis] = (ang[good] % (2.0 * np.pi)) * shape[axis] / (2.0 * np.pi)
+        ang = _resolved_angle(np.sin(theta) @ W, np.cos(theta) @ W, total)
+        com[:, axis] = (ang % (2.0 * np.pi)) * shape[axis] / (2.0 * np.pi)
 
     return CenterOfMassResult(com=com, shape=shape, voxel=voxel)
