@@ -15,7 +15,6 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from cycler import cycler
-from reportlab.lib.pagesizes import letter
 
 if TYPE_CHECKING:
     from matplotlib.typing import RcKeyType
@@ -48,7 +47,7 @@ class Theme:
     """
 
     # Page geometry (points).
-    page_size: tuple[float, float] = letter
+    page_size: tuple[float, float] = (612.0, 792.0)
     margin: float = 40.0
 
     # Typography: names of fonts registered with ReportLab.

@@ -19,6 +19,8 @@ backend is needed; importing this package never touches the process's
 matplotlib backend.
 """
 
+from typing import TYPE_CHECKING
+
 from .document import (
     TIERS,
     Appendix,
@@ -29,9 +31,13 @@ from .document import (
     compose,
     parts_for,
 )
-from .formats.reportlab import add_report_pages, write_report
 from .summary import package_version
 from .theme import DEFAULT_THEME, Theme
+
+if TYPE_CHECKING:
+    # Kept verbatim (not the lazy `__getattr__` below) so mypy and pyright
+    # resolve both names statically; never executed at runtime.
+    from .formats.reportlab import add_report_pages, write_report
 
 __all__ = [
     "DEFAULT_THEME",
@@ -48,3 +54,27 @@ __all__ = [
     "parts_for",
     "write_report",
 ]
+
+# The current PDF driver's public names, resolved only when a caller needs one.
+_LAZY = frozenset({"add_report_pages", "write_report"})
+
+
+def __getattr__(name: str) -> object:
+    """Resolve PDF entry points without importing their driver eagerly.
+
+    Caches the result as a module global (assigning into `globals()`), so this
+    runs at most once per name -- every later access is a plain attribute
+    lookup, same as an eager re-export.
+    """
+    if name not in _LAZY:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    from .formats import reportlab
+
+    value = getattr(reportlab, name)
+    globals()[name] = value
+    return value
+
+
+def __dir__() -> list[str]:
+    """List the public names, matching what an eager module would show."""
+    return sorted(__all__)

@@ -21,6 +21,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 import fmriqc_report
 
 # The only calculation-side modules presentation is allowed to reach for.
@@ -43,6 +45,18 @@ _CALCULATION_ONLY = (
     "netCDF4",
 )
 
+# The format-agnostic public surface must stay importable without the current
+# PDF driver's dependencies. Each target runs in its own new interpreter so a
+# previous probe cannot hide a dependency imported by another target.
+_PDF_ONLY = ("reportlab", "svglib")
+_REPORT_IMPORT_TARGETS = (
+    "fmriqc_report",
+    "fmriqc_report.content",
+    "fmriqc_report.theme",
+    "fmriqc_report.summary",
+    "fmriqc_report.panels",
+)
+
 # Run in a fresh interpreter: only a process that has imported nothing else can
 # say what `import fmriqc_report.cli` costs. This one already has the whole
 # stack loaded from the other tests in the suite.
@@ -52,6 +66,17 @@ import fmriqc_report.cli
 calculation = {_CALCULATION_ONLY!r}
 loaded = sorted(
     m for m in sys.modules if any(m == c or m.startswith(c + ".") for c in calculation)
+)
+print(loaded)
+"""
+
+_REPORT_IMPORT_PROBE = f"""
+import importlib
+import sys
+importlib.import_module(sys.argv[1])
+pdf = {_PDF_ONLY!r}
+loaded = sorted(
+    m for m in sys.modules if any(m == p or m.startswith(p + ".") for p in pdf)
 )
 print(loaded)
 """
@@ -123,4 +148,18 @@ def test_importing_the_report_cli_does_not_load_the_calculation_stack() -> None:
     assert result.stdout.strip() == "[]", (
         f"importing the report CLI loaded the calculation stack: {result.stdout}\n"
         f"{result.stderr}"
+    )
+
+
+@pytest.mark.parametrize("module", _REPORT_IMPORT_TARGETS)
+def test_format_agnostic_report_modules_do_not_load_the_pdf_driver(module: str) -> None:
+    """The content surface imports without ReportLab or svglib."""
+    result = subprocess.run(  # noqa: S603 - fixed literal script, not untrusted input
+        [sys.executable, "-c", _REPORT_IMPORT_PROBE, module],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    assert result.stdout.strip() == "[]", (
+        f"importing {module} loaded the PDF driver: {result.stdout}\n{result.stderr}"
     )
