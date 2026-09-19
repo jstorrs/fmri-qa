@@ -23,7 +23,8 @@ def phantom_core_mask(volume: FloatArray, erode: int = HILO_ERODE) -> BoolArray:
     quantile / watershed steps are all dimension-agnostic), keeps the largest
     connected component with its interior holes filled, then peels `erode` voxel
     layers so the core excludes edge and partial-volume voxels — matching the
-    note's `3dAutomask -q -erode 5`.
+    note's `3dAutomask -q -erode 5`. A constant volume has no distinct phantom
+    and background and returns an empty core.
     """
     mask = ndimage.binary_fill_holes(segment_phantom(volume))
     labels, n = ndimage.label(mask)

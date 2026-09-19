@@ -48,6 +48,16 @@ or more of the image sits exactly on the minimum — an exactly-zero background,
 which background-suppressed and mask-multiplied reconstructions do produce —
 and a watershed with no background seed floods the whole frame as phantom.
 
+If the two quantiles coincide, inclusive seeds would overlap — for example,
+both quantiles are zero when a small phantom fills less than a tenth of an
+otherwise zero frame. In that case, the minimum intensity seeds background
+and the maximum seeds phantom instead. These classes are disjoint whenever
+the image is nonconstant. A constant image has no distinct classes and returns
+an empty mask, which fails the segmentation verdict below and retains the
+usual warning. The same rule applies to the 3-D watershed used to form the
+hi/lo phantom core before filling holes, keeping the largest connected
+component, and eroding its boundary.
+
 Separately, any image edge that is entirely nulled is excluded from every
 statistic. Some vendors null one outer row or column to encode the
 phase-encode direction; a nulled border carries no signal, but blanket-trimming

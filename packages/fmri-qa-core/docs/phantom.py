@@ -35,9 +35,8 @@ from scipy.ndimage import gaussian_filter
 import fmriqc as q
 
 # Background noise floor, as a fraction of phantom signal. A real magnitude
-# image has a Rician air background; an exactly-constant one makes the intensity
-# quantiles that seed the segmentation degenerate, so the background gets a
-# floor and the figures exercise the segmentation rather than a failure path.
+# image has a Rician air background, so the figures include a realistic noise
+# floor rather than a background-suppressed reconstruction.
 BACKGROUND_SCALE = 8.0
 PHANTOM_SIGNAL = 1000.0
 

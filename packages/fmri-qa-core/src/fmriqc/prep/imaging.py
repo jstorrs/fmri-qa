@@ -53,15 +53,23 @@ def segment_phantom(image: FloatArray) -> BoolArray:
     the whole frame as phantom, and every downstream statistic then silently
     reads background: the ROI-fit guard passes vacuously, SFNR divides by a
     noiseless floor, and the N/2 ghost region erodes to nothing. The same holds
-    symmetrically at the bright end. `detect_phantom` still checks the result for
-    the degenerate masks a pathological image can produce anyway.
+    symmetrically at the bright end. If the quantiles coincide, the minimum and
+    maximum seed the two classes instead, keeping them disjoint. A constant
+    image has no distinct classes and returns an empty mask. `detect_phantom`
+    still checks the result for degenerate masks.
     """
+    low, high = np.quantile(image, [0.1, 0.9])
+    if low == high:
+        low, high = image.min(), image.max()
+        if low == high:
+            return np.zeros_like(image, dtype=bool)
+
     # mode="wrap": MRI images are periodic (FFT reconstruction), so the edge
     # filter must wrap rather than pad.
     edges = filters.sobel(image, mode="wrap")
     labels = np.zeros_like(image, dtype=np.uint8)
-    labels[image <= np.quantile(image, 0.1)] = 1
-    labels[image >= np.quantile(image, 0.9)] = 2
+    labels[image <= low] = 1
+    labels[image >= high] = 2
     return np.asarray(segmentation.watershed(edges, labels) == 2)
 
 

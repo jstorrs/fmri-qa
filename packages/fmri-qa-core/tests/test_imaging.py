@@ -23,10 +23,12 @@ from fmriqc.prep.imaging import (
 )
 
 
-def _disk(n: int = 32) -> np.ndarray:
-    """A centered boolean disk of radius n/4 — the fixtures' phantom shape."""
+def _disk(n: int = 32, radius: float | None = None) -> np.ndarray:
+    """A centered boolean disk, defaulting to radius n/4."""
+    if radius is None:
+        radius = n / 4
     yy, xx = np.mgrid[0:n, 0:n]
-    return np.asarray(((xx - n / 2) ** 2 + (yy - n / 2) ** 2) < (n / 4) ** 2)
+    return np.asarray(((xx - n / 2) ** 2 + (yy - n / 2) ** 2) < radius**2)
 
 
 def _air(shape: tuple[int, ...], seed: int = 0, scale: float = 8.0) -> np.ndarray:
@@ -118,19 +120,40 @@ def test_segment_phantom_separates_a_disk_over_an_exactly_zero_background() -> N
     assert 0 < mask.mean() < 1  # neither collapsed direction
 
 
-def test_detect_phantom_warns_when_the_mask_covers_the_whole_frame() -> None:
-    """A collapsed segmentation is announced rather than passed on in silence.
+@pytest.mark.parametrize("background", [0.0, 5.0])
+def test_segment_phantom_recovers_a_sparse_disk_when_quantiles_coincide(
+    background: float,
+) -> None:
+    disk = _disk(64, radius=8)
+    image = np.where(disk, 1000.0, background)
+    assert np.quantile(image, 0.1) == np.quantile(image, 0.9)
+    assert np.array_equal(segment_phantom(image), disk)
+    assert phantom_area(image) == disk.sum()
 
-    Nothing downstream would catch it: a whole-frame mask satisfies `roi_fits`
-    for any ROI, so the pipeline's own ROI guard stays quiet too. A constant
-    image is the reliable way to collapse the watershed once the seeds are
-    inclusive.
-    """
-    flat = np.full((16, 16, 8), 5.0)
+
+@pytest.mark.parametrize("value", [0.0, 5.0])
+@pytest.mark.parametrize("shape", [(16, 16), (16, 16, 16)])
+def test_segment_phantom_returns_an_empty_mask_for_a_constant_image(
+    value: float, shape: tuple[int, ...]
+) -> None:
+    mask = segment_phantom(np.full(shape, value))
+    assert mask.shape == shape
+    assert mask.dtype == np.bool_
+    assert not mask.any()
+
+
+@pytest.mark.parametrize("value", [0.0, 5.0])
+def test_detect_phantom_warns_for_an_empty_mask_on_a_constant_image(
+    value: float,
+) -> None:
+    """A constant image cannot distinguish phantom from background."""
+    flat = np.full((16, 16, 8), value)
     images = q.QAImages(center_slice=flat, fluctuations=np.zeros_like(flat), tr=2.0)
     with pytest.warns(UserWarning, match="did not separate phantom from background"):
         geom = q.detect_phantom(images)
-    assert geom.fraction == 1.0
+    assert geom.fraction == 0.0
+    assert geom.contrast == 0.0
+    assert geom.plausible is False
 
 
 def test_detect_phantom_is_quiet_on_a_separable_phantom() -> None:
@@ -238,6 +261,19 @@ def test_extract_center_slice_prefers_the_phantom_over_a_larger_air_mask() -> No
     # not a fresh segmentation -- so it should agree with the phantom itself.
     assert np.array_equal(mask, disk)
     assert np.array_equal(chosen, data[:, :, 1, :])
+
+
+def test_select_slice_prefers_a_sparse_phantom_over_empty_slices() -> None:
+    disk = _disk(64, radius=8)
+    data = np.zeros((64, 64, 3, 2))
+    data[:, :, 0, :] = np.where(disk, 1000.0, 0.0)[:, :, None]
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        z, mask = select_slice(data, center="phantom")
+
+    assert z == 0  # the phantom must win over the empty middle slice
+    assert np.array_equal(mask, disk)
 
 
 def test_extract_center_slice_falls_back_when_no_slice_holds_a_phantom() -> None:

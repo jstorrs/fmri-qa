@@ -3,8 +3,37 @@
 import warnings
 
 import numpy as np
+import pytest
+from scipy import ndimage
 
 from fmriqc.hilo import separate_noise
+from fmriqc.hilo.mask import HILO_ERODE, phantom_core_mask
+
+
+@pytest.mark.parametrize(("radius", "noisy"), [(8, False), (8, True), (12, True)])
+def test_phantom_core_mask_stays_inside_the_sphere(radius: int, noisy: bool) -> None:
+    z, y, x = np.mgrid[:32, :32, :32]
+    sphere = (x - 16) ** 2 + (y - 16) ** 2 + (z - 16) ** 2 < radius**2
+    volume = np.where(sphere, 1000.0, 0.0)
+    if noisy:
+        rng = np.random.default_rng(0)
+        volume += np.abs(rng.normal(scale=8.0, size=volume.shape))
+    else:
+        assert np.quantile(volume, 0.1) == np.quantile(volume, 0.9)
+
+    core = phantom_core_mask(volume)
+
+    assert core.any()
+    assert not core[~sphere].any()
+    if not noisy:
+        assert np.array_equal(
+            core, ndimage.binary_erosion(sphere, iterations=HILO_ERODE)
+        )
+
+
+@pytest.mark.parametrize("value", [0.0, 5.0])
+def test_phantom_core_mask_is_empty_for_a_constant_volume(value: float) -> None:
+    assert not phantom_core_mask(np.full((32, 32, 32), value)).any()
 
 
 def test_separate_noise_recovers_the_planted_variances() -> None:

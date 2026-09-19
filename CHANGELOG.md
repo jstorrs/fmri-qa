@@ -400,6 +400,12 @@ versioning when the first stable public interface is released.
 
 ### Fixed
 
+- **Sparse phantoms retain separate background and foreground seeds.** When
+  the watershed's intensity quantiles coincide, distinct minimum and maximum
+  intensities seed the two classes instead. Small phantoms over zero background
+  no longer flood the frame or contaminate the hi/lo core with background;
+  constant images return an empty, invalid mask with the existing warning.
+
 - **Imported companions stay with their own series when stems overlap.** NIfTIs
   keep their parsed stems; other companions use the longest matching series stem.
   File destination collisions are refused before any move, even with `--force`.
