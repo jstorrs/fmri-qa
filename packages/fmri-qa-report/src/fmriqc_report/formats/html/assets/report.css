@@ -53,6 +53,10 @@ details { margin: .6rem 0; }
 summary { cursor: pointer; font-weight: 700; }
 details p { overflow-wrap: anywhere; }
 
+.inventory-list { display: grid; gap: .75rem; list-style: none; margin: 0; padding: 0; }
+.inventory-list li { background: #fff; border: 1px solid #d1dce1; border-radius: .35rem; padding: .85rem; overflow-wrap: anywhere; }
+.inventory-list p { margin: .4rem 0 0; white-space: pre-wrap; }
+
 @media (max-width: 34rem) {
   .shell { padding: 1rem; }
   .metadata, .metric-grid, .figure-grid { grid-template-columns: 1fr; }

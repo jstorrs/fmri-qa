@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>fMRI QA report inventory</title>
+  <link rel="stylesheet" href="assets/report.css">
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to report content</a>
+  <header class="page-header">
+    <div class="shell">
+      <p class="eyebrow">fMRI QA static report</p>
+      <h1>Report inventory</h1>
+      <nav aria-label="Report sections">
+        <a href="#runs">Run reports</a>
+        <a href="#omissions">Omitted inputs</a>
+        <a href="summary.json">Summary JSON</a>
+      </nav>
+    </div>
+  </header>
+  <main id="main" class="shell">
+    <section aria-labelledby="summary-heading">
+      <h2 id="summary-heading">Inventory summary</h2>
+      <p>$summary</p>
+      $site_status
+      <p>These reports are descriptive and do not apply acceptance thresholds.</p>
+    </section>
+    <section id="runs" aria-labelledby="runs-heading">
+      <h2 id="runs-heading">Run reports</h2>
+      <ul class="inventory-list">$runs</ul>
+    </section>
+    <section id="omissions" aria-labelledby="omissions-heading">
+      <h2 id="omissions-heading">Omitted inputs</h2>
+      <ul class="inventory-list">$omissions</ul>
+    </section>
+  </main>
+</body>
+</html>
