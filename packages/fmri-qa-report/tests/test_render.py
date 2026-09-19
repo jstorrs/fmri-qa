@@ -191,3 +191,33 @@ def test_add_report_pages_accepts_a_bare_artifact(tmp_path, artifact) -> None:
     assert report.add_report_pages(c, artifact, "scan") == 1
     c.save()
     assert pdf.read_bytes().startswith(b"%PDF")
+
+
+@pytest.mark.parametrize("page_size", [(612.0, 792.0), (595.28, 841.89)])
+def test_combined_warnings_still_render_one_dashboard_page(
+    tmp_path, artifact, page_size
+) -> None:
+    artifact = replace(
+        artifact,
+        measurements=replace(
+            artifact.measurements,
+            clipped_any=True,
+            clipped_kept=True,
+            n_clipped_kept=12,
+            n_clipped_pre=3,
+            clip_ceiling=4095,
+            clip_bits=12,
+            phantom_mask_ok=False,
+            roi_inside_phantom=False,
+        ),
+    )
+    pdf = tmp_path / "warnings.pdf"
+    assert (
+        report.write_report(
+            [("scan", artifact)],
+            pdf,
+            theme=report.Theme(page_size=page_size, footer="Physics"),
+        )
+        == 1
+    )
+    assert pdf.read_bytes().startswith(b"%PDF")

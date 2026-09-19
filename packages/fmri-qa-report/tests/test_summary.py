@@ -42,7 +42,8 @@ def test_clipping_in_the_analyzed_data_is_called_out(artifact) -> None:
         clip_ceiling=4095.0,
         clip_bits=12,
     )
-    line = summary.acquisition_line(biased)
+    assert "CLIP" not in summary.acquisition_line(biased)
+    line = summary.acquisition_notes(biased)
     assert "CLIP 12 in analyzed data (+3 pre-SS) @ 4095 (12-bit)" in line
 
 
@@ -57,7 +58,7 @@ def test_clipping_confined_to_warm_up_is_reported_quietly(artifact) -> None:
         clip_ceiling=4095.0,
         clip_bits=12,
     )
-    line = summary.acquisition_line(warmup)
+    line = summary.acquisition_notes(warmup)
     assert "clip 7 pre-SS only @ 4095 (12-bit)" in line
     assert "CLIP" not in line
 
@@ -96,14 +97,14 @@ def test_appendix_accounts_for_a_scan_without_a_sidecar(bare_artifact) -> None:
 def test_a_collapsed_phantom_mask_is_called_out(artifact) -> None:
     """A bad mask invalidates every mask-based number on the page.
 
-    It has to say so on the acquisition line: the metrics themselves still look
+    It has to say so in the notes block: the metrics themselves still look
     like ordinary measurements, so a reader has nothing else to go on. The
     verdict is the artifact's -- the bounds it was reached by live with the
     segmentation, in a package this one cannot import -- and the fraction beside
     it is what the reader is shown.
     """
     collapsed = _clipped(artifact, phantom_fraction=1.0, phantom_mask_ok=False)
-    assert "BAD PHANTOM MASK (100% of frame" in summary.acquisition_line(collapsed)
+    assert "BAD PHANTOM MASK (100% of frame" in summary.acquisition_notes(collapsed)
 
 
 def test_a_bad_mask_note_shows_the_contrast_when_the_artifact_has_it(artifact) -> None:
@@ -113,12 +114,12 @@ def test_a_bad_mask_note_shows_the_contrast_when_the_artifact_has_it(artifact) -
     noisy = _clipped(
         artifact, phantom_fraction=0.54, phantom_contrast=1.7, phantom_mask_ok=False
     )
-    assert "(54% of frame, 1.7× contrast)" in summary.acquisition_line(noisy)
+    assert "(54% of frame, 1.7× contrast)" in summary.acquisition_notes(noisy)
     migrated = _clipped(noisy, phantom_contrast=float("nan"))
-    assert "(54% of frame)" in summary.acquisition_line(migrated)
+    assert "(54% of frame)" in summary.acquisition_notes(migrated)
 
 
-def test_acquisition_line_flags_an_analysis_of_background() -> None:
+def test_acquisition_notes_flag_an_analysis_of_background() -> None:
     """A noise-only scan's failed verdict reaches the page as the analysis made it.
 
     End to end rather than by overriding the field: the calculation half once
@@ -130,13 +131,13 @@ def test_acquisition_line_flags_an_analysis_of_background() -> None:
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")  # the analysis warns; the page is under test
         artifact = q.analyze(q.QAScan(data=noise, tr=2.0), settings)
-    assert "BAD PHANTOM MASK" in summary.acquisition_line(artifact)
-    assert "× contrast" in summary.acquisition_line(artifact)
+    assert "BAD PHANTOM MASK" in summary.acquisition_notes(artifact)
+    assert "× contrast" in summary.acquisition_notes(artifact)
 
 
 def test_an_off_phantom_roi_is_called_out(artifact) -> None:
     outside = _clipped(artifact, roi_inside_phantom=False)
-    assert "ROI NOT INSIDE PHANTOM" in summary.acquisition_line(outside)
+    assert "ROI NOT INSIDE PHANTOM" in summary.acquisition_notes(outside)
 
 
 def test_a_well_localized_run_carries_no_localization_note(artifact) -> None:

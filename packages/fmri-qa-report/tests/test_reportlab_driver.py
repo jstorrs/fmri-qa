@@ -5,15 +5,19 @@ driver decides before it draws anything — how much fits on a page, and that th
 embedded-image alignment fix is installed and still needed.
 """
 
+from dataclasses import replace
+from itertools import pairwise
 from typing import get_args
 
 import pytest
+from reportlab.lib.pagesizes import A4
 from reportlab.pdfbase import pdfmetrics
 from svglib import svglib as _svglib
 
 import fmriqc_report as report
-from fmriqc_report import content
+from fmriqc_report import content, summary
 from fmriqc_report.document import Part
+from fmriqc_report.formats.reportlab import pages
 from fmriqc_report.formats.reportlab.layout import (
     appendix_chunks,
     appendix_cursors,
@@ -64,18 +68,34 @@ class RecordingCanvas:
     def __init__(self):
         self.strings = []  # (x, y, text), in the order they were drawn
         self.images = []  # (path, x, y)
+        self.text_bounds = []  # (left, bottom, right, top, text)
+        self.rectangles = []
+        self.font, self.size = "Helvetica", 10
 
     def setFont(self, font, size):
+        self.font, self.size = font, size
+
+    def setStrokeGray(self, gray):
         pass
+
+    def setLineWidth(self, width):
+        pass
+
+    def rect(self, x, y, width, height, **kwargs):
+        self.rectangles.append((x, y, x + width, y + height))
 
     def setFillGray(self, gray):
         pass
 
     def drawString(self, x, y, text):
         self.strings.append((x, y, text))
+        width = pdfmetrics.stringWidth(text, self.font, self.size)
+        ascent, descent = pdfmetrics.getAscentDescent(self.font, self.size)
+        self.text_bounds.append((x, y + descent, x + width, y + ascent, text))
 
     def drawCentredString(self, x, y, text):
-        self.strings.append((x, y, text))
+        width = pdfmetrics.stringWidth(text, self.font, self.size)
+        self.drawString(x - width / 2, y, text)
 
     def drawImage(self, path, x, y, **kwargs):
         self.images.append((path, x, y))
@@ -279,3 +299,85 @@ def test_svglib_probe_rejects_an_unknown_converter_shape() -> None:
 
     with pytest.raises(RuntimeError, match="unsupported image converter API"):
         _truncates_image_geometry(unknown_converter)
+
+
+@pytest.mark.parametrize(
+    "theme",
+    [
+        report.Theme(footer="Physics"),
+        report.Theme(
+            page_size=A4, margin=24, font_body="Times-Roman", footer="Physics"
+        ),
+    ],
+)
+@pytest.mark.parametrize("warnings", [False, True])
+def test_dashboard_text_tiles_and_panels_fit_one_page(
+    artifact, monkeypatch, theme, warnings
+) -> None:
+    if warnings:
+        artifact = replace(
+            artifact,
+            measurements=replace(
+                artifact.measurements,
+                clipped_any=True,
+                clipped_kept=True,
+                n_clipped_kept=12,
+                n_clipped_pre=3,
+                clip_ceiling=4095,
+                clip_bits=12,
+                phantom_mask_ok=False,
+                roi_inside_phantom=False,
+            ),
+            provenance=replace(
+                artifact.provenance,
+                model="Research scanner with a long device model name " * 2,
+                coil="Head receive array with many channels " * 2,
+                software="Extended research software release " * 3,
+            ),
+        )
+    title = "scan_" + "long_identifier_" * 8 if warnings else "scan"
+    boxes = []
+    monkeypatch.setattr(
+        pages,
+        "_draw_fig",
+        lambda c, fig, x, top, w, h: boxes.append((x, top - h, x + w, top)),
+    )
+    c = RecordingCanvas()
+    pages.condensed_page(c, artifact, title, theme)
+    for left, bottom, right, top, _text in c.text_bounds:
+        assert theme.margin <= left < right <= theme.page_width - theme.margin
+        assert theme.margin <= bottom < top <= theme.page_height
+    tile_text = c.text_bounds[-2 * len(content.metric_tiles(artifact.measurements)) :]
+    assert len({bottom for _, bottom, _, _ in c.rectangles}) > 1
+    for bounds, value, label in zip(
+        c.rectangles, tile_text[::2], tile_text[1::2], strict=True
+    ):
+        left, bottom, right, top = bounds
+        for tx0, ty0, tx1, ty1, _ in (value, label):
+            assert left < tx0 < tx1 < right
+            assert bottom < ty0 < ty1 < top
+    assert [
+        (label[-1], value[-1])
+        for value, label in zip(tile_text[::2], tile_text[1::2], strict=True)
+    ] == content.metric_tiles(artifact.measurements)
+    header_text = c.text_bounds[: -len(tile_text)]
+    for upper, lower in pairwise(header_text):
+        assert upper[1] > lower[3]
+    assert header_text[-1][1] > max(top for _, _, _, top in c.rectangles)
+    rendered = "".join(text for _, _, text in c.strings)
+    for text in (
+        title,
+        summary.device_line(artifact.provenance),
+        summary.acquisition_line(artifact),
+        summary.provenance_line(artifact.provenance),
+        summary.acquisition_notes(artifact),
+    ):
+        assert "".join(text.split()) in "".join(rendered.split())
+    assert min(bottom for _, bottom, _, _ in boxes) >= theme.margin - 1e-9
+    assert max(top for _, _, _, top in boxes) < min(
+        bottom for _, bottom, _, _ in c.rectangles
+    )
+    row_tops = sorted({top for _, _, _, top in boxes}, reverse=True)
+    assert len(row_tops) == 4  # images, two curve rows, stability strip
+    for upper, lower in pairwise(row_tops):
+        assert min(bottom for _, bottom, _, top in boxes if top == upper) > lower

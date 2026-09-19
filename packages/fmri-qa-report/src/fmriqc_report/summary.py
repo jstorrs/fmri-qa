@@ -73,15 +73,20 @@ def acquisition_line(artifact: QAArtifact) -> str:
         unit = "deg" if settings.detrend == "poly" else "knots"
         detrend += f" ({unit} {settings.detrend_order})"
     parts.append(detrend)
-    if clip := _clipping_note(artifact):
-        parts.append(clip)
-    if localization := _localization_note(artifact):
-        parts.append(localization)
     return _SEP.join(parts)
 
 
+def acquisition_notes(artifact: QAArtifact) -> str:
+    """Clipping and localization notes, separate from acquisition metadata."""
+    return _SEP.join(
+        note
+        for note in (_clipping_note(artifact), _localization_note(artifact))
+        if note
+    )
+
+
 def _localization_note(artifact: QAArtifact) -> str:
-    """The phantom/ROI localization warning for the acquisition line; empty if fine.
+    """The phantom/ROI localization warning for the notes block; empty if fine.
 
     Both failures make every mask-based number on the page meaningless while
     leaving it looking like an ordinary measurement, so they are called out in
@@ -114,7 +119,7 @@ def _localization_note(artifact: QAArtifact) -> str:
 
 
 def _clipping_note(artifact: QAArtifact) -> str:
-    """The ADC-saturation warning for the acquisition line; empty if none.
+    """The ADC-saturation warning for the notes block; empty if none.
 
     Clipping inside the analyzed data biases every metric and is called out in
     capitals; clipping confined to the dropped warm-up volumes is expected on

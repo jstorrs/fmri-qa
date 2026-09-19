@@ -35,6 +35,9 @@ APPENDIX_ROW_H = APPENDIX_NAME_DROP + APPENDIX_DETAIL_DROP
 # itself -- so that the titles of a packet line up from sheet to sheet.
 TITLE_DROP = 34.0
 
+TILE_H = 34.0
+TILE_GAP = 6.0
+
 
 def title_baseline(theme: Theme) -> float:
     """The top baseline a titled page's heading is drawn on."""
@@ -61,7 +64,47 @@ def wrap_text(text: str, font: str, size: float, width: float) -> list[str]:
     For the catalog's definitions and methods, which say what a number is and
     must not be cut short the way a one-line label (`fit_text`) can be.
     """
-    return simpleSplit(text, font, size, width) or [""]
+    lines = []
+    for line in simpleSplit(text, font, size, width) or [""]:
+        # Scan identifiers and software versions can be a single long token.
+        fragment = ""
+        for char in line:
+            if fragment and pdfmetrics.stringWidth(fragment + char, font, size) > width:
+                lines.append(fragment)
+                fragment = ""
+            fragment += char
+        lines.append(fragment)
+    return lines
+
+
+def tile_geometry(tiles: list[tuple[str, str]], theme: Theme) -> tuple[int, float]:
+    """Columns and uniform tile width, with padding around every label/value."""
+    widest = max(
+        max(
+            pdfmetrics.stringWidth(label, theme.font_body, 6.5),
+            pdfmetrics.stringWidth(value, theme.font_numeric, 12),
+        )
+        for label, value in tiles
+    )
+    columns = max(
+        1,
+        min(
+            len(tiles), int((theme.content_width + TILE_GAP) / (widest + 12 + TILE_GAP))
+        ),
+    )
+    return columns, (theme.content_width - (columns - 1) * TILE_GAP) / columns
+
+
+def dashboard_heights(
+    top: float, image_height: float, theme: Theme
+) -> tuple[float, float, float]:
+    """Fit image row, two curve rows and strip above the footer, sharing shrinkage.
+
+    The 28 points reserve the image/curve gaps and both curve-row drops.
+    Header wrapping and tile rows have already consumed their measured height.
+    """
+    scale = min(1.0, (top - theme.margin - 28) / (image_height + 2 * 150 + 120))
+    return image_height * scale, 150 * scale, 120 * scale
 
 
 def _page_chunks[T](

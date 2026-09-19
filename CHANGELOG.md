@@ -400,6 +400,11 @@ versioning when the first stable public interface is released.
 
 ### Fixed
 
+- Dashboard reports wrap acquisition metadata and warning notes, and size metric
+  tiles to fit their values across multiple rows. Plot heights share the remaining
+  space so combined clipping, phantom-mask, and ROI warnings remain visible on a
+  single Letter or A4 page without colliding with the footer.
+
 - **Sparse phantoms retain separate background and foreground seeds.** When
   the watershed's intensity quantiles coincide, distinct minimum and maximum
   intensities seed the two classes instead. Small phantoms over zero background

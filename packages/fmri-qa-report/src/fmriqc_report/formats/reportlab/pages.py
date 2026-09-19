@@ -32,16 +32,20 @@ from ...panels.timeseries import (
     plot_spectrum,
     plot_weisskoff,
 )
-from ...summary import acquisition_line, device_line, provenance_line
+from ...summary import acquisition_line, acquisition_notes, device_line, provenance_line
 from ...theme import Theme
 from .layout import (
     APPENDIX_DETAIL_DROP,
     APPENDIX_NAME_DROP,
     COVER_ROW_H,
+    TILE_GAP,
+    TILE_H,
     CoverRow,
     appendix_cursors,
     cover_cursors,
+    dashboard_heights,
     fit_text,
+    tile_geometry,
     title_baseline,
     wrap_text,
 )
@@ -49,9 +53,6 @@ from .svglib_patch import ensure_installed
 
 # A page-part renderer: draw one scan's part onto the canvas (no showPage).
 PageRenderer = Callable[[canvas.Canvas, QAArtifact, str, Theme], None]
-
-_TILE_H = 34.0  # metric-tile height (pt)
-_TILE_GAP = 6.0
 
 
 def _draw_fig(
@@ -92,17 +93,18 @@ def _draw_plot(
 def _draw_tiles(
     c: canvas.Canvas, tiles: list[tuple[str, str]], top: float, theme: Theme
 ) -> float:
-    """Draw the metric tiles as an even strip across the content width."""
-    n = len(tiles)
-    tw = (theme.content_width - (n - 1) * _TILE_GAP) / n
-    bottom = top - _TILE_H
+    """Draw measured metric tiles in as many rows as their text needs."""
+    columns, tw = tile_geometry(tiles, theme)
+    bottom = top
     for i, (label, value) in enumerate(tiles):
-        x = theme.margin + i * (tw + _TILE_GAP)
+        row, column = divmod(i, columns)
+        bottom = top - row * (TILE_H + TILE_GAP) - TILE_H
+        x = theme.margin + column * (tw + TILE_GAP)
         cx = x + tw / 2
         c.setFillGray(theme.tile_fill_gray)
         c.setStrokeGray(theme.tile_stroke_gray)
         c.setLineWidth(0.5)
-        c.rect(x, bottom, tw, _TILE_H, stroke=1, fill=1)
+        c.rect(x, bottom, tw, TILE_H, stroke=1, fill=1)
         c.setFillGray(theme.tile_value_gray)
         c.setFont(theme.font_numeric, 12)
         c.drawCentredString(cx, bottom + 18, value)
@@ -116,43 +118,58 @@ def _draw_tiles(
 def _header(c: canvas.Canvas, artifact: QAArtifact, title: str, theme: Theme) -> float:
     """Draw the scan name, metadata lines, and metric tiles; return the y below."""
     y = theme.page_height - 32
-    if title:
-        c.setFont(theme.font_title, 14)
-        c.drawString(theme.margin, y, title)
-    device = device_line(artifact.provenance)
-    if device:
-        c.setFont(theme.font_body, 9)
-        c.setFillGray(theme.text_muted_gray)
-        c.drawRightString(theme.page_width - theme.margin, y, device)
-    if title or device:
-        y -= 14
-
-    c.setFont(theme.font_body, 8.3)
-    c.setFillGray(theme.text_muted_gray)
-    c.drawString(theme.margin, y, acquisition_line(artifact))
-    prov = provenance_line(artifact.provenance)
-    if prov:
-        y -= 11
-        c.drawString(theme.margin, y, prov)
-    c.setFillGray(theme.text_primary_gray)
-
-    bottom = _draw_tiles(c, metric_tiles(artifact.measurements), y - 12, theme)
+    rows = (
+        (title, theme.font_title, 14.0, 17.0, theme.text_primary_gray),
+        (
+            device_line(artifact.provenance),
+            theme.font_body,
+            9.0,
+            12.0,
+            theme.text_muted_gray,
+        ),
+        (acquisition_line(artifact), theme.font_body, 8.3, 11.0, theme.text_muted_gray),
+        (
+            provenance_line(artifact.provenance),
+            theme.font_body,
+            8.3,
+            11.0,
+            theme.text_muted_gray,
+        ),
+        (
+            acquisition_notes(artifact),
+            theme.font_body,
+            8.3,
+            11.0,
+            theme.text_primary_gray,
+        ),
+    )
+    for text, font, size, pitch, gray in rows:
+        if not text:
+            continue
+        c.setFont(font, size)
+        c.setFillGray(gray)
+        for line in wrap_text(text, font, size, theme.content_width):
+            c.drawString(theme.margin, y, line)
+            y -= pitch
+    bottom = _draw_tiles(c, metric_tiles(artifact.measurements), y - 1, theme)
     return bottom - 10
 
 
 def _panel_row(
-    c: canvas.Canvas, figs: list[Figure], top: float, theme: Theme, *, gap: float = 8.0
+    c: canvas.Canvas,
+    figs: list[Figure],
+    top: float,
+    theme: Theme,
+    *,
+    height: float,
+    gap: float = 8.0,
 ) -> float:
     """Draw the panels in one row across the content width; return the y below."""
     n = len(figs)
     pw = (theme.content_width - (n - 1) * gap) / n
-    # The box takes its aspect from the figures it holds, so a panel drawn taller
-    # or shorter is still boxed to match and the rows below start where it ends.
-    aspect = max(fig.get_figheight() / fig.get_figwidth() for fig in figs)
-    ph = pw * aspect
     for i, fig in enumerate(figs):
-        _draw_fig(c, fig, theme.margin + i * (pw + gap), top, pw, ph)
-    return top - ph
+        _draw_fig(c, fig, theme.margin + i * (pw + gap), top, pw, height)
+    return top - height
 
 
 def _curve_grid(
@@ -230,11 +247,23 @@ def condensed_page(
     """Dashboard: header tiles, the phantom-image row, and the core curves."""
     curves, m = artifact.curves, artifact.measurements
     y = _header(c, artifact, title, theme)
-    y = _panel_row(c, panel_figs(artifact), y - 6, theme)
+    figs = panel_figs(artifact)
+    image_width = (theme.content_width - (len(figs) - 1) * 8) / len(figs)
+    aspect = max(fig.get_figheight() / fig.get_figwidth() for fig in figs)
+    image_h, curve_h, strip_h = dashboard_heights(y, image_width * aspect, theme)
+    y = _panel_row(c, figs, y - 6, theme, height=image_h)
     y = _curve_grid(
-        c, curves, m, theme, y - 10, fs=9, figsize=(3.6, 2.5), row_h=150.0, row_gap=6.0
+        c,
+        curves,
+        m,
+        theme,
+        y - 10,
+        fs=9,
+        figsize=(3.6, 2.5),
+        row_h=curve_h,
+        row_gap=6.0,
     )
-    _stability_strip(c, curves, m, theme, y, fs=9, figsize=(3.0, 2.0), height=120.0)
+    _stability_strip(c, curves, m, theme, y, fs=9, figsize=(3.0, 2.0), height=strip_h)
 
 
 def analysis_page(
