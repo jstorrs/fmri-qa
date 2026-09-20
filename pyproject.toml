@@ -57,8 +57,18 @@ docs = [
     "furo>=2024",
     "matplotlib>=3.9",
 ]
+# PyInstaller, for the single-file `fmri-qa-run` (`make bundle`; see
+# packages/fmri-qa-launcher/bundle/fmri-qa-run.spec). A workspace group for the
+# reason `notebooks` and `docs` are: it builds a distribution and is never part
+# of one. It is also the only group the bundle is built with -- `make bundle`
+# resolves an isolated environment from the lock with `dev` left out, so the
+# executable carries what the three packages declare and nothing this shared
+# environment happens to have installed.
+bundle = [
+    "pyinstaller>=6.11",
+]
 
-# Sync the dev group by default; notebooks and docs stay opt-in.
+# Sync the dev group by default; notebooks, docs and bundle stay opt-in.
 [tool.uv]
 default-groups = ["dev"]
 

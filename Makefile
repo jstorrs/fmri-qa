@@ -7,7 +7,7 @@
 # notebook stack is a separate group, `make sync-notebooks`.
 
 .PHONY: all format lint typecheck pyright test license check sync sync-notebooks \
-	sync-docs docs build
+	sync-docs docs build bundle
 
 all: lint typecheck pyright test
 
@@ -60,6 +60,22 @@ license:
 
 build:
 	uv build --all-packages
+
+# The single-file executable: `fmri-qa-run` with the interpreter, the whole
+# scientific stack and dcm2niix inside, for a machine with no Python. The spec
+# says what goes in and why. `--isolated --no-default-groups` builds from a
+# throwaway environment resolved from uv.lock rather than from .venv: PyInstaller
+# bundles whatever the import graph reaches, so it should only be able to reach
+# what the packages declare. Output goes under dist/bundle and build/bundle to
+# stay clear of the wheels `make build` leaves in dist/. The closing `--version`
+# is the cheapest proof the result starts and found its own metadata; it is
+# slow (seconds) because a one-file executable unpacks itself on every launch.
+# PyInstaller does not cross-compile: this builds for the platform it runs on.
+bundle:
+	uv run --isolated --locked --all-packages --no-default-groups --group bundle \
+		pyinstaller --noconfirm --distpath dist/bundle --workpath build/bundle \
+		packages/fmri-qa-launcher/bundle/fmri-qa-run.spec
+	dist/bundle/fmri-qa-run --version
 
 # CI-style gate: prove each package still ships the right LICENSE, then fail on
 # any formatting drift or lint hit, then both type checkers + test with a
