@@ -12,9 +12,11 @@ denied) or `WinError 32` (sharing violation). Both reach Python as
 failed once and then could not be made to fail again, which is what a race
 looks like.
 
-The holder lets go within moments, so the answer is to ask again. It is not to
-stage somewhere unwatched: a staging directory off the destination's filesystem
-turns the final rename into a copy, and the half-written series comes back.
+The holder lets go within moments, so the answer is to ask again. Working
+somewhere unwatched helps -- the launcher stages in the system's temporary
+directory for that reason -- but it cannot replace this: results still have to
+land in the watched place, and the step that makes them appear there all at
+once is still a rename of files written a moment ago.
 """
 
 import time
@@ -32,7 +34,9 @@ __all__ = ["replace_patiently"]
 # rename is a property of the filesystem, not of the client: a Linux machine
 # writing to an SMB share gets the same refusal from the server. And the wait
 # is only ever paid on a path that was about to fail anyway -- a destination
-# that is genuinely unwritable is refused earlier, when staging is created in it.
+# that is genuinely unwritable is refused earlier: by the import when it makes
+# its staging directory there, and by the launcher when it probes its output
+# directory before starting.
 _DELAYS: tuple[float, ...] = (0.05, 0.1, 0.2, 0.4, 0.8, 1.6, 3.2)
 
 

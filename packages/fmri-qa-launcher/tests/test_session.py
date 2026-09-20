@@ -9,8 +9,10 @@ to point at.
 
 import logging
 import os
+import shutil
 import stat
 import sys
+import tempfile
 import warnings
 from collections.abc import Callable
 from pathlib import Path
@@ -28,6 +30,7 @@ from fmriqc_launcher.session import (
     Published,
     Refused,
     _assign_companions,
+    _copy_durably,
     _publish,
     run_session,
 )
@@ -36,6 +39,20 @@ PreparedSeries = Callable[..., tuple[Path, dict[str, object]]]
 StubDcm2niix = Callable[..., Path]
 
 _SETTINGS = AnalysisSettings(roi_size=9)
+
+
+@pytest.fixture
+def staging_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """A private stand-in for the system's temporary directory.
+
+    Staging is made with `tempfile.mkdtemp`, so where it lands is whatever
+    `tempfile.tempdir` says. Pointing that here lets a test see exactly what a
+    run made and left, in a place no other process is writing to.
+    """
+    root = tmp_path / "system-tmp"
+    root.mkdir()
+    monkeypatch.setattr(tempfile, "tempdir", str(root))
+    return root
 
 
 def _sidecar(
@@ -108,6 +125,7 @@ def test_one_series_is_imported_analyzed_and_published(
     dicom_dir: Path,
     prepared_series: PreparedSeries,
     stub_dcm2niix: StubDcm2niix,
+    staging_root: Path,
 ) -> None:
     nifti, base = prepared_series(name="scan")
     sidecar = _sidecar(base, series_number=1, description="QA_EPI")
@@ -147,12 +165,16 @@ def test_one_series_is_imported_analyzed_and_published(
     assert published.artifact == series_dir / f"{name}.qa.nc"
     assert published.report == series_dir / f"{name}.html"
 
-    # The published series directory honours the umask -- 0o755, not
-    # `tempfile.mkdtemp`'s unconditional 0o700.
+    # What is published honours the umask -- 0o755 and 0o644 -- and not the
+    # 0o700 of the `tempfile.mkdtemp` staging directory it was copied out of.
     assert stat.S_IMODE(series_dir.stat().st_mode) == 0o755
+    for published_file in series_dir.iterdir():
+        assert stat.S_IMODE(published_file.stat().st_mode) == 0o644
 
-    # No staging directory survives a successful run.
+    # Nothing but the series is left in the output directory, and nothing at
+    # all where the work was done.
     assert [p.name for p in output_dir.iterdir()] == [name]
+    assert list(staging_root.iterdir()) == []
 
     reloaded = fmriqc.load_artifact(published.artifact)
     assert reloaded.provenance.source == str(series_dir / f"{name}.nii.gz")
@@ -363,18 +385,88 @@ def test_an_output_directory_that_cannot_be_created_is_a_session_error(
     sys.platform == "win32" or os.geteuid() == 0,
     reason="POSIX permission bits, and root ignores them",
 )
-def test_a_staging_directory_that_cannot_be_created_is_a_session_error(
-    tmp_path: Path, dicom_dir: Path
+def test_an_output_directory_that_cannot_be_written_to_stops_the_run_at_once(
+    tmp_path: Path, dicom_dir: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    """Before any work: staging is elsewhere, so publishing would find out last."""
+
+    def _never(*_args: object, **_kwargs: object) -> None:
+        raise AssertionError("started work for an output directory it cannot fill")
+
+    monkeypatch.setattr("fmriqc_launcher.session._run_in_staging", _never)
     output_dir = tmp_path / "output"
     output_dir.mkdir()
     output_dir.chmod(0o555)  # exists already, so the first mkdir is a no-op
     try:
         request = RunRequest(dicom_dir=dicom_dir, output_dir=output_dir)
-        with pytest.raises(SessionError, match="cannot create a staging directory"):
+        with pytest.raises(SessionError, match="cannot write to"):
             run_session(request)
     finally:
         output_dir.chmod(0o755)
+
+
+def test_the_writability_probe_leaves_nothing_behind(
+    tmp_path: Path, dicom_dir: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def _stop(*_args: object, **_kwargs: object) -> None:
+        raise SessionError("stopped before any series")
+
+    monkeypatch.setattr("fmriqc_launcher.session._run_in_staging", _stop)
+    request = RunRequest(dicom_dir=dicom_dir, output_dir=tmp_path / "output")
+
+    with pytest.raises(SessionError, match="stopped before any series"):
+        run_session(request)
+
+    assert list((tmp_path / "output").iterdir()) == []
+
+
+def test_a_probe_that_cannot_be_removed_is_logged_and_does_not_stop_the_run(
+    tmp_path: Path,
+    dicom_dir: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Making the probe proved the directory writable; failing to remove it cannot.
+
+    A sync client opens what was just made, and the removal is refused -- the
+    very race `fmriqc.rename` exists for. Treated as "cannot write", it would
+    refuse every run into a watched directory before the run began.
+    """
+    real = shutil.rmtree
+
+    def _held(path: Path, **kwargs: object) -> None:
+        if not Path(path).name.startswith(".fmri-qa-probe."):
+            real(path, **kwargs)
+
+    def _stop(*_args: object, **_kwargs: object) -> None:
+        raise SessionError("got as far as starting work")
+
+    monkeypatch.setattr("fmriqc_launcher.session.shutil.rmtree", _held)
+    monkeypatch.setattr("fmriqc_launcher.session._run_in_staging", _stop)
+    request = RunRequest(dicom_dir=dicom_dir, output_dir=tmp_path / "output")
+
+    with (
+        caplog.at_level(logging.WARNING, logger="fmriqc_launcher.session"),
+        pytest.raises(SessionError, match="got as far as starting work"),
+    ):
+        run_session(request)
+
+    (probe,) = (tmp_path / "output").iterdir()
+    assert str(probe) in caplog.text
+    assert "can be deleted" in caplog.text
+
+
+def test_a_staging_directory_that_cannot_be_created_is_a_session_error(
+    tmp_path: Path, dicom_dir: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def _full(*_args: object, **_kwargs: object) -> str:
+        raise OSError(28, "No space left on device")
+
+    monkeypatch.setattr("fmriqc_launcher.session.tempfile.mkdtemp", _full)
+    request = RunRequest(dicom_dir=dicom_dir, output_dir=tmp_path / "output")
+
+    with pytest.raises(SessionError, match="cannot create a staging directory"):
+        run_session(request)
 
 
 def test_a_target_that_appears_mid_run_fails_that_series(
@@ -667,15 +759,221 @@ def test_a_failure_saving_the_artifact_is_a_failed_outcome_with_its_warnings(
     assert list(output_dir.iterdir()) == []
 
 
-def test_publishing_renames_the_work_directory(tmp_path: Path) -> None:
-    work, target = tmp_path / "work", tmp_path / "series"
+def test_the_output_directory_holds_no_intermediates_while_a_series_is_worked_on(
+    tmp_path: Path,
+    dicom_dir: Path,
+    prepared_series: PreparedSeries,
+    stub_dcm2niix: StubDcm2niix,
+    staging_root: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """What a sync client watching `output_dir` would have been handed to upload.
+
+    Looked at from inside the render, the last step before publishing: by then
+    the import has run, the scan has been filed and the artifact written, and
+    under the old staging-in-`output_dir` design every one of those was sitting
+    there. All of it is in the temporary directory instead.
+    """
+    output_dir = tmp_path / "output"
+    seen: dict[str, list[str]] = {}
+
+    def _look_then_render(artifact: object, path: Path, **kwargs: object) -> Path:
+        seen["output"] = sorted(p.name for p in output_dir.rglob("*"))
+        seen["staging"] = sorted(p.name for p in staging_root.rglob("*") if p.is_file())
+        return _fast_render(artifact, path, **kwargs)
+
+    monkeypatch.setattr("fmriqc_launcher.session.write_run_page", _look_then_render)
+    nifti, base = prepared_series(name="scan")
+    sidecar = _sidecar(base, series_number=1, description="QA_EPI")
+    name = naming.qa_stem(sidecar)
+    assert name is not None
+    request = RunRequest(
+        dicom_dir=dicom_dir,
+        output_dir=output_dir,
+        settings=_SETTINGS,
+        dcm2niix=stub_dcm2niix({"stem1": (nifti, sidecar)}),
+    )
+
+    result = run_session(request)
+
+    assert result.complete
+    assert seen["output"] == []
+    assert seen["staging"] == [f"{name}.json", f"{name}.nii.gz", f"{name}.qa.nc"]
+    # And afterwards: the series where it belongs, nothing where it was made.
+    assert [p.name for p in output_dir.iterdir()] == [name]
+    assert list(staging_root.iterdir()) == []
+
+
+def test_a_published_series_is_dropped_from_staging_before_the_next_one_starts(
+    tmp_path: Path,
+    dicom_dir: Path,
+    prepared_series: PreparedSeries,
+    stub_dcm2niix: StubDcm2niix,
+    staging_root: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Publishing copies where it used to move, so staging has to be emptied by hand.
+
+    Otherwise a session's every finished series sits in the temporary
+    directory until the run ends -- the small, often RAM-backed disk, filling
+    while the output directory the user chose has room to spare.
+    """
+    staged_at_each_render: list[set[str]] = []
+
+    def _look_then_render(artifact: object, path: Path, **kwargs: object) -> Path:
+        staged_at_each_render.append({p.name for p in staging_root.rglob("*.qa.nc")})
+        return _fast_render(artifact, path, **kwargs)
+
+    monkeypatch.setattr("fmriqc_launcher.session.write_run_page", _look_then_render)
+    first_nifti, first_base = prepared_series(name="first", t=40, seed=1)
+    first_sidecar = _sidecar(first_base, series_number=1, description="First")
+    second_nifti, second_base = prepared_series(name="second", t=40, seed=2)
+    second_sidecar = _sidecar(second_base, series_number=2, description="Second")
+    first_name = naming.qa_stem(first_sidecar)
+    second_name = naming.qa_stem(second_sidecar)
+    assert first_name is not None
+    assert second_name is not None
+    request = RunRequest(
+        dicom_dir=dicom_dir,
+        output_dir=tmp_path / "output",
+        settings=_SETTINGS,
+        dcm2niix=stub_dcm2niix(
+            {
+                "stem1": (first_nifti, first_sidecar),
+                "stem2": (second_nifti, second_sidecar),
+            }
+        ),
+    )
+
+    result = run_session(request)
+
+    assert [o.name for o in result.published] == [first_name, second_name]
+    # Each render sees its own series' artifact in staging, and only that one.
+    assert staged_at_each_render == [
+        {f"{first_name}.qa.nc"},
+        {f"{second_name}.qa.nc"},
+    ]
+
+
+def test_publishing_copies_the_work_directory_into_place(tmp_path: Path) -> None:
+    work, output = tmp_path / "work", tmp_path / "output"
     work.mkdir()
-    (work / "scan.nii.gz").write_text("scan")
+    output.mkdir()
+    (work / "scan.nii.gz").write_bytes(b"scan")
+    (work / "scan.html").write_bytes(b"page")
 
-    _publish(work, target)
+    _publish(work, output / "series")
 
-    assert (target / "scan.nii.gz").read_text() == "scan"
-    assert not work.exists()
+    assert (output / "series" / "scan.nii.gz").read_bytes() == b"scan"
+    assert (output / "series" / "scan.html").read_bytes() == b"page"
+    # Only the series: the hidden sibling it was copied into became it.
+    assert [p.name for p in output.iterdir()] == ["series"]
+
+
+def test_a_series_is_never_visible_under_its_name_until_it_is_whole(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The copy is the slow step, so it must not happen under the final name."""
+    work, output = tmp_path / "work", tmp_path / "output"
+    work.mkdir()
+    output.mkdir()
+    for file_name in ("a", "b", "c"):
+        (work / file_name).write_bytes(b"x")
+    seen: list[bool] = []
+    copied_into: set[str] = set()
+
+    def _watching(source: Path, destination: Path) -> None:
+        seen.append((output / "series").exists())
+        copied_into.add(destination.parent.name)
+        _copy_durably(source, destination)
+
+    monkeypatch.setattr("fmriqc_launcher.session._copy_durably", _watching)
+
+    _publish(work, output / "series")
+
+    assert seen == [False, False, False]
+    # One hidden sibling, in the output directory itself so the rename that
+    # follows stays on one filesystem -- and gone once it has become the series.
+    (sibling,) = copied_into
+    assert sibling.startswith(".series.")
+    assert sibling.endswith(".partial")
+    assert [p.name for p in output.iterdir()] == ["series"]
+    assert sorted(p.name for p in (output / "series").iterdir()) == ["a", "b", "c"]
+
+
+def test_a_copy_that_fails_leaves_nothing_in_the_output_directory(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    work, output = tmp_path / "work", tmp_path / "output"
+    work.mkdir()
+    output.mkdir()
+    for file_name in ("a", "b"):
+        (work / file_name).write_bytes(b"x")
+
+    def _fill_the_disk(source: Path, destination: Path) -> None:
+        if source.name == "b":
+            raise OSError(28, "No space left on device")
+        _copy_durably(source, destination)
+
+    monkeypatch.setattr("fmriqc_launcher.session._copy_durably", _fill_the_disk)
+
+    with pytest.raises(OSError, match="No space left"):
+        _publish(work, output / "series")
+
+    assert list(output.iterdir()) == []
+    # Staging is untouched, so nothing about the failure cost the work itself.
+    assert sorted(p.name for p in work.iterdir()) == ["a", "b"]
+
+
+def test_a_rename_that_is_refused_leaves_nothing_in_the_output_directory(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    work, output = tmp_path / "work", tmp_path / "output"
+    work.mkdir()
+    output.mkdir()
+    (work / "a").write_bytes(b"x")
+
+    def _held(*_args: object, **_kwargs: object) -> None:
+        raise PermissionError(13, "held open by a sync client")
+
+    monkeypatch.setattr("fmriqc_launcher.session.replace_patiently", _held)
+
+    with pytest.raises(PermissionError, match="held open"):
+        _publish(work, output / "series")
+
+    assert list(output.iterdir()) == []
+
+
+def test_copying_durably_copies_the_bytes_and_never_overwrites(tmp_path: Path) -> None:
+    source, destination = tmp_path / "source", tmp_path / "destination"
+    source.write_bytes(b"\x00scan\xff" * 100_000)
+
+    _copy_durably(source, destination)
+    assert destination.read_bytes() == source.read_bytes()
+
+    with pytest.raises(FileExistsError):
+        _copy_durably(source, destination)
+
+
+def test_copying_durably_syncs_before_it_returns(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The rename that follows is only as durable as the bytes it renames."""
+    source, destination = tmp_path / "source", tmp_path / "destination"
+    source.write_bytes(b"scan")
+    synced: list[int] = []
+    real = os.fsync
+
+    def _fsync(descriptor: int) -> None:
+        synced.append(destination.stat().st_size)
+        real(descriptor)
+
+    monkeypatch.setattr("fmriqc_launcher.session.os.fsync", _fsync)
+
+    _copy_durably(source, destination)
+
+    # Once, and with every byte already written through to the file.
+    assert synced == [4]
 
 
 def test_publishing_onto_an_existing_series_is_refused_before_any_rename(
@@ -736,6 +1034,7 @@ def test_a_rename_refused_for_any_other_reason_keeps_its_own_error(
 def test_a_staging_directory_that_cannot_be_removed_is_logged_by_name(
     tmp_path: Path,
     dicom_dir: Path,
+    staging_root: Path,
     monkeypatch: pytest.MonkeyPatch,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
@@ -744,8 +1043,14 @@ def test_a_staging_directory_that_cannot_be_removed_is_logged_by_name(
     def _stop(*_args: object, **_kwargs: object) -> None:
         raise SessionError("stopped before any series")
 
+    real = shutil.rmtree
+
+    def _held(path: Path, **kwargs: object) -> None:
+        if not Path(path).name.startswith("fmri-qa-run."):
+            real(path, **kwargs)
+
     monkeypatch.setattr("fmriqc_launcher.session._run_in_staging", _stop)
-    monkeypatch.setattr("fmriqc_launcher.session.shutil.rmtree", lambda *_a, **_k: None)
+    monkeypatch.setattr("fmriqc_launcher.session.shutil.rmtree", _held)
     request = RunRequest(
         dicom_dir=dicom_dir, output_dir=tmp_path / "output", settings=_SETTINGS
     )
@@ -756,14 +1061,17 @@ def test_a_staging_directory_that_cannot_be_removed_is_logged_by_name(
     ):
         run_session(request)
 
-    (left_behind,) = (tmp_path / "output").glob(".fmri-qa-run.*")
+    (left_behind,) = staging_root.glob("fmri-qa-run.*")
     assert str(left_behind) in caplog.text
     assert "can be deleted" in caplog.text
+    # Wherever it was left, it was not among the reports.
+    assert list((tmp_path / "output").iterdir()) == []
 
 
 def test_a_staging_directory_that_was_removed_is_not_mentioned(
     tmp_path: Path,
     dicom_dir: Path,
+    staging_root: Path,
     monkeypatch: pytest.MonkeyPatch,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
@@ -781,5 +1089,5 @@ def test_a_staging_directory_that_was_removed_is_not_mentioned(
     ):
         run_session(request)
 
-    assert not list((tmp_path / "output").glob(".fmri-qa-run.*"))
-    assert "staging directory" not in caplog.text
+    assert list(staging_root.iterdir()) == []
+    assert "could not remove" not in caplog.text

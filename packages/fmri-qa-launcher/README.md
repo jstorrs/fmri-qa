@@ -104,10 +104,19 @@ Start it with `fmri-qa-run` and no arguments, or directly with
   then for each series analyze it, save its `.qa.nc` artifact, render a
   self-contained HTML report, and publish all four files (the converted scan,
   its sidecar, the archive, the report) together under one directory named
-  for the series. Work happens in a hidden staging directory first, so a
-  reader of the output directory only ever sees a series that is completely
-  finished -- never one with a report still rendering, or a report for a run
-  that then failed.
+  for the series. Work happens in a staging directory under the system's
+  temporary directory first, and a finished series is copied out and renamed
+  into place, so a reader of the output directory only ever sees a series
+  that is completely finished -- never one with a report still rendering, or
+  a report for a run that then failed -- and a sync client watching it
+  (OneDrive, a lab share) is handed finished files only, never the
+  converter's raw output or a file on its way to being renamed. Those files
+  arrive in a hidden `.<series>.<token>.partial` directory that is renamed
+  to the series name once complete; a run killed outright mid-copy can leave
+  one behind, which is safe to delete. The temporary directory needs room
+  for the converted session plus one series being worked on, and is wherever
+  `TMPDIR` (or `TEMP` on Windows) says -- worth setting where `/tmp` is small
+  or RAM-backed.
 - **Refusal, not replacement.** A series whose name already exists in the
   output directory is left untouched and reported as refused; nothing here
   ever overwrites what an earlier run produced.

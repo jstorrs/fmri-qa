@@ -292,9 +292,10 @@ def test_the_default_run_calls_the_real_session_lazily(
 def test_the_thread_is_non_daemon(request_: RunRequest) -> None:
     """No public seam exposes daemon-ness, so this reaches the private `_thread`.
 
-    A daemon thread would let the interpreter exit mid-`shutil.rmtree` on the
-    staging directory (see the module docstring) -- worth pinning even at the
-    cost of one implementation-detail assertion.
+    A daemon thread would let the interpreter exit in the middle of a publish,
+    before the half-copied series is removed from the output directory (see
+    the module docstring) -- worth pinning even at the cost of one
+    implementation-detail assertion.
     """
     background = BackgroundRun(request_, run=_fake_series_run(()))
     background.start()

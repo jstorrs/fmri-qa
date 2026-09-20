@@ -1,7 +1,7 @@
 """The functional core: one DICOM directory in, one report per series out.
 
 `run_session` is the whole pipeline -- import, analyze, save the artifact,
-render the report -- run once per series inside a hidden staging directory,
+render the report -- run once per series inside a staging directory,
 publishing each series only once every one of its files exists. Nothing is
 ever half-published: a series either lands in `output_dir` complete, or it
 never appears there at all, whatever failed along the way. That is why
@@ -9,6 +9,18 @@ staging exists at all rather than writing straight into `output_dir` -- a
 report that takes eight seconds to render is eight seconds in which a reader
 could otherwise see a scan with no report yet, or a report for a run that then
 fails.
+
+Staging is the system's temporary directory, not `output_dir`. An output
+directory is often a watched one -- OneDrive, a lab share with a sync client --
+and everything written into it is something the watcher uploads: dcm2niix's raw
+output, a scan under the name it had before it was filed, every `.tmp` on its
+way to being renamed. None of that is a result, and a watcher busy with it is
+also what refuses the next rename (see `fmriqc.rename`). So `output_dir`
+receives finished files only, once each. They arrive by a copy, since staging
+is on another filesystem, and a copy is not atomic -- so it is made into a
+hidden sibling of the series directory and *that* is renamed into place, which
+keeps the guarantee above at the cost of one rename the watcher can still
+contest (see `_publish`).
 
 The heavy imports below (`fmriqc`'s analysis stack, `fmriqc_report`'s HTML
 renderer) sit at module top rather than behind a lazy `__getattr__`, unlike
@@ -18,8 +30,10 @@ where the laziness actually lives.
 """
 
 import logging
+import os
 import secrets
 import shutil
+import tempfile
 import warnings
 from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass
@@ -158,12 +172,14 @@ def run_session(
 ) -> RunResult:
     """Run one import-analyze-report-publish pass over `request`.
 
-    `output_dir` is created if missing. Work happens inside a hidden staging
-    directory beside it (`.fmri-qa-run.<token>`, removed whether or not the
-    run succeeds -- or, where something else holds a file in it open, logged
-    by name as left behind), so a reader of `output_dir` only ever sees series
-    that are completely finished. A series whose name already exists in `output_dir`
-    is refused rather than overwritten and costs nothing; `should_continue` is
+    `output_dir` is created if missing. Work happens inside a staging
+    directory under the system's temporary directory (`fmri-qa-run.<token>`,
+    removed whether or not the run succeeds -- or, where something else holds
+    a file in it open, logged by name as left behind), so a reader of
+    `output_dir` only ever sees series that are completely finished, and a
+    sync client watching it only ever sees finished files. A series whose name
+    already exists in `output_dir` is refused rather than overwritten and
+    costs nothing; `should_continue` is
     polled between the remaining series (never in the middle of one) so a
     cancel takes effect at the next safe point rather than tearing a render in
     half. `index`/`total` on the `Progress` this reports count the series that
@@ -177,10 +193,11 @@ def run_session(
     (staging is still removed either way -- see below).
 
     Raises:
-        SessionError: If `output_dir` cannot be created, the DICOM import
-            fails outright (no converter, an unreadable source, dcm2niix
-            exiting non-zero, an `OSError` while filing its output), or the
-            import produces no series at all. A failure specific to *one*
+        SessionError: If `output_dir` cannot be created or written to, no
+            staging directory can be made, the DICOM import fails outright
+            (no converter, an unreadable source, dcm2niix exiting non-zero,
+            an `OSError` while filing its output), or the import produces no
+            series at all. A failure specific to *one*
             series never raises -- it becomes a `Failed` outcome and the run
             continues with the next series.
     """
@@ -189,33 +206,62 @@ def run_session(
     except OSError as exc:
         raise SessionError(f"cannot create {request.output_dir}: {exc}") from exc
 
-    # Inside `output_dir`, so publishing a series is a same-filesystem rename;
-    # `secrets.token_hex` and a plain `Path.mkdir()` rather than
-    # `tempfile.mkdtemp`, which forces `0700` regardless of the process umask
-    # -- the directory twin of what `fmriqc_report.atomic` does for a file.
-    staging = request.output_dir / f".fmri-qa-run.{secrets.token_hex(8)}"
+    _require_writable(request.output_dir)
+
+    # `mkdtemp`'s `0700` is wanted here, where it was not when staging was
+    # renamed into `output_dir`: what sits in it is a scan on a machine's shared
+    # temporary directory. Nothing published inherits it -- `_publish` makes
+    # its own directory and its own files, under the umask.
     try:
-        staging.mkdir()
+        staging = Path(tempfile.mkdtemp(prefix="fmri-qa-run."))
     except OSError as exc:
-        raise SessionError(
-            f"cannot create a staging directory under {request.output_dir}: {exc}"
-        ) from exc
+        raise SessionError(f"cannot create a staging directory: {exc}") from exc
     try:
         return _run_in_staging(request, staging, progress, should_continue)
     finally:
-        shutil.rmtree(staging, ignore_errors=True)
-        # `ignore_errors` is what lets this run while an exception unwinds, and
-        # it is also what would make a failure silent. The same holder that
-        # refuses a rename (see `fmriqc.rename`) refuses an unlink, and what it
-        # leaves is a directory with a random name sitting beside the reports --
-        # a leading dot hides nothing on Windows -- that nothing will ever
-        # remove. It holds no finished series, so say so and say it is safe.
-        if staging.exists():
-            _LOG.warning(
-                "could not remove the staging directory %s; it holds nothing "
-                "finished and can be deleted",
-                staging,
-            )
+        _discard(staging)
+
+
+def _require_writable(output_dir: Path) -> None:
+    """Refuse an `output_dir` nothing can be published into, before any work.
+
+    Staging used to be made inside `output_dir`, so an unwritable one stopped
+    the run at once. With staging elsewhere the first write into it is the
+    first publish, minutes of analysis later, and every series would fail there
+    in turn. Making an empty directory asks the same question up front, of the
+    same operation publishing will perform.
+
+    Only making it decides. Removing it is cleanup, and in a watched directory
+    cleanup can be refused for the reason a rename can (see `fmriqc.rename`):
+    the watcher has opened what was just made. That is no evidence against
+    writing here -- the `mkdir` has just proved the opposite -- so it must not
+    stop the run; it is logged by name like any other leftover.
+    """
+    probe = output_dir / f".fmri-qa-probe.{secrets.token_hex(8)}"
+    try:
+        probe.mkdir()
+    except OSError as exc:
+        raise SessionError(f"cannot write to {output_dir}: {exc}") from exc
+    _discard(probe)
+
+
+def _discard(directory: Path) -> None:
+    """Remove `directory` and what is in it, saying so by name if that fails.
+
+    `ignore_errors` is what lets this run while an exception unwinds, and it is
+    also what would make a failure silent. Whatever holds a file open refuses
+    an unlink as it refuses a rename (see `fmriqc.rename`), and what is left is
+    a directory with a random name that nothing will ever remove -- holding a
+    scan, if it is staging. Nothing finished is ever in one, so say that it is
+    safe to delete.
+    """
+    shutil.rmtree(directory, ignore_errors=True)
+    if directory.exists():
+        _LOG.warning(
+            "could not remove the working directory %s; it holds nothing "
+            "finished and can be deleted",
+            directory,
+        )
 
 
 def _assign_companions(
@@ -257,7 +303,11 @@ def _run_in_staging(
             anonymize=request.anonymize,
         )
     except (ConversionError, OSError) as exc:
-        raise SessionError(f"could not import {request.dicom_dir}: {exc}") from exc
+        # Names staging too: it is on a disk the user did not choose, and when
+        # that one is full dcm2niix's own complaint need not say where.
+        raise SessionError(
+            f"could not import {request.dicom_dir} into {import_dir}: {exc}"
+        ) from exc
     if not result.series:
         raise SessionError(f"{request.dicom_dir} produced no series to import")
 
@@ -400,6 +450,11 @@ def _publish_series(
         _publish(work_dir, planned.target)
     except Exception as exc:  # noqa: BLE001 - one series' failure, reported and skipped
         return _failed(name, exc, noted)
+    # Publishing is a copy now, where it was a move, so without this staging
+    # would hold every series the run has finished until the run ended -- on a
+    # temporary directory that is often small, RAM-backed, or under a quota,
+    # while the output directory the user chose has room to spare.
+    _discard(work_dir)
 
     sidecar = planned.target / f"{name}.json"
     return Published(
@@ -414,10 +469,31 @@ def _publish_series(
 
 
 def _publish(work_dir: Path, target: Path) -> None:
-    """Rename a finished `work_dir` to `target`, refusing one that already exists.
+    """Copy a finished `work_dir` out of staging and into place as `target`.
 
-    The check has to be made on both sides of the rename. Before, because a
-    rename onto an existing directory must never be attempted. After, because
+    In two steps, because the copy crosses filesystems and so cannot be the
+    atomic one: the files are copied into a hidden sibling of `target`, and the
+    sibling is renamed. Copying straight into `target` would be one step and
+    could not be refused by a sync client -- and would leave, for as long as a
+    30 MB scan takes to copy and for ever after a crash, a series directory
+    that looks published and is not. That one is the worse failure: the next
+    run finds the name taken and refuses it, so a half-copied series blocks its
+    own repair. A refused rename only fails the series, loudly, and the
+    sibling is removed with it.
+
+    What neither step can cover is a process that is killed outright during
+    the copy -- no `finally` runs, and the sibling stays: a directory named
+    `.<series>.<token>.partial`, which a sync client will have uploaded. It is
+    never mistaken for a series and never blocks one, and no later run removes
+    it, since one run cannot tell a dead run's sibling from a live run's. It
+    is safe to delete by hand.
+
+    `work_dir` holds files only, which is all the pipeline puts there; a
+    directory in it fails the series rather than being silently left out.
+
+    `target`'s existence is checked on both sides of the rename. Before,
+    because a rename onto an existing directory must never be attempted (and
+    before the copy, which would be wasted). After, because
     `replace_patiently` can spend seconds waiting, another run can publish
     `target` in that window, and Windows reports a rename onto an existing
     directory as the very `PermissionError` being waited out (sometimes as
@@ -427,12 +503,40 @@ def _publish(work_dir: Path, target: Path) -> None:
     taken = f"{target} was created while this run was in progress"
     if target.exists():
         raise SessionError(taken)
+    partial = target.with_name(f".{target.name}.{secrets.token_hex(8)}.partial")
     try:
-        replace_patiently(work_dir, target)
-    except OSError as exc:
-        if target.exists():
-            raise SessionError(taken) from exc
-        raise
+        partial.mkdir()
+        for path in sorted(work_dir.iterdir()):
+            _copy_durably(path, partial / path.name)
+        try:
+            replace_patiently(partial, target)
+        except OSError as exc:
+            if target.exists():
+                raise SessionError(taken) from exc
+            raise
+    finally:
+        # Renamed away on success, so this finds nothing; after any failure it
+        # is what keeps a half-copied series out of `output_dir`.
+        if partial.exists():
+            _discard(partial)
+
+
+def _copy_durably(source: Path, destination: Path) -> None:
+    """Copy one file, syncing its contents before returning.
+
+    `save_artifact` syncs what it writes before renaming it, so that a crash
+    soon after cannot leave a truncated file under a finished name. That was a
+    promise about staging's filesystem; the rename that matters now is the one
+    in `output_dir`, of these copies, so they are synced the same way. Like
+    `save_artifact`, this syncs the file and not the directory holding it,
+    which is as far as the guarantee goes. Created exclusively and with
+    default permissions, so a published file answers to the umask and not to
+    staging's `0700`.
+    """
+    with source.open("rb") as read, destination.open("xb") as write:
+        shutil.copyfileobj(read, write)
+        write.flush()
+        os.fsync(write.fileno())
 
 
 def _messages(caught: list[warnings.WarningMessage]) -> tuple[str, ...]:

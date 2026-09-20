@@ -12,11 +12,14 @@ is heavy. The `TYPE_CHECKING`-only import of `RunResult` below mirrors
 at runtime unless a run actually starts.
 
 The thread is non-daemon on purpose: a windowed build has no console for a
-half-finished staging tree to complain from, and `run_session` already
-promises nothing partial ever reaches `output_dir` -- but only if it is
-allowed to finish unwinding (its `finally: shutil.rmtree(staging, ...)`, which
-logs the one case it cannot finish: a file something else holds open) when
-the process is asked to exit. A `Crashed` event is how *any* exception,
+half-copied series to complain from, and `run_session` already promises
+nothing partial is ever left in `output_dir` -- but only if it is allowed to
+finish unwinding when the process is asked to exit. The `finally` that matters
+is `session._publish`'s, which removes the hidden `.partial` sibling a series
+is copied into before it is renamed into place; cut short, that is a partial
+scan left in the user's output directory, and uploaded if it is a synced one.
+(Staging itself is in the system's temporary directory, and losing the race to
+remove that would cost `output_dir` nothing.) A `Crashed` event is how *any* exception,
 expected or not, still reaches a caller that has no stderr of its own -- a
 windowed executable's `sys.stderr` is `None`, so an error that only ever
 reached a thread's default excepthook would be lost silently.

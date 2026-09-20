@@ -622,9 +622,9 @@ class Panel:
     def _on_close(self) -> None:
         if self._closing:
             # A second close request: stop waiting on the run. The
-            # non-daemon worker thread still runs its own `finally:
-            # shutil.rmtree(staging, ...)` to completion before the process
-            # actually exits, so nothing partial is ever published.
+            # non-daemon worker thread still runs `session._publish`'s
+            # `finally` to completion before the process actually exits, so
+            # no half-copied series is left in the output directory.
             self._destroy()
             return
         self._closing = True
