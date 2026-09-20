@@ -71,6 +71,8 @@ build:
 # is the cheapest proof the result starts and found its own metadata; it is
 # slow (seconds) because a one-file executable unpacks itself on every launch.
 # PyInstaller does not cross-compile: this builds for the platform it runs on.
+# scripts/bundle.ps1 is the same two commands for Windows, where there is no
+# make; change them together.
 bundle:
 	uv run --isolated --locked --all-packages --no-default-groups --group bundle \
 		pyinstaller --noconfirm --distpath dist/bundle --workpath build/bundle \
