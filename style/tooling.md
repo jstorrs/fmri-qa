@@ -115,8 +115,8 @@ runtime and reviewers; a well-typed one makes the checker reject mistakes for fr
 
 ### Local stubs for third-party types
 
-The scientific stack (`nibabel`, `scipy`, `scikit-image`, `reportlab`, `svglib`) types its
-public API unevenly — some packages ship nothing, some ship stubs that are wrong or too
+The scientific stack (`nibabel`, `scipy`, `scikit-image`) types its public API unevenly —
+some packages ship nothing, some ship stubs that are wrong or too
 broad for the way we call them. That is the checkers' blind spot, not ours to absorb into
 the code. Work down this ladder — the *first* option that fits is the right one, and most of
 them are not "write a stub":
@@ -124,10 +124,10 @@ them are not "write a stub":
 1. **The library ships good types → use them.** Nothing to do. `numpy` and `matplotlib`
    are here.
 2. **A genuine `Optional` or error return is not a stub gap → handle it.** If a call really
-   can return `None` (e.g. `svg2rlg` on a parse failure), guard it and `raise` — don't stub
-   the `None` away and pretend the failure can't happen. This is the *errors never pass
-   silently* rule from [exceptions.md](exceptions.md), and the guard is real safety, not a
-   type-checker appeasement.
+   can return `None`, guard it and `raise` — don't stub the `None` away and pretend the
+   failure can't happen. This is the *errors never pass silently* rule from
+   [exceptions.md](exceptions.md), and the guard is real safety, not a type-checker
+   appeasement.
 3. **A one-off narrowing of a correct-but-broad type → a scoped `cast`.** When a shipped
    signature is accurate but wider than the single form you use at *one* site, a
    `typing.cast(Target, expr)` with a one-line reason is lighter than a stub. Reach for a
@@ -140,8 +140,7 @@ them are not "write a stub":
 5. **Untyped across a large or awkward surface, or you monkeypatch its internals → treat it
    as `Any`.** In the mypy override, `follow_imports = "skip"` (plus `ignore_missing_imports`)
    renders the package as `Any` so calling it isn't flagged as an untyped call. This is the
-   fallback for `scikit-image`, `reportlab`, and `svglib` — stubbing their full surface, or
-   the `Svg2RlgShapeConverter` monkeypatch, would cost more than it's worth.
+   fallback for `scikit-image` — stubbing its full surface would cost more than it's worth.
 
 Writing a local stub:
 
@@ -169,9 +168,9 @@ part of the standard loop rather than a separate audit step:
   checks are in the gate that already has to pass — not in a scan someone remembers to run.
 - **`uv.lock` is committed**, and CI syncs with `--locked`, so a dependency cannot change
   under a build without the change appearing in a diff.
-- **Dependency bounds are floors with a stated reason** when the reason isn't obvious —
-  `svglib>=2.0.2,<2.1` is capped because the report driver patches a private converter, and
-  the comment beside it says so.
+- **Dependency bounds are floors with a stated reason** when the reason isn't obvious
+  (`cycler` is declared because the `Theme` builds a prop cycle directly), and a ceiling
+  always carries a comment saying what breaks above it.
 
 There is no separate scanner suite here (no bandit config, no `make security`). If a class
 of finding starts recurring, add the tool and give it a `make` target — but keep the

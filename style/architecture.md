@@ -493,13 +493,14 @@ separate distributions, separate dependency sets, installable apart.
 The seam worth splitting on is where the two sides differ in almost everything: what they
 depend on, how fast they run, what changes them, and who deploys them. In this repo that
 seam is calculation versus presentation. Computing needs numpy, scipy, and the acquisition
-on disk, and changes when the physics changes; drawing needs matplotlib and ReportLab and
-changes when someone wants a different report. Nothing but a *result* passes between them.
+on disk, and changes when the physics changes; drawing needs matplotlib, and changes when
+someone wants a different report. Nothing but a *result* passes between them.
 
 ```
 packages/
-    fmri-qa-core/       # fmriqc         -- metrics, pipeline, and the artifact
-    fmri-qa-report/     # fmriqc_report  -- plots and PDF packets, from an artifact
+    fmri-qa-core/       # fmriqc          -- metrics, pipeline, and the artifact
+    fmri-qa-report/     # fmriqc_report   -- plots and an HTML report, from an artifact
+    fmri-qa-launcher/   # fmriqc_launcher -- the application shell over the two above
 ```
 
 Three rules make such a split hold:
@@ -536,8 +537,8 @@ fmriqc_report/
     summary.py          # format-agnostic text/tiles from an artifact
     panels/             # format-agnostic figures from an artifact
     formats/
-        reportlab/      # one driver: composes summary + panels into a PDF
-        # html.py, ...  # a second format reuses summary + panels unchanged
+        html/           # one driver: composes summary + panels into one page
+        # contact_sheet.py, ...  # a second format reuses summary + panels unchanged
 ```
 
 Adding a format touches only `formats/`; the content modules never learn that a format exists.
@@ -546,9 +547,9 @@ an implementation detail behind the content, not threaded through it. The payoff
 a new output format is a new entry in `formats/`, not an edit to every figure-building function.
 
 A driver that outgrows one file becomes a subpackage in `formats/`, by the same one-topic
-rule a level down — the PDF driver holds `layout` (page arithmetic), `pages` (one function
-per page), `packet` (assembling them into a file), and `svglib_patch` (the third-party
-defect embedding a figure has to work around).
+rule a level down — the HTML driver holds `figures` (rendering each panel to a standalone
+SVG), `resources` (the packaged template and stylesheet), and `run` (composing them into
+one page).
 
 ## Example: Complete Pattern
 

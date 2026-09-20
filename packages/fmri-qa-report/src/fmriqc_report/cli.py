@@ -26,8 +26,8 @@ def _expand_globs(paths: Sequence[str]) -> list[str]:
     """Every path, with any wildcard pattern that named nothing expanded here.
 
     PowerShell and cmd do not expand a wildcard before starting the command, so
-    `fmri-qa-report artifacts/*.qa.nc` -- the line the README gives -- reaches
-    this process with the `*` still in it and fails as a missing artifact.
+    `fmri-qa-report artifacts/*.qa.nc` reaches this process with the `*` still
+    in it and fails as a missing artifact.
 
     A deliberate twin of `fmriqc.cli.arguments.expand_globs` rather than an
     import of it: the report package may reach into `fmriqc.analysis` and

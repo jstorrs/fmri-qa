@@ -9,7 +9,7 @@ These pages document the calculation. There is one page per analysis: what it
 is for, the computation with its equations and settings, a figure, and a table
 of exactly what it contributes to the artifact under the names a reader will
 find in the file. The repository's `README.md` covers the workflow instead —
-installing, importing DICOM, the command line, and the PDF report.
+installing, importing DICOM, the command line, and the HTML report.
 
 ```{toctree}
 :maxdepth: 2

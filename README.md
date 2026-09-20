@@ -4,7 +4,8 @@ Phantom fMRI quality-assurance metrics, following the Glover/fBIRN stability
 protocol (Friedman & Glover, 2006). Given a 4-D phantom time series it reports
 SNR, SFNR, the Weisskoff radius of decorrelation (RDC), drift, temporal
 fluctuation, and two Nyquist-ghost measures (fBIRN percent ghost and the
-ACR/AAPM ghosting ratio), and can render offline web or PDF reports per scan.
+ACR/AAPM ghosting ratio), and renders a self-contained offline HTML report
+per scan.
 
 ## The packages
 
@@ -15,7 +16,7 @@ and the third is an application shell built on both of them:
 | Package | Import | Does | Needs |
 | --- | --- | --- | --- |
 | **`fmri-qa-core`** | `fmriqc` | the metrics, the pipeline, and the **analysis artifact** they are published as | numpy, scipy, nibabel, scikit-image, netCDF4 |
-| **`fmri-qa-report`** | `fmriqc_report` | plots and offline web sites or multi-page PDF packets, built from an artifact | matplotlib, reportlab, svglib (+ core) |
+| **`fmri-qa-report`** | `fmriqc_report` | plots and a self-contained offline HTML report, built from an artifact | matplotlib (+ core) |
 | **`fmri-qa-launcher`** | `fmriqc_launcher` | one-step DICOM-directory-in, report-directory-out pipeline: a command line and a desktop panel | core + report; stdlib `tkinter` for the panel |
 
 Between the first two, a `QAArtifact` is the only thing that crosses: the
@@ -26,8 +27,7 @@ two separate steps even when `fmri-qa-launcher` runs them back to back:
 
 ```bash
 uv run fmri-qa scan.nii.gz --artifact qa.nc      # calculate once
-uv run fmri-qa-site qa.nc --output qa-site/       # browse the offline site
-uv run fmri-qa-report qa.nc --pdf report.pdf     # render as often as you like
+uv run fmri-qa-report qa.nc --html report.html   # render as often as you like
 ```
 
 Install the core alone where you only want numbers (a trend database, a console
@@ -74,7 +74,7 @@ both `fmri-qa-core` and `fmri-qa-report`, and `fmri-qa-report` pulls in
 
 ```bash
 pip install fmri-qa-core      # metrics and artifacts only
-pip install fmri-qa-report    # + plots, offline sites, and PDF packets
+pip install fmri-qa-report    # + plots and self-contained HTML reports
 pip install fmri-qa-launcher  # + fmri-qa-run and the desktop panel
 ```
 
@@ -145,9 +145,9 @@ display to attach to; without either, it prints a message explaining that and
 exits `2`.
 
 The step-by-step commands in the following sections — `fmri-qa-import`,
-`fmri-qa`, `fmri-qa-report`, `fmri-qa-site` — remain available on their own,
-for trending numbers over time or for custom workflows the one-step command
-does not cover.
+`fmri-qa`, `fmri-qa-report` — remain available on their own, for trending
+numbers over time or for custom workflows the one-step command does not
+cover.
 
 ## Importing DICOM
 
@@ -328,7 +328,7 @@ uv run fmri-qa data/*_fMRI_*.nii.gz --artifact artifacts/
 
 An existing file at the destination is replaced, atomically. An output that
 names one of the run's own inputs (the scan, its sidecar, or, for
-`fmri-qa-report --pdf`, an artifact) is refused before anything is read, since
+`fmri-qa-report --html`, an artifact) is refused before anything is read, since
 replacing it would destroy the data the output describes.
 
 **Reading an artifact elsewhere** — MATLAB, R, Python/xarray and `ncdump` all
@@ -367,146 +367,46 @@ so `fmri-qa --json scan.nii.gz | jq` stays clean:
 uv run fmri-qa --json data/*_fMRI_*.nii.gz > qa.json
 ```
 
-## PDF report
+## HTML report
 
 Reporting reads artifacts, never scans:
 
 ```bash
-uv run fmri-qa data/*_fMRI_*.nii.gz --artifact artifacts/
-uv run fmri-qa-report artifacts/*.qa.nc --pdf qa.pdf
+uv run fmri-qa scan.nii.gz --artifact scan.qa.nc
+uv run fmri-qa-report scan.qa.nc --html report.html
 ```
 
 | Flag | Default | Meaning |
 | --- | --- | --- |
-| `--pdf` | — | write the PDF report to this file |
-| `--html` | — | write one self-contained HTML report for one artifact to this file |
-| `--tier` | `dashboard` | `dashboard` (condensed overview) or `physics` (adds stability, characterization, and methods pages) per scan — applies only to `--pdf` |
-| `--cover` | — | prepend a cover page listing the scans in the packet — applies only to `--pdf` |
-| `--appendix` | — | append a provenance page (per-scan metadata + version) — applies only to `--pdf` |
+| `--html` | — | required; write the self-contained HTML report to this file |
+| `-h`, `--help` | — | show usage and available options |
+| `--version` | — | show the report package version |
 
-At least one of `--pdf` or `--html` is required; both may be given together to
-write both from one run. `--tier`/`--cover`/`--appendix` shape the PDF only, so
-passing one of them with `--html` alone (no `--pdf`) is a usage error.
+`--html` takes exactly one artifact. A wildcard pattern is expanded by the
+command when the shell leaves it unexpanded, and one that matches several
+artifacts is a usage error. An artifact that cannot be read is reported on
+stderr and the command exits non-zero, writing nothing.
 
-An artifact that cannot be read is reported on stderr, skipped, and the run
-exits non-zero — but the packet is still written, and it says what it is
-missing: the cover counts the scans against those requested and lists the
-omitted ones with the reason, the appendix carries a row for each, every scan
-page's footer reads INCOMPLETE PACKET, and the PDF's subject metadata counts
-them. A page handed on alone must not read as the whole.
-
-Each page carries the metadata and metrics, the four summary images (signal,
-SFNR, fluctuation noise, static spatial noise) with the phantom mask and ROI
-overlaid, the Weisskoff plot, the ROI signal with its fitted trend, and the
-residual time course, spectrum, per-frame outlier fraction, per-frame in-plane
-motion (translation and scale/shear strain, with the count of any frames whose
-fit did not resolve), and the directional PSF curves (PE and RO). `--tier
-physics` follows that dashboard overview with a full-size stability page, a
-per-metric characterization table (value + definition), and a methods page
-describing how each metric is computed.
-
-Several scans combine into one branded packet: `--cover` prepends a cover with
-the scan inventory and `--appendix` appends a provenance page, and a running
-footer carries page numbers once the packet spans pages. The cover
-title, logo, footer text, fonts, and colours all come from a `report.Theme`, so
-a group brands every packet it issues from one object (see the library section).
-
-### Single-file HTML report
-
-`--html FILE` renders one artifact to one self-contained HTML file — the same
-report page `fmri-qa-site` publishes per run, handed out on its own as a PDF
-alternative:
-
-```bash
-uv run fmri-qa-report scan.qa.nc --html report.html
-```
+The page carries the scan's identification and the metric tiles, any
+localization or clipping warning, and the acquisition and analysis settings,
+then fourteen figures in two groups: image diagnostics (signal, SFNR,
+fluctuation noise, and static spatial noise, with the phantom outline and
+summary ROI drawn on where they apply, plus an N/2 ghost panel showing the
+phase-encode and readout sampling regions) and temporal and spatial diagnostics
+(the Weisskoff curve, the decorrelation factor by ROI width, the ROI mean
+signal with its fitted trend, the detrended residual, its spectrum, the
+per-frame outlier fraction, per-frame in-plane motion, whole-slice
+center-of-mass shift, and the directional PSF curves). A
+definitions-and-methods section follows, one entry per metric with its
+definition and how it is computed, and a provenance table closes the page.
 
 It opens by double-click with no network and no sibling file, so it is safe to
 email, attach to a QA record, or drop as-is into an existing website. It
 contains no JavaScript, so an embedding site's Content-Security-Policy only
-needs `style-src 'unsafe-inline'` (or a hash) and `img-src data:`. `--html`
-takes exactly one artifact; use `fmri-qa-site` for several.
-
-## Offline web report
-
-`fmri-qa-site` publishes saved analysis artifacts as a static website. It is
-included in `fmri-qa-report`; in this repository, install the workspace with
-`uv sync --all-packages`. If you installed the package with pip, run the same
-commands below without the `uv run` prefix.
-
-Calculate an artifact, then build a report from it:
-
-```bash
-uv run fmri-qa scan.nii.gz --artifact scan.qa.nc
-uv run fmri-qa-site scan.qa.nc --output qa-site/
-```
-
-For several scans, save their artifacts to a directory and build one site:
-
-```bash
-uv run fmri-qa data/*_fMRI_*.nii.gz --artifact artifacts/
-uv run fmri-qa-site "artifacts/*.qa.nc" --output qa-batch/
-```
-
-You can also list artifact paths explicitly:
-
-```bash
-uv run fmri-qa-site first.qa.nc second.qa.nc --output qa-comparison/
-```
-
-The command reads the computed artifacts, so rebuilding a report needs no
-original NIfTI data and does not rerun the analysis. Wildcard patterns are
-expanded by the command when the shell leaves them unexpanded.
-
-| Argument or flag | Meaning |
-| --- | --- |
-| `ARTIFACT...` | one or more saved analysis artifacts; wildcard patterns are accepted |
-| `--output DIRECTORY` | required; publish the site to a new directory |
-| `-h`, `--help` | show usage and available options |
-| `--version` | show the report package version |
-
-Open `qa-site/index.html` in a browser. No server, JavaScript, or CDN is needed.
-The index links to each run's metrics, warnings, acquisition metadata, analysis
-settings, diagnostic figures, and expandable metric definitions and methods.
-
-The generated directory has this layout:
-
-```text
-qa-site/
-  index.html
-  summary.json
-  assets/report.css
-  runs/<sha256>/index.html
-```
-
-Share the whole directory, or upload its contents to a static web host while
-preserving the directory structure. Each run page is a single self-contained
-file — stylesheet inlined, every figure embedded as a `data:` URI — that can be
-moved, emailed, or dropped into another site on its own; only the index
-depends on `assets/report.css`. Each figure has an Enlarge link that fills the
-viewport through CSS alone, no script involved; dark mode follows the reader's
-OS setting (figures stay on a white plate so plotted data keeps its colors);
-and the page is print-ready.
-
-The output path must not already exist, including as a file or symlink. To
-rebuild or add scans, pass all desired artifacts again and choose a new output
-directory, such as `--output qa-site-v2/`; the command does not update an
-existing site. Byte-identical inputs share one run page while retaining every
-requested file name in the inventory. The SHA-256 paths identify exact artifact
-bytes, rather than acquisitions or sessions.
-
-A successful build exits with status `0`. If an input cannot be read or
-rendered, the command publishes the successful runs, lists the omitted inputs
-and reasons in the index, marks every run page as incomplete, and exits with
-status `1`. If all inputs fail, it still publishes a failure-only inventory.
-An existing output path or a failure to publish also returns `1`. Build notices
-and errors go to stderr; the site data is written to files, not stdout.
-
-`summary.json` contains the version-1 inventory, numeric metrics with units and
-availability, and provenance. See the
-[web summary schema](packages/fmri-qa-report/README.md#web-summary-schema) for
-its fields. The current site presents individual runs; trend reports and
-integrated multi-test QA-program views are future consumers of this summary.
+needs `style-src 'unsafe-inline'` (or a hash) and `img-src data:`. Each figure
+has an Enlarge link that fills the viewport through CSS alone, no script
+involved; dark mode follows the reader's OS setting (figures stay on a white
+plate so plotted data keeps its colors); and the page is print-ready.
 
 ## Library
 
@@ -549,40 +449,24 @@ resolved: a consumer never recomputes a metric.
 ### Reporting
 
 ```python
-from pathlib import Path
-
 import fmriqc as q
 import fmriqc_report as report
 
 artifact = q.load_artifact("qa.nc")
 
-theme = report.Theme(
-    font_title="Times-Bold",
-    panel_accent="#1a4d7a",
-    logo=Path("group-logo.png"),
-    footer="Acme MR Physics · confidential",
-    cover_title="Acme Phantom QA",
-)
-report.write_report(
-    [("run-1", artifact)],
-    "packet.pdf",
-    tier="physics",
-    theme=theme,
-    cover=True,
-    appendix=True,
+report.write_run_page(
+    artifact, "report.html", title="run-1", theme=report.Theme(panel_accent="#1a4d7a")
 )
 ```
 
 Inside `fmriqc_report`, content is separated from format: `summary` (metadata
 text), `content` (the per-metric catalog), and `panels` (the figures) know
-nothing about PDFs, while `theme` supplies one `Theme` object driving both the
-page furniture and the matplotlib panels, and a `formats` driver composes them
-by walking the `document` block model (cover, tiered scan sections, appendix).
-A group brands every packet it issues from that one `Theme`.
+nothing about HTML, while `theme` supplies one `Theme` object driving the
+matplotlib panels, and `formats.html` composes them into the one self-contained
+page.
 
-Large scan inventories and provenance appendices continue onto additional
-pages. PDF output is written atomically: a rendering failure leaves any
-existing destination file unchanged and makes the CLI exit non-zero.
+The page is written atomically: a rendering failure leaves any existing
+destination file unchanged and makes the CLI exit non-zero.
 
 ## License
 

@@ -3,8 +3,10 @@ message: "If you use fmri-qa in published work, please cite this software."
 title: "fmri-qa"
 type: software
 abstract: >-
-  Phantom fMRI quality assurance, distributed as two packages: fmri-qa-core
-  (metrics and the analysis artifact) and fmri-qa-report (plots and PDF packets).
+  Phantom fMRI quality assurance, distributed as three packages: fmri-qa-core
+  (metrics and the analysis artifact), fmri-qa-report (plots and a
+  self-contained HTML report), and fmri-qa-launcher (a one-step DICOM-in,
+  report-out application shell).
 authors:
   - family-names: "Storrs"
     given-names: "Judd"

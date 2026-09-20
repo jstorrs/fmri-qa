@@ -20,7 +20,7 @@ need no toolbox, R reads one through `ncdf4` on CRAN, Python through
 netCDF4-python or xarray, and `ncdump` comes with the netCDF tools — written
 through `netCDF4`, the Unidata C library those readers use themselves;
 artifacts written by earlier builds as `.qa.npz` still load.
-Rendering one into a PDF is the separate
+Rendering one into a report is the separate
 [`fmri-qa-report`](../fmri-qa-report) distribution's job; this package depends
 on nothing that draws.
 

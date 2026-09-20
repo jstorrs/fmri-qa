@@ -8,6 +8,10 @@ versioning when the first stable public interface is released.
 
 ### Changed
 
+- **`fmri-qa-report` renders one artifact to one HTML file, and nothing else.**
+  `--html FILE` is now required rather than one of two output flags, and the
+  command takes exactly one artifact; a wildcard that matches several is a
+  usage error. Reporting is one command with one output.
 - **A published run report is one self-contained HTML file.** `fmri-qa-site`
   no longer writes a `runs/<sha256>/figures/` directory: `write_run_page`
   inlines the stylesheet in a `<style>` block and embeds all fourteen figures
@@ -855,6 +859,24 @@ versioning when the first stable public interface is released.
 
 ### Removed
 
+- **The ReportLab PDF packet.** `fmri-qa-report --pdf`, `--tier`, `--cover`,
+  and `--appendix` are gone, along with the `formats.reportlab` driver
+  (`write_report`, `add_report_pages`), the `document` block model (`Block`,
+  `Cover`, `ScanSection`, `Appendix`, `Tier`, `TIERS`, `compose`, `parts_for`),
+  `content.metric_tiles`, `content.characterization_rows`,
+  `summary.appendix_rows`, and every `Theme` field that only the page furniture
+  read (page geometry, fonts, gray levels, `logo`, `footer`, `cover_title`,
+  `pass_warn_fail`). `Theme` now carries only what the matplotlib panels use.
+  `MetricDoc.unit` and the `MetricUnit` alias are gone too — their last reader
+  was `web_summary`. `cli_shared` is folded into `cli`. The package no longer
+  depends on `reportlab` or `svglib`. The self-contained HTML page is the
+  report.
+- **`fmri-qa-site` and the multi-run static site.** `write_site`,
+  `SiteContext`, `SiteResult`, `SiteStatus`, the `templates/index.html`
+  inventory page, and the whole `fmriqc_report.web_summary` module (the
+  version-1 `summary.json` wire format) are gone. `render_run_page` and
+  `write_run_page` no longer take a `site` argument, and a run page carries no
+  link out of itself.
 - **`QAImages.pe_axis`.** Nothing read it since `validate_qa_run` began
   returning the resolved axis; the narrowing (`load.pe_axis.in_plane`) still
   happens, once, in `validate_qa_run`.
