@@ -69,6 +69,9 @@ DEFAULT_SETTINGS: AnalysisSettings = AnalysisSettings()
 DETREND_CHOICES: tuple[DetrendMethod, ...] = DETREND_METHODS
 CENTER_CHOICES: tuple[RoiCenter, ...] = ROI_CENTER_MODES
 ANONYMIZE_CHOICES: tuple[Anonymize, ...] = ANONYMIZE_MODES
+# `fmri-qa-import`'s own default: strips the patient and keeps the dates the
+# series names are built from.
+DEFAULT_ANONYMIZE: Anonymize = "pii"
 
 DICOM_DIR_LABEL = "DICOM directory"
 DICOM_DIR_HELP = "Directory of DICOM files (searched recursively)."
@@ -109,8 +112,12 @@ ANONYMIZE_HELP = (
     "everything."
 )
 
-OPEN_REPORT_LABEL = "Open report when done"
-OPEN_REPORT_HELP = "Open the last series' report in a browser once the run finishes."
+OPEN_REPORT_LABEL = "Open when done"
+OPEN_REPORT_HELP = (
+    "Open the report in a browser once the run finishes -- the one report, if "
+    "exactly one series was published, else the output directory (a browser "
+    "can list the series folders)."
+)
 
 
 def _choices(choices: tuple[str, ...]) -> str:
@@ -157,7 +164,7 @@ class RunRequest:
     dicom_dir: Path
     output_dir: Path
     settings: AnalysisSettings = DEFAULT_SETTINGS
-    anonymize: Anonymize = "pii"
+    anonymize: Anonymize = DEFAULT_ANONYMIZE
     dcm2niix: Path | None = None  # a specific converter; None = bundled, else PATH
     open_report: bool = False
 

@@ -31,6 +31,9 @@ dependencies = [
     "fmri-qa-report==0.1.0",
 ]
 
+[project.scripts]
+fmri-qa-run = "fmriqc_launcher.cli:main"
+
 [tool.uv.sources]
 fmri-qa-core = { workspace = true }
 fmri-qa-report = { workspace = true }

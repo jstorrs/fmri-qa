@@ -56,15 +56,32 @@ def _fast_render(artifact: object, path: Path, **_kwargs: object) -> Path:
 
 
 def _warn_then_render(artifact: object, path: Path, **_kwargs: object) -> Path:
-    """`_fast_render`, but warns first -- for exercising the warnings contract."""
+    """`_fast_render`, but warns first -- proves a render warning is not captured."""
     warnings.warn("a stub warning from the render step", stacklevel=2)
     return _fast_render(artifact, path)
 
 
-def _warn_then_fail(artifact: object, path: Path, **_kwargs: object) -> Path:
-    """Warns, then fails -- so a `Failed` outcome can still carry a warning."""
-    warnings.warn("a stub warning before the failure", stacklevel=2)
+def _fail_render(_artifact: object, _path: Path, **_kwargs: object) -> Path:
+    """A render that always fails -- pairs an analysis warning with a later failure."""
     raise RuntimeError("stub render failure")
+
+
+def _warning_wrapper(
+    real: Callable[..., object],
+) -> Callable[..., object]:
+    """Wrap `real` (`fmriqc.analyze`) to warn first -- for the warnings contract.
+
+    `session.py` calls `fmriqc.analyze(...)` as an attribute of the `fmriqc`
+    module, so the warning has to come from there, not from a fake render:
+    `_publish_series` only captures warnings around `from_nifti`/`analyze`
+    now, exactly as `fmriqc.cli.qa` does.
+    """
+
+    def wrapper(*args: object, **kwargs: object) -> object:
+        warnings.warn("a stub warning from the analysis", stacklevel=2)
+        return real(*args, **kwargs)
+
+    return wrapper
 
 
 def test_assign_companions_gives_a_dotted_prefix_file_to_the_longer_stem() -> None:
@@ -477,14 +494,16 @@ def test_a_progress_callback_that_raises_propagates_and_fails_no_series(
     assert list(output_dir.iterdir()) == []
 
 
-def test_a_warning_during_render_lands_on_the_published_outcome(
+def test_a_warning_during_analysis_lands_on_the_published_outcome(
     tmp_path: Path,
     dicom_dir: Path,
     prepared_series: PreparedSeries,
     stub_dcm2niix: StubDcm2niix,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr("fmriqc_launcher.session.write_run_page", _warn_then_render)
+    monkeypatch.setattr("fmriqc_launcher.session.write_run_page", _fast_render)
+    real = fmriqc.analyze
+    monkeypatch.setattr(fmriqc, "analyze", _warning_wrapper(real))
     nifti, base = prepared_series(name="scan")
     sidecar = _sidecar(base, series_number=1, description="QA_EPI")
     name = naming.qa_stem(sidecar)
@@ -501,7 +520,46 @@ def test_a_warning_during_render_lands_on_the_published_outcome(
 
     outcome = result.outcomes[0]
     assert isinstance(outcome, Published)
-    assert any("stub warning from the render step" in w for w in outcome.warnings)
+    assert any("stub warning from the analysis" in w for w in outcome.warnings)
+
+
+def test_a_warning_during_render_is_not_captured(
+    tmp_path: Path,
+    dicom_dir: Path,
+    prepared_series: PreparedSeries,
+    stub_dcm2niix: StubDcm2niix,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Only analysis is captured now, exactly as `fmriqc.cli.qa` does.
+
+    `simplefilter("always")` over save/render used to revive warnings a
+    library silences on purpose -- netCDF4's first-import numpy notice --
+    and present them as findings about the physicist's scan. A render that
+    warns is proof the fix holds: the warning still fires (`pytest.warns`
+    around the whole call), but nothing lands on the outcome.
+    """
+    monkeypatch.setattr("fmriqc_launcher.session.write_run_page", _warn_then_render)
+    nifti, base = prepared_series(name="scan")
+    sidecar = _sidecar(base, series_number=1, description="QA_EPI")
+    name = naming.qa_stem(sidecar)
+    assert name is not None
+    converter = stub_dcm2niix({"stem1": (nifti, sidecar)})
+
+    request = RunRequest(
+        dicom_dir=dicom_dir,
+        output_dir=tmp_path / "output",
+        dcm2niix=converter,
+    )
+    with pytest.warns(UserWarning, match="stub warning from the render step"):
+        result = run_session(request)
+
+    outcome = result.outcomes[0]
+    assert isinstance(outcome, Published)
+    # This phantom's own analysis warns too (its motion fit never converges,
+    # by construction -- see `prepared_series`), so the assertion that
+    # matters is that the *render's* warning specifically never lands here,
+    # not that the tuple is empty.
+    assert not any("stub warning from the render step" in w for w in outcome.warnings)
 
 
 def test_a_failure_staging_a_series_is_a_failed_outcome(
@@ -536,14 +594,17 @@ def test_a_failure_staging_a_series_is_a_failed_outcome(
     assert "disk full while staging" in outcome.reason
 
 
-def test_a_warning_before_a_failure_lands_on_the_failed_outcome(
+def test_a_warning_during_analysis_lands_on_the_failed_outcome(
     tmp_path: Path,
     dicom_dir: Path,
     prepared_series: PreparedSeries,
     stub_dcm2niix: StubDcm2niix,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr("fmriqc_launcher.session.write_run_page", _warn_then_fail)
+    """A warning during analysis, then a *later* stage (render) fails: both survive."""
+    monkeypatch.setattr("fmriqc_launcher.session.write_run_page", _fail_render)
+    real = fmriqc.analyze
+    monkeypatch.setattr(fmriqc, "analyze", _warning_wrapper(real))
     nifti, base = prepared_series(name="scan")
     sidecar = _sidecar(base, series_number=1, description="QA_EPI")
     name = naming.qa_stem(sidecar)
@@ -561,4 +622,44 @@ def test_a_warning_before_a_failure_lands_on_the_failed_outcome(
     outcome = result.outcomes[0]
     assert isinstance(outcome, Failed)
     assert "stub render failure" in outcome.reason
-    assert any("stub warning before the failure" in w for w in outcome.warnings)
+    assert any("stub warning from the analysis" in w for w in outcome.warnings)
+
+
+def test_a_failure_saving_the_artifact_is_a_failed_outcome_with_its_warnings(
+    tmp_path: Path,
+    dicom_dir: Path,
+    prepared_series: PreparedSeries,
+    stub_dcm2niix: StubDcm2niix,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """`save_artifact` failing is `Failed`, carrying the analysis warnings, nothing
+    staged left over.
+    """
+    real = fmriqc.analyze
+    monkeypatch.setattr(fmriqc, "analyze", _warning_wrapper(real))
+
+    def _failing_save(*_args: object, **_kwargs: object) -> None:
+        raise OSError("disk full while saving the artifact")
+
+    monkeypatch.setattr(fmriqc, "save_artifact", _failing_save)
+    nifti, base = prepared_series(name="scan")
+    sidecar = _sidecar(base, series_number=1, description="QA_EPI")
+    name = naming.qa_stem(sidecar)
+    assert name is not None
+    converter = stub_dcm2niix({"stem1": (nifti, sidecar)})
+
+    output_dir = tmp_path / "output"
+    request = RunRequest(
+        dicom_dir=dicom_dir,
+        output_dir=output_dir,
+        settings=_SETTINGS,
+        dcm2niix=converter,
+    )
+    result = run_session(request)
+
+    outcome = result.outcomes[0]
+    assert isinstance(outcome, Failed)
+    assert "disk full while saving the artifact" in outcome.reason
+    assert any("stub warning from the analysis" in w for w in outcome.warnings)
+    assert output_dir.is_dir()
+    assert list(output_dir.iterdir()) == []

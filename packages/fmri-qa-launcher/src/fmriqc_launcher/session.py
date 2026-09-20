@@ -304,11 +304,11 @@ def _move_companions(
         (source_dir / file_name).replace(work_dir / file_name)
 
 
-def _failed(name: str, exc: Exception, caught: list[warnings.WarningMessage]) -> Failed:
+def _failed(name: str, exc: Exception, noted: tuple[str, ...] = ()) -> Failed:
     """A logged `Failed` outcome for `exc`, carrying whatever warnings preceded it."""
     reason = str(exc) or type(exc).__name__
     _LOG.warning("series %s failed: %s", name, reason)
-    return Failed(name, reason=reason, warnings=_messages(caught))
+    return Failed(name, reason=reason, warnings=noted)
 
 
 def _publish_series(
@@ -319,13 +319,17 @@ def _publish_series(
 ) -> SeriesOutcome:
     """Analyze, report, and publish one planned series; `Failed` on any error.
 
-    Every warning raised while doing this (a missing spatial unit, an
-    unreadable sidecar) is captured rather than left to print, and carried on
-    whichever outcome this returns -- the core stays silent; a shell decides
-    whether and how to show them. `warnings.catch_warnings` is process-global
-    state, not thread-local (mirrors `fmriqc.cli.qa`'s use of it) -- a caller
-    running `run_session` on a worker thread must not rely on warnings filters
-    it sets in any other thread meanwhile.
+    Every warning the analysis raises about the scan (a missing spatial unit,
+    an unreadable sidecar, a motion fit that did not converge) is captured
+    rather than left to print, and carried on whichever outcome this returns
+    -- the core stays silent; a shell decides whether and how to show them.
+    Only loading and analyzing are captured, exactly as `fmriqc.cli.qa` does:
+    `simplefilter("always")` also revives warnings a library silences on
+    purpose, and saving or rendering under it would present, say, netCDF4's
+    first-import numpy notice as a finding about the physicist's scan.
+    `warnings.catch_warnings` is process-global state, not thread-local -- a
+    caller running `run_session` on a worker thread must not rely on warnings
+    filters it sets in any other thread meanwhile.
 
     `progress` is called before the guarded step for each stage, never inside
     it, so a `progress` that raises is a bug in the caller, not a reason to
@@ -337,20 +341,20 @@ def _publish_series(
     artifact_path = work_dir / f"{name}.qa.nc"
     report_path = work_dir / f"{name}.html"
 
+    try:
+        work_dir.mkdir()
+        _move_companions(
+            planned.imported_path.parent,
+            work_dir,
+            scan_path.name,
+            planned.companions,
+        )
+    except Exception as exc:  # noqa: BLE001 - one series' failure, reported and skipped
+        return _failed(name, exc)
+
+    progress(Progress(Stage.ANALYZE, planned.index, planned.total, name))
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
-        try:
-            work_dir.mkdir()
-            _move_companions(
-                planned.imported_path.parent,
-                work_dir,
-                scan_path.name,
-                planned.companions,
-            )
-        except Exception as exc:  # noqa: BLE001 - one series' failure, reported and skipped
-            return _failed(name, exc, caught)
-
-        progress(Progress(Stage.ANALYZE, planned.index, planned.total, name))
         try:
             scan = fmriqc.QAScan.from_nifti(scan_path)
             # The published path, not the staging one: this is what the
@@ -363,25 +367,30 @@ def _publish_series(
                 name=scan_path.name,
                 source=str(planned.target / scan_path.name),
             )
-            fmriqc.save_artifact(artifact, artifact_path)
         except Exception as exc:  # noqa: BLE001 - one series' failure, reported and skipped
-            return _failed(name, exc, caught)
+            return _failed(name, exc, _messages(caught))
+    noted = _messages(caught)
 
-        progress(Progress(Stage.REPORT, planned.index, planned.total, name))
-        try:
-            write_run_page(artifact, report_path, title=name, site=None)
-        except Exception as exc:  # noqa: BLE001 - one series' failure, reported and skipped
-            return _failed(name, exc, caught)
+    try:
+        fmriqc.save_artifact(artifact, artifact_path)
+    except Exception as exc:  # noqa: BLE001 - one series' failure, reported and skipped
+        return _failed(name, exc, noted)
 
-        progress(Progress(Stage.PUBLISH, planned.index, planned.total, name))
-        try:
-            if planned.target.exists():
-                raise SessionError(
-                    f"{planned.target} was created while this run was in progress"
-                )
-            work_dir.replace(planned.target)
-        except Exception as exc:  # noqa: BLE001 - one series' failure, reported and skipped
-            return _failed(name, exc, caught)
+    progress(Progress(Stage.REPORT, planned.index, planned.total, name))
+    try:
+        write_run_page(artifact, report_path, title=name, site=None)
+    except Exception as exc:  # noqa: BLE001 - one series' failure, reported and skipped
+        return _failed(name, exc, noted)
+
+    progress(Progress(Stage.PUBLISH, planned.index, planned.total, name))
+    try:
+        if planned.target.exists():
+            raise SessionError(
+                f"{planned.target} was created while this run was in progress"
+            )
+        work_dir.replace(planned.target)
+    except Exception as exc:  # noqa: BLE001 - one series' failure, reported and skipped
+        return _failed(name, exc, noted)
 
     sidecar = planned.target / f"{name}.json"
     return Published(
@@ -391,7 +400,7 @@ def _publish_series(
         sidecar=sidecar if sidecar.exists() else None,
         artifact=planned.target / artifact_path.name,
         report=planned.target / report_path.name,
-        warnings=_messages(caught),
+        warnings=noted,
     )
 
 
