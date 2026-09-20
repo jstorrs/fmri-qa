@@ -1,19 +1,29 @@
 """The application shell over fmri-qa: DICOM directory in, report directory out.
 
 This package is the one-step pipeline built on top of the calculation half
-(`fmriqc`) and the presentation half (`fmriqc_report`) — a command line and a
-desktop panel, both still to come, that turn a DICOM directory into one report
-directory per series without asking the caller to wire the two libraries
-together itself.
+(`fmriqc`) and the presentation half (`fmriqc_report`) — a command line
+(`fmri-qa-run`) and a desktop panel (`fmri-qa-panel`) that turn a DICOM
+directory into one report directory per series without asking the caller to
+wire the two libraries together itself.
 
-* `exceptions` -- the hierarchy: `RequestError` for a bad request, `SessionError`
-  for a run that could not happen at all
-* `progress`   -- `Stage`/`Progress`/`describe`: what to show while a run works
-* `request`    -- `RunRequest`/`FormValues`/`parse_form`: the parse-don't-validate
+* `exceptions`  -- the hierarchy: `RequestError` for a bad request, `SessionError`
+  for a run that could not happen at all, `PanelUnavailableError` for a panel
+  with no display to attach to
+* `progress`    -- `Stage`/`Progress`/`describe`: what to show while a run works
+* `request`     -- `RunRequest`/`FormValues`/`parse_form`: the parse-don't-validate
   boundary a form's raw text crosses to become something `run_session` trusts
-* `session`    -- `run_session` and its outcome types (`Published`/`Refused`/
+* `session`     -- `run_session` and its outcome types (`Published`/`Refused`/
   `Failed`): the functional core itself
-* `version`    -- the installed distribution's version
+* `results`     -- `open_results`: where to look at a finished run
+* `worker`      -- `BackgroundRun`: `run_session` on its own thread, polled
+  through typed `Progress`/`Finished`/`Crashed` events
+* `panel_state` -- the desktop panel's pure decisions (`bar_state`,
+  `summarize`, `stopping_message`, `exit_code`, ...), kept apart from
+  `panel` so they are testable without a display
+* `panel`       -- `Panel`/`run_panel`/`main`: the desktop panel itself, the
+  only module here that imports `tkinter`
+* `cli`         -- `main`: the `fmri-qa-run` command line
+* `version`     -- the installed distribution's version
 
 `exceptions`, `progress`, and `version` are cheap leaves -- none of them
 imports `fmriqc` or `fmriqc_report` at all -- so they stay eager. `request`

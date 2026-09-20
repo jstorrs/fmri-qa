@@ -35,11 +35,47 @@ constants a future desktop panel's fields will):
   the series folders).
 - `--version` -- print the installed version and exit.
 
-With neither `DICOM_DIR` nor `OUTPUT_DIR` given, `fmri-qa-run` opens a desktop
-panel instead -- not built yet, so today this prints a message explaining
-that and exits `2`. Giving exactly one of the two directories, or any option
-without both, is a usage error for the same reason: the panel (once it
-exists) takes no command-line options of its own.
+With neither `DICOM_DIR` nor `OUTPUT_DIR` given, `fmri-qa-run` opens the
+desktop panel described below. If `tkinter` has no display to attach to (no
+`$DISPLAY`), or this Python was built without `tkinter` at all, it prints a
+message explaining that and exits `2` instead. Giving exactly one of the two
+directories, or any option without both, is a usage error for the same
+reason: the panel takes no command-line options of its own.
+
+## The desktop panel
+
+Start it with `fmri-qa-run` and no arguments, or directly with
+`fmri-qa-panel` (a `gui-scripts` entry point -- on Windows this runs under
+`pythonw`, with no console window at all). One window, titled "fMRI QA":
+
+- **DICOM folder** / **Output folder** -- a text field plus a "Browse…"
+  button (`tkinter.filedialog.askdirectory`) for each.
+- **Open the report when done** -- checked by default in the panel (unlike
+  `fmri-qa-run`'s own `--open`, which defaults off): once a run finishes with
+  something published, its report (or the output folder, for several series)
+  opens in a browser automatically. An "Open results" button next to Run
+  does the same thing on demand, and is enabled whenever anything was
+  published.
+- **Show advanced options** -- collapsed by default; expanding it shows an
+  "Advanced options" frame with Trim, Detrend method, ROI center, and ROI
+  size, each with the same wording `--help` uses, and a note that these
+  change the numbers and are recorded in every report.
+- **Run** reads the form, shows every problem at once in a pop-up if
+  anything is wrong (a bad number, a missing directory), and otherwise
+  starts the run on a background thread so the window stays responsive. A
+  progress bar and a status line track the run stage by stage; a scrolling
+  log records the same detail `fmri-qa-run` sends to stderr, plus the finish
+  summary (how many series published, and one line per refusal, failure, or
+  warning).
+- **Closing the window** while a run is in progress asks it to stop after
+  the series in progress finishes (never mid-series; or after import itself
+  finishes, if closed before any series has started), and says so on the
+  status line. Closing a second time, before that happens, closes the window
+  immediately instead of waiting -- the run itself still finishes unwinding
+  in the background, so nothing partial is ever written to the output
+  folder. Closing while idle closes immediately. Either way, a crash is
+  always reported on the status line and in the log before any dialog, so
+  the detail survives dismissing it.
 
 ### stdout / stderr / exit codes
 
@@ -79,11 +115,23 @@ exists) takes no command-line options of its own.
   few volumes to analyze) never stops the run -- it becomes a per-series
   failure outcome, and every other series is still attempted.
 - `cli.main` -- the `fmri-qa-run` command line above.
-- `results.open_results` -- what `--open` calls: pick a single report or the
-  output directory, and open it. Kept apart from `session` so a future
-  desktop panel's "open results" action can import it without pulling in
+- `results.open_results` -- what `--open` (and the panel's "Open when done" /
+  "Open results") calls: pick a single report or the output directory, and
+  open it. Kept apart from `session` so it can be imported without pulling in
   `fmriqc`'s analysis stack or `fmriqc_report`'s renderer.
-- A desktop panel, built on the same `request`/`session` core, is still to
-  come.
+- `worker.BackgroundRun` -- runs `session.run_session` on its own
+  non-daemon thread, delivering `Progress` events and one terminal
+  `Finished`/`Crashed` event through a queue a caller polls. No `tkinter`
+  import; this is what lets the panel stay responsive during a run.
+- `panel_state.bar_state` / `panel_state.summarize` -- the panel's pure
+  decisions: where the progress bar sits for a given `Progress`, and what to
+  tell a physicist once a run has finished. No `tkinter` import either.
+- `panel.Panel` / `panel.run_panel` / `panel.main` -- the desktop panel
+  described above. The only module here that imports `tkinter`; almost
+  everything it decides comes from `request`/`worker`/`panel_state` above
+  it. `run_panel` builds the window and runs its event loop (what
+  `cli._launch_panel` calls); `main` is the `fmri-qa-panel` gui-script entry
+  point, which has no console to report a missing display to and so returns
+  a plain exit code instead.
 
 This package adds no third-party dependency of its own.

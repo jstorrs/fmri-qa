@@ -22,7 +22,7 @@ from pathlib import Path
 
 from fmriqc.settings import AnalysisSettings
 
-from .exceptions import LauncherError, RequestError
+from .exceptions import LauncherError, PanelUnavailableError, RequestError
 from .progress import Progress, describe
 from .request import (
     ANONYMIZE_CHOICES,
@@ -137,27 +137,56 @@ def _build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _is_missing_tkinter(exc: ImportError) -> bool:
+    """Whether `exc` is `tkinter` (or its C extension `_tkinter`) missing outright.
+
+    `exc.name` is the dotted module the failed import was looking for --
+    `tkinter` itself, one of its submodules (`tkinter.ttk`, `tkinter.font`,
+    ...), or `_tkinter`, the C extension `tkinter` is built on and the one
+    that is actually absent on a Python built without Tcl/Tk support. Any
+    other name (a typo in `panel.py`, a missing unrelated dependency) is a
+    real bug, not "no tkinter", and must not be reported as one.
+    """
+    name = exc.name or ""
+    return name == "tkinter" or name.startswith(("tkinter.", "_tkinter"))
+
+
 def _launch_panel() -> int:
     """Open the desktop panel, or explain on stderr why it could not start.
 
-    `.panel` does not exist yet -- a later commit adds it -- so today the
-    `ImportError` branch below is the only one reached. `import_module` (not
-    a plain `from . import panel`) is what lets a type checker resolve this
-    module cleanly before `.panel` exists at all: there is no import target
-    for it to fail to find.
+    `import_module` (not a plain `from . import panel`) is what lets a type
+    checker resolve this module cleanly even on a Python built without
+    `tkinter`: there is then no import target for a plain import to fail to
+    find, whereas `import_module` fails at run time the same way either way.
+    Two distinct failures are reported the same way, since both leave a
+    physicist with the same fix: an `ImportError` naming `tkinter`/`_tkinter`
+    (see `_is_missing_tkinter`) when this Python has no `tkinter` at all, and
+    `panel.run_panel` raising `PanelUnavailableError` when `tkinter` imports
+    fine but there is no display for it to attach to (a `tkinter.TclError`
+    that never escapes this module -- `cli.py` imports no `tkinter` type at
+    all, at module scope or otherwise). Any other `ImportError` -- a genuine
+    bug or packaging fault -- propagates unchanged, naming whatever it is
+    that actually failed to import.
     """
+    message = (
+        "ERROR: the desktop panel needs tkinter with a graphical display "
+        "attached, which this Python or this session does not have; pass "
+        "the DICOM directory and the output directory on the command line "
+        "instead.\n"
+        "usage: fmri-qa-run DICOM_DIR OUTPUT_DIR [options]"
+    )
     try:
         panel = import_module(f"{__package__}.panel")
-    except ImportError:
-        print(
-            "ERROR: the desktop panel needs tkinter, which this Python does "
-            "not have (or the panel is not available); pass the DICOM "
-            "directory and the output directory on the command line instead.\n"
-            "usage: fmri-qa-run DICOM_DIR OUTPUT_DIR [options]",
-            file=sys.stderr,
-        )
+    except ImportError as exc:
+        if not _is_missing_tkinter(exc):
+            raise
+        print(message, file=sys.stderr)
         return 2
-    return int(panel.main())
+    try:
+        return int(panel.run_panel())
+    except PanelUnavailableError:
+        print(message, file=sys.stderr)
+        return 2
 
 
 def main(argv: Sequence[str] | None = None) -> int:

@@ -517,14 +517,14 @@ def test_one_failed_series_does_not_stop_the_report_of_another(
     assert "ERROR:" in captured.err and "expected at least 4 frame" in captured.err
 
 
-def test_launch_panel_runs_the_panels_main_when_importable(
+def test_launch_panel_runs_the_panels_run_panel_when_importable(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Once `.panel` exists, `_launch_panel` runs it -- faked since it does not yet."""
+    """`_launch_panel` calls `panel.run_panel`, the entry point `cli.py` drives."""
 
     class _FakePanel:
         @staticmethod
-        def main() -> int:
+        def run_panel() -> int:
             return 0
 
     monkeypatch.setattr("fmriqc_launcher.cli.import_module", lambda _name: _FakePanel())
@@ -541,19 +541,73 @@ def test_zero_arguments_reports_the_missing_panel(
     assert "fmri-qa-run" in captured.err
 
 
-def test_zero_arguments_reports_the_missing_panel_by_a_failed_import(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+@pytest.mark.parametrize("missing_name", ["tkinter", "tkinter.ttk", "_tkinter"])
+def test_zero_arguments_reports_the_missing_panel_by_a_failed_tkinter_import(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    missing_name: str,
 ) -> None:
-    """Stays valid once `.panel` exists: force the import to fail regardless."""
+    """An `ImportError` naming `tkinter`/`_tkinter` (however deep) is "no tkinter"."""
 
     def _raise(_name: str) -> None:
-        raise ImportError("no panel here")
+        raise ImportError("no such module", name=missing_name)
 
     monkeypatch.setattr("fmriqc_launcher.cli.import_module", _raise)
     rc = cli.main([])
     captured = capsys.readouterr()
     assert rc == 2
     assert "tkinter" in captured.err
+
+
+def test_an_import_error_unrelated_to_tkinter_is_a_real_bug_and_propagates(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """`panel.py` failing to import `numpy` (say) is a packaging bug, not "no tkinter".
+
+    Reporting this as "install tkinter" would send a physicist chasing the
+    wrong fix entirely -- it must propagate and say what actually failed.
+    """
+
+    def _raise(_name: str) -> None:
+        raise ImportError("no module named 'numpy'", name="numpy")
+
+    monkeypatch.setattr("fmriqc_launcher.cli.import_module", _raise)
+    with pytest.raises(ImportError, match="numpy"):
+        cli._launch_panel()
+
+
+def test_an_import_error_with_no_name_at_all_propagates(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A bare `raise ImportError(...)`, naming nothing, is not "no tkinter"."""
+
+    def _raise(_name: str) -> None:
+        raise ImportError("something else broke")
+
+    monkeypatch.setattr("fmriqc_launcher.cli.import_module", _raise)
+    with pytest.raises(ImportError, match="something else broke"):
+        cli._launch_panel()
+
+
+def test_zero_arguments_with_no_display_reports_the_display_message(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """`run_panel` raising `PanelUnavailableError` (no display) is reported plainly."""
+    from fmriqc_launcher.exceptions import PanelUnavailableError
+
+    class _FakePanel:
+        @staticmethod
+        def run_panel() -> int:
+            raise PanelUnavailableError(
+                "no display name and no $DISPLAY environment variable"
+            )
+
+    monkeypatch.setattr("fmriqc_launcher.cli.import_module", lambda _name: _FakePanel())
+    rc = cli.main([])
+    captured = capsys.readouterr()
+    assert rc == 2
+    assert "display" in captured.err
+    assert "fmri-qa-run" in captured.err
 
 
 _FORBIDDEN = ("scipy", "matplotlib", "tkinter")

@@ -45,10 +45,12 @@ __all__ = [
     "DETREND_LABEL",
     "DICOM_DIR_HELP",
     "DICOM_DIR_LABEL",
+    "DICOM_DIR_PANEL_LABEL",
     "OPEN_REPORT_HELP",
     "OPEN_REPORT_LABEL",
     "OUTPUT_DIR_HELP",
     "OUTPUT_DIR_LABEL",
+    "OUTPUT_DIR_PANEL_LABEL",
     "ROI_SIZE_HELP",
     "ROI_SIZE_LABEL",
     "TRIM_SEC_HELP",
@@ -75,6 +77,13 @@ DEFAULT_ANONYMIZE: Anonymize = "pii"
 
 DICOM_DIR_LABEL = "DICOM directory"
 DICOM_DIR_HELP = "Directory of DICOM files (searched recursively)."
+# The panel speaks to a physicist, not a script: "folder" is the word the
+# panel's own widgets and Browse dialogs use, kept here rather than forked
+# inline in `panel.py` so the two front ends' wording for the same concept
+# lives in one place. `DICOM_DIR_LABEL` stays "directory" -- the CLI's
+# positional-argument help and `parse_form`'s problem messages (shown
+# verbatim in the panel's own error dialog) are unchanged by this addition.
+DICOM_DIR_PANEL_LABEL = "DICOM folder"
 
 OUTPUT_DIR_LABEL = "Output directory"
 OUTPUT_DIR_HELP = (
@@ -82,6 +91,7 @@ OUTPUT_DIR_HELP = (
     "the QA archive, and the report. Created if missing; an existing series "
     "folder is never overwritten."
 )
+OUTPUT_DIR_PANEL_LABEL = "Output folder"
 
 TRIM_SEC_LABEL = "Trim"
 TRIM_SEC_HELP = (
@@ -112,11 +122,11 @@ ANONYMIZE_HELP = (
     "everything."
 )
 
-OPEN_REPORT_LABEL = "Open when done"
+OPEN_REPORT_LABEL = "Open the report when done"
 OPEN_REPORT_HELP = (
     "Open the report in a browser once the run finishes -- the one report, if "
-    "exactly one series was published, else the output directory (a browser "
-    "can list the series folders)."
+    "exactly one series was published, else the output folder (a browser can "
+    "list the series folders)."
 )
 
 

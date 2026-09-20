@@ -182,6 +182,24 @@ source = [
     "packages/fmri-qa-launcher/src/fmriqc_launcher",
 ]
 branch = true
+# `panel.py` is Tk widget construction, layout, and the `after` pump: headless
+# CI has no display to build a `tk.Tk` root against at all. What decisions it
+# still owns -- destroy-on-close being unconditional, skipping auto-open
+# while closing, not resuming the `after` chain after a callback exception --
+# are lifecycle wiring that only exists once real widgets do; everything that
+# can be decided as a pure function of a value (where the bar sits, what a
+# finished run means, the stopping message, the exit code, the bar's `max(...,
+# 1)` guard) lives in `worker.py`/`panel_state.py`/`request.parse_form`
+# instead, which *are* covered. `tests/test_panel.py` exercises `panel.py`'s
+# lifecycle end to end (a real `Panel` on a real `tk.Tk` root, a fake
+# background run, no real pipeline) wherever a display exists -- gated on
+# whether `tk.Tk()` succeeds, not on `$DISPLAY`, so it runs on Windows/macOS
+# too; run it explicitly under Xvfb where CI has none:
+# `xvfb-run -a uv run pytest packages/fmri-qa-launcher/tests/test_panel.py`.
+# One greppable exemption here, rather than scattered `# pragma: no cover`
+# comments (this repo uses none), also keeps the pressure on `panel.py` to
+# stay decision-free.
+omit = ["packages/fmri-qa-launcher/src/fmriqc_launcher/panel.py"]
 
 [tool.coverage.report]
 # The numeric core carries the metrics; the untested lines that remain are

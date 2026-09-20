@@ -34,6 +34,14 @@ dependencies = [
 [project.scripts]
 fmri-qa-run = "fmriqc_launcher.cli:main"
 
+# A gui-script, not a second `[project.scripts]` entry: on Windows this runs
+# under `pythonw` with no console attached, which is why `panel` never
+# prints (`sys.stdout`/`sys.stderr` are `None` there) and why the
+# console entry point above stays separate -- `fmri-qa-run` still needs a
+# console for its stdout/stderr contract.
+[project.gui-scripts]
+fmri-qa-panel = "fmriqc_launcher.panel:main"
+
 [tool.uv.sources]
 fmri-qa-core = { workspace = true }
 fmri-qa-report = { workspace = true }
