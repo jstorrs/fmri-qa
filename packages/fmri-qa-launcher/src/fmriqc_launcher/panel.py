@@ -86,6 +86,12 @@ __all__ = ["Panel", "main", "run_panel"]
 
 _TITLE = "fMRI QA"
 _TICK_MS = 150
+# An indeterminate bar sweeps once per `maximum` steps, so `maximum` sets the
+# bounce speed. It has to be put back on every run: a finished run leaves the
+# bar's `maximum` at a handful of ticks, which would turn the next run's
+# bounce into a flicker between the two ends.
+_PULSE_MAXIMUM = 100
+_PULSE_STEP_MS = 10
 _MIN_WIDTH = 480
 _HINT_PADDING = 24  # room either side of a wrapped hint label within its row
 _MIN_WRAPLENGTH = 200
@@ -483,8 +489,10 @@ class Panel:
     def _apply_bar_state(self, state: BarState) -> None:
         if isinstance(state, Indeterminate):
             if str(self._progress["mode"]) != "indeterminate":
-                self._progress.configure(mode="indeterminate")
-                self._progress.start(10)
+                self._progress.configure(
+                    mode="indeterminate", maximum=_PULSE_MAXIMUM, value=0
+                )
+                self._progress.start(_PULSE_STEP_MS)
             return
         self._progress.stop()  # stop the animation before resting on a fixed value
         self._progress.configure(
@@ -504,8 +512,7 @@ class Panel:
         self._last_result = None
         self._last_progress = None
         self._status_var.set("Starting...")
-        self._progress.configure(mode="indeterminate")
-        self._progress.start(10)
+        self._apply_bar_state(Indeterminate())
 
         self._background = self._background_factory(request)
         self._background.start()

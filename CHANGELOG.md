@@ -485,6 +485,11 @@ versioning when the first stable public interface is released.
 
 ### Fixed
 
+- **The panel's progress bar bounces during DICOM import on every run, not
+  just the first.** A finished run leaves the bar's `maximum` at a handful of
+  ticks, and an indeterminate `ttk.Progressbar` sweeps once per `maximum`
+  steps, so a second run's bounce collapsed into a flicker between the two
+  ends. The range is now reset whenever the bar goes indeterminate.
 - **Published HTML reports, sites, and PDFs no longer come out `0600`/`0700`
   regardless of the umask.** `write_run_page`, `write_site`, and the PDF
   writer atomically wrote through `tempfile.mkstemp`/`tempfile.mkdtemp`, whose

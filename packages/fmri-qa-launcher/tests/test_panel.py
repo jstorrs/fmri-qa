@@ -168,6 +168,27 @@ def test_a_successful_run_fills_the_bar_and_opens_the_report(
     assert errors == []
 
 
+def test_a_second_run_bounces_the_bar_over_the_same_range_as_the_first(
+    root: tk.Tk, tmp_path: Path
+) -> None:
+    factory = _Factory()
+    panel = Panel(root, background=factory, opener=_recording_opener([]))
+    _set_form(panel, _valid_form(tmp_path, open_report=False))
+
+    panel._on_run()
+    first_maximum = panel._progress["maximum"]
+    output_dir = Path(factory.last.request.output_dir)
+    result = RunResult(output_dir, (_published("scan", output_dir),))
+    factory.last.push(Finished(result))
+    panel._tick()
+    assert panel._progress["maximum"] != first_maximum  # the run left its ticks
+
+    panel._on_run()
+
+    assert str(panel._progress["mode"]) == "indeterminate"
+    assert panel._progress["maximum"] == first_maximum
+
+
 def test_an_all_refused_run_reports_a_plain_headline(
     root: tk.Tk, tmp_path: Path
 ) -> None:
