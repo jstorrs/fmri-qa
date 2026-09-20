@@ -321,9 +321,41 @@ versioning when the first stable public interface is released.
   an axial acquisition the two agree; where they do not, an oblique or
   transposed series previously took the DICOM tag's answer or fell through to
   the header's `dim_info`.
+- **The workspace has a third member, `fmri-qa-launcher`.** `make license`
+  now also checks its copy of the root `LICENSE`, and `panel.py` — Tk widget
+  construction with no display in headless CI — is named in
+  `tool.coverage.run.omit`, the one exemption from the coverage floor, since
+  everything it decides that can be a pure function already lives in
+  `worker.py`/`panel_state.py`/`request.parse_form` and is covered there.
 
 ### Added
 
+- **The `fmri-qa-launcher` package: `fmri-qa-run`, one command from a DICOM
+  directory to a report per series.** `fmri-qa-run DICOM_DIR OUTPUT_DIR`
+  converts, analyzes, and renders every series it finds, writing one folder
+  per series under `OUTPUT_DIR` — named for the series and holding the
+  converted scan, its sidecar, the `.qa.nc` artifact, and a self-contained
+  HTML report — with the four appearing together only once every one of them
+  is written. A series whose folder already exists is refused, never
+  replaced; a failure in one series is reported and every other series is
+  still attempted. Analysis defaults are `fmriqc`'s own, so the numbers match
+  a `fmri-qa` run by hand — a test pins the equality. `--trim-sec`,
+  `--detrend`, `--center`, `--roi-size`, `--anonymize`, and `--dcm2niix` cover
+  the same ground `fmri-qa`/`fmri-qa-import` do; `--open` opens the report
+  (or, for several series, the output folder) once the run finishes. stdout
+  carries only each published report's path, one per line; everything else —
+  progress, refusals, failures, warnings — goes to stderr, and the exit code
+  is `0` when every series published, `1` when any was refused or failed, `2`
+  on a usage error. With neither directory given, `fmri-qa-run` opens a
+  desktop panel instead, also reachable directly as `fmri-qa-panel`
+  (a `gui-scripts` entry point, so no console window on Windows): DICOM and
+  output folders, an advanced-options section for the four analysis knobs
+  above, a progress bar and log, and an "Open results" action. Closing the
+  window mid-run stops the run after the series in progress finishes;
+  closing again quits immediately without waiting. The package adds no
+  third-party dependency of its own — the panel is built on stdlib
+  `tkinter` — and a layering test keeps `tkinter` out of `fmri-qa-core` and
+  `fmri-qa-report`.
 - **`fmri-qa-report` can now write a single-file HTML report.** `--html FILE`
   renders one artifact to one self-contained page — the same page
   `fmri-qa-site` publishes per run — as a PDF alternative that opens by

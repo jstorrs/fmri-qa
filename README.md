@@ -6,20 +6,23 @@ SNR, SFNR, the Weisskoff radius of decorrelation (RDC), drift, temporal
 fluctuation, and two Nyquist-ghost measures (fBIRN percent ghost and the
 ACR/AAPM ghosting ratio), and can render offline web or PDF reports per scan.
 
-## Two halves
+## The packages
 
-The project ships as two installable packages, split at the widest seam in it —
-calculating a result, and presenting one:
+The project ships as three installable packages. The first two split at the
+widest seam in the calculation — calculating a result, and presenting one —
+and the third is an application shell built on both of them:
 
 | Package | Import | Does | Needs |
 | --- | --- | --- | --- |
 | **`fmri-qa-core`** | `fmriqc` | the metrics, the pipeline, and the **analysis artifact** they are published as | numpy, scipy, nibabel, scikit-image, netCDF4 |
 | **`fmri-qa-report`** | `fmriqc_report` | plots and offline web sites or multi-page PDF packets, built from an artifact | matplotlib, reportlab, svglib (+ core) |
+| **`fmri-qa-launcher`** | `fmriqc_launcher` | one-step DICOM-directory-in, report-directory-out pipeline: a command line and a desktop panel | core + report; stdlib `tkinter` for the panel |
 
-A `QAArtifact` is the only thing that crosses: the run's settings, provenance,
-scalar measurements, stability curves, and the four fBIRN summary images —
-everything a report needs, and none of the heavy inputs. It saves to a single
-netCDF-4 file, so calculation and reporting are separate steps:
+Between the first two, a `QAArtifact` is the only thing that crosses: the
+run's settings, provenance, scalar measurements, stability curves, and the
+four fBIRN summary images — everything a report needs, and none of the heavy
+inputs. It saves to a single netCDF-4 file, so calculation and reporting stay
+two separate steps even when `fmri-qa-launcher` runs them back to back:
 
 ```bash
 uv run fmri-qa scan.nii.gz --artifact qa.nc      # calculate once
@@ -58,19 +61,21 @@ builds into browsable HTML with `make sync-docs && make docs`.
 ## Install
 
 The project uses [uv](https://docs.astral.sh/uv/) and Python 3.13. The repo is a
-uv workspace holding both packages; syncing all of it gives the full development
-environment:
+uv workspace holding all three packages; syncing all of it gives the full
+development environment:
 
 ```bash
 uv sync --all-packages
 ```
 
-Downstream, install whichever half you need — `fmri-qa-report` pulls in
-`fmri-qa-core`, so installing it gives you the core's commands too:
+Downstream, install whichever package you need — `fmri-qa-launcher` pulls in
+both `fmri-qa-core` and `fmri-qa-report`, and `fmri-qa-report` pulls in
+`fmri-qa-core`, so installing either gives you the commands underneath it too:
 
 ```bash
 pip install fmri-qa-core      # metrics and artifacts only
 pip install fmri-qa-report    # + plots, offline sites, and PDF packets
+pip install fmri-qa-launcher  # + fmri-qa-run and the desktop panel
 ```
 
 `fmri-qa-import` needs a dcm2niix, and `fmri-qa-core` depends on one: the
@@ -86,7 +91,7 @@ Published work using the package should cite the software metadata in
 [`CITATION.cff`](CITATION.cff). User-facing changes are recorded in
 [`CHANGELOG.md`](CHANGELOG.md).
 
-Two stacks are heavier than either published distribution and stay out of the
+Two stacks are heavier than any published distribution and stay out of the
 default sync, each as its own workspace dependency group. The exploratory
 notebooks (DICOM conversion, BIDS, and interactive viewers) are development
 tooling; so is the Sphinx build for the analysis documentation:
@@ -96,6 +101,53 @@ make sync-notebooks    # uv sync --all-packages --all-extras --group notebooks
 make sync-docs         # uv sync --all-packages --all-extras --group docs
 make docs              # build the analysis pages into docs/_build/html
 ```
+
+## One step: DICOM in, reports out
+
+`fmri-qa-launcher` runs the whole pipeline in a single command: a DICOM
+directory in, one report directory per series out.
+
+```bash
+uv run fmri-qa-run DICOM_DIR OUTPUT_DIR
+```
+
+For each series it finds under `DICOM_DIR`, it converts, analyzes, and writes
+a folder under `OUTPUT_DIR`, named for the series, holding four files:
+
+```text
+OUTPUT_DIR/
+  <series>/
+    <series>.nii.gz   # converted scan
+    <series>.json     # acquisition sidecar
+    <series>.qa.nc    # QA artifact
+    <series>.html     # self-contained report -- double-click to open
+```
+
+`OUTPUT_DIR` is created if it does not exist. Analysis uses `fmri-qa`'s own
+defaults, so the numbers match a `fmri-qa` run by hand. A series whose folder
+already exists in `OUTPUT_DIR` is refused, not replaced — nothing here ever
+overwrites an earlier run's output. A failure in one series is reported and
+the rest of the run still completes.
+
+The command takes the same analysis flags as `fmri-qa` (`--trim-sec`,
+`--detrend`, `--center`, `--roi-size`), plus `--anonymize`, `--dcm2niix`, and
+`--open` to open the result when the run finishes; see `fmri-qa-run -h` for
+the full list and their defaults.
+
+stdout carries only the path of each published report, one per line; every
+other message — progress, refusals, failures, warnings — goes to stderr. The
+exit code is `0` when every series published, `1` if any series was refused
+or failed, and `2` on a usage error.
+
+With neither directory given, `fmri-qa-run` opens a desktop panel instead —
+also reachable directly as `fmri-qa-panel`. It needs `tkinter` and a graphical
+display to attach to; without either, it prints a message explaining that and
+exits `2`.
+
+The step-by-step commands in the following sections — `fmri-qa-import`,
+`fmri-qa`, `fmri-qa-report`, `fmri-qa-site` — remain available on their own,
+for trending numbers over time or for custom workflows the one-step command
+does not cover.
 
 ## Importing DICOM
 

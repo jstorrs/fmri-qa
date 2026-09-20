@@ -21,7 +21,7 @@ never overwritten -- it is refused and reported, at no cost beyond the import
 it shared with the rest of the run.
 
 Options (each documented in full by `--help`, which reads from the same
-constants a future desktop panel's fields will):
+constants the desktop panel's advanced-options fields do):
 
 - `--trim-sec SECONDS` -- initial volumes to drop as non-steady-state.
 - `--detrend {poly,spline}` -- detrending method.

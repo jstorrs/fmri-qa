@@ -6,6 +6,9 @@ dist/
 wheels/
 *.egg-info
 
+# Editor backups
+*~
+
 # Virtual environments
 .venv
 

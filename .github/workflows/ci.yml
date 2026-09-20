@@ -75,3 +75,16 @@ jobs:
           .venv-report-smoke/bin/python -c "import sys; import fmriqc_report.site_cli; forbidden = ('reportlab', 'svglib', 'fmriqc.pipeline'); assert not any(name == item or name.startswith(item + '.') for name in sys.modules for item in forbidden), 'site CLI imported a PDF or pipeline module'"
           .venv-report-smoke/bin/python -c "from importlib.metadata import distribution; text = distribution('fmri-qa-report').read_text('licenses/LICENSE'); assert text and 'MIT License' in text, 'the report wheel ships no license text'"
           .venv-report-smoke/bin/python -c "import tarfile; archive = next(__import__('pathlib').Path('dist').glob('fmri_qa_report-*.tar.gz')); names = tarfile.open(archive).getnames(); assert any(name.endswith('src/fmriqc_report/formats/html/templates/run.html') for name in names) and any(name.endswith('src/fmriqc_report/formats/html/templates/index.html') for name in names) and any(name.endswith('src/fmriqc_report/formats/html/assets/report.css') for name in names), 'the report sdist ships no HTML resources'"
+
+      - name: Smoke-test the launcher wheel against the core and report wheels
+        run: |
+          core=(dist/fmri_qa_core-*.whl)
+          report=(dist/fmri_qa_report-*.whl)
+          launcher=(dist/fmri_qa_launcher-*.whl)
+          test -f "${launcher[0]}"
+          uv venv --python 3.13 .venv-launcher-smoke
+          uv pip install --python .venv-launcher-smoke/bin/python "${core[0]}" "${report[0]}" "${launcher[0]}"
+          .venv-launcher-smoke/bin/fmri-qa-run --version
+          .venv-launcher-smoke/bin/fmri-qa-run -h > /dev/null
+          .venv-launcher-smoke/bin/python -c "from importlib.resources import files; assert files('fmriqc_launcher').joinpath('py.typed').is_file()"
+          .venv-launcher-smoke/bin/python -c "from importlib.metadata import distribution; text = distribution('fmri-qa-launcher').read_text('licenses/LICENSE'); assert text and 'MIT License' in text, 'the launcher wheel ships no license text'"
