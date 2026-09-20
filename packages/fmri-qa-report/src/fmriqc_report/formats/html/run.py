@@ -2,16 +2,14 @@
 
 The page needs no companion file: the stylesheet is inlined and every figure
 is embedded as a ``data:`` URI, so it opens from ``file://`` with no network
-or sibling asset. It can be published inside a site (see :class:`SiteContext`)
-or handed out entirely on its own, as a PDF alternative a physicist can
-double-click, email, or drop into their own website.
+or sibling asset. It is handed out entirely on its own, as a PDF alternative
+a physicist can double-click, email, or drop into their own website.
 """
 
 import html
 import math
 import re
 from base64 import b64encode
-from dataclasses import dataclass
 from pathlib import Path
 from string import Template
 
@@ -30,7 +28,7 @@ from ...theme import DEFAULT_THEME, Theme
 from . import resources
 from .figures import RenderedFigure, render_figures
 
-__all__ = ["SiteContext", "render_run_page", "write_run_page"]
+__all__ = ["render_run_page", "write_run_page"]
 
 
 _UNAVAILABLE = "Unavailable — estimator unresolved"
@@ -40,58 +38,18 @@ _UNAVAILABLE = "Unavailable — estimator unresolved"
 _VALUE = re.compile(r"(?P<n>-?[\d.,]+(?:[eE][-+]?\d+)?)\s*(?P<u>.*)\Z")
 
 
-@dataclass(frozen=True, slots=True)
-class SiteContext:
-    """A run page's place inside a published site, when it is published in one.
-
-    ``index_href`` is the fixed relative route from the page to the inventory
-    that lists it; a publisher supplies it, and no artifact field ever reaches
-    it.  ``incomplete`` can only be recorded alongside that route, because a
-    standalone page has no inventory to say what is missing from.
-    """
-
-    index_href: str
-    incomplete: bool = False
-
-    def __post_init__(self) -> None:
-        value = self.index_href
-        if not value:
-            raise ValueError("index_href must be a non-empty relative route")
-        if any(c.isspace() or ord(c) < 0x20 or ord(c) == 0x7F for c in value):
-            raise ValueError(
-                "index_href must be a relative route with no whitespace or "
-                "control characters"
-            )
-        if "\\" in value:
-            raise ValueError("index_href must be a relative route with no backslashes")
-        if value.startswith("/"):
-            raise ValueError(
-                "index_href must be a relative route, not an absolute path"
-            )
-        if "#" in value or "?" in value:
-            raise ValueError(
-                "index_href must be a relative route with no fragment or query "
-                "component; the page appends its own fragment"
-            )
-        head = value.split("/", maxsplit=1)[0]
-        if ":" in head:
-            raise ValueError("index_href must not carry a URL scheme")
-
-
 def render_run_page(
     artifact: QAArtifact,
     *,
     title: str | None = None,
     report_version: str | None = None,
-    site: SiteContext | None = None,
     theme: Theme = DEFAULT_THEME,
 ) -> str:
     """Return one complete, self-contained HTML document for ``artifact``.
 
     The result needs no companion file: the stylesheet is inlined and every
     figure is embedded as a ``data:`` URI, so it opens from ``file://`` with
-    no network or sibling asset.  With no ``site`` it carries no link out at
-    all.
+    no network or sibling asset.
     """
     page_title = (
         title or artifact.provenance.scan or Path(artifact.provenance.source).name
@@ -104,9 +62,9 @@ def render_run_page(
         "stylesheet": resources.read_stylesheet(),
         "subline": _subline(artifact),
         "idblock": _idblock(artifact),
-        "nav": _nav(site),
+        "nav": _nav(),
         "metrics": _metrics(artifact),
-        "notices": _notices(artifact, site),
+        "notices": _notices(artifact),
         "acquisition": _acquisition(artifact),
         "figures_image": figures_image,
         "figures_stability": figures_stability,
@@ -124,7 +82,6 @@ def write_run_page(
     *,
     title: str | None = None,
     report_version: str | None = None,
-    site: SiteContext | None = None,
     theme: Theme = DEFAULT_THEME,
 ) -> Path:
     """Write :func:`render_run_page`'s document to ``path`` and return it.
@@ -137,7 +94,7 @@ def write_run_page(
     """
     target = Path(path)
     page = render_run_page(
-        artifact, title=title, report_version=report_version, site=site, theme=theme
+        artifact, title=title, report_version=report_version, theme=theme
     )
     target.parent.mkdir(parents=True, exist_ok=True)
     with atomic_file(target) as temporary:
@@ -162,7 +119,7 @@ def _idblock(artifact: QAArtifact) -> str:
     )
 
 
-def _nav(site: SiteContext | None) -> str:
+def _nav() -> str:
     links = [
         ("#metrics", "Metrics"),
         ("#acquisition", "Acquisition"),
@@ -170,8 +127,6 @@ def _nav(site: SiteContext | None) -> str:
         ("#methods", "Definitions"),
         ("#provenance", "Provenance"),
     ]
-    if site is not None:
-        links.append((site.index_href, "Report index"))
     return "\n    ".join(
         f'<a href="{_text(href)}">{_text(label)}</a>' for href, label in links
     )
@@ -182,27 +137,17 @@ def _figure_src(rendered: RenderedFigure) -> str:
     return "data:image/svg+xml;base64," + b64encode(rendered.svg).decode("ascii")
 
 
-def _notices(artifact: QAArtifact, site: SiteContext | None) -> str:
+def _notices(artifact: QAArtifact) -> str:
     notes = acquisition_notes(artifact)
-    messages = []
-    if site is not None and site.incomplete:
-        messages.append(
-            '<p class="note alert"><span class="pill warn">Incomplete</span> '
-            "<strong>Site incomplete.</strong> One or more requested inputs were "
-            f'not rendered. <a href="{_text(site.index_href)}#omissions">'
-            "View omitted inputs.</a></p>"
-        )
     if notes:
-        messages.append(
+        return (
             '<p class="note alert"><span class="pill warn">Warning</span> '
             f"<strong>Localization or clipping warning.</strong> {_text(notes)}</p>"
         )
-    else:
-        messages.append(
-            '<p class="note"><span class="pill muted">None recorded</span> '
-            "No localization or clipping warnings recorded.</p>"
-        )
-    return "\n".join(messages)
+    return (
+        '<p class="note"><span class="pill muted">None recorded</span> '
+        "No localization or clipping warnings recorded.</p>"
+    )
 
 
 def _metrics(artifact: QAArtifact) -> str:

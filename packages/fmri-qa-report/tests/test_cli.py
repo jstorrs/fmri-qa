@@ -127,7 +127,6 @@ def test_html_refuses_more_than_one_artifact(tmp_path, saved, capsys) -> None:
     assert info.value.code == 2
     err = capsys.readouterr().err
     assert "--html renders one artifact to one file" in err
-    assert "fmri-qa-site" in err
     assert not html.exists()
 
 
@@ -194,8 +193,7 @@ def test_html_and_pdf_together_write_both(tmp_path, saved, capsys, monkeypatch) 
     real-render coverage above."""
     written: list[Path] = []
 
-    def fake_write_run_page(artifact, path, *, title=None, site=None, **_kw):
-        assert site is None
+    def fake_write_run_page(artifact, path, *, title=None, **_kw):
         Path(path).write_text("<html><style></style></html>", encoding="utf-8")
         written.append(Path(path))
         return Path(path)

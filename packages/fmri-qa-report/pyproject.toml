@@ -41,7 +41,6 @@ dependencies = [
 
 [project.scripts]
 fmri-qa-report = "fmriqc_report.cli:main"
-fmri-qa-site = "fmriqc_report.site_cli:main"
 
 [tool.uv.sources]
 fmri-qa-core = { workspace = true }

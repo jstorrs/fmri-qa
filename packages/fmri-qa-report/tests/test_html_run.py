@@ -14,7 +14,7 @@ from fmriqc_report.content import METRIC_DOCS
 from fmriqc_report.formats.html import resources
 from fmriqc_report.formats.html import run as run_module
 from fmriqc_report.formats.html.figures import FIGURE_ASSETS, RenderedFigure
-from fmriqc_report.formats.html.run import SiteContext, render_run_page, write_run_page
+from fmriqc_report.formats.html.run import render_run_page, write_run_page
 
 _ID = re.compile(r"^[A-Za-z][A-Za-z0-9_-]*\Z")
 
@@ -42,19 +42,8 @@ def _tiny_rendered_figures() -> tuple[RenderedFigure, ...]:
 
 @pytest.fixture(scope="module")
 def standalone_page(artifact) -> str:
-    """One real rendering with no site context, shared across read-only tests."""
+    """One real rendering, shared across read-only tests."""
     return render_run_page(artifact, title="Test run", report_version="report-test")
-
-
-@pytest.fixture(scope="module")
-def in_site_page(artifact) -> str:
-    """One real rendering published inside a site, shared across read-only tests."""
-    return render_run_page(
-        artifact,
-        title="Test run",
-        report_version="report-test",
-        site=SiteContext("../../index.html"),
-    )
 
 
 def test_run_page_contains_complete_offline_report_content(standalone_page) -> None:
@@ -187,53 +176,6 @@ def test_run_page_is_byte_reproducible(artifact) -> None:
     second = render_run_page(artifact, title="Test run", report_version="report-test")
 
     assert first == second
-
-
-def test_run_page_is_standalone_without_site_context(standalone_page) -> None:
-    page = standalone_page
-
-    assert "../../index.html" not in page
-    assert "Report index" not in page
-    assert "Site incomplete." not in page
-
-
-def test_run_page_links_its_index_when_published_in_a_site(
-    in_site_page, artifact
-) -> None:
-    assert 'href="../../index.html"' in in_site_page
-
-    incomplete_page = render_run_page(
-        artifact, site=SiteContext("../../index.html", incomplete=True)
-    )
-    assert "Site incomplete." in incomplete_page
-    assert 'href="../../index.html#omissions"' in incomplete_page
-
-
-@pytest.mark.parametrize(
-    "index_href",
-    [
-        "",
-        "/index.html",
-        "//evil/x",
-        "https://evil/x",
-        "javascript:alert(1)",
-        "#omissions",
-        "\\\\evil.com/x",
-        "\n//evil.com/x",
-        "\t/index.html",
-        " ",
-        "../../index.html#runs",
-        "../index.html?x=1",
-    ],
-)
-def test_site_context_refuses_a_route_that_is_not_relative(index_href: str) -> None:
-    with pytest.raises(ValueError, match=r"relative|scheme"):
-        SiteContext(index_href)
-
-
-@pytest.mark.parametrize("index_href", ["../../index.html", "index.html"])
-def test_site_context_accepts_a_plain_relative_route(index_href: str) -> None:
-    assert SiteContext(index_href).index_href == index_href
 
 
 def test_run_page_marks_nonfinite_values_and_analysis_warnings(
@@ -444,7 +386,6 @@ def test_write_run_page_is_atomic_when_the_write_step_itself_fails(
 
 def test_run_template_and_stylesheet_are_packaged_resources() -> None:
     assert resources.read_resource(resources.RUN_TEMPLATE)
-    assert resources.read_resource(resources.INDEX_TEMPLATE)
     assert resources.read_resource(resources.STYLESHEET)
 
 

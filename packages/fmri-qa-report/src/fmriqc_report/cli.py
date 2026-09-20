@@ -115,9 +115,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     args.artifacts = _expand_globs(args.artifacts)
 
     if args.html and len(args.artifacts) != 1:
-        parser.error(
-            "--html renders one artifact to one file; use fmri-qa-site for several"
-        )
+        parser.error("--html renders one artifact to one file")
 
     # Refuse before reading anything: an output that names an input is a usage
     # error, and one that must be caught while the input is still intact.
@@ -164,7 +162,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
         title, artifact = items[0]
         try:
-            write_run_page(artifact, args.html, title=title, site=None)
+            write_run_page(artifact, args.html, title=title)
         except Exception as exc:  # noqa: BLE001 - CLI boundary reports cleanly
             print(f"ERROR: could not write HTML {args.html}: {exc}", file=sys.stderr)
             return 1

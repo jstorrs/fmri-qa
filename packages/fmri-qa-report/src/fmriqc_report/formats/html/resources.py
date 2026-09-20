@@ -1,16 +1,15 @@
-"""The packaged, freeze-safe report resources: the two templates and the stylesheet.
+"""The packaged, freeze-safe report resources: the run template and the stylesheet.
 
 Everything is read through :func:`importlib.resources.files` on this package —
 never ``__file__`` arithmetic — so a zipped or frozen install resolves the same
-way an unpacked one does.  These three names are the complete resource
-inventory; adding a fourth means teaching any future packaging step about it.
+way an unpacked one does.  These two names are the complete resource
+inventory; adding a third means teaching any future packaging step about it.
 """
 
 from importlib.resources import files
 from typing import Literal
 
 __all__ = [
-    "INDEX_TEMPLATE",
     "RUN_TEMPLATE",
     "STYLESHEET",
     "ResourceName",
@@ -18,14 +17,11 @@ __all__ = [
     "read_stylesheet",
 ]
 
-type ResourceName = Literal[
-    "assets/report.css", "templates/run.html", "templates/index.html"
-]
+type ResourceName = Literal["assets/report.css", "templates/run.html"]
 
 
 STYLESHEET: ResourceName = "assets/report.css"
 RUN_TEMPLATE: ResourceName = "templates/run.html"
-INDEX_TEMPLATE: ResourceName = "templates/index.html"
 
 
 def read_resource(name: ResourceName) -> str:

@@ -190,8 +190,7 @@ def run_session(
     # Inside `output_dir`, so publishing a series is a same-filesystem rename;
     # `secrets.token_hex` and a plain `Path.mkdir()` rather than
     # `tempfile.mkdtemp`, which forces `0700` regardless of the process umask
-    # -- see `fmriqc_report.atomic`'s docstring and `formats.html.site`'s
-    # staging directory, which this mirrors.
+    # -- see `fmriqc_report.atomic`'s docstring.
     staging = request.output_dir / f".fmri-qa-run.{secrets.token_hex(8)}"
     try:
         staging.mkdir()
@@ -378,7 +377,7 @@ def _publish_series(
 
     progress(Progress(Stage.REPORT, planned.index, planned.total, name))
     try:
-        write_run_page(artifact, report_path, title=name, site=None)
+        write_run_page(artifact, report_path, title=name)
     except Exception as exc:  # noqa: BLE001 - one series' failure, reported and skipped
         return _failed(name, exc, noted)
 
