@@ -190,7 +190,7 @@ def run_session(
     # Inside `output_dir`, so publishing a series is a same-filesystem rename;
     # `secrets.token_hex` and a plain `Path.mkdir()` rather than
     # `tempfile.mkdtemp`, which forces `0700` regardless of the process umask
-    # -- see `fmriqc_report.atomic`'s docstring.
+    # -- the directory twin of what `fmriqc_report.atomic` does for a file.
     staging = request.output_dir / f".fmri-qa-run.{secrets.token_hex(8)}"
     try:
         staging.mkdir()

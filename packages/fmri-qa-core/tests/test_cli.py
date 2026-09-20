@@ -4,7 +4,7 @@ These exercise the layers unit tests skip: argument wiring, the batch loop and
 its error handling, the JSON document, and saving artifacts to disk. A tiny
 synthetic phantom is written as a NIfTI + BIDS sidecar (see `conftest`) so
 `QAScan.from_nifti` runs its real file-I/O path. Rendering those artifacts into
-a PDF is `fmri-qa-report`'s job and is tested there.
+a report is `fmri-qa-report`'s job and is tested there.
 """
 
 import json
@@ -100,7 +100,7 @@ def test_main_refuses_a_batch_whose_artifacts_would_collide(
 
     A batch names each artifact after the scan's stem, so `a/scan.nii.gz` and
     `b/scan.nii.gz` land on one file: the second analysis replaces the first and
-    a later `fmri-qa-report BASE/*.nc` renders a packet quietly missing a scan.
+    nothing downstream can tell that a scan went missing.
     The run is refused up front instead, before any analysis is done.
     """
     (tmp_path / "a").mkdir()

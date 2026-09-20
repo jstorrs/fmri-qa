@@ -45,10 +45,11 @@ _CALCULATION_ONLY = (
     "netCDF4",
 )
 
-# The format-agnostic public surface must stay importable without the current
-# PDF driver's dependencies. Each target runs in its own new interpreter so a
-# previous probe cannot hide a dependency imported by another target.
-_PDF_ONLY = ("reportlab", "svglib")
+# The format-agnostic public surface must stay importable without the drawing
+# stack: the package resolves its driver lazily so that `import fmriqc_report`
+# never pays for matplotlib unused. Each target runs in its own new interpreter
+# so a previous probe cannot hide a dependency imported by another target.
+_DRIVER_ONLY = ("matplotlib",)
 _REPORT_IMPORT_TARGETS = (
     "fmriqc_report",
     "fmriqc_report.content",
@@ -74,9 +75,9 @@ _REPORT_IMPORT_PROBE = f"""
 import importlib
 import sys
 importlib.import_module(sys.argv[1])
-pdf = {_PDF_ONLY!r}
+driver = {_DRIVER_ONLY!r}
 loaded = sorted(
-    m for m in sys.modules if any(m == p or m.startswith(p + ".") for p in pdf)
+    m for m in sys.modules if any(m == d or m.startswith(d + ".") for d in driver)
 )
 print(loaded)
 """
@@ -164,8 +165,10 @@ def test_importing_the_report_cli_does_not_load_the_calculation_stack() -> None:
 
 
 @pytest.mark.parametrize("module", _REPORT_IMPORT_TARGETS)
-def test_format_agnostic_report_modules_do_not_load_the_pdf_driver(module: str) -> None:
-    """The content surface imports without ReportLab or svglib."""
+def test_format_agnostic_report_modules_do_not_load_the_drawing_stack(
+    module: str,
+) -> None:
+    """The content surface imports without matplotlib."""
     result = subprocess.run(  # noqa: S603 - fixed literal script, not untrusted input
         [sys.executable, "-c", _REPORT_IMPORT_PROBE, module],
         capture_output=True,
@@ -173,5 +176,5 @@ def test_format_agnostic_report_modules_do_not_load_the_pdf_driver(module: str) 
         check=True,
     )
     assert result.stdout.strip() == "[]", (
-        f"importing {module} loaded the PDF driver: {result.stdout}\n{result.stderr}"
+        f"importing {module} loaded the drawing stack: {result.stdout}\n{result.stderr}"
     )

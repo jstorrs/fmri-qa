@@ -1,7 +1,7 @@
 [project]
 name = "fmri-qa-report"
 version = "0.1.0"
-description = "Offline web and PDF reports for fmri-qa phantom QA analysis artifacts"
+description = "Self-contained offline HTML reports for fmri-qa phantom QA analysis artifacts"
 readme = "README.md"
 requires-python = ">=3.13"
 license = "MIT"
@@ -33,10 +33,6 @@ dependencies = [
     "cycler>=0.10",
     "matplotlib>=3.10.7",
     "numpy>=2.3.4",
-    "reportlab>=5.0.0",
-    # formats/reportlab.py probes and patches svglib's private image converter.
-    # Verify that adapter before widening this bound.
-    "svglib>=2.0.2,<2.1",
 ]
 
 [project.scripts]

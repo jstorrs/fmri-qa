@@ -1,17 +1,13 @@
-"""The report `Theme`: the single source of every visual decision.
+"""The report `Theme`: the visual decisions the matplotlib panels are drawn
+with.
 
-A `Theme` carries the page geometry, typography, and colours a report is drawn
-with. One instance is threaded through both output paths -- the ReportLab page
-furniture (this driver) and, once wired, the matplotlib panels -- so an embedded
-figure stays visually consistent with the page around it. The default `Theme()`
-reproduces the historical appearance exactly, so adopting it changes no output;
-a group rebrands by instantiating or subclassing it.
-
-See `notes/report_redesign.md` for the design.
+A `Theme` carries the colormap, accent colour, and font family a run page's
+figures use, exposed as matplotlib rcParams through `rc_params()`. The default
+`Theme()` reproduces the panels' established appearance exactly, so adopting
+it changes no output; a group rebrands by instantiating it.
 """
 
 from dataclasses import dataclass
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 from cycler import cycler
@@ -38,64 +34,20 @@ _MPL_TAB10 = (
 
 @dataclass(frozen=True, slots=True)
 class Theme:
-    """Page geometry, fonts, and colours for a rendered report.
-
-    Colours are ReportLab gray levels (0.0 black .. 1.0 white) for the furniture
-    the driver draws natively, and hex strings for the marks the matplotlib
-    panels draw. `pass_warn_fail` is reserved for the deferred acceptance
-    thresholds and is unused until they land.
-    """
-
-    # Page geometry (points).
-    page_size: tuple[float, float] = (612.0, 792.0)
-    margin: float = 40.0
-
-    # Typography: names of fonts registered with ReportLab.
-    font_title: str = "Helvetica-Bold"
-    font_body: str = "Helvetica"
-    font_numeric: str = "Helvetica-Bold"  # the big metric-tile values
-
-    # Furniture colours as ReportLab gray levels.
-    text_primary_gray: float = 0.0
-    text_muted_gray: float = 0.40
-    tile_value_gray: float = 0.10
-    tile_label_gray: float = 0.45
-    tile_fill_gray: float = 0.96
-    tile_stroke_gray: float = 0.80
+    """Colours and fonts for a rendered report's matplotlib panels."""
 
     # Panel colours, applied to the matplotlib figures via `rc_params`.
     panel_cmap: str = "gray"
     panel_accent: str = "#1f77b4"  # matplotlib "tab:blue"; the primary-series colour
     panel_font_family: str | None = None  # None keeps the matplotlib default family
-    pass_warn_fail: tuple[str, str, str] = ("#2e7d32", "#f9a825", "#c62828")  # reserved
-
-    # Brand furniture.
-    logo: Path | None = None
-    footer: str = ""
-    cover_title: str = "fMRI QA Report"
-
-    @property
-    def page_width(self) -> float:
-        """Width of the sheet (points)."""
-        return self.page_size[0]
-
-    @property
-    def page_height(self) -> float:
-        """Height of the sheet (points)."""
-        return self.page_size[1]
-
-    @property
-    def content_width(self) -> float:
-        """Drawable width between the left and right margins (points)."""
-        return self.page_width - 2 * self.margin
 
     def rc_params(self) -> "dict[RcKeyType, object]":
         """matplotlib rcParams that style the panels to match the page.
 
         A driver activates these with `matplotlib.rc_context` around the figure
         building so the phantom colormap, the primary-series colour, and the
-        font follow the theme. The default theme returns matplotlib's own
-        defaults (gray images, the tab10 cycle), so panels are unchanged.
+        font follow the theme. The default theme returns the panels' established
+        look (gray images, matplotlib's tab10 cycle), so panels are unchanged.
         """
         rc: dict[RcKeyType, object] = {
             "image.cmap": self.panel_cmap,

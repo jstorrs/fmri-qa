@@ -1,4 +1,4 @@
-"""The `fmri-qa-report` command line: artifacts on disk in, a PDF or HTML out."""
+"""The `fmri-qa-report` command line: an artifact on disk in, one HTML page out."""
 
 import inspect
 from pathlib import Path
@@ -22,92 +22,29 @@ def saved(tmp_path, artifact) -> str:
     return str(q.save_artifact(artifact, tmp_path / "scan.qa.nc"))
 
 
-def test_main_renders_a_saved_artifact(tmp_path, saved, capsys) -> None:
-    pdf = tmp_path / "qa.pdf"
-    rc = cli.main([saved, "--pdf", str(pdf)])
-    assert rc == 0
-    assert "# wrote" in capsys.readouterr().out
-    assert pdf.read_bytes().startswith(b"%PDF")
-
-
-def test_main_builds_a_packet_from_several_artifacts(tmp_path, saved) -> None:
-    pdf = tmp_path / "packet.pdf"
-    rc = cli.main([saved, saved, "--pdf", str(pdf), "--cover", "--appendix"])
-    assert rc == 0  # cover + two dashboard pages + appendix
-    assert pdf.read_bytes().startswith(b"%PDF")
-
-
-def test_main_renders_the_physics_tier(tmp_path, saved) -> None:
-    pdf = tmp_path / "physics.pdf"
-    rc = cli.main([saved, "--pdf", str(pdf), "--tier", "physics"])
-    assert rc == 0
-    assert pdf.read_bytes().startswith(b"%PDF")
-
-
-def test_main_skips_an_unreadable_artifact_but_renders_the_rest(
-    tmp_path, saved, capsys
-) -> None:
-    pdf = tmp_path / "qa.pdf"
-    rc = cli.main([str(tmp_path / "missing.nc"), saved, "--pdf", str(pdf)])
-    captured = capsys.readouterr()
-    assert rc == 1  # a failure makes the run exit non-zero
-    assert "ERROR" in captured.err and "Traceback" not in captured.err
-    assert pdf.read_bytes().startswith(b"%PDF")  # the readable one still rendered
-    # ...and the packet says it is missing one, in its own metadata: a PDF is
-    # handed on without this terminal.
-    assert "1 of 2 artifact(s) could not be read" in captured.err
-    assert b"1 of 2 scans; 1 omitted" in pdf.read_bytes()
-
-
-def test_main_refuses_a_pdf_that_would_overwrite_an_artifact(
-    tmp_path, saved, capsys, monkeypatch
-) -> None:
-    """`--pdf` naming an input must fail before the artifact is read or replaced.
-
-    The artifacts are loaded first and the PDF is moved over its destination
-    last, so without the guard the run succeeds and leaves a PDF where the
-    archive was. The relative spelling is the one a shell produces.
-    """
-    archive = Path(saved)
-    before = archive.read_bytes()
-    monkeypatch.chdir(tmp_path)
-    rc = cli.main([saved, "--pdf", f"./{archive.name}"])
-    assert rc == 1
-    assert "would overwrite the input" in capsys.readouterr().err
-    assert archive.read_bytes() == before
-
-
-def test_main_fails_when_no_artifact_can_be_read(tmp_path, capsys) -> None:
-    rc = cli.main([str(tmp_path / "missing.nc"), "--pdf", str(tmp_path / "qa.pdf")])
-    assert rc == 1
-    assert "nothing to render" in capsys.readouterr().err
-    assert not (tmp_path / "qa.pdf").exists()
-
-
 def test_main_reports_a_write_failure_without_a_traceback(
     tmp_path, saved, capsys
 ) -> None:
     blocked = tmp_path / "blocked"
     blocked.write_text("not a directory")  # a file where a parent dir must go
-    rc = cli.main([saved, "--pdf", str(blocked / "qa.pdf")])
+    rc = cli.main([saved, "--html", str(blocked / "qa.html")])
     captured = capsys.readouterr()
     assert rc == 1
-    assert "ERROR: could not write PDF" in captured.err
+    assert "ERROR: could not write HTML" in captured.err
     assert "Traceback" not in captured.err
     # the atomic write's temporary file is an implementation detail, not an error
     assert ".tmp" not in captured.err
 
 
-def test_main_creates_the_pdf_destination_directory(tmp_path, saved) -> None:
+def test_main_creates_the_html_destination_directory(tmp_path, saved) -> None:
     """A missing output directory is created, as `--artifact` already does."""
-    pdf = tmp_path / "reports" / "2026-01" / "qa.pdf"
-    assert cli.main([saved, "--pdf", str(pdf)]) == 0
-    assert pdf.is_file()
+    html = tmp_path / "reports" / "2026-01" / "qa.html"
+    assert cli.main([saved, "--html", str(html)]) == 0
+    assert html.is_file()
 
 
 def test_main_writes_a_single_file_html_report(tmp_path, saved, capsys) -> None:
-    """The one real end-to-end HTML render in this module; every other HTML
-    test below stubs `write_run_page` to stay fast."""
+    """The end-to-end render: a saved artifact in, one self-contained page out."""
     html = tmp_path / "qa.html"
     rc = cli.main([saved, "--html", str(html)])
     captured = capsys.readouterr()
@@ -133,6 +70,12 @@ def test_html_refuses_more_than_one_artifact(tmp_path, saved, capsys) -> None:
 def test_html_refuses_to_overwrite_an_input(
     tmp_path, saved, capsys, monkeypatch
 ) -> None:
+    """`--html` naming an input must fail before the artifact is read or replaced.
+
+    The artifact is loaded first and the HTML is moved over its destination
+    last, so without the guard the run succeeds and leaves a report where the
+    archive was. The relative spelling is the one a shell produces.
+    """
     archive = Path(saved)
     before = archive.read_bytes()
     monkeypatch.chdir(tmp_path)
@@ -142,75 +85,13 @@ def test_html_refuses_to_overwrite_an_input(
     assert archive.read_bytes() == before
 
 
-def test_html_and_pdf_refuse_to_share_one_destination(tmp_path, saved, capsys) -> None:
-    shared = tmp_path / "qa.out"
-    rc = cli.main([saved, "--pdf", str(shared), "--html", f"{tmp_path}/./qa.out"])
-    assert rc == 1
-    assert "would overwrite each other" in capsys.readouterr().err
-    assert not shared.exists()
-
-
-@pytest.mark.parametrize(
-    ("flag", "value"),
-    [("--tier", "physics"), ("--cover", None), ("--appendix", None)],
-)
-def test_html_alone_refuses_a_pdf_only_option(
-    tmp_path, saved, capsys, flag, value
-) -> None:
-    html = tmp_path / "qa.html"
-    argv = [saved, "--html", str(html), flag]
-    if value is not None:
-        argv.append(value)
-    with pytest.raises(SystemExit) as info:
-        cli.main(argv)
-    assert info.value.code == 2
-    err = capsys.readouterr().err
-    assert flag in err and "only apply to --pdf" in err
-    assert not html.exists()
-
-
-def test_html_with_pdf_still_accepts_pdf_only_options(tmp_path, saved) -> None:
-    pdf = tmp_path / "qa.pdf"
-    html = tmp_path / "qa.html"
-    rc = cli.main(
-        [saved, "--pdf", str(pdf), "--html", str(html), "--cover", "--appendix"]
-    )
-    assert rc == 0
-    assert pdf.read_bytes().startswith(b"%PDF")
-
-
-def test_html_skips_an_unreadable_artifact(tmp_path, capsys) -> None:
+def test_main_fails_when_the_artifact_cannot_be_read(tmp_path, capsys) -> None:
     html = tmp_path / "qa.html"
     rc = cli.main([str(tmp_path / "missing.nc"), "--html", str(html)])
     captured = capsys.readouterr()
     assert rc == 1
     assert "ERROR" in captured.err
     assert not html.exists()
-
-
-def test_html_and_pdf_together_write_both(tmp_path, saved, capsys, monkeypatch) -> None:
-    """Stub the expensive HTML render; the PDF path already has its own
-    real-render coverage above."""
-    written: list[Path] = []
-
-    def fake_write_run_page(artifact, path, *, title=None, **_kw):
-        Path(path).write_text("<html><style></style></html>", encoding="utf-8")
-        written.append(Path(path))
-        return Path(path)
-
-    from fmriqc_report.formats import html as html_module
-
-    monkeypatch.setattr(html_module, "write_run_page", fake_write_run_page)
-
-    pdf = tmp_path / "qa.pdf"
-    html = tmp_path / "qa.html"
-    rc = cli.main([saved, "--pdf", str(pdf), "--html", str(html)])
-    captured = capsys.readouterr()
-    assert rc == 0
-    assert pdf.read_bytes().startswith(b"%PDF")
-    assert html.read_text(encoding="utf-8") == "<html><style></style></html>"
-    assert "# wrote" in captured.out
-    assert written == [html]
 
 
 def test_main_titles_a_section_from_the_artifact_provenance(tmp_path, artifact) -> None:
@@ -236,13 +117,13 @@ def test_version_flag_prints_and_exits(capsys) -> None:
     assert "fmri-qa-report" in capsys.readouterr().out
 
 
-def test_pdf_or_html_is_required(capsys) -> None:
+def test_html_is_required(capsys) -> None:
     with pytest.raises(SystemExit) as info:
         cli.main(["scan.qa.nc"])
     assert info.value.code == 2
     err = capsys.readouterr().err
     assert "error:" in err
-    assert "--pdf or --html" in err
+    assert "--html" in err
 
 
 def test_help_renders(capsys) -> None:
@@ -253,19 +134,18 @@ def test_help_renders(capsys) -> None:
     assert "usage:" in capsys.readouterr().out
 
 
-def test_a_wildcard_argument_is_expanded(tmp_path, artifact, capsys) -> None:
+def test_a_wildcard_argument_is_expanded(tmp_path, artifact) -> None:
     """PowerShell hands `artifacts/*.qa.nc` over with the `*` still in it."""
-    for name in ("first", "second"):
-        q.save_artifact(artifact, tmp_path / f"{name}.qa.nc")
-    pdf = tmp_path / "qa.pdf"
-    rc = cli.main([f"{tmp_path}/*.qa.nc", "--pdf", str(pdf)])
+    q.save_artifact(artifact, tmp_path / "scan.qa.nc")
+    html = tmp_path / "qa.html"
+    rc = cli.main([f"{tmp_path}/*.qa.nc", "--html", str(html)])
     assert rc == 0
-    assert pdf.is_file()
+    assert html.is_file()
 
 
 def test_a_wildcard_matching_nothing_is_reported_not_dropped(tmp_path, capsys) -> None:
-    """A pattern that names no artifact must fail, not render an empty packet."""
-    rc = cli.main([f"{tmp_path}/*.qa.nc", "--pdf", str(tmp_path / "qa.pdf")])
+    """A pattern that names no artifact must fail, not render an empty report."""
+    rc = cli.main([f"{tmp_path}/*.qa.nc", "--html", str(tmp_path / "qa.html")])
     assert rc == 1
     assert "*.qa.nc" in capsys.readouterr().err
 

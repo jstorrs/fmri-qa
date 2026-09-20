@@ -3,10 +3,9 @@
 One `MetricDoc` per reported metric is the single source for what a metric is
 called, how its value is formatted, what it means, and how it is computed. Every
 formatter reads the artifact's flat `Measurements`, so a report needs nothing
-but the artifact to render a metric. The
-header tiles (`metric_tiles`) and the physics characterization/methods pages
-(`characterization_rows`, `method_rows`) all read this catalog, so a metric's
-name and formatting can't drift between the dashboard and the physics report.
+but the artifact to render a metric. The run page's metric tiles and its
+definitions list both read this catalog, so a metric's name and formatting
+can't drift between them.
 
 The prose is condensed from `notes/` and the metric modules; see those for the
 full derivations. Each `method` names the order of operations the code actually
@@ -20,7 +19,6 @@ from dataclasses import dataclass
 from typing import Literal
 
 from fmriqc.analysis import Measurements
-from fmriqc.types import LengthUnit
 
 MetricName = Literal[
     "snr",
@@ -39,12 +37,11 @@ MetricName = Literal[
     "max_com_displacement",
     "fwhm",
 ]
-MetricUnit = Literal["%", "1"] | LengthUnit
 
 
 @dataclass(frozen=True, slots=True)
 class MetricDoc:
-    """A reported metric's stable identity, meaning, display, value, and unit."""
+    """A reported metric's stable identity, meaning, display, and value."""
 
     label: str
     definition: str
@@ -52,27 +49,6 @@ class MetricDoc:
     fmt: Callable[[Measurements], str]
     name: MetricName
     value: Callable[[Measurements], float]
-    unit: Callable[[Measurements], MetricUnit]
-
-
-def _dimensionless_unit(_: Measurements) -> Literal["1"]:
-    """Return the standard unit for a pure ratio or score."""
-    return "1"
-
-
-def _percent_unit(_: Measurements) -> Literal["%"]:
-    """Return the standard unit for a percentage."""
-    return "%"
-
-
-def _displacement_unit(m: Measurements) -> LengthUnit:
-    """Return the artifact's unit for motion and center-of-mass displacement."""
-    return m.displacement_unit
-
-
-def _fwhm_unit(m: Measurements) -> LengthUnit:
-    """Return the artifact's unit for spatial smoothness."""
-    return m.fwhm_unit
 
 
 def _fwhm_label(m: Measurements) -> str:
@@ -100,7 +76,6 @@ METRIC_DOCS: tuple[MetricDoc, ...] = (
         lambda m: f"{m.snr:.1f}",
         name="snr",
         value=lambda m: m.snr,
-        unit=_dimensionless_unit,
     ),
     MetricDoc(
         "SFNR",
@@ -110,7 +85,6 @@ METRIC_DOCS: tuple[MetricDoc, ...] = (
         lambda m: f"{m.sfnr:.1f}",
         name="sfnr",
         value=lambda m: m.sfnr,
-        unit=_dimensionless_unit,
     ),
     MetricDoc(
         "RDC",
@@ -121,7 +95,6 @@ METRIC_DOCS: tuple[MetricDoc, ...] = (
         lambda m: f"{m.rdc:.2f}",
         name="rdc",
         value=lambda m: m.rdc,
-        unit=_dimensionless_unit,
     ),
     MetricDoc(
         "ghost",
@@ -131,7 +104,6 @@ METRIC_DOCS: tuple[MetricDoc, ...] = (
         lambda m: f"{m.ghost_pct:.2f}%",
         name="ghost_pct",
         value=lambda m: m.ghost_pct,
-        unit=_percent_unit,
     ),
     MetricDoc(
         "ghostT",
@@ -140,7 +112,6 @@ METRIC_DOCS: tuple[MetricDoc, ...] = (
         lambda m: f"{m.ghost_top_pct:.2f}%",
         name="ghost_top_pct",
         value=lambda m: m.ghost_top_pct,
-        unit=_percent_unit,
     ),
     MetricDoc(
         "RO",
@@ -149,7 +120,6 @@ METRIC_DOCS: tuple[MetricDoc, ...] = (
         lambda m: f"{m.ro_ghost_pct:.2f}%",
         name="ro_ghost_pct",
         value=lambda m: m.ro_ghost_pct,
-        unit=_percent_unit,
     ),
     MetricDoc(
         "ACRg",
@@ -158,7 +128,6 @@ METRIC_DOCS: tuple[MetricDoc, ...] = (
         lambda m: f"{m.acr_ghost_pct:.2f}%",
         name="acr_ghost_pct",
         value=lambda m: m.acr_ghost_pct,
-        unit=_percent_unit,
     ),
     MetricDoc(
         "drift",
@@ -167,7 +136,6 @@ METRIC_DOCS: tuple[MetricDoc, ...] = (
         lambda m: f"{m.drift_pct:.3f}%",
         name="drift_pct",
         value=lambda m: m.drift_pct,
-        unit=_percent_unit,
     ),
     MetricDoc(
         "fluct",
@@ -177,7 +145,6 @@ METRIC_DOCS: tuple[MetricDoc, ...] = (
         lambda m: f"{m.percent_fluctuation:.3f}%",
         name="percent_fluctuation",
         value=lambda m: m.percent_fluctuation,
-        unit=_percent_unit,
     ),
     MetricDoc(
         "outl",
@@ -187,7 +154,6 @@ METRIC_DOCS: tuple[MetricDoc, ...] = (
         lambda m: f"{m.outlier_max_pct:.2f}%",
         name="outlier_max_pct",
         value=lambda m: m.outlier_max_pct,
-        unit=_percent_unit,
     ),
     MetricDoc(
         "tcOut",
@@ -196,7 +162,6 @@ METRIC_DOCS: tuple[MetricDoc, ...] = (
         lambda m: f"{m.tc_outlier:.1f}",
         name="tc_outlier",
         value=lambda m: m.tc_outlier,
-        unit=_dimensionless_unit,
     ),
     MetricDoc(
         "spec",
@@ -205,7 +170,6 @@ METRIC_DOCS: tuple[MetricDoc, ...] = (
         lambda m: f"{m.spec_outlier:.1f}",
         name="spec_outlier",
         value=lambda m: m.spec_outlier,
-        unit=_dimensionless_unit,
     ),
     MetricDoc(
         "motn",
@@ -214,7 +178,6 @@ METRIC_DOCS: tuple[MetricDoc, ...] = (
         _motn_label,
         name="max_translation",
         value=lambda m: m.max_translation,
-        unit=_displacement_unit,
     ),
     MetricDoc(
         "com",
@@ -223,7 +186,6 @@ METRIC_DOCS: tuple[MetricDoc, ...] = (
         _com_label,
         name="max_com_displacement",
         value=lambda m: m.max_com_displacement,
-        unit=_displacement_unit,
     ),
     MetricDoc(
         "fwhm",
@@ -232,16 +194,5 @@ METRIC_DOCS: tuple[MetricDoc, ...] = (
         _fwhm_label,
         name="fwhm",
         value=lambda m: m.fwhm,
-        unit=_fwhm_unit,
     ),
 )
-
-
-def metric_tiles(m: Measurements) -> list[tuple[str, str]]:
-    """(label, value) pairs for the header metric tiles, in display order."""
-    return [(d.label, d.fmt(m)) for d in METRIC_DOCS]
-
-
-def characterization_rows(m: Measurements) -> list[tuple[MetricDoc, str]]:
-    """(doc, formatted value) per metric for the physics characterization table."""
-    return [(d, d.fmt(m)) for d in METRIC_DOCS]

@@ -1,4 +1,4 @@
-"""The per-metric catalog: tiles and characterization share one source."""
+"""The per-metric catalog: one source for every metric's label and format."""
 
 import math
 from dataclasses import replace
@@ -6,18 +6,9 @@ from dataclasses import replace
 from fmriqc_report import content
 
 
-def test_tiles_and_characterization_share_labels_and_values(artifact) -> None:
+def test_metric_docs_keep_their_existing_labels_order_and_formatting(artifact) -> None:
     m = artifact.measurements
-    tiles = content.metric_tiles(m)
-    rows = content.characterization_rows(m)
-    # Same metrics, same order, same formatted values -- one catalog drives both.
-    assert [label for label, _ in tiles] == [doc.label for doc, _ in rows]
-    assert [value for _, value in tiles] == [value for _, value in rows]
-
-
-def test_metric_tiles_keep_their_existing_labels_order_and_formatting(artifact) -> None:
-    m = artifact.measurements
-    assert content.metric_tiles(m) == [
+    assert [(d.label, d.fmt(m)) for d in content.METRIC_DOCS] == [
         ("SNR", f"{m.snr:.1f}"),
         ("SFNR", f"{m.sfnr:.1f}"),
         ("RDC", f"{m.rdc:.2f}"),
@@ -85,35 +76,6 @@ def test_metric_value_accessors_keep_unresolved_values_nonfinite(artifact) -> No
     measurements = replace(artifact.measurements, ghost_pct=float("nan"))
     ghost = next(doc for doc in content.METRIC_DOCS if doc.name == "ghost_pct")
     assert math.isnan(ghost.value(measurements))
-
-
-def test_metric_units_distinguish_percent_dimensionless_and_dynamic_values(
-    artifact, bare_artifact
-) -> None:
-    by_name = {doc.name: doc for doc in content.METRIC_DOCS}
-    m = artifact.measurements
-    assert {name: doc.unit(m) for name, doc in by_name.items()} == {
-        "snr": "1",
-        "sfnr": "1",
-        "rdc": "1",
-        "ghost_pct": "%",
-        "ghost_top_pct": "%",
-        "ro_ghost_pct": "%",
-        "acr_ghost_pct": "%",
-        "drift_pct": "%",
-        "percent_fluctuation": "%",
-        "outlier_max_pct": "%",
-        "tc_outlier": "1",
-        "spec_outlier": "1",
-        "max_translation": "mm",
-        "max_com_displacement": "mm",
-        "fwhm": "mm",
-    }
-
-    bare = bare_artifact.measurements
-    assert by_name["max_translation"].unit(bare) == "vox"
-    assert by_name["max_com_displacement"].unit(bare) == "vox"
-    assert by_name["fwhm"].unit(bare) == "vox"
 
 
 def test_methods_describe_the_implemented_order_of_operations() -> None:

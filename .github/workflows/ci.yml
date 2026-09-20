@@ -44,7 +44,7 @@ jobs:
       # Exercise the artifacts users install, independently of the editable
       # environment used by the source-tree gate above. The core wheel is
       # installed alone first: the calculation half must stand up without the
-      # report half (and so without matplotlib or ReportLab).
+      # report half (and so without matplotlib).
       - name: Smoke-test the core wheel on its own
         run: |
           core=(dist/fmri_qa_core-*.whl)
@@ -55,7 +55,7 @@ jobs:
           .venv-core-smoke/bin/fmri-qa-hilo --help > /dev/null
           .venv-core-smoke/bin/python -c "from importlib.resources import files; assert files('fmriqc').joinpath('py.typed').is_file()"
           # The seam, checked against the installed artifact: no drawing stack.
-          .venv-core-smoke/bin/python -c "import importlib.util as u; assert u.find_spec('matplotlib') is None and u.find_spec('reportlab') is None"
+          .venv-core-smoke/bin/python -c "import importlib.util as u; assert u.find_spec('matplotlib') is None"
           # The MIT text has to reach whoever installs the wheel. hatchling puts
           # a declared license file under the dist-info `licenses/` directory.
           .venv-core-smoke/bin/python -c "from importlib.metadata import distribution; text = distribution('fmri-qa-core').read_text('licenses/LICENSE'); assert text and 'MIT License' in text, 'the core wheel ships no license text'"
@@ -70,7 +70,8 @@ jobs:
           .venv-report-smoke/bin/fmri-qa-report --version
           .venv-report-smoke/bin/python -c "from importlib.resources import files; assert files('fmriqc_report').joinpath('py.typed').is_file()"
           .venv-report-smoke/bin/python -c "from importlib.resources import files; root = files('fmriqc_report.formats.html'); assert root.joinpath('templates/run.html').is_file() and root.joinpath('assets/report.css').is_file(), 'the report wheel ships no HTML resources'"
-          .venv-report-smoke/bin/python -c "import sys; import fmriqc_report.formats.html.run; assert not any(name == 'reportlab' or name.startswith('reportlab.') for name in sys.modules), 'HTML run renderer imported ReportLab'"
+          .venv-report-smoke/bin/python -c "import sys; import fmriqc_report; assert 'matplotlib' not in sys.modules, 'importing the report package loaded matplotlib'"
+          .venv-report-smoke/bin/python -c "import fmriqc_report.formats.html.run"
           .venv-report-smoke/bin/python -c "import sys; import fmriqc_report.cli; assert not any(name == 'fmriqc.pipeline' or name.startswith('fmriqc.pipeline.') for name in sys.modules), 'the report CLI imported the pipeline'"
           .venv-report-smoke/bin/python -c "from importlib.metadata import distribution; text = distribution('fmri-qa-report').read_text('licenses/LICENSE'); assert text and 'MIT License' in text, 'the report wheel ships no license text'"
           .venv-report-smoke/bin/python -c "import tarfile; archive = next(__import__('pathlib').Path('dist').glob('fmri_qa_report-*.tar.gz')); names = tarfile.open(archive).getnames(); assert any(name.endswith('src/fmriqc_report/formats/html/templates/run.html') for name in names) and any(name.endswith('src/fmriqc_report/formats/html/assets/report.css') for name in names), 'the report sdist ships no HTML resources'"

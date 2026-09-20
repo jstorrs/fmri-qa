@@ -76,9 +76,9 @@ def artifact_collisions(
     A batch names each artifact by the scan's stem, so inputs from different
     directories with the same file name (`sub-01/qa.nii.gz`, `sub-02/qa.nii.gz`)
     collide. Writing them in turn would leave one file holding the last scan's
-    analysis and silently drop the rest, and a later `fmri-qa-report BASE/*.qa.nc`
-    would render a packet quietly missing scans. `main` checks this up front and
-    refuses rather than analyze work it cannot keep.
+    analysis and silently drop the rest, with nothing downstream able to tell
+    that scans went missing. `main` checks this up front and refuses rather than
+    analyze work it cannot keep.
     """
     by_dest: dict[Path, list[str]] = {}
     for path, dest in destinations:

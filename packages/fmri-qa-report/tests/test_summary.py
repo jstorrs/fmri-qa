@@ -82,18 +82,6 @@ def test_device_and_provenance_lines_are_empty_without_metadata(
     assert summary.provenance_line(prov) == ""
 
 
-def test_appendix_rows_name_the_computing_version(artifact) -> None:
-    ((title, detail),) = summary.appendix_rows([("run-1", artifact)])
-    assert title == "run-1"
-    assert "Acme Scanner 3T" in detail
-    assert f"computed by fmri-qa-core {artifact.provenance.core_version}" in detail
-
-
-def test_appendix_accounts_for_a_scan_without_a_sidecar(bare_artifact) -> None:
-    ((_, detail),) = summary.appendix_rows([("bare", bare_artifact)])
-    assert "computed by fmri-qa-core" in detail  # still accounted for
-
-
 def test_a_collapsed_phantom_mask_is_called_out(artifact) -> None:
     """A bad mask invalidates every mask-based number on the page.
 

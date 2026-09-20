@@ -167,3 +167,10 @@ def test_plot_fig_clears_its_figure_when_its_callback_fails() -> None:
 
     assert len(captured) == 1
     assert not captured[0].axes
+
+
+def test_a_theme_font_family_reaches_the_rc_params() -> None:
+    from fmriqc_report.theme import Theme
+
+    assert "font.family" not in Theme().rc_params()
+    assert Theme(panel_font_family="serif").rc_params()["font.family"] == "serif"

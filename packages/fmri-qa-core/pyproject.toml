@@ -24,7 +24,7 @@ classifiers = [
     "Typing :: Typed",
 ]
 # The calculation half deliberately depends on nothing that draws: no
-# matplotlib, no ReportLab. Rendering lives in the fmri-qa-report distribution.
+# matplotlib. Rendering lives in the fmri-qa-report distribution.
 dependencies = [
     "nibabel>=5.3.2",
     "numpy>=2.3.4",

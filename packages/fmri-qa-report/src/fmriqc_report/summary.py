@@ -2,14 +2,12 @@
 
 The strings a report shows about a scan, derived from a `QAArtifact` with no
 dependency on any output format: the `*_line` helpers return the acquisition /
-provenance / device strings, `appendix_rows` the packet provenance table, and
-`package_version` the running renderer version. The per-metric vocabulary (tile
-labels and value formatting) lives in `content`. A format driver (see `formats`)
-decides how to lay these out.
+provenance / device strings, and `package_version` the running renderer
+version. The per-metric vocabulary (tile labels and value formatting) lives in
+`content`. A format driver (see `formats`) decides how to lay these out.
 """
 
 import math
-from collections.abc import Iterable
 from importlib.metadata import PackageNotFoundError, version
 
 from fmriqc.analysis import Provenance, QAArtifact
@@ -24,26 +22,6 @@ def package_version() -> str:
         return version("fmri-qa-report")
     except PackageNotFoundError:
         return "unknown"
-
-
-def appendix_rows(
-    items: Iterable[tuple[str, QAArtifact]],
-) -> list[tuple[str, str]]:
-    """(scan title, provenance text) rows for the packet appendix.
-
-    Joins the device and scanner/coil/software/time lines with the version of
-    the package that computed the artifact; a scan without a sidecar still
-    contributes its computed-by line, so every scan is accounted for.
-    """
-    rows = []
-    for title, artifact in items:
-        prov = artifact.provenance
-        parts = [device_line(prov), provenance_line(prov)]
-        if prov.core_version:
-            parts.append(f"computed by fmri-qa-core {prov.core_version}")
-        detail = _SEP.join(p for p in parts if p) or "no sidecar metadata"
-        rows.append((title, detail))
-    return rows
 
 
 def acquisition_line(artifact: QAArtifact) -> str:

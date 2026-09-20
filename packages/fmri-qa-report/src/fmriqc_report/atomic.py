@@ -1,14 +1,13 @@
-"""Atomic writes of a single file or a fresh directory, honouring the umask.
+"""Atomic writes of a single file, honouring the umask.
 
-Every format driver that publishes a finished artifact — a run page, a PDF
-packet, a whole site — wants the same two guarantees: a reader never observes
-a partial write, and the file or directory left behind carries ordinary
-permissions rather than the `0600`/`0700` `tempfile` defaults. `tempfile.mkstemp`
-and `tempfile.mkdtemp` create their result `0600`/`0700` regardless of the
-process umask, because they are designed for private scratch files, not for
-something meant to be read back by someone else. A report or a published site
-is exactly the opposite case, so this module creates its own uniquely named
-sibling paths with the kernel's ordinary umask-filtered permissions instead.
+Every format driver that publishes a finished artifact — a run page — wants
+the same two guarantees: a reader never observes a partial write, and the file
+left behind carries ordinary permissions rather than the `0600` `tempfile`
+default. `tempfile.mkstemp` creates its result `0600` regardless of the process
+umask, because it is designed for a private scratch file, not for something
+meant to be read back by someone else. A report is exactly the opposite case,
+so this module creates its own uniquely named sibling path with the kernel's
+ordinary umask-filtered permissions instead.
 """
 
 import os

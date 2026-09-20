@@ -2,8 +2,8 @@
 
 The page needs no companion file: the stylesheet is inlined and every figure
 is embedded as a ``data:`` URI, so it opens from ``file://`` with no network
-or sibling asset. It is handed out entirely on its own, as a PDF alternative
-a physicist can double-click, email, or drop into their own website.
+or sibling asset. It is handed out entirely on its own: a physicist can
+double-click it, email it, or drop it into their own website.
 """
 
 import html
@@ -86,11 +86,10 @@ def write_run_page(
 ) -> Path:
     """Write :func:`render_run_page`'s document to ``path`` and return it.
 
-    The write is atomic, matching ``formats.reportlab.packet``'s convention:
-    the page is rendered fully in memory first, then written to a sibling
-    temporary file and moved into place with :meth:`Path.replace`, so a reader
-    never observes a partial file and a failed render or write never disturbs
-    an existing destination.
+    The write is atomic: the page is rendered fully in memory first, then
+    written to a sibling temporary file and moved into place with
+    :meth:`Path.replace`, so a reader never observes a partial file and a
+    failed render or write never disturbs an existing destination.
     """
     target = Path(path)
     page = render_run_page(

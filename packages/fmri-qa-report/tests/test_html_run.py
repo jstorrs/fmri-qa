@@ -8,8 +8,10 @@ from dataclasses import replace
 from html.parser import HTMLParser
 from pathlib import Path
 
+import numpy as np
 import pytest
 
+import fmriqc as q
 from fmriqc_report.content import METRIC_DOCS
 from fmriqc_report.formats.html import resources
 from fmriqc_report.formats.html import run as run_module
@@ -178,6 +180,26 @@ def test_run_page_is_byte_reproducible(artifact) -> None:
     assert first == second
 
 
+def test_a_reloaded_artifact_renders_identically(tmp_path, artifact) -> None:
+    """The seam's payoff: a saved artifact is as good as a freshly computed one."""
+    reloaded = q.load_artifact(q.save_artifact(artifact, tmp_path / "qa.nc"))
+    live = render_run_page(artifact, title="Test run", report_version="report-test")
+    disk = render_run_page(reloaded, title="Test run", report_version="report-test")
+    assert live == disk
+
+
+def test_a_blank_scan_with_an_unresolved_rdc_still_renders(tmp_path) -> None:
+    """Every panel must degrade to a page, not an exception, on a degenerate run."""
+    artifact = q.analyze(
+        q.QAScan(data=np.zeros((16, 16, 1, 10)), tr=2.0, pe_axis=1),
+        q.AnalysisSettings(roi_size=3, trim_sec=0, detrend_order=0),
+    )
+    reloaded = q.load_artifact(q.save_artifact(artifact, tmp_path / "blank.nc"))
+    assert not np.isfinite(reloaded.curves.weisskoff.rdc).any()
+    page = render_run_page(reloaded, title="blank", report_version="report-test")
+    assert "Unavailable — estimator unresolved" in page
+
+
 def test_run_page_marks_nonfinite_values_and_analysis_warnings(
     artifact, monkeypatch
 ) -> None:
@@ -239,9 +261,10 @@ def test_run_page_splits_metric_values_from_their_units(
     measurements = artifact.measurements
     # A unit-bearing metric ("4.03%") splits its formatted text into a number
     # and a <small> unit with no inserted space; a dimensionless one ("449.7")
-    # stays a bare number.
-    unit_bearing = next(doc for doc in METRIC_DOCS if doc.unit(measurements) != "1")
-    dimensionless = next(doc for doc in METRIC_DOCS if doc.unit(measurements) == "1")
+    # stays a bare number. "ghost" and "SNR" are picked by label rather than a
+    # unit lookup: the former always formats with a "%" suffix, the latter never.
+    unit_bearing = next(doc for doc in METRIC_DOCS if doc.label == "ghost")
+    dimensionless = next(doc for doc in METRIC_DOCS if doc.label == "SNR")
     assert run_module._split_value(unit_bearing.fmt(measurements)) in page
     dimensionless_text = dimensionless.fmt(measurements)
     assert f'<span class="v num">{dimensionless_text}</span>' in page
