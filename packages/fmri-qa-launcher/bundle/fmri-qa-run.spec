@@ -9,6 +9,8 @@
 # project reaches some other way, stated once here rather than discovered as a
 # ModuleNotFoundError on a scanner console.
 
+from pathlib import Path
+
 from PyInstaller.utils.hooks import (
     collect_data_files,
     collect_submodules,
@@ -44,8 +46,18 @@ for distribution in FIRST_PARTY:
 # `find_dcm2niix` prefers the binary the `dcm2niix` wheel ships, located at
 # `dcm2niix.bin` beside the module's `__file__`. Placing it at the same relative
 # path keeps that branch the one that answers, so the executable converts DICOM
-# on a machine with no dcm2niix. As a *binary* entry it keeps its exec bit.
-binaries = [(dcm2niix.bin, "dcm2niix")]
+# on a machine with no dcm2niix. As *binary* entries they keep their exec bit.
+#
+# What is collected is every non-Python file in the package directory, not
+# `dcm2niix.bin` itself, because that path is not a file on every platform: it
+# is always the extensionless `dcm2niix`, while the Windows wheel ships
+# `dcm2niix.exe` (found at run time because CreateProcess appends `.exe`) with
+# the MSVC runtime DLLs it loads from its own directory beside it.
+binaries = [
+    (str(path), "dcm2niix")
+    for path in Path(dcm2niix.__file__).parent.iterdir()
+    if path.is_file() and path.suffix != ".py"
+]
 
 a = Analysis(
     ["fmri_qa_run.py"],
