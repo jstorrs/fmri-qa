@@ -53,6 +53,7 @@ from typing import Any
 from numpy.typing import NDArray
 
 from ...exceptions import InvalidArtifactError
+from ...rename import replace_patiently
 from ..artifact import ARTIFACT_SCHEMA_VERSION, QAArtifact
 from ..validation import validate_artifact, validate_document
 from . import netcdf, npz
@@ -156,8 +157,10 @@ def save_artifact(artifact: QAArtifact, path: str | Path) -> Path:
             os.fsync(fh.fileno())
         # Only after the writer has closed the file: Windows refuses to rename
         # one that is still open, and HDF5 holds it open until the Dataset is
-        # closed.
-        tmp.replace(out)
+        # closed. It can also refuse one that something *else* has opened, and
+        # a file closed a moment ago is exactly what a sync client or scanner
+        # opens next -- hence patiently (see `rename`).
+        replace_patiently(tmp, out)
     finally:
         # A no-op once the move succeeded; the cleanup that matters is the one
         # after a failure, which must not leave debris beside the archive.

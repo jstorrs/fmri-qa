@@ -16,6 +16,8 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
 
+from fmriqc.rename import replace_patiently
+
 __all__ = ["atomic_file"]
 
 
@@ -28,16 +30,19 @@ def atomic_file(target: Path) -> Iterator[Path]:
     kernel — not this function — applies the process umask; reading the umask
     directly (``os.umask``) is not thread-safe and is deliberately avoided.
     The caller writes through the yielded path; on a clean exit it is moved
-    onto ``target`` with :meth:`Path.replace`, so a reader never sees a
-    partial file. Any exception, including one raised while writing, skips
-    the replace and leaves an existing ``target`` untouched; the temporary
-    file is always removed. ``target``'s parent directory must already exist.
+    onto ``target`` by a rename, so a reader never sees a partial file. The
+    rename is :func:`fmriqc.rename.replace_patiently`: a page closed a moment
+    ago is what a sync client or virus scanner opens next, and while either
+    holds it the rename is refused. Any exception, including one raised while
+    writing, skips the rename and leaves an existing ``target`` untouched; the
+    temporary file is always removed. ``target``'s parent directory must
+    already exist.
     """
     temporary = target.parent / f".{target.name}.{secrets.token_hex(8)}.tmp"
     fd = os.open(temporary, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o666)
     os.close(fd)
     try:
         yield temporary
-        temporary.replace(target)
+        replace_patiently(temporary, target)
     finally:
         temporary.unlink(missing_ok=True)

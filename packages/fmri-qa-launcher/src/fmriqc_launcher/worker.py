@@ -14,7 +14,8 @@ at runtime unless a run actually starts.
 The thread is non-daemon on purpose: a windowed build has no console for a
 half-finished staging tree to complain from, and `run_session` already
 promises nothing partial ever reaches `output_dir` -- but only if it is
-allowed to finish unwinding (its `finally: shutil.rmtree(staging, ...)`) when
+allowed to finish unwinding (its `finally: shutil.rmtree(staging, ...)`, which
+logs the one case it cannot finish: a file something else holds open) when
 the process is asked to exit. A `Crashed` event is how *any* exception,
 expected or not, still reaches a caller that has no stderr of its own -- a
 windowed executable's `sys.stderr` is `None`, so an error that only ever

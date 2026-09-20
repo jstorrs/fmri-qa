@@ -31,6 +31,7 @@ from typing import assert_never
 
 from ..exceptions import ConversionError, InvalidChoiceError
 from ..load.paths import NIFTI_SUFFIXES, nifti_stem, sidecar_path
+from ..rename import replace_patiently
 from ..types import ANONYMIZE_MODES, NAME_STYLES, Anonymize, NameStyle, Sidecar
 from . import naming
 from .dcm2niix import DEFAULT_TEMPLATE, build_args, find_dcm2niix, run, version
@@ -216,7 +217,7 @@ def _file_series(
     planned = _plan_files(staged, destination, chosen)
     _refuse_collisions(planned, destination, force)
     for source, target_path in planned:
-        source.replace(target_path)
+        replace_patiently(source, target_path)
 
     filed = []
     for path in produced:

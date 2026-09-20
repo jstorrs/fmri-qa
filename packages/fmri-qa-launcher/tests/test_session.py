@@ -7,6 +7,7 @@ milliseconds' stand-in that still leaves a file behind for `Published.report`
 to point at.
 """
 
+import logging
 import os
 import stat
 import sys
@@ -27,6 +28,7 @@ from fmriqc_launcher.session import (
     Published,
     Refused,
     _assign_companions,
+    _publish,
     run_session,
 )
 
@@ -663,3 +665,121 @@ def test_a_failure_saving_the_artifact_is_a_failed_outcome_with_its_warnings(
     assert any("stub warning from the analysis" in w for w in outcome.warnings)
     assert output_dir.is_dir()
     assert list(output_dir.iterdir()) == []
+
+
+def test_publishing_renames_the_work_directory(tmp_path: Path) -> None:
+    work, target = tmp_path / "work", tmp_path / "series"
+    work.mkdir()
+    (work / "scan.nii.gz").write_text("scan")
+
+    _publish(work, target)
+
+    assert (target / "scan.nii.gz").read_text() == "scan"
+    assert not work.exists()
+
+
+def test_publishing_onto_an_existing_series_is_refused_before_any_rename(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    work, target = tmp_path / "work", tmp_path / "series"
+    work.mkdir()
+    target.mkdir()
+
+    def _never(*_args: object, **_kwargs: object) -> None:
+        raise AssertionError("renamed onto a directory that already existed")
+
+    monkeypatch.setattr("fmriqc_launcher.session.replace_patiently", _never)
+
+    with pytest.raises(SessionError, match="created while this run was in progress"):
+        _publish(work, target)
+
+
+@pytest.mark.parametrize("refusal", [PermissionError, FileExistsError])
+def test_a_series_published_by_another_run_mid_rename_is_named_as_that(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, refusal: type[OSError]
+) -> None:
+    """Windows reports a rename onto an existing directory as `refusal`.
+
+    `PermissionError` is the one `replace_patiently` waits out, so by the time
+    it gives up the other run has long since published -- and "access is
+    denied" is no description of that.
+    """
+    work, target = tmp_path / "work", tmp_path / "series"
+    work.mkdir()
+
+    def _lose_the_race(_source: Path, destination: Path) -> None:
+        destination.mkdir()
+        raise refusal(13, "Access is denied")
+
+    monkeypatch.setattr("fmriqc_launcher.session.replace_patiently", _lose_the_race)
+
+    with pytest.raises(SessionError, match="created while this run was in progress"):
+        _publish(work, target)
+    assert work.exists()
+
+
+def test_a_rename_refused_for_any_other_reason_keeps_its_own_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    work, target = tmp_path / "work", tmp_path / "series"
+    work.mkdir()
+
+    def _held(*_args: object, **_kwargs: object) -> None:
+        raise PermissionError(13, "held open by a sync client")
+
+    monkeypatch.setattr("fmriqc_launcher.session.replace_patiently", _held)
+
+    with pytest.raises(PermissionError, match="held open by a sync client"):
+        _publish(work, target)
+
+
+def test_a_staging_directory_that_cannot_be_removed_is_logged_by_name(
+    tmp_path: Path,
+    dicom_dir: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """`ignore_errors=True` must not mean a silent residue beside the reports."""
+
+    def _stop(*_args: object, **_kwargs: object) -> None:
+        raise SessionError("stopped before any series")
+
+    monkeypatch.setattr("fmriqc_launcher.session._run_in_staging", _stop)
+    monkeypatch.setattr("fmriqc_launcher.session.shutil.rmtree", lambda *_a, **_k: None)
+    request = RunRequest(
+        dicom_dir=dicom_dir, output_dir=tmp_path / "output", settings=_SETTINGS
+    )
+
+    with (
+        caplog.at_level(logging.WARNING, logger="fmriqc_launcher.session"),
+        pytest.raises(SessionError, match="stopped before any series"),
+    ):
+        run_session(request)
+
+    (left_behind,) = (tmp_path / "output").glob(".fmri-qa-run.*")
+    assert str(left_behind) in caplog.text
+    assert "can be deleted" in caplog.text
+
+
+def test_a_staging_directory_that_was_removed_is_not_mentioned(
+    tmp_path: Path,
+    dicom_dir: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    def _stop(*_args: object, **_kwargs: object) -> None:
+        raise SessionError("stopped before any series")
+
+    monkeypatch.setattr("fmriqc_launcher.session._run_in_staging", _stop)
+    request = RunRequest(
+        dicom_dir=dicom_dir, output_dir=tmp_path / "output", settings=_SETTINGS
+    )
+
+    with (
+        caplog.at_level(logging.WARNING, logger="fmriqc_launcher.session"),
+        pytest.raises(SessionError),
+    ):
+        run_session(request)
+
+    assert not list((tmp_path / "output").glob(".fmri-qa-run.*"))
+    assert "staging directory" not in caplog.text

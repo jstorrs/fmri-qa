@@ -28,6 +28,7 @@ from pathlib import Path
 import fmriqc
 from fmriqc.exceptions import ConversionError
 from fmriqc.load.paths import nifti_stem
+from fmriqc.rename import replace_patiently
 from fmriqc_report.formats.html import write_run_page
 
 from .exceptions import SessionError
@@ -159,8 +160,9 @@ def run_session(
 
     `output_dir` is created if missing. Work happens inside a hidden staging
     directory beside it (`.fmri-qa-run.<token>`, removed whether or not the
-    run succeeds), so a reader of `output_dir` only ever sees series that are
-    completely finished. A series whose name already exists in `output_dir`
+    run succeeds -- or, where something else holds a file in it open, logged
+    by name as left behind), so a reader of `output_dir` only ever sees series
+    that are completely finished. A series whose name already exists in `output_dir`
     is refused rather than overwritten and costs nothing; `should_continue` is
     polled between the remaining series (never in the middle of one) so a
     cancel takes effect at the next safe point rather than tearing a render in
@@ -202,6 +204,18 @@ def run_session(
         return _run_in_staging(request, staging, progress, should_continue)
     finally:
         shutil.rmtree(staging, ignore_errors=True)
+        # `ignore_errors` is what lets this run while an exception unwinds, and
+        # it is also what would make a failure silent. The same holder that
+        # refuses a rename (see `fmriqc.rename`) refuses an unlink, and what it
+        # leaves is a directory with a random name sitting beside the reports --
+        # a leading dot hides nothing on Windows -- that nothing will ever
+        # remove. It holds no finished series, so say so and say it is safe.
+        if staging.exists():
+            _LOG.warning(
+                "could not remove the staging directory %s; it holds nothing "
+                "finished and can be deleted",
+                staging,
+            )
 
 
 def _assign_companions(
@@ -300,7 +314,7 @@ def _move_companions(
 ) -> None:
     """Move the NIfTI `imported_name` and its assigned `companions` into `work_dir`."""
     for file_name in (imported_name, *companions):
-        (source_dir / file_name).replace(work_dir / file_name)
+        replace_patiently(source_dir / file_name, work_dir / file_name)
 
 
 def _failed(name: str, exc: Exception, noted: tuple[str, ...] = ()) -> Failed:
@@ -383,11 +397,7 @@ def _publish_series(
 
     progress(Progress(Stage.PUBLISH, planned.index, planned.total, name))
     try:
-        if planned.target.exists():
-            raise SessionError(
-                f"{planned.target} was created while this run was in progress"
-            )
-        work_dir.replace(planned.target)
+        _publish(work_dir, planned.target)
     except Exception as exc:  # noqa: BLE001 - one series' failure, reported and skipped
         return _failed(name, exc, noted)
 
@@ -401,6 +411,28 @@ def _publish_series(
         report=planned.target / report_path.name,
         warnings=noted,
     )
+
+
+def _publish(work_dir: Path, target: Path) -> None:
+    """Rename a finished `work_dir` to `target`, refusing one that already exists.
+
+    The check has to be made on both sides of the rename. Before, because a
+    rename onto an existing directory must never be attempted. After, because
+    `replace_patiently` can spend seconds waiting, another run can publish
+    `target` in that window, and Windows reports a rename onto an existing
+    directory as the very `PermissionError` being waited out (sometimes as
+    `FileExistsError`) -- so without the second look, the one collision this
+    guard exists to name would surface as "access is denied".
+    """
+    taken = f"{target} was created while this run was in progress"
+    if target.exists():
+        raise SessionError(taken)
+    try:
+        replace_patiently(work_dir, target)
+    except OSError as exc:
+        if target.exists():
+            raise SessionError(taken) from exc
+        raise
 
 
 def _messages(caught: list[warnings.WarningMessage]) -> tuple[str, ...]:

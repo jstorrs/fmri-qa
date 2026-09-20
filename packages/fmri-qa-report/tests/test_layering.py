@@ -4,7 +4,8 @@ The whole point of the split is that presentation depends on the *published
 artifact*, not on the pipeline that produced it. That is easy to state and easy
 to erode one convenient import at a time, so it is checked mechanically here:
 every `fmriqc` import in the report package must land in `fmriqc.analysis` (the
-artifact) or `fmriqc.types` (the shared array/option vocabulary). An import of
+artifact), `fmriqc.types` (the shared array/option vocabulary), or
+`fmriqc.rename` (how a finished file is moved into place). An import of
 `fmriqc.metrics`, `fmriqc.pipeline`, `fmriqc.prep`, or `fmriqc.load` — or of the
 `fmriqc` package as a whole, which pulls all of them — fails this test.
 
@@ -26,7 +27,15 @@ import pytest
 import fmriqc_report
 
 # The only calculation-side modules presentation is allowed to reach for.
-ALLOWED = frozenset({"fmriqc.analysis", "fmriqc.types"})
+#
+# `fmriqc.rename` is here although it is not about the artifact at all, and that
+# is the argument for it: it is a leaf over the standard library, so it cannot
+# bring a line of the calculation in behind it (the runtime half of this test
+# would catch it if that changed). What it carries is a policy -- how long to
+# outwait a sync client holding a just-written file -- that the artifact's
+# writer and the page's writer must agree on, and a second copy kept in step by
+# hand is the worse way to say so.
+ALLOWED = frozenset({"fmriqc.analysis", "fmriqc.types", "fmriqc.rename"})
 
 _SOURCE_ROOT = Path(fmriqc_report.__file__).parent
 
