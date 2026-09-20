@@ -540,6 +540,363 @@ def test_force_overwrites_what_the_refusal_protects(tmp_path, fake_dcm2niix) -> 
     assert existing.read_bytes() == b"2_QA"
 
 
+# --------------------------------------------------------------------------
+# filing: a move that starts and cannot finish
+# --------------------------------------------------------------------------
+
+QA_NIFTI = "20260909_143012_s002_QA_EPI_ISO.nii.gz"
+QA_JSON = "20260909_143012_s002_QA_EPI_ISO.json"
+
+
+def _refusing(monkeypatch, refuse) -> list[tuple[str, str]]:
+    """Make the filing rename refuse whenever `refuse(source, target)` says so.
+
+    Stands in for `replace_patiently` where `convert.session` looks it up, so
+    no test waits out the real ladder; every rename asked for is logged as
+    `(source name, target name)`, refused or not.
+    """
+    asked: list[tuple[str, str]] = []
+
+    def replace(source: Path, target: Path) -> None:
+        asked.append((source.name, target.name))
+        if refuse(source, target):
+            raise PermissionError(13, "held open by a sync client")
+        source.replace(target)
+
+    monkeypatch.setattr("fmriqc.convert.session.replace_patiently", replace)
+    return asked
+
+
+def _listing(directory: Path) -> dict[str, bytes | None]:
+    """Everything under `directory`, by relative name: bytes, or None for a directory.
+
+    Directories count, so that "as it was" notices an emptied set-aside
+    directory left behind as surely as a file.
+    """
+    return {
+        str(path.relative_to(directory)): path.read_bytes() if path.is_file() else None
+        for path in sorted(directory.rglob("*"))
+    }
+
+
+def test_a_move_that_fails_part_way_is_undone(
+    tmp_path, fake_dcm2niix, monkeypatch
+) -> None:
+    """Files move in name order: the sidecar lands, the NIfTI is refused, and
+    the sidecar goes back."""
+    binary = fake_dcm2niix({"2_QA": FULL_SIDECAR})
+    out = tmp_path / "nifti"
+    out.mkdir()
+    (out / "notes.txt").write_text("the caller's own file")
+    before = _listing(out)
+    asked = _refusing(
+        monkeypatch, lambda _, target: target.parent == out and target.name == QA_NIFTI
+    )
+
+    with pytest.raises(q.ConversionError) as excinfo:
+        import_dicom(tmp_path, out, binary=binary)
+
+    assert excinfo.value.stage == "destination"
+    assert f"could not move {QA_NIFTI}" in str(excinfo.value)
+    assert "held open by a sync client" in str(excinfo.value)
+    assert "was undone" in str(excinfo.value)
+    assert _listing(out) == before
+    # It really had been filed, and really was withdrawn -- not never moved.
+    assert ("2_QA.json", QA_JSON) in asked
+    assert (QA_JSON, "2_QA.json") in asked
+
+
+def test_a_fresh_destination_is_removed_again_when_the_move_is_undone(
+    tmp_path, fake_dcm2niix, monkeypatch
+) -> None:
+    binary = fake_dcm2niix({"2_QA": FULL_SIDECAR})
+    out = tmp_path / "nifti"
+    _refusing(monkeypatch, lambda _, target: target.name == QA_NIFTI)
+
+    with pytest.raises(q.ConversionError, match="was undone"):
+        import_dicom(tmp_path, out, binary=binary)
+
+    assert not out.exists()
+
+
+def test_a_forced_move_that_fails_puts_back_what_it_had_replaced(
+    tmp_path, fake_dcm2niix, monkeypatch
+) -> None:
+    """The case that matters most: never a new scan beside an old sidecar."""
+    binary = fake_dcm2niix({"2_QA": FULL_SIDECAR})
+    out = tmp_path / "nifti"
+    out.mkdir()
+    (out / QA_NIFTI).write_text("an earlier scan")
+    (out / QA_JSON).write_text("an earlier sidecar")
+    before = _listing(out)
+    # The earlier sidecar is set aside and the new one filed, the earlier scan
+    # is set aside -- and then the new scan is refused.
+    _refusing(
+        monkeypatch,
+        lambda source, target: source.name == "2_QA.nii.gz" and target.parent == out,
+    )
+
+    with pytest.raises(q.ConversionError, match="was undone"):
+        import_dicom(tmp_path, out, binary=binary, force=True)
+
+    assert _listing(out) == before
+
+
+def test_nothing_is_filed_until_everything_in_its_way_has_been_set_aside(
+    tmp_path, fake_dcm2niix, monkeypatch
+) -> None:
+    """The order is the safety: a refused set-aside must find nothing new filed.
+
+    Set one aside, file its replacement, go on to the next -- and the earlier
+    scan that will not move is left beside a new sidecar, which may then refuse
+    to come back out: a scan described by the wrong series, under final names,
+    with nothing to say so. Done in two passes there is nothing to withdraw.
+    """
+    binary = fake_dcm2niix({"2_QA": FULL_SIDECAR})
+    out = tmp_path / "nifti"
+    out.mkdir()
+    (out / QA_NIFTI).write_text("an earlier scan")
+    (out / QA_JSON).write_text("an earlier sidecar")
+    before = _listing(out)
+
+    def refuse(source: Path, target: Path) -> bool:
+        setting_the_scan_aside = source == out / QA_NIFTI
+        withdrawing_anything = source.parent == out and target.name.startswith("2_QA")
+        return setting_the_scan_aside or withdrawing_anything
+
+    asked = _refusing(monkeypatch, refuse)
+
+    with pytest.raises(q.ConversionError) as excinfo:
+        import_dicom(tmp_path, out, binary=binary, force=True)
+
+    assert f"could not set the existing {QA_NIFTI} aside" in str(excinfo.value)
+    assert "was undone" in str(excinfo.value)
+    assert not any(source.startswith("2_QA") for source, _ in asked)
+    assert _listing(out) == before
+
+
+def test_a_forced_move_refused_at_its_first_file_puts_everything_back(
+    tmp_path, fake_dcm2niix, monkeypatch
+) -> None:
+    """Everything is set aside and nothing filed: the undo starts from there."""
+    binary = fake_dcm2niix({"2_QA": FULL_SIDECAR})
+    out = tmp_path / "nifti"
+    out.mkdir()
+    (out / QA_NIFTI).write_text("an earlier scan")
+    (out / QA_JSON).write_text("an earlier sidecar")
+    before = _listing(out)
+    _refusing(
+        monkeypatch,
+        lambda source, target: source.name == "2_QA.json" and target.parent == out,
+    )
+
+    with pytest.raises(q.ConversionError, match="was undone"):
+        import_dicom(tmp_path, out, binary=binary, force=True)
+
+    assert _listing(out) == before
+
+
+def test_a_series_already_filed_is_withdrawn_when_a_later_one_is_refused(
+    tmp_path, fake_dcm2niix, monkeypatch
+) -> None:
+    """All or nothing is a promise about the session, not about each series."""
+    later = FULL_SIDECAR | {
+        "SeriesNumber": 3,
+        "AcquisitionDateTime": "2026-09-09T14:41:00.000000",
+        "AcquisitionTime": "14:41:00.000000",
+    }
+    binary = fake_dcm2niix({"2_QA": FULL_SIDECAR, "3_QA": later})
+    out = tmp_path / "nifti"
+    out.mkdir()
+    (out / "notes.txt").write_text("the caller's own file")
+    before = _listing(out)
+    asked = _refusing(
+        monkeypatch,
+        lambda source, target: source.name == "3_QA.nii.gz" and target.parent == out,
+    )
+
+    with pytest.raises(q.ConversionError, match="was undone"):
+        import_dicom(tmp_path, out, binary=binary)
+
+    # The whole of series 2 had landed, and the whole of it went back.
+    assert ("2_QA.nii.gz", QA_NIFTI) in asked
+    assert (QA_NIFTI, "2_QA.nii.gz") in asked
+    assert _listing(out) == before
+
+
+def test_a_set_aside_directory_that_will_not_go_does_not_hide_the_error(
+    tmp_path, fake_dcm2niix, monkeypatch
+) -> None:
+    """Removing it is cleanup; what the caller needs is the state of the import."""
+    binary = fake_dcm2niix({"2_QA": FULL_SIDECAR})
+    out = tmp_path / "nifti"
+    out.mkdir()
+    (out / QA_NIFTI).write_text("an earlier scan")
+    real = Path.rmdir
+
+    def rmdir(self: Path) -> None:
+        if self.name.startswith(".fmri-qa-replaced-"):
+            raise PermissionError(13, "held open by a sync client")
+        real(self)
+
+    monkeypatch.setattr(Path, "rmdir", rmdir)
+    _refusing(
+        monkeypatch,
+        lambda source, target: source.name == "2_QA.nii.gz" and target.parent == out,
+    )
+
+    with pytest.raises(q.ConversionError, match="was undone"):
+        import_dicom(tmp_path, out, binary=binary, force=True)
+
+    assert (out / QA_NIFTI).read_text() == "an earlier scan"
+
+
+def test_replaced_files_that_cannot_be_deleted_are_not_left_silently(
+    tmp_path, fake_dcm2niix, monkeypatch
+) -> None:
+    """The import succeeded, so this is a warning -- but it is not nothing."""
+    binary = fake_dcm2niix({"2_QA": FULL_SIDECAR})
+    out = tmp_path / "nifti"
+    out.mkdir()
+    (out / QA_NIFTI).write_text("an earlier scan")
+    real = shutil.rmtree
+
+    def rmtree(path: Path, **kwargs: object) -> None:
+        if not Path(path).name.startswith(".fmri-qa-replaced-"):
+            real(path, **kwargs)
+
+    monkeypatch.setattr("fmriqc.convert.session.shutil.rmtree", rmtree)
+
+    with pytest.warns(UserWarning, match="holds the files this import replaced"):
+        result = import_dicom(tmp_path, out, binary=binary, force=True)
+
+    assert [series.path.name for series in result.series] == [QA_NIFTI]
+    assert (out / QA_NIFTI).read_bytes() == b"2_QA"
+    (aside,) = out.glob(".fmri-qa-replaced-*")
+    assert (aside / QA_NIFTI).read_text() == "an earlier scan"
+
+
+def test_a_forced_move_that_succeeds_leaves_nothing_set_aside(
+    tmp_path, fake_dcm2niix
+) -> None:
+    binary = fake_dcm2niix({"2_QA": FULL_SIDECAR})
+    out = tmp_path / "nifti"
+    out.mkdir()
+    (out / QA_NIFTI).write_text("an earlier scan")
+    (out / QA_JSON).write_text("an earlier sidecar")
+
+    import_dicom(tmp_path, out, binary=binary, force=True)
+
+    assert sorted(p.name for p in out.iterdir()) == [QA_JSON, QA_NIFTI]
+    assert (out / QA_NIFTI).read_bytes() == b"2_QA"
+    assert json.loads((out / QA_JSON).read_text()) == FULL_SIDECAR
+
+
+def test_a_move_that_cannot_be_undone_says_exactly_what_is_left(
+    tmp_path, fake_dcm2niix, monkeypatch
+) -> None:
+    """The holder that refused the scan now refuses to let the sidecar go back.
+
+    Nothing more is forced, and nothing is put back around it: the earlier scan
+    *could* be restored, and would then sit beside this import's sidecar looking
+    like a matching pair. So the new sidecar stays, named as this import's, and
+    both earlier files are kept, set aside, where nothing will read them as a
+    result.
+    """
+    binary = fake_dcm2niix({"2_QA": FULL_SIDECAR})
+    out = tmp_path / "nifti"
+    out.mkdir()
+    (out / QA_NIFTI).write_text("an earlier scan")
+    (out / QA_JSON).write_text("an earlier sidecar")
+
+    def refuse(source: Path, target: Path) -> bool:
+        filing_the_scan = source.name == "2_QA.nii.gz" and target.parent == out
+        withdrawing_the_sidecar = source == out / QA_JSON and target.name == "2_QA.json"
+        return filing_the_scan or withdrawing_the_sidecar
+
+    _refusing(monkeypatch, refuse)
+
+    with pytest.raises(q.ConversionError) as excinfo:
+        import_dicom(tmp_path, out, binary=binary, force=True)
+
+    message = str(excinfo.value)
+    assert "undoing the import failed too" in message
+    assert f"{QA_JSON} in it are from this import" in message
+    (aside,) = out.glob(".fmri-qa-replaced-*")
+    assert f"the {QA_JSON}, {QA_NIFTI} it replaced are kept in {aside}" in message
+
+    left = _listing(out)
+    assert json.loads(left.pop(QA_JSON) or b"") == FULL_SIDECAR
+    assert left == {
+        aside.name: None,
+        f"{aside.name}/{QA_JSON}": b"an earlier sidecar",
+        f"{aside.name}/{QA_NIFTI}": b"an earlier scan",
+    }
+
+
+def test_an_unforced_move_that_cannot_be_undone_names_what_it_left(
+    tmp_path, fake_dcm2niix, monkeypatch
+) -> None:
+    """Nothing was replaced, so nothing is set aside: only this import's file."""
+    binary = fake_dcm2niix({"2_QA": FULL_SIDECAR})
+    out = tmp_path / "nifti"
+    out.mkdir()
+
+    def refuse(source: Path, target: Path) -> bool:
+        filing_the_scan = source.name == "2_QA.nii.gz" and target.parent == out
+        withdrawing_the_sidecar = source == out / QA_JSON
+        return filing_the_scan or withdrawing_the_sidecar
+
+    _refusing(monkeypatch, refuse)
+
+    with pytest.raises(q.ConversionError) as excinfo:
+        import_dicom(tmp_path, out, binary=binary)
+
+    message = str(excinfo.value)
+    assert "undoing the import failed too" in message
+    assert f"{QA_JSON} in it are from this import" in message
+    assert "it replaced" not in message
+    assert sorted(p.name for p in out.iterdir()) == [QA_JSON]
+
+
+def test_a_replaced_file_that_cannot_be_put_back_is_kept_and_named(
+    tmp_path, fake_dcm2niix, monkeypatch
+) -> None:
+    """Everything of this import is withdrawn; one earlier file will not go back.
+
+    The rest are restored -- there is no new file left for them to be mistaken
+    beside -- and the one that would not move is kept where it is, by name.
+    """
+    binary = fake_dcm2niix({"2_QA": FULL_SIDECAR})
+    out = tmp_path / "nifti"
+    out.mkdir()
+    (out / QA_NIFTI).write_text("an earlier scan")
+    (out / QA_JSON).write_text("an earlier sidecar")
+
+    def refuse(source: Path, target: Path) -> bool:
+        filing_the_scan = source.name == "2_QA.nii.gz" and target.parent == out
+        restoring_the_sidecar = (
+            ".fmri-qa-replaced-" in str(source) and target == out / QA_JSON
+        )
+        return filing_the_scan or restoring_the_sidecar
+
+    _refusing(monkeypatch, refuse)
+
+    with pytest.raises(q.ConversionError) as excinfo:
+        import_dicom(tmp_path, out, binary=binary, force=True)
+
+    message = str(excinfo.value)
+    (aside,) = out.glob(".fmri-qa-replaced-*")
+    assert "undoing the import failed too" in message
+    assert "from this import" not in message
+    assert f"the {QA_JSON} it replaced are kept in {aside}" in message
+    assert _listing(out) == {
+        QA_NIFTI: b"an earlier scan",
+        aside.name: None,
+        f"{aside.name}/{QA_JSON}": b"an earlier sidecar",
+    }
+
+
 def test_dcm2niix_names_are_kept_verbatim_when_asked_for(
     tmp_path, fake_dcm2niix
 ) -> None:

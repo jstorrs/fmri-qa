@@ -252,7 +252,11 @@ The import is all-or-nothing: it converts into a staging directory and moves the
 result into place only once every file has a name and none would overwrite
 something already there. The names come out of the DICOM, so they cannot be
 checked before converting — checking them before the *move* is what keeps a
-refused import from leaving half a session behind.
+refused import from leaving half a session behind. A move that starts and then
+fails (a sync client holding a file, a disk error) is undone the same way, and
+under `--force` the files being replaced are set aside until the import has
+succeeded, so a failure puts them back rather than leaving a new scan beside an
+old sidecar.
 
 `--dcm2niix-arg` is an escape hatch, passed after everything the command chose
 so it wins; a value starting with `-` needs the `=` form

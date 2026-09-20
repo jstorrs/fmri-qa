@@ -14,6 +14,11 @@ both are the reason for it:
   `cli.destinations` checks `--artifact` paths. Checking them before the *move*
   is the next best thing: the import refuses with every conflict named and the
   destination exactly as it was.
+* **A move that fails part-way is undone.** Filing is a sequence of renames, and
+  the fifth of twelve can be refused -- a sync client holding the file, a disk
+  error. `_file_atomically` records the renames it has made and reverses them,
+  so the destination is as it was; see there for where that cannot be promised,
+  and what is said instead.
 
 Staging is created inside the destination so the move is a rename within one
 filesystem rather than a copy, and is removed whether or not the import
@@ -25,9 +30,11 @@ import shutil
 import tempfile
 from collections import Counter
 from collections.abc import Sequence
+from contextlib import suppress
 from dataclasses import dataclass
 from pathlib import Path
 from typing import assert_never
+from warnings import warn
 
 from ..exceptions import ConversionError, InvalidChoiceError
 from ..load.paths import NIFTI_SUFFIXES, nifti_stem, sidecar_path
@@ -137,9 +144,10 @@ def import_dicom(
             `anonymize` is not one of `ANONYMIZE_MODES`.
         ConversionError: If `source` is not a directory, if no dcm2niix can be
             found or it exits non-zero, if imported files would share a
-            destination, or if the import would overwrite files already in
-            `destination` and `force` is not set. Both destination checks
-            happen before any file moves.
+            destination, if the import would overwrite files already in
+            `destination` and `force` is not set, or if a file cannot be moved
+            into `destination`. Both destination checks happen before any file
+            moves, and a move that fails is undone (see `_file_atomically`).
     """
     # Guarded up front so an untyped caller still gets the named error, then
     # matched exhaustively: `assert_never` is unreachable for a `NameStyle`, so
@@ -216,8 +224,7 @@ def _file_series(
             assert_never(names)
     planned = _plan_files(staged, destination, chosen)
     _refuse_collisions(planned, destination, force)
-    for source, target_path in planned:
-        replace_patiently(source, target_path)
+    _file_atomically(planned, destination)
 
     filed = []
     for path in produced:
@@ -238,10 +245,10 @@ def _refuse_collisions(
 ) -> None:
     """Refuse duplicate destinations, and existing files unless forced.
 
-    Checked across every file of every series before a single one moves, so the
-    destination is either updated completely or not at all — a half-moved import
-    is the state that is hardest to reason about afterwards, and the one a
-    physicist would have to unpick by hand.
+    Checked across every file of every series before a single one moves, so a
+    refusal costs nothing: the destination is exactly as it was. That is half of
+    "updated completely or not at all"; the other half, a move that starts and
+    cannot finish, is `_file_atomically`'s.
     """
     counts = Counter(target for _, target in planned)
     duplicates = sorted(path.name for path, count in counts.items() if count > 1)
@@ -260,6 +267,132 @@ def _refuse_collisions(
             f"{destination} already holds {', '.join(clashes)}; "
             "import into an empty directory, or pass --force to overwrite",
         )
+
+
+def _file_atomically(planned: Sequence[tuple[Path, Path]], destination: Path) -> None:
+    """Move every planned file into `destination`, or leave it as it was.
+
+    A half-moved import is the state that is hardest to reason about afterwards,
+    and under `--force` it is worse than untidy: a new sidecar left beside the
+    *previous* import's scan is a scan described by the wrong series, and
+    nothing about either file says so. So every step here is a rename, recorded
+    as it is made, and a step that fails has the record reversed.
+
+    It is done in two passes, and the order is the safety. First every target
+    that already exists is moved aside -- only ever reached under `--force`
+    (`_refuse_collisions` has refused it otherwise), and moved rather than
+    overwritten so that it can be put back. Only then is anything filed. A pass
+    that fails part-way therefore fails with one vintage of file in
+    `destination`: the old ones while setting aside, since nothing new has been
+    filed, and the new ones while filing, since everything they collide with is
+    already out of the way. Interleaved -- set one aside, file its replacement,
+    go on to the next -- a refused set-aside leaves an old scan that never moved
+    beside a new sidecar that may not come back out.
+
+    Aside is a hidden directory in `destination`, not the staging directory:
+    staging is removed unconditionally when the import ends, and what is set
+    aside is the caller's own file until the import has succeeded. Once it has,
+    the files set aside are deleted -- that is what `--force` asked for.
+
+    Undoing is itself a sequence of renames and can be refused for the reason
+    the move was, so it too is ordered to stop safely: every file this import
+    filed is withdrawn, and only if all of them went are the files set aside put
+    back. A new file that will not leave never has an old one restored around
+    it; what was set aside is *kept*, where nothing will read it as a result,
+    and the error says which files are which. Two things this cannot cover: a
+    process killed part-way, which leaves the half-moved state with whatever it
+    had replaced still set aside; and a file of an earlier import that this one
+    does not collide with, which was never this function's to move.
+
+    Raises:
+        ConversionError: If a file cannot be moved, saying whether the import
+            was undone and, if not completely, exactly what is left.
+    """
+    replaced: list[tuple[Path, Path]] = []  # (target, where it was set aside)
+    filed: list[tuple[Path, Path]] = []  # (staged, target)
+    aside: Path | None = None
+    doing = f"write to {destination}"
+    try:
+        colliding = [target for _, target in planned if target.exists()]
+        if colliding:
+            aside = Path(tempfile.mkdtemp(prefix=".fmri-qa-replaced-", dir=destination))
+            for target in colliding:
+                doing = f"set the existing {target.name} aside"
+                replace_patiently(target, aside / target.name)
+                replaced.append((target, aside / target.name))
+        for staged, target in planned:
+            doing = f"move {target.name} into {destination}"
+            replace_patiently(staged, target)
+            filed.append((staged, target))
+    except OSError as exc:
+        ours = _undo(filed)
+        kept = replaced if ours else _undo(replaced)
+        _remove_if_empty(aside)
+        raise ConversionError(
+            "destination",
+            f"could not {doing}: {exc}; {_aftermath(ours, kept, destination)}",
+        ) from exc
+    if aside is not None:
+        shutil.rmtree(aside, ignore_errors=True)
+        # `ignore_errors` must not mean silently: what is in there is the scans
+        # `--force` was asked to replace, in a directory nothing else removes.
+        if aside.exists():
+            warn(
+                f"could not remove {aside}; it holds the files this import "
+                "replaced and can be deleted",
+                stacklevel=4,  # report at the caller of `import_dicom`
+            )
+
+
+def _undo(moves: Sequence[tuple[Path, Path]]) -> list[tuple[Path, Path]]:
+    """Reverse each `(origin, now)` rename, newest first; return any that refused."""
+    stuck = []
+    for origin, now in reversed(moves):
+        try:
+            replace_patiently(now, origin)
+        except OSError:
+            stuck.append((origin, now))
+    return stuck
+
+
+def _remove_if_empty(aside: Path | None) -> None:
+    """Remove the set-aside directory once an undo has emptied it.
+
+    Cleanup, made while an error is being raised, in a directory something may
+    be holding open -- so it is never allowed to raise. A refusal here would
+    replace the statement of what state the destination is in with a bare errno
+    naming a hidden directory the caller has never heard of.
+    """
+    if aside is not None:
+        with suppress(OSError):
+            if not any(aside.iterdir()):
+                aside.rmdir()
+
+
+def _aftermath(
+    ours: Sequence[tuple[Path, Path]],
+    kept: Sequence[tuple[Path, Path]],
+    destination: Path,
+) -> str:
+    """The second half of the error: what state the move left `destination` in.
+
+    `ours` are files of this import that could not be withdrawn; `kept` are files
+    it had replaced that are still set aside, because they could not be put back
+    or because, with `ours` still in place, they were deliberately not.
+    """
+    if not ours and not kept:
+        return f"the import was undone and {destination} is as it was"
+    left = []
+    if ours:
+        names = ", ".join(sorted(target.name for _, target in ours))
+        left.append(f"{names} in it are from this import")
+    if kept:
+        names = ", ".join(sorted(target.name for target, _ in kept))
+        left.append(f"the {names} it replaced are kept in {kept[0][1].parent}")
+    return (
+        f"undoing the import failed too, so {destination} is left changed: "
+        + "; ".join(left)
+    )
 
 
 def _describe(
