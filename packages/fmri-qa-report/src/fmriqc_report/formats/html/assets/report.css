@@ -142,11 +142,11 @@ table.kv td{overflow-wrap:anywhere; color:var(--ink)}
 .fig figcaption{padding:9px 12px 11px; display:flex; flex-direction:column; gap:3px}
 .fig figcaption strong{font-size:12.5px}
 .fig figcaption span{font-size:11.5px; color:var(--ink-2)}
-.fig .zoomrow{display:flex; align-items:baseline; justify-content:space-between; gap:8px 10px; flex-wrap:wrap}
-@media (max-width:560px){ .fig .zoomrow{flex-direction:column; align-items:flex-start; gap:2px} }
-a.zoom{font-family:"IBM Plex Mono",ui-monospace,monospace; font-size:9.5px; letter-spacing:.08em;
-  text-transform:uppercase; color:var(--ink-3); text-decoration:none; flex:none}
-a.zoom:hover{color:var(--accent)}
+/* the image is itself the enlarge link; .fig clips overflow, so the focus
+   ring is drawn inside the plate rather than around it */
+.fig .plate{position:relative; scroll-margin-top:14px} /* closing returns here, not flush to the edge */
+a.zoom{display:block; cursor:zoom-in}
+a.zoom:focus-visible{outline-offset:-2px}
 a.zoom.close{display:none}
 
 /* figure enlargement, CSS-only via :target.
@@ -154,24 +154,22 @@ a.zoom.close{display:none}
    fills the viewport for either a square phantom image or a wide,
    short time-series plot: the browser's replaced-element sizing picks
    whichever constraint (width or height) binds, preserving the SVG's own
-   intrinsic aspect ratio either way. Close is positioned, not reordered,
-   so DOM order stays img, figcaption, a.zoom, a.zoom.close.
+   intrinsic aspect ratio either way. Clicking the enlarged image closes it:
+   the empty close link is laid over the plate, and the enlarge link beneath
+   is hidden (its image kept visible) so it drops out of the tab order.
    Scoped to screen: a URL carrying a `#fig-…` fragment must still print that
    figure laid out like every other one, not as a fixed full-page overlay. */
 @media screen{
   .fig:target{position:fixed; inset:0; z-index:50; overflow:auto; background:var(--plane); border-radius:0;
-    display:flex; flex-direction:column; align-items:center; gap:14px; padding:70px 28px 32px}
+    display:flex; flex-direction:column; align-items:center; gap:14px; padding:32px 28px}
+  .fig:target .plate{width:100%; max-width:1400px}
   .fig:target img{display:block; margin:0 auto; width:100%; height:auto;
-    max-width:1400px; max-height:70vh; object-fit:contain;
+    max-height:80vh; object-fit:contain;
     background:#fff; padding:16px; border:1px solid var(--rule); border-radius:3px}
   .fig:target figcaption{max-width:900px; width:100%; text-align:center}
-  .fig:target .zoomrow{flex-direction:column; align-items:center; gap:2px}
-  .fig:target a.zoom{display:none}
-  .fig:target a.zoom.close{
-    display:inline-flex; align-items:center; gap:6px;
-    position:fixed; top:18px; right:18px; z-index:51;
-    padding:8px 14px; border:1px solid var(--rule-2); border-radius:3px; background:var(--surface); color:var(--ink)}
-  .fig:target a.zoom.close:hover{border-color:var(--ink); color:var(--accent)}
+  .fig:target a.zoom{visibility:hidden}
+  .fig:target a.zoom img{visibility:visible}
+  .fig:target a.zoom.close{display:block; visibility:visible; position:absolute; inset:0; cursor:zoom-out}
 }
 
 /* ---- methods ----
@@ -209,7 +207,7 @@ details.method p strong{color:var(--ink)}
     --rule:#d7dce0; --rule-2:#c9d1d4;
   }
   body{background:#fff}
-  .skip-link, nav.secnav, a.zoom{display:none!important}
+  .skip-link, nav.secnav{display:none!important}
   /* break-avoidance is ignored between flex items, so stacked containers
      print as plain blocks; a heading then stays with the content it names */
   main, #figures, .panel{display:block}

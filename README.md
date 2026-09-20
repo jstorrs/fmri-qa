@@ -407,10 +407,11 @@ definition and how it is computed, and a provenance table closes the page.
 It opens by double-click with no network and no sibling file, so it is safe to
 email, attach to a QA record, or drop as-is into an existing website. It
 contains no JavaScript, so an embedding site's Content-Security-Policy only
-needs `style-src 'unsafe-inline'` (or a hash) and `img-src data:`. Each figure
-has an Enlarge link that fills the viewport through CSS alone, no script
-involved; dark mode follows the reader's OS setting (figures stay on a white
-plate so plotted data keeps its colors); and the page is print-ready.
+needs `style-src 'unsafe-inline'` (or a hash) and `img-src data:`. Clicking a
+figure enlarges it to fill the viewport, and clicking it again closes it,
+through CSS alone, no script involved; dark mode follows the reader's OS
+setting (figures stay on a white plate so plotted data keeps its colors); and
+the page is print-ready.
 
 ## Library
 

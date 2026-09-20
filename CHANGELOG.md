@@ -8,6 +8,11 @@ versioning when the first stable public interface is released.
 
 ### Changed
 
+- **Clicking a figure in the HTML report enlarges it, and clicking the enlarged
+  figure closes it.** The separate Enlarge and Close links are gone, and
+  closing returns to the figure rather than to the top of the Figures section.
+  The mechanism is still CSS alone, so the page carries no script, and a
+  printed report is unchanged.
 - **`fmri-qa-report` renders one artifact to one HTML file, and nothing else.**
   `--html FILE` is now required rather than one of two output flags, and the
   command takes exactly one artifact; a wildcard that matches several is a

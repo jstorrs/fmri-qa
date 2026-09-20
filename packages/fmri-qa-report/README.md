@@ -23,8 +23,8 @@ self-contained HTML file — stylesheet inlined, every figure embedded as a
 so it is safe to email, attach to a QA record, or drop as-is into an existing
 website. It carries no JavaScript, so an embedding site's
 Content-Security-Policy only needs `style-src 'unsafe-inline'` (or a hash) and
-`img-src data:`. Each figure has an Enlarge link that fills the viewport
-through CSS alone, no script involved; dark mode follows the reader's OS
-setting (figures stay on a white plate so plotted data keeps its colors); and
-the page is print-ready. `--html` takes exactly one artifact; a wildcard
-pattern that matches several is a usage error.
+`img-src data:`. Clicking a figure enlarges it to fill the viewport, and
+clicking it again closes it, through CSS alone, no script involved; dark mode
+follows the reader's OS setting (figures stay on a white plate so plotted data
+keeps its colors); and the page is print-ready. `--html` takes exactly one
+artifact; a wildcard pattern that matches several is a usage error.

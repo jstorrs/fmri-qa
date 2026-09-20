@@ -101,7 +101,11 @@ def test_run_page_offers_a_scriptless_enlarge_target_for_every_figure(
 
     for asset in FIGURE_ASSETS:
         assert f'id="fig-{asset.name}"' in page
-        assert f'href="#fig-{asset.name}"' in page
+        # the image itself is the enlarge link, and a link over it closes,
+        # returning to the figure it came from
+        assert re.search(rf'<a [^>]*href="#fig-{asset.name}"[^>]*><img ', page)
+        assert f'id="plate-{asset.name}"' in page
+        assert f'<a class="zoom close" href="#plate-{asset.name}"' in page
 
     href_values = [
         value for attributes in parsed.attributes if (value := attributes.get("href"))

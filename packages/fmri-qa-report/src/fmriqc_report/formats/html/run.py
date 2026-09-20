@@ -211,13 +211,13 @@ def _acquisition(artifact: QAArtifact) -> str:
 def _figure(rendered: RenderedFigure) -> str:
     asset = rendered.asset
     name = _text(asset.name)
+    title = _text(asset.title)
     return (
-        f'<figure class="fig" id="fig-{name}">'
-        f'<img src="{_figure_src(rendered)}" alt="{_text(asset.title)}">'
-        '<figcaption><div class="zoomrow">'
-        f"<strong>{_text(asset.title)}</strong> "
-        f'<a class="zoom" href="#fig-{name}">Enlarge</a>'
-        '<a class="zoom close" href="#figures">Close</a></div>'
+        f'<figure class="fig" id="fig-{name}"><div class="plate" id="plate-{name}">'
+        f'<a class="zoom" href="#fig-{name}" aria-label="Enlarge {title}">'
+        f'<img src="{_figure_src(rendered)}" alt="{title}"></a>'
+        f'<a class="zoom close" href="#plate-{name}" aria-label="Close {title}"></a>'
+        f"</div><figcaption><strong>{title}</strong>"
         f"<span>{_text(asset.description)}</span></figcaption></figure>"
     )
 
