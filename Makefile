@@ -7,7 +7,7 @@
 # notebook stack is a separate group, `make sync-notebooks`.
 
 .PHONY: all format lint typecheck pyright test license check sync sync-notebooks \
-	sync-docs docs docs-core docs-clean build bundle
+	sync-docs docs docs-core docs-report docs-clean build bundle
 
 all: lint typecheck pyright test
 
@@ -26,14 +26,15 @@ sync-docs:
 	uv sync --all-packages --all-extras --group docs
 
 # The documentation is one site under build/site: a landing page at the root and
-# each package's own Sphinx project in a directory beneath it (core/). Each
-# package's project still builds on its own. A cross-package link goes only
+# each package's own Sphinx project in a directory beneath it (core/, report/).
+# Each package's project still builds on its own. A cross-package link goes only
 # toward a dependency, and is resolved against the dependency's objects.inv
 # already built into the site rather than one fetched over the network, so no
 # build reaches the network and no two builds need each other; the landing page
 # links to everything and so builds last. The layout is also spelled out in SITE
-# in docs/conf.py and in the link back to the landing page in
-# docs/_templates/sidebar/site-home.html; change them together. SITE is
+# in docs/conf.py, in the intersphinx path to core in
+# packages/fmri-qa-report/docs/conf.py, and in the link back to the landing page
+# in docs/_templates/sidebar/site-home.html; change them together. SITE is
 # therefore fixed, not an override point: docs/conf.py assumes build/site, so
 # `make docs SITE=...` would still resolve the landing page's links there.
 #
@@ -59,12 +60,15 @@ sync-docs:
 SITE := build/site
 SPHINX := uv run --group docs sphinx-build -W --keep-going -b html
 
-docs: docs-core
+docs: docs-core docs-report
 	$(SPHINX) -E -d build/sphinx/home/doctrees docs $(SITE)
 	uv run python scripts/check_site_links.py $(SITE)
 
 docs-core:
 	$(SPHINX) -d build/sphinx/core/doctrees packages/fmri-qa-core/docs $(SITE)/core
+
+docs-report: docs-core
+	$(SPHINX) -E -d build/sphinx/report/doctrees packages/fmri-qa-report/docs $(SITE)/report
 
 docs-clean:
 	rm -rf $(SITE) build/sphinx

@@ -13,6 +13,9 @@ spreadsheet, or a trend database reads.
   a page per analysis with its equations, a figure rendered by running the
   pipeline over a synthetic phantom, and exactly what it contributes to the
   analysis artifact, plus a page on the artifact file itself.
+- **{external+report:doc}`fmri-qa-report <index>`** — how an artifact becomes
+  a single self-contained HTML page: the command, what the page shows and what
+  it needs from a browser, and rendering one from Python.
 
 ## Where to start
 
@@ -22,6 +25,10 @@ spreadsheet, or a trend database reads.
 - **"How do I open a `.qa.nc` file?"** — {external+core:doc}`artifact` has the
   MATLAB, R and Python recipes, and the dimensions and coordinates the file is
   laid out on.
+- **"How do I make a report from one?"** — {external+report:doc}`usage`.
+- **"Can I put a report on our website?"** — {external+report:doc}`page` says
+  what the file contains and what an embedding site's Content-Security-Policy
+  has to allow.
 
 Installing, importing DICOM, and the `fmri-qa` command line are covered in the
 repository's `README.md`.
