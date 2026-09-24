@@ -36,7 +36,6 @@ myst_heading_anchors = 3
 
 html_theme = "furo"
 html_title = "fmri-qa analyses"
-html_static_path = ["_static"]
 
 # Figures are results, not examples: the reader wants the curve, and the code
 # that drew it is on the page's subject matter only incidentally. PNG at 150 dpi
