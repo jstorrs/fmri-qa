@@ -16,6 +16,7 @@ what keeps a future CLI's `--help` and a future panel's field labels saying the
 same thing.
 """
 
+import os
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -175,7 +176,11 @@ class RunRequest:
     output_dir: Path
     settings: AnalysisSettings = DEFAULT_SETTINGS
     anonymize: Anonymize = DEFAULT_ANONYMIZE
-    dcm2niix: Path | None = None  # a specific converter; None = bundled, else PATH
+    # A specific converter, as the user named it; None = bundled, else PATH. A
+    # string, not a Path: `Path("./dcm2niix")` is `Path("dcm2niix")`, and the
+    # `./` is what tells `find_dcm2niix` to run that file rather than look the
+    # name up on PATH.
+    dcm2niix: str | None = None
     open_report: bool = False
 
     def __post_init__(self) -> None:
@@ -188,8 +193,10 @@ class RunRequest:
         object.__setattr__(self, "output_dir", self.output_dir.expanduser().resolve())
         if self.dcm2niix is not None:
             # Only the tilde: `find_dcm2niix` looks a bare name up on PATH, and
-            # anchoring it at the current directory would defeat that.
-            object.__setattr__(self, "dcm2niix", self.dcm2niix.expanduser())
+            # anchoring it at the current directory would defeat that. On the
+            # string, because a round trip through Path would drop a `./`.
+            expanded = os.path.expanduser(self.dcm2niix)  # noqa: PTH111  (keeps ./)
+            object.__setattr__(self, "dcm2niix", expanded)
 
         problems = _directory_problems(self.dicom_dir, self.output_dir)
         if self.anonymize not in ANONYMIZE_CHOICES:

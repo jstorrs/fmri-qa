@@ -226,7 +226,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             output_dir=Path(args.output_dir),
             settings=settings,
             anonymize=args.anonymize,
-            dcm2niix=Path(args.dcm2niix) if args.dcm2niix else None,
+            dcm2niix=args.dcm2niix,
             open_report=args.open,
         )
     except RequestError as exc:

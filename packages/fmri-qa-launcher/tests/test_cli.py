@@ -16,6 +16,7 @@ import pytest
 
 import fmriqc
 from fmriqc.convert import naming
+from fmriqc.convert.dcm2niix import find_dcm2niix
 from fmriqc.settings import AnalysisSettings
 from fmriqc_launcher import cli
 from fmriqc_launcher.results import open_results
@@ -150,8 +151,40 @@ def test_each_flag_lands_in_the_right_field(
         trim_sec=3.0, detrend="spline", center="phantom", roi_size=11
     )
     assert request.anonymize == "all"  # type: ignore[attr-defined]
-    assert request.dcm2niix == converter  # type: ignore[attr-defined]
+    assert request.dcm2niix == str(converter)  # type: ignore[attr-defined]
     assert request.open_report is True  # type: ignore[attr-defined]
+
+
+def test_a_dot_slash_dcm2niix_runs_the_file_here_not_one_on_path(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """`--dcm2niix ./dcm2niix` reaches `find_dcm2niix` with its `./` intact."""
+    dicom_dir = tmp_path / "dicom"
+    dicom_dir.mkdir()
+    output_dir = tmp_path / "output"
+    here = tmp_path / "here"
+    here.mkdir()
+    converter = here / "dcm2niix"
+    converter.write_text("#!/bin/sh\n")
+    converter.chmod(converter.stat().st_mode | stat.S_IXUSR)
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    monkeypatch.chdir(here)
+    monkeypatch.setenv("PATH", str(elsewhere))
+    captured: dict[str, object] = {}
+
+    def _fake_run_session(request: object, **_kwargs: object) -> RunResult:
+        captured["request"] = request
+        return RunResult(output_dir, ())
+
+    import fmriqc_launcher.session as session_module
+
+    monkeypatch.setattr(session_module, "run_session", _fake_run_session)
+
+    cli.main([str(dicom_dir), str(output_dir), "--dcm2niix", "./dcm2niix"])
+
+    named = captured["request"].dcm2niix  # type: ignore[attr-defined]
+    assert Path(find_dcm2niix(named)).resolve() == converter.resolve()
 
 
 @pytest.mark.parametrize(

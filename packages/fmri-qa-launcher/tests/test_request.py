@@ -261,10 +261,10 @@ def test_run_request_expands_a_tilde_dcm2niix(
     request = RunRequest(
         dicom_dir=dicom_dir,
         output_dir=tmp_path / "output",
-        dcm2niix=Path("~/dcm2niix"),
+        dcm2niix="~/dcm2niix",
     )
 
-    assert request.dcm2niix == binary
+    assert request.dcm2niix == str(binary)
 
 
 def test_run_request_leaves_a_bare_dcm2niix_name_for_path_lookup(
@@ -277,10 +277,24 @@ def test_run_request_leaves_a_bare_dcm2niix_name_for_path_lookup(
     request = RunRequest(
         dicom_dir=dicom_dir,
         output_dir=tmp_path / "output",
-        dcm2niix=Path("dcm2niix"),
+        dcm2niix="dcm2niix",
     )
 
-    assert request.dcm2niix == Path("dcm2niix")
+    assert request.dcm2niix == "dcm2niix"
+
+
+def test_run_request_keeps_a_dot_slash_dcm2niix_as_given(tmp_path: Path) -> None:
+    """`./dcm2niix` names the file here, and `find_dcm2niix` needs the `./` to know."""
+    dicom_dir = tmp_path / "dicom"
+    dicom_dir.mkdir()
+
+    request = RunRequest(
+        dicom_dir=dicom_dir,
+        output_dir=tmp_path / "output",
+        dcm2niix="./dcm2niix",
+    )
+
+    assert request.dcm2niix == "./dcm2niix"
 
 
 def test_run_request_makes_a_relative_dicom_dir_absolute(
