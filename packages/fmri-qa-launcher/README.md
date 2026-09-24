@@ -6,6 +6,10 @@ directory in, one report directory per series out" pipeline built on top of
 [`fmri-qa-report`](../fmri-qa-report) (rendering). It adds no third-party
 dependency of its own.
 
+The pages in [`docs/`](docs/index.md) cover the command line, the panel, and
+what a run writes. Build them from the workspace root with `make sync-docs &&
+make docs`; they land under `build/site/launcher`.
+
 ## `fmri-qa-run`
 
 ```

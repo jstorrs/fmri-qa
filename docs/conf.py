@@ -1,12 +1,12 @@
 """Sphinx configuration for the fmri-qa documentation site's landing page.
 
 The documentation is one site under build/site: each package's own Sphinx
-project builds into a directory beneath it (core/, report/), and this project
-builds last, into the site root, as the one page that points into all of them.
-Its links into a package are resolved with `intersphinx` against the objects.inv
-that package's build has already written into the site, never one fetched over
-the network, so the build works offline and fails if a sibling has not been
-built. `make docs` builds them in order.
+project builds into a directory beneath it (core/, report/, launcher/), and
+this project builds last, into the site root, as the one page that points into
+all of them. Its links into a package are resolved with `intersphinx` against
+the objects.inv that package's build has already written into the site, never
+one fetched over the network, so the build works offline and fails if a sibling
+has not been built. `make docs` builds them in order.
 """
 
 from pathlib import Path
@@ -31,4 +31,5 @@ SITE = Path(__file__).resolve().parent.parent / "build" / "site"
 intersphinx_mapping = {
     "core": ("core/", str(SITE / "core" / "objects.inv")),
     "report": ("report/", str(SITE / "report" / "objects.inv")),
+    "launcher": ("launcher/", str(SITE / "launcher" / "objects.inv")),
 }

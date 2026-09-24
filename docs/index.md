@@ -16,9 +16,15 @@ spreadsheet, or a trend database reads.
 - **{external+report:doc}`fmri-qa-report <index>`** — how an artifact becomes
   a single self-contained HTML page: the command, what the page shows and what
   it needs from a browser, and rendering one from Python.
+- **{external+launcher:doc}`fmri-qa-launcher <index>`** — the whole pipeline
+  in one step, from a DICOM directory to one report folder per series: the
+  `fmri-qa-run` command, the desktop panel, and what a run writes.
 
 ## Where to start
 
+- **"How do I run QA on a phantom series?"** —
+  {external+launcher:doc}`the command line <command-line>`, or
+  {external+launcher:doc}`the desktop panel <panel>` without a terminal.
 - **"What does this number mean?"** — find it in
   {external+core:doc}`analyses/index`; every measurement is listed there against
   the page that publishes it.
@@ -30,5 +36,5 @@ spreadsheet, or a trend database reads.
   what the file contains and what an embedding site's Content-Security-Policy
   has to allow.
 
-Installing, importing DICOM, and the `fmri-qa` command line are covered in the
-repository's `README.md`.
+Installing, importing DICOM on its own with `fmri-qa-import`, and the `fmri-qa`
+command line are covered in the repository's `README.md`.
