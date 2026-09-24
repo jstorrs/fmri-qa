@@ -339,6 +339,17 @@ versioning when the first stable public interface is released.
 
 ### Added
 
+- **`make docs` builds one documentation site, with pages for every package.**
+  Each package keeps its own Sphinx project, and all of them build into
+  `build/site`: a landing page at the root, the analysis pages under `core/`,
+  and new pages for `fmri-qa-report` (the command, what the page shows and
+  what an embedding site must allow, rendering from Python) and
+  `fmri-qa-launcher` (the `fmri-qa-run` options and exit codes, the desktop
+  panel, what a run writes). Links between packages are checked against each
+  other's local inventories, never the network, and a final pass fails the
+  build on any relative link that does not land on a file inside the site.
+  The analysis pages move from `packages/fmri-qa-core/docs/_build/html` to
+  `build/site/core`, and now build from a fresh checkout.
 - **The `fmri-qa-launcher` package: `fmri-qa-run`, one command from a DICOM
   directory to a report per series.** `fmri-qa-run DICOM_DIR OUTPUT_DIR`
   converts, analyzes, and renders every series it finds, writing one folder
