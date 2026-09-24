@@ -56,7 +56,8 @@ synthetic phantom, and the exact netCDF names it contributes to the artifact:
 file those numbers are published in — its dimensions and coordinates, the
 global attributes that carry every scalar in it, and how to read one from MATLAB,
 R, Python or `ncdump`. The [documentation index](packages/fmri-qa-core/docs/index.md)
-builds into browsable HTML with `make sync-docs && make docs`.
+builds into browsable HTML with `make sync-docs && make docs`, as part of the
+documentation site under `build/site`.
 
 ## Install
 
@@ -99,7 +100,7 @@ tooling; so is the Sphinx build for the analysis documentation:
 ```bash
 make sync-notebooks    # uv sync --all-packages --all-extras --group notebooks
 make sync-docs         # uv sync --all-packages --all-extras --group docs
-make docs              # build the analysis pages into docs/_build/html
+make docs              # build the documentation site into build/site
 ```
 
 ## One step: DICOM in, reports out

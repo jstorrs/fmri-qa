@@ -31,8 +31,8 @@ jobs:
       # --locked fails if uv.lock is out of date with pyproject.toml, so a stale
       # lockfile is caught here rather than drifting silently.
       - name: Sync the locked environment
-        # The docs group comes too: `make check` ends by building the analysis
-        # pages, whose figures are rendered by running the pipeline.
+        # The docs group comes too: `make check` ends by building the
+        # documentation site, whose figures are rendered by running the pipeline.
         run: uv sync --all-packages --all-extras --group docs --locked
 
       - name: Run the gate

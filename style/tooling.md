@@ -30,8 +30,8 @@ declares `[tool.uv.workspace]` members, `.python-version` pins the interpreter (
   extra is published metadata: whoever installs `fmri-qa-core` is offered it. The heavy
   exploratory notebook stack (JupyterLab, nilearn, dcm2bids) is a `notebooks` group on the
   workspace root instead, outside the default sync — take it with `make sync-notebooks`.
-  The Sphinx stack that builds the analysis documentation is a second such group, `docs`
-  (`make sync-docs`).
+  The Sphinx stack that builds the documentation site (`make docs`, into `build/site`) is a
+  second such group, `docs` (`make sync-docs`).
 
 ## Formatting: `ruff format`
 
@@ -202,12 +202,13 @@ make test                 # uv run pytest      — see testing.md
 ```
 
 Or just `make all` (= `lint typecheck pyright test`). `make check` is the gate itself: the
-same steps with `ruff format --check` instead of a rewrite, plus a coverage floor, a
-`cmp` that each package's shipped `LICENSE` still matches the root one, and a `make docs`
-build of the analysis pages — whose figures are rendered by running the pipeline, so a
-clean build (`-W`, warnings are errors) is a check that the documentation still describes
-the package. The Sphinx stack is its own opt-in group, `make sync-docs`. Green is the bar;
-CI runs `make check` verbatim, so running it locally just shortens the feedback loop.
+same steps with `ruff format --check` instead of a rewrite, plus a coverage floor, a `cmp`
+that each package's shipped `LICENSE` still matches the root one, and a `make docs` build of
+the documentation site into `build/site` — whose figures are rendered by running the
+pipeline, so a clean build (`-W`, warnings are errors) is a check that the documentation
+still describes the package. The Sphinx stack is its own opt-in group, `make sync-docs`.
+Green is the bar; CI runs `make check` verbatim, so running it locally just shortens the
+feedback loop.
 
 ## Don't
 

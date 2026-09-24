@@ -10,12 +10,14 @@ synthetic phantom in `phantom.py`. `make docs` builds with `-W`, so a figure
 whose code stops matching the package fails the build rather than going stale.
 
 Deliberately no `intersphinx`: nothing here links into another project's API,
-and a build that reaches the network to succeed is one that fails offline.
+and a build that reaches the network to succeed is one that fails offline. Core
+is also the bottom of the stack: its dependents' pages link to it, not the
+reverse.
 """
 
 from pathlib import Path
 
-project = "fmri-qa"
+project = "fmri-qa-core"
 author = "Judd Storrs"
 copyright = "2026, Judd Storrs"  # noqa: A001  (the name Sphinx reads)
 
@@ -36,6 +38,25 @@ myst_heading_anchors = 3
 
 html_theme = "furo"
 html_title = "fmri-qa analyses"
+
+# These pages build into core/ beneath the documentation site's landing page
+# (build/site; see the Makefile), and every page links back up to it. The link
+# is a sidebar template shared with the other packages' projects from the
+# repository's docs/_templates; the sidebar is furo's default with that one
+# entry put first.
+templates_path = [str(Path(__file__).resolve().parents[3] / "docs" / "_templates")]
+html_sidebars = {
+    "**": [
+        "sidebar/site-home.html",
+        "sidebar/brand.html",
+        "sidebar/search.html",
+        "sidebar/scroll-start.html",
+        "sidebar/navigation.html",
+        "sidebar/ethical-ads.html",
+        "sidebar/scroll-end.html",
+        "sidebar/variant-selector.html",
+    ]
+}
 
 # Figures are results, not examples: the reader wants the curve, and the code
 # that drew it is on the page's subject matter only incidentally. PNG at 150 dpi

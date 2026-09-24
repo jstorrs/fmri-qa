@@ -1,0 +1,9 @@
+{# The link from a package's pages back up to the documentation site's landing
+   page. Each package's conf.py puts this first in its sidebar; the landing page
+   itself does not use it. pathto(..., 1) makes the target relative to the
+   current page, however deep it sits. #}
+<div class="sidebar-tree">
+  <ul>
+    <li class="toctree-l1"><a class="reference" href="{{ pathto('../index.html', 1) }}">&larr; All fmri-qa documentation</a></li>
+  </ul>
+</div>

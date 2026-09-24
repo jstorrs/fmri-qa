@@ -139,6 +139,7 @@ files = [
     "packages/fmri-qa-core/src",
     "packages/fmri-qa-report/src",
     "packages/fmri-qa-launcher/src",
+    "scripts",
 ]
 # Local partial stubs (see stubs/) fix the return types nibabel and scipy ship
 # imprecisely; both type checkers read them first (pyright via tool.pyright.stubPath).
@@ -161,7 +162,11 @@ include = [
     "packages/fmri-qa-core/src",
     "packages/fmri-qa-report/src",
     "packages/fmri-qa-launcher/src",
+    "scripts",
 ]
+# scripts/ is not a package: its tests import a script by its bare module name,
+# as pytest's `pythonpath` lets them at run time.
+extraPaths = ["scripts"]
 stubPath = "stubs"
 pythonVersion = "3.13"
 typeCheckingMode = "standard"
@@ -171,7 +176,11 @@ testpaths = [
     "packages/fmri-qa-core/tests",
     "packages/fmri-qa-report/tests",
     "packages/fmri-qa-launcher/tests",
+    "scripts/tests",
 ]
+# The repository's own scripts are not a package, so their tests import one by
+# its bare module name from here.
+pythonpath = ["scripts"]
 python_files = ["test_*.py"]
 python_functions = ["test_*"]
 # Coverage is opt-in (the `check` gate passes --cov) so a bare `pytest` on one

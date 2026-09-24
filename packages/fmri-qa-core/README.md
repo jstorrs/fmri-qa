@@ -30,7 +30,8 @@ on nothing that draws.
 computation with its equations, a figure rendered by running this package over
 a synthetic phantom, and the exact netCDF names it contributes — plus
 [`docs/artifact.md`](docs/artifact.md) on the file itself. Build them into HTML
-from the workspace root with `make sync-docs && make docs`.
+from the workspace root with `make sync-docs && make docs`, which builds the
+documentation site into `build/site`, these pages under `build/site/core`.
 
 ## Commands
 

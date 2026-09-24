@@ -30,5 +30,6 @@ bids/
 QA_FMRI_2025-10-07a/
 *.zip
 
-# Built documentation (make docs)
+# The conventional output directory of a hand-run sphinx-build (sphinx-quickstart's
+# `_build`); `make docs` builds the documentation site into build/site instead.
 _build/
