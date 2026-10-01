@@ -1174,3 +1174,31 @@ def test_a_destination_the_caller_already_had_survives_a_failed_import(
         import_dicom(tmp_path, out, binary=binary)
 
     assert out.is_dir()
+
+
+@pytest.mark.parametrize(
+    ("extra", "suffix", "glob"),
+    [([], ".nii.gz", "*.nii.gz"), (["--no-compress"], ".nii", "*.nii")],
+)
+def test_import_main_globs_the_nifti_suffix_not_the_last_two_dots(
+    tmp_path, fake_dcm2niix, capsys, extra, suffix, glob
+):
+    """A dot inside the stem must not leak into the paste-able glob."""
+    binary = fake_dcm2niix({"a_1.5mm": FULL_SIDECAR}, suffix=suffix)
+    out = tmp_path / "nifti"
+
+    cli.import_main(
+        [
+            str(tmp_path),
+            "-o",
+            str(out),
+            "--dcm2niix",
+            str(binary),
+            "--names",
+            "dcm2niix",
+            *extra,
+        ]
+    )
+
+    printed = capsys.readouterr().out
+    assert f"fmri-qa {out}/{glob}\n" in printed, printed

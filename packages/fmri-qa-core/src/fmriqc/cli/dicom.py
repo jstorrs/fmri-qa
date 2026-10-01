@@ -22,6 +22,7 @@ from pathlib import Path
 import fmriqc as q
 from fmriqc.convert.dcm2niix import DEFAULT_TEMPLATE
 from fmriqc.convert.session import ImportResult, import_dicom
+from fmriqc.load.paths import NIFTI_SUFFIXES
 
 from .arguments import PrintVersion, positive_int, print_warnings
 
@@ -151,7 +152,8 @@ def _print_listing(result: ImportResult, destination: Path, *, renaming: bool) -
     print(f"# {len(result.series)} series -> {destination}")
     # The glob names the suffix actually written, so the line can be pasted
     # whether or not --no-compress was used.
-    suffix = "".join(result.series[0].path.suffixes[-2:])
+    name = result.series[0].path.name
+    suffix = next(s for s in NIFTI_SUFFIXES if name.endswith(s))
     print(f"# analyze with:  fmri-qa {destination}/*{suffix}")
 
 
