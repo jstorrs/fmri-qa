@@ -4,14 +4,19 @@ The refusal it exists for is another process holding a just-written file open
 (a sync client, a scanner), which nothing here can provoke. What is tested is
 the policy: `Path.replace` is made to refuse a set number of times, and the
 delays and the sleep are injected, so no test waits.
+
+`rename.atomic_file`, the write-then-rename built on it, is tested at the end.
 """
 
+import os
+import stat
+import sys
 from pathlib import Path
 
 import pytest
 
 from fmriqc import rename
-from fmriqc.rename import replace_patiently
+from fmriqc.rename import atomic_file, replace_patiently
 
 DELAYS = (0.1, 0.2, 0.4)
 
@@ -139,3 +144,57 @@ def test_the_default_is_the_ladder_on_every_platform() -> None:
     assert defaults["delays"] is rename._DELAYS
     assert list(rename._DELAYS) == sorted(rename._DELAYS)
     assert 5 <= sum(rename._DELAYS) <= 10
+
+
+def test_atomic_file_writes_through_the_temporary_and_replaces_the_target(
+    tmp_path: Path,
+) -> None:
+    target = tmp_path / "out.txt"
+
+    with atomic_file(target) as temporary:
+        assert temporary.parent == tmp_path
+        assert temporary.name.startswith(".out.txt.")
+        assert temporary.name.endswith(".tmp")
+        temporary.write_text("payload", encoding="utf-8")
+
+    assert target.read_text(encoding="utf-8") == "payload"
+    assert not list(tmp_path.glob(".out.txt.*"))
+
+
+def test_atomic_file_leaves_an_existing_target_unchanged_on_failure(
+    tmp_path: Path,
+) -> None:
+    target = tmp_path / "out.txt"
+    target.write_text("previous", encoding="utf-8")
+
+    with pytest.raises(RuntimeError, match="boom"), atomic_file(target) as temporary:
+        temporary.write_text("partial", encoding="utf-8")
+        raise RuntimeError("boom")
+
+    assert target.read_text(encoding="utf-8") == "previous"
+    assert [path.name for path in tmp_path.iterdir()] == ["out.txt"]
+
+
+def test_atomic_file_leaves_no_target_when_none_existed_before_a_failure(
+    tmp_path: Path,
+) -> None:
+    target = tmp_path / "out.txt"
+
+    with pytest.raises(RuntimeError, match="boom"), atomic_file(target):
+        raise RuntimeError("boom")
+
+    assert not target.exists()
+    assert list(tmp_path.iterdir()) == []
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX permission bits only")
+def test_atomic_file_output_respects_the_umask(tmp_path: Path) -> None:
+    target = tmp_path / "out.txt"
+    old_umask = os.umask(0o022)
+    try:
+        with atomic_file(target) as temporary:
+            temporary.write_text("payload", encoding="utf-8")
+    finally:
+        os.umask(old_umask)
+
+    assert stat.S_IMODE(target.stat().st_mode) == 0o644

@@ -14,8 +14,8 @@ from pathlib import Path
 from string import Template
 
 from fmriqc.analysis import Measurements, QAArtifact
+from fmriqc.rename import atomic_file
 
-from ...atomic import atomic_file
 from ...content import METRIC_DOCS, MetricDoc
 from ...summary import (
     acquisition_line,
@@ -87,9 +87,10 @@ def write_run_page(
     """Write :func:`render_run_page`'s document to ``path`` and return it.
 
     The write is atomic: the page is rendered fully in memory first, then
-    written to a sibling temporary file and moved into place with
-    :meth:`Path.replace`, so a reader never observes a partial file and a
-    failed render or write never disturbs an existing destination.
+    written to a sibling temporary file and moved into place by
+    :func:`fmriqc.rename.replace_patiently`, so a reader never observes a
+    partial file and a failed render or write never disturbs an existing
+    destination.
     """
     target = Path(path)
     page = render_run_page(

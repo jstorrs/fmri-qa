@@ -1,4 +1,8 @@
-"""Renaming into place on a filesystem something else is watching.
+"""Writing a file, or moving a directory, into place without a reader seeing half.
+
+This holds the whole write-then-rename: `atomic_file` stages a single file
+beside its destination and moves it in, and `replace_patiently` is the move
+itself, also used directly for a staged directory.
 
 Every import and every published series ends in a `Path.replace`: work is
 staged beside its destination so that the last step is one rename on one
@@ -19,11 +23,14 @@ land in the watched place, and the step that makes them appear there all at
 once is still a rename of files written a moment ago.
 """
 
+import os
+import secrets
 import time
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Iterator, Sequence
+from contextlib import contextmanager
 from pathlib import Path
 
-__all__ = ["replace_patiently"]
+__all__ = ["atomic_file", "replace_patiently"]
 
 # Waits between attempts, about six seconds in all before the error is allowed
 # through. Doubling, because the two holders differ by orders of magnitude: a
@@ -62,3 +69,47 @@ def replace_patiently(
         else:
             return
     source.replace(target)
+
+
+@contextmanager
+def atomic_file(target: Path) -> Iterator[Path]:
+    """Yield a sibling temporary path to write, then move it onto `target`.
+
+    The caller writes through the yielded path, which already exists and is
+    empty. On a clean exit the file is flushed to disk and renamed onto
+    `target`, so a reader never sees a partial file. Any exception, including
+    one raised while writing, skips the rename and leaves an existing `target`
+    untouched; the temporary is always removed. `target`'s parent directory
+    must already exist.
+    """
+    # In the destination's own directory: a rename is only atomic within a
+    # single filesystem, and the system temporary directory is often on another.
+    temporary = target.parent / f".{target.name}.{secrets.token_hex(8)}.tmp"
+    # Not `tempfile.mkstemp`: that creates the file `0600` whatever the umask,
+    # which is right for private scratch and wrong for a result someone else is
+    # meant to open. Mode `0o666` leaves the permissions to the kernel's umask
+    # (reading it with `os.umask` is not thread-safe), and `O_EXCL` keeps the
+    # name from colliding with a concurrent writer. Writers may open the path
+    # themselves (HDF5 does), so the descriptor is closed at once; what it is
+    # wanted for is the name it reserved.
+    os.close(os.open(temporary, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o666))
+    try:
+        yield temporary
+        with temporary.open("r+b") as fh:
+            # The rename is only as durable as the bytes it renames: without
+            # this, both the file data and the directory's rename record can
+            # still sit in a page cache that a power loss or crash never
+            # flushes, and the survivor is a zero-length or truncated file
+            # wearing the final name -- the half-written file atomicity was
+            # meant to rule out, moved from "mid-write" to "mid-write, then a
+            # clean-looking rename over it".
+            os.fsync(fh.fileno())
+        # Only after the writer has closed the file: Windows refuses to rename
+        # one that is still open. It can also refuse one that something *else*
+        # has opened, and a file closed a moment ago is exactly what a sync
+        # client or scanner opens next -- hence patiently.
+        replace_patiently(temporary, target)
+    finally:
+        # A no-op once the rename succeeded; the cleanup that matters is the
+        # one after a failure, which must not leave debris beside the target.
+        temporary.unlink(missing_ok=True)

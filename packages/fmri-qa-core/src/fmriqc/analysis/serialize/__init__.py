@@ -45,15 +45,13 @@ rather than flattened.
 """
 
 import json
-import os
-import secrets
 from pathlib import Path
 from typing import Any
 
 from numpy.typing import NDArray
 
 from ...exceptions import InvalidArtifactError
-from ...rename import replace_patiently
+from ...rename import atomic_file
 from ..artifact import ARTIFACT_SCHEMA_VERSION, QAArtifact
 from ..validation import validate_artifact, validate_document
 from . import netcdf, npz
@@ -133,38 +131,8 @@ def save_artifact(artifact: QAArtifact, path: str | Path) -> Path:
             out, f"refusing to write an artifact that would not read back: {exc}"
         ) from exc
     out.parent.mkdir(parents=True, exist_ok=True)
-    # In the destination's own directory: a move is only atomic within a single
-    # filesystem, and the system temporary directory is often on another.
-    tmp = out.parent / f".{out.name}.{secrets.token_hex(8)}.tmp"
-    # Not `tempfile.mkstemp`: that creates the file `0600` whatever the umask,
-    # which is right for private scratch and wrong for an archive a colleague
-    # is meant to open. Mode `0o666` leaves the permissions to the umask, and
-    # `O_EXCL` keeps the name from colliding with a concurrent writer. The
-    # netCDF writer opens the path itself, so the descriptor is closed at once;
-    # what it is wanted for is the name it reserved, and the writer overwrites
-    # the empty file it left behind.
-    os.close(os.open(tmp, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o666))
-    try:
-        netcdf.write(content, tmp)
-        with tmp.open("r+b") as fh:
-            # The rename below is only as durable as the bytes it renames: without
-            # this, both the file data and the directory's rename record can still
-            # be sitting in a page cache that a power loss or crash never flushes,
-            # and the survivor is a zero-length or truncated file wearing the final
-            # name -- exactly the half-written archive atomicity was meant to rule
-            # out, just moved from "mid-write" to "mid-write, then a clean-looking
-            # rename over it."
-            os.fsync(fh.fileno())
-        # Only after the writer has closed the file: Windows refuses to rename
-        # one that is still open, and HDF5 holds it open until the Dataset is
-        # closed. It can also refuse one that something *else* has opened, and
-        # a file closed a moment ago is exactly what a sync client or scanner
-        # opens next -- hence patiently (see `rename`).
-        replace_patiently(tmp, out)
-    finally:
-        # A no-op once the move succeeded; the cleanup that matters is the one
-        # after a failure, which must not leave debris beside the archive.
-        tmp.unlink(missing_ok=True)
+    with atomic_file(out) as temporary:
+        netcdf.write(content, temporary)
     return out
 
 
