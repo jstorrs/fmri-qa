@@ -63,11 +63,19 @@ def test_separate_noise_falls_back_when_instability_goes_negative() -> None:
 def test_hilo_fsnr_properties_handle_degenerate_variance() -> None:
     res = separate_noise(mean_high=200.0, mean_low=100.0, var_high=30.0, var_low=15.0)
     assert np.isclose(res.thermal_fsnr, 200.0 / np.sqrt(res.thermal_var))
-    # a non-positive thermal variance yields NaN, not a crash
-    degenerate = separate_noise(
-        mean_high=100.0, mean_low=100.001, var_high=1.0, var_low=1.0
+    # a non-positive thermal variance yields NaN, not a crash. m == 4 here, so
+    # thermal_var = (m * var_low - var_high) / (m - 1) is exactly 0 for these.
+    zero = separate_noise(mean_high=200.0, mean_low=100.0, var_high=40.0, var_low=10.0)
+    assert not zero.fell_back
+    assert zero.thermal_var == 0.0
+    assert np.isnan(zero.thermal_fsnr), zero.thermal_fsnr
+    # ... and negative (-10 / 3) without the instability fallback kicking in
+    negative = separate_noise(
+        mean_high=200.0, mean_low=100.0, var_high=50.0, var_low=10.0
     )
-    assert np.isnan(degenerate.thermal_fsnr) or np.isfinite(degenerate.thermal_fsnr)
+    assert not negative.fell_back
+    assert np.isclose(negative.thermal_var, -10.0 / 3.0), negative.thermal_var
+    assert np.isnan(negative.thermal_fsnr), negative.thermal_fsnr
 
 
 def test_separate_noise_is_nan_when_signal_does_not_change_with_flip() -> None:
