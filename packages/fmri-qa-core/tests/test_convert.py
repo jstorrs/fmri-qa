@@ -398,6 +398,36 @@ def test_the_sidecar_travels_with_the_nifti_it_describes(
     assert json.loads((out / f"{stem}.json").read_text())["SeriesNumber"] == 2
 
 
+def test_a_series_lists_its_nifti_then_its_sidecar(tmp_path, fake_dcm2niix) -> None:
+    binary = fake_dcm2niix({"2_QA": FULL_SIDECAR})
+    out = tmp_path / "nifti"
+
+    (series,) = import_dicom(tmp_path, out, binary=binary).series
+
+    stem = "20260909_143012_s002_QA_EPI_ISO"
+    assert series.files == (out / f"{stem}.nii.gz", out / f"{stem}.json")
+
+
+def test_each_overlapping_series_lists_only_its_own_files(
+    tmp_path, fake_dcm2niix
+) -> None:
+    stems = ("scan", "scan.rep")
+    binary = fake_dcm2niix(
+        {stem: {"SeriesNumber": number} for number, stem in enumerate(stems, 1)},
+        companions={f"{stem}.bval": b"" for stem in stems},
+    )
+    out = tmp_path / "nifti"
+
+    result = import_dicom(tmp_path, out, binary=binary, names="dcm2niix")
+
+    assert {
+        entry.path.name: [f.name for f in entry.files] for entry in result.series
+    } == {
+        "scan.nii.gz": ["scan.nii.gz", "scan.bval", "scan.json"],
+        "scan.rep.nii.gz": ["scan.rep.nii.gz", "scan.rep.bval", "scan.rep.json"],
+    }
+
+
 @pytest.mark.parametrize("stems", [("scan", "scan.repeat"), ("x", "x.nii")])
 @pytest.mark.parametrize("suffix", [".nii", ".nii.gz"])
 @pytest.mark.parametrize("names", ["qa", "dcm2niix"])

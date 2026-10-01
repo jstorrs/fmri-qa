@@ -35,11 +35,12 @@ import secrets
 import shutil
 import tempfile
 import warnings
-from collections.abc import Callable, Iterable, Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
 import fmriqc
+from fmriqc.convert.session import ImportedSeries
 from fmriqc.exceptions import ConversionError
 from fmriqc.load.paths import nifti_stem
 from fmriqc.rename import replace_patiently
@@ -141,16 +142,12 @@ class RunResult:
 class _PlannedSeries:
     """One series `_run_in_staging` has decided to attempt.
 
-    `imported_path` is where the converter left this series' NIfTI inside
-    staging's import directory; `companions` are the other files there filed
-    under this series' name (its sidecar, most often) -- see
-    `_assign_companions`. `index`/`total` are what `Progress` reports.
+    `series` is what the converter filed in staging's import directory; its
+    name is `target.name`. `index`/`total` are what `Progress` reports.
     """
 
-    imported_path: Path
-    name: str
+    series: ImportedSeries
     target: Path
-    companions: tuple[str, ...]
     index: int
     total: int
 
@@ -264,26 +261,6 @@ def _discard(directory: Path) -> None:
         )
 
 
-def _assign_companions(
-    file_names: Iterable[str], series_names: Sequence[str]
-) -> dict[str, str]:
-    """Map each of `file_names` to the longest name in `series_names` it is filed under.
-
-    Mirrors `fmriqc.convert.session._plan_files`'s rule, for the same reason:
-    with series names `X` and `X.rep`, `X.rep.json` must be claimed by
-    `X.rep`, not by the shorter `X` that is also a prefix of its name. Checking
-    the longest candidate first is what makes that so. A file matching no
-    series name at all is left out of the result.
-    """
-    stems = sorted(series_names, key=len, reverse=True)
-    assigned: dict[str, str] = {}
-    for file_name in file_names:
-        owner = next((stem for stem in stems if file_name.startswith(f"{stem}.")), None)
-        if owner is not None:
-            assigned[file_name] = owner
-    return assigned
-
-
 def _run_in_staging(
     request: RunRequest,
     staging: Path,
@@ -311,60 +288,40 @@ def _run_in_staging(
     if not result.series:
         raise SessionError(f"{request.dicom_dir} produced no series to import")
 
-    series_entries = [
-        (series.path, nifti_stem(series.path)) for series in result.series
-    ]
-    names = [name for _, name in series_entries]
-
-    # Every companion (sidecar, or a second echo's own NIfTI's sidecar) is
-    # assigned to its series once, up front, over every file the import
-    # produced -- not filed one series at a time as each is published, which
-    # is what let a shorter stem steal a longer one's file (see
-    # `_assign_companions`).
-    nifti_names = {path.name for path, _ in series_entries}
-    companion_files = [
-        p.name for p in import_dir.iterdir() if p.name not in nifti_names
-    ]
-    companion_owner = _assign_companions(companion_files, names)
-    companions_by_name: dict[str, list[str]] = {name: [] for name in names}
-    for file_name, owner in companion_owner.items():
-        companions_by_name[owner].append(file_name)
-
     plan = [
-        (imported_path, name, request.output_dir / name)
-        for imported_path, name in series_entries
+        (series, request.output_dir / nifti_stem(series.path))
+        for series in result.series
     ]
-    total = sum(1 for _, _, target in plan if not target.exists())
+    refused = {target for _, target in plan if target.exists()}
+    total = len(plan) - len(refused)
 
     outcomes: list[SeriesOutcome] = []
     cancelled = False
     index = 0
-    for imported_path, name, target in plan:
+    for series, target in plan:
+        name = target.name
+        if target in refused:
+            outcomes.append(Refused(name, target))
+            continue
         if target.exists():
+            # Created by another run since the snapshot above: refused for
+            # nothing, and no longer part of what the progress bar counts.
+            total -= 1
             outcomes.append(Refused(name, target))
             continue
         if not should_continue():
             cancelled = True
             break
         index += 1
-        planned = _PlannedSeries(
-            imported_path=imported_path,
-            name=name,
-            target=target,
-            companions=tuple(companions_by_name[name]),
-            index=index,
-            total=total,
-        )
+        planned = _PlannedSeries(series, target, index, total)
         outcomes.append(_publish_series(request, staging, planned, progress))
     return RunResult(request.output_dir, tuple(outcomes), cancelled=cancelled)
 
 
-def _move_companions(
-    source_dir: Path, work_dir: Path, imported_name: str, companions: Sequence[str]
-) -> None:
-    """Move the NIfTI `imported_name` and its assigned `companions` into `work_dir`."""
-    for file_name in (imported_name, *companions):
-        replace_patiently(source_dir / file_name, work_dir / file_name)
+def _move_files(work_dir: Path, files: Sequence[Path]) -> None:
+    """Move each of `files` into `work_dir`, keeping its name."""
+    for file in files:
+        replace_patiently(file, work_dir / file.name)
 
 
 def _failed(name: str, exc: Exception, noted: tuple[str, ...] = ()) -> Failed:
@@ -398,20 +355,15 @@ def _publish_series(
     it, so a `progress` that raises is a bug in the caller, not a reason to
     fail this series -- see `run_session`'s docstring.
     """
-    name = planned.name
+    name = planned.target.name
     work_dir = staging / name
-    scan_path = work_dir / planned.imported_path.name
+    scan_path = work_dir / planned.series.path.name
     artifact_path = work_dir / f"{name}.qa.nc"
     report_path = work_dir / f"{name}.html"
 
     try:
         work_dir.mkdir()
-        _move_companions(
-            planned.imported_path.parent,
-            work_dir,
-            scan_path.name,
-            planned.companions,
-        )
+        _move_files(work_dir, planned.series.files)
     except Exception as exc:  # noqa: BLE001 - one series' failure, reported and skipped
         return _failed(name, exc)
 
@@ -456,12 +408,13 @@ def _publish_series(
     # while the output directory the user chose has room to spare.
     _discard(work_dir)
 
-    sidecar = planned.target / f"{name}.json"
+    sidecar_name = f"{name}.json"
+    has_sidecar = any(file.name == sidecar_name for file in planned.series.files)
     return Published(
         name=name,
         directory=planned.target,
         scan=planned.target / scan_path.name,
-        sidecar=sidecar if sidecar.exists() else None,
+        sidecar=planned.target / sidecar_name if has_sidecar else None,
         artifact=planned.target / artifact_path.name,
         report=planned.target / report_path.name,
         warnings=noted,

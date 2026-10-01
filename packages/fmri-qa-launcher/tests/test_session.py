@@ -29,7 +29,6 @@ from fmriqc_launcher.session import (
     Failed,
     Published,
     Refused,
-    _assign_companions,
     _copy_durably,
     _publish,
     run_session,
@@ -101,22 +100,6 @@ def _warning_wrapper(
         return real(*args, **kwargs)
 
     return wrapper
-
-
-def test_assign_companions_gives_a_dotted_prefix_file_to_the_longer_stem() -> None:
-    """`scan.rep.json` belongs to `scan.rep`, not to `scan`, its shorter prefix."""
-    assigned = _assign_companions(
-        file_names=["scan.json", "scan.rep.json"],
-        series_names=["scan", "scan.rep"],
-    )
-    assert assigned == {"scan.json": "scan", "scan.rep.json": "scan.rep"}
-
-
-def test_assign_companions_drops_a_file_matching_no_series() -> None:
-    assigned = _assign_companions(
-        file_names=["scan.json", "unrelated.txt"], series_names=["scan"]
-    )
-    assert assigned == {"scan.json": "scan"}
 
 
 @pytest.mark.skipif(sys.platform == "win32", reason="POSIX permission bits only")
@@ -516,8 +499,8 @@ def test_two_series_with_a_dotted_prefix_pair_each_publish_their_own_files(
 
     Sidecars here carry none of `naming.qa_stem`'s fields, so `import_dicom`
     keeps each series' original dcm2niix stem verbatim -- "scan" and
-    "scan.rep" -- reproducing the dotted-prefix collision `_assign_companions`
-    exists to resolve.
+    "scan.rep" -- reproducing the dotted-prefix collision that the converter's
+    longest-stem rule resolves.
     """
     monkeypatch.setattr("fmriqc_launcher.session.write_run_page", _fast_render)
     scan_nifti, scan_base = prepared_series(name="scan")
@@ -552,6 +535,80 @@ def test_two_series_with_a_dotted_prefix_pair_each_publish_their_own_files(
         "scan.rep.nii.gz",
         "scan.rep.qa.nc",
     ]
+
+
+def test_a_series_whose_directory_appears_mid_run_is_refused_not_analyzed(
+    tmp_path: Path,
+    dicom_dir: Path,
+    prepared_series: PreparedSeries,
+    stub_dcm2niix: StubDcm2niix,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Another run publishing the second name during the first's render is no cost."""
+    first_nifti, first_base = prepared_series(name="a")
+    second_nifti, second_base = prepared_series(name="b", seed=1)
+    first = _sidecar(first_base, series_number=1, description="QA_EPI")
+    second = _sidecar(second_base, series_number=2, description="QA_EPI")
+    first_name = naming.qa_stem(first)
+    second_name = naming.qa_stem(second)
+    assert first_name is not None
+    assert second_name is not None
+    converter = stub_dcm2niix(
+        {"stem1": (first_nifti, first), "stem2": (second_nifti, second)}
+    )
+    output_dir = tmp_path / "output"
+
+    def render_then_race(artifact: object, path: Path, **kwargs: object) -> Path:
+        (output_dir / second_name).mkdir()
+        return _fast_render(artifact, path, **kwargs)
+
+    monkeypatch.setattr("fmriqc_launcher.session.write_run_page", render_then_race)
+    request = RunRequest(
+        dicom_dir=dicom_dir,
+        output_dir=output_dir,
+        settings=_SETTINGS,
+        dcm2niix=converter,
+    )
+    events: list[Progress] = []
+
+    result = run_session(request, progress=events.append)
+
+    by_name = {o.name: o for o in result.outcomes}
+    assert isinstance(by_name[first_name], Published)
+    assert by_name[second_name] == Refused(second_name, output_dir / second_name)
+    assert second_name not in {e.series for e in events}
+
+
+def test_a_series_with_no_sidecar_is_published_without_one(
+    tmp_path: Path,
+    dicom_dir: Path,
+    prepared_series: PreparedSeries,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr("fmriqc_launcher.session.write_run_page", _fast_render)
+    nifti, _ = prepared_series(name="scan")
+    converter = tmp_path / "bare-dcm2niix"
+    converter.write_text(
+        f"#!{sys.executable}\n"
+        "import shutil, sys\n"
+        "from pathlib import Path\n"
+        "out = Path(sys.argv[sys.argv.index('-o') + 1])\n"
+        'print("Chris Rorden\'s dcm2niiX version v1.0.20260724 (JP2:OpenJPEG)")\n'
+        f"shutil.copy({str(nifti)!r}, out / 'scan.nii.gz')\n"
+    )
+    converter.chmod(0o755)
+    request = RunRequest(
+        dicom_dir=dicom_dir,
+        output_dir=tmp_path / "output",
+        settings=_SETTINGS,
+        dcm2niix=converter,
+    )
+
+    (outcome,) = run_session(request).outcomes
+
+    assert isinstance(outcome, Published)
+    assert outcome.sidecar is None
+    assert not (outcome.directory / "scan.json").exists()
 
 
 def test_a_progress_callback_that_raises_propagates_and_fails_no_series(
@@ -668,7 +725,7 @@ def test_a_failure_staging_a_series_is_a_failed_outcome(
     def _raise(*_args: object, **_kwargs: object) -> None:
         raise OSError("disk full while staging")
 
-    monkeypatch.setattr("fmriqc_launcher.session._move_companions", _raise)
+    monkeypatch.setattr("fmriqc_launcher.session._move_files", _raise)
     nifti, base = prepared_series(name="scan")
     sidecar = _sidecar(base, series_number=1, description="QA_EPI")
     name = naming.qa_stem(sidecar)

@@ -51,10 +51,13 @@ class ImportedSeries:
     `renamed_from` is dcm2niix's own stem when the series was renamed and None
     when it kept that stem — which is how a caller reports the two cases
     `naming.plan` leaves alone (an uninformative sidecar, a name two series
-    would share) without re-deriving why.
+    would share) without re-deriving why. `files` is every file filed for the
+    series, so a caller needs no rule of its own for which files belong to it.
     """
 
     path: Path  # the NIfTI, under its final name
+    # Every file filed for this series: `path` first, then the rest by name.
+    files: tuple[Path, ...]
     series: int | None  # SeriesNumber, as the sidecar gave it
     description: str | None  # SeriesDescription, unsanitized
     acquired: str | None  # the sidecar's AcquisitionDateTime / AcquisitionTime
@@ -98,15 +101,17 @@ def _refiled(name: str, stem: str, target: str) -> str:
 
 def _plan_files(
     staged: Sequence[Path], destination: Path, chosen: dict[str, str]
-) -> list[tuple[Path, Path]]:
+) -> dict[str, list[tuple[Path, Path]]]:
     """Assign each NIfTI and companion one destination before any file moves.
+
+    Returns each stem's `(staged, target)` moves, keyed by the stem.
 
     NIfTIs belong to their parsed stem: `x.nii.gz` belongs to `x` even when
     another series has stem `x.nii`. Other files belong to the longest matching
     stem, so `scan.repeat.json` travels with `scan.repeat`, never `scan`.
     """
     stems = sorted(chosen, key=len, reverse=True)
-    planned = []
+    planned: dict[str, list[tuple[Path, Path]]] = {stem: [] for stem in chosen}
     for path in staged:
         if path.name.endswith(NIFTI_SUFFIXES):
             stem: str | None = nifti_stem(path)
@@ -116,7 +121,7 @@ def _plan_files(
             )
         if stem is not None:
             target = destination / _refiled(path.name, stem, chosen[stem])
-            planned.append((path, target))
+            planned[stem].append((path, target))
     return planned
 
 
@@ -222,7 +227,8 @@ def _file_series(
             chosen = {stem: stem for stem in sidecars}
         case _:
             assert_never(names)
-    planned = _plan_files(staged, destination, chosen)
+    by_stem = _plan_files(staged, destination, chosen)
+    planned = [move for moves in by_stem.values() for move in moves]
     _refuse_collisions(planned, destination, force)
     _file_atomically(planned, destination)
 
@@ -233,6 +239,7 @@ def _file_series(
         filed.append(
             _describe(
                 destination / _refiled(path.name, stem, target),
+                [moved for _, moved in by_stem[stem]],
                 sidecars[stem] or {},
                 renamed_from=stem if target != stem else None,
             )
@@ -395,14 +402,19 @@ def _aftermath(
 
 
 def _describe(
-    path: Path, sidecar: Sidecar, *, renamed_from: str | None
+    path: Path, targets: Sequence[Path], sidecar: Sidecar, *, renamed_from: str | None
 ) -> ImportedSeries:
-    """One filed series, with the sidecar fields worth showing in a listing."""
+    """One filed series, with the sidecar fields worth showing in a listing.
+
+    `targets` are the series' files under their final names, in any order and
+    including `path`; the ordering of `ImportedSeries.files` is done here.
+    """
     stamp = naming.text_field(sidecar, "AcquisitionDateTime") or naming.text_field(
         sidecar, "AcquisitionTime"
     )
     return ImportedSeries(
         path=path,
+        files=(path, *sorted(target for target in targets if target != path)),
         series=naming.series_number(sidecar),
         description=naming.text_field(sidecar, "SeriesDescription"),
         acquired=stamp,
