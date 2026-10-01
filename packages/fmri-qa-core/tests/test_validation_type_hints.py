@@ -7,7 +7,7 @@ in a class's defining module writes `from __future__ import annotations` (PEP
 against the string `"int"` instead of `int` and reject everything. This
 module's own `from __future__ import annotations` reproduces that exact
 condition for `_Example` below without touching the real artifact records, so
-this pins `_resolved_annotations` (`analysis.validation`, built on
+this pins `resolved_annotations` (`fmriqc._records`, built on
 `typing.get_type_hints`) against the regression a stylistic change elsewhere
 in the package could otherwise reintroduce silently.
 """
@@ -16,7 +16,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from fmriqc.analysis.validation import _matches, _resolved_annotations
+from fmriqc._records import resolved_annotations
+from fmriqc.analysis.validation import _matches
 from fmriqc.types import PeAxis
 
 
@@ -30,7 +31,7 @@ class _Example:
 
 
 def test_resolved_annotations_recover_real_types_from_a_stringized_module() -> None:
-    hints = _resolved_annotations(_Example)
+    hints = resolved_annotations(_Example)
 
     assert hints["count"] is int  # not the string "int"
     assert _matches(3, hints["count"])
@@ -56,7 +57,7 @@ def test_matches_accepts_both_spellings_of_an_optional_annotation() -> None:
     perfectly well-formed. `Measurements.pe_axis` and
     `AnalysisSettings.pe_axis_override` are both this shape.
     """
-    hints = _resolved_annotations(_Example)
+    hints = resolved_annotations(_Example)
 
     assert _matches(0, hints["axis"])
     assert _matches(1, hints["axis"])

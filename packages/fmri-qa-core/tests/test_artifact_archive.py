@@ -1134,6 +1134,29 @@ def test_save_refuses_a_provenance_integer_no_attribute_can_hold(
     assert not (tmp_path / "qa.nc").exists()
 
 
+def test_a_whole_number_setting_is_published_as_a_double(tmp_path, artifact) -> None:
+    """`trim_sec=5` is a float field given an int: NC_DOUBLE, not NC_INT."""
+    settings = q.AnalysisSettings(trim_sec=5, roi_size=9)
+    saved = q.save_artifact(
+        replace(artifact, settings=settings), tmp_path / "scan.qa.nc"
+    )
+    trim = np.asarray(_section_attributes(saved, "settings")["trim_sec"])
+    assert trim.dtype == np.float64
+    assert trim == 5.0
+
+
+def test_a_voxel_size_mixing_ints_and_floats_saves_as_doubles(
+    tmp_path, artifact
+) -> None:
+    """`(3.0, 3, 3.0)` is one vector of doubles, not a list of two kinds."""
+    prov = replace(artifact.provenance, voxel_mm=(3.0, 3, 3.0))
+    saved = q.save_artifact(replace(artifact, provenance=prov), tmp_path / "v.qa.nc")
+    voxel = np.asarray(_section_attributes(saved, "provenance")["voxel_mm"])
+    assert voxel.dtype == np.float64
+    assert voxel.shape == (3,)
+    assert q.load_artifact(saved).provenance.voxel_mm == (3.0, 3.0, 3.0)
+
+
 def test_encode_refuses_a_provenance_list_with_no_element_type(artifact) -> None:
     """An attribute is a *typed* vector, and an empty list names no type."""
     document, arrays = decompose(artifact)

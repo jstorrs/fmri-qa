@@ -18,27 +18,19 @@ but coordinates and counts must be usable.
 
 import math
 from dataclasses import fields
-from functools import cache
-from types import UnionType
-from typing import Any, Literal, Union, get_args, get_origin, get_type_hints
+from typing import Any, Literal, get_args, get_origin
 
 import numpy as np
 
+from .._records import UNIONS, resolved_annotations
 from ..settings import AnalysisSettings
 from ..types import LengthUnit
 from .artifact import Measurements, Provenance, QAArtifact, RoiBox, _require
 
-# The two spellings an optional field's annotation can arrive in. `int | None`
-# evaluates to a `types.UnionType`, but `Literal[0, 1] | None` -- a `typing`
-# special form on the left -- evaluates to `typing.Optional[...]`, whose origin
-# is `typing.Union`. They mean the same thing and this validator must accept
-# both, or the field it cannot read is silently rejected for every value.
-_UNIONS = (UnionType, Union)
-
 
 def _matches(value: object, annotation: Any) -> bool:
     origin = get_origin(annotation)
-    if origin in _UNIONS:
+    if origin in UNIONS:
         return any(_matches(value, choice) for choice in get_args(annotation))
     if origin is Literal:
         return any(type(value) is type(v) and value == v for v in get_args(annotation))
@@ -52,25 +44,6 @@ def _matches(value: object, annotation: Any) -> bool:
     if annotation is float:
         return type(value) in (int, float)
     return type(value) is annotation
-
-
-@cache
-def _resolved_annotations(cls: type) -> dict[str, Any]:
-    """Field annotations for `cls`, resolved rather than read off `field.type`.
-
-    `dataclasses.fields(cls).type` is whatever sits in `__annotations__` --
-    the live type object today, since none of these four modules use `from
-    __future__ import annotations` (PEP 563). But nothing enforces that: the
-    day one of them adopts it as a stylistic change, every annotation on that
-    class becomes a plain *string*, and `_matches` would compare `value`
-    against the string `"float"` and reject every field -- loudly, but for a
-    reason nobody would guess from the call site. `get_type_hints` evaluates
-    annotations in the class's own defining module regardless of how they're
-    stored, so the validator is correct either way. The four record classes
-    below are fixed, and this resolution runs on every artifact load and
-    save, so it's cached rather than repeated.
-    """
-    return get_type_hints(cls)
 
 
 def _object(value: Any, name: str) -> dict[str, Any]:
@@ -91,7 +64,7 @@ def validate_document(document: dict[str, Any]) -> None:
     )
     for name, value, cls in records:
         record = _object(value, name)
-        annotations = _resolved_annotations(cls)
+        annotations = resolved_annotations(cls)
         for field in fields(cls):
             if not _matches(record[field.name], annotations[field.name]):
                 raise ValueError(f"{name}.{field.name} has an invalid type or value")

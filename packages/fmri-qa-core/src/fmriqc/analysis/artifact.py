@@ -24,6 +24,7 @@ import math
 from dataclasses import dataclass
 
 from .._arrays import ArrayValue
+from .._records import coerce_float_fields
 from ..settings import AnalysisSettings
 from ..types import BoolArray, FloatArray, LengthUnit, PeAxis, PeLabel
 
@@ -102,6 +103,7 @@ class Provenance:
     series: str | None = None
 
     def __post_init__(self) -> None:
+        coerce_float_fields(self)
         _require(self.n_frames > 0, "invalid provenance.n_frames")
         _require(
             self.n_trimmed is None or self.n_trimmed >= 0,
@@ -233,6 +235,7 @@ class Measurements:
     roi_inside_phantom: bool | None  # the ROI lies wholly within the phantom
 
     def __post_init__(self) -> None:
+        coerce_float_fields(self)
         # `fwhm_pe`/`fwhm_ro` are None exactly when no axis resolved
         # (`SmoothnessResult.fwhm_pe`), in every build since schema 1, and no
         # migration touches them -- one fact, stored twice. `pe_label` looks
@@ -327,6 +330,12 @@ class PsfCurves(ArrayValue):
     model: FloatArray  # (2, n_model)
     xmax: float
 
+    def __post_init__(self) -> None:
+        # Zero-argument `super()` cannot find its class in a slots dataclass,
+        # which is a new class object built after this body runs.
+        ArrayValue.__post_init__(self)
+        coerce_float_fields(self)
+
 
 @dataclass(frozen=True, eq=False, slots=True)
 class Curves(ArrayValue):
@@ -356,6 +365,12 @@ class Curves(ArrayValue):
     com_deviation: FloatArray  # (T, 2) voxels
     weisskoff: WeisskoffCurve
     psf: PsfCurves
+
+    def __post_init__(self) -> None:
+        # Zero-argument `super()` cannot find its class in a slots dataclass,
+        # which is a new class object built after this body runs.
+        ArrayValue.__post_init__(self)
+        coerce_float_fields(self)
 
 
 @dataclass(frozen=True, slots=True)

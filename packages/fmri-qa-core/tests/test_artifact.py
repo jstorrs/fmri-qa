@@ -8,12 +8,15 @@ carries it to disk is `test_artifact_archive.py`.
 """
 
 import warnings
-from dataclasses import asdict, replace
+from collections.abc import Iterator
+from dataclasses import asdict, fields, is_dataclass, replace
+from typing import Any, get_args, get_origin
 
 import numpy as np
 import pytest
 
 import fmriqc as q
+from fmriqc._records import UNIONS, resolved_annotations
 from fmriqc.analysis.build import _convex_hull
 
 
@@ -495,3 +498,58 @@ def test_an_roi_box_that_starts_outside_the_image_cannot_be_constructed(
     roi = artifact.images.roi
     with pytest.raises(ValueError, match=r"images\.roi must be square"):
         replace(roi, row0=-1, col0=-1)
+
+
+def _holds_floats(annotation: Any) -> bool:
+    """`float`, a tuple of floats, or either of those or None."""
+    if get_origin(annotation) in UNIONS:
+        return any(_holds_floats(a) for a in get_args(annotation))
+    if get_origin(annotation) is tuple:
+        args = [a for a in get_args(annotation) if a is not Ellipsis]
+        return bool(args) and all(a is float for a in args)
+    return annotation is float
+
+
+def _float_fields(record: object) -> Iterator[tuple[object, str]]:
+    """Every (record, field) below `record` that is annotated to hold floats.
+
+    Walks the values, not the classes, so a section the fixture does not carry
+    (an absent `images.ghost`) is skipped, and so is a float field it leaves
+    None: replacing None with a number is a different record, not a test.
+    """
+    annotations = resolved_annotations(type(record))
+    for field in fields(record):  # type: ignore[arg-type]
+        value = getattr(record, field.name)
+        if is_dataclass(value):
+            yield from _float_fields(value)
+        elif value is not None and _holds_floats(annotations[field.name]):
+            yield record, field.name
+
+
+def test_every_float_field_stores_a_whole_number_as_a_float(artifact) -> None:
+    """`trim_sec=5` is 5.0: an int in a float field would be published as NC_INT.
+
+    Walked from the artifact down rather than listed, so a record or a float
+    field added later is held to the same rule without anyone remembering to.
+    """
+    checked = list(_float_fields(artifact))
+    assert {name for _, name in checked} >= {"trim_sec", "snr", "voxel_mm", "xmax"}
+    for record, name in checked:
+        current = getattr(record, name)
+        whole = (1,) * len(current) if isinstance(current, tuple) else 1
+        stored = getattr(replace(record, **{name: whole}), name)  # type: ignore[type-var]
+        elements = stored if isinstance(stored, tuple) else (stored,)
+        label = f"{type(record).__name__}.{name}"
+        assert all(type(v) is float for v in elements), (label, stored)
+
+
+def test_a_bool_in_a_float_field_is_kept_for_the_archive_to_refuse(
+    tmp_path, artifact
+) -> None:
+    """`True` is an int to Python but not a measurement; it is not made 1.0."""
+    measurements = replace(artifact.measurements, snr=True)
+    assert measurements.snr is True
+    with pytest.raises(q.InvalidArtifactError, match=r"measurements\.snr"):
+        q.save_artifact(
+            replace(artifact, measurements=measurements), tmp_path / "qa.nc"
+        )

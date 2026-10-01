@@ -10,6 +10,7 @@ vocabulary.
 import math
 from dataclasses import dataclass
 
+from ._records import coerce_float_fields
 from .exceptions import InvalidScanError
 from .types import FBIRN_ROI_SIZE, DetrendMethod, PeAxis, RoiCenter
 
@@ -50,6 +51,7 @@ class AnalysisSettings:
     detrend_order: int | None = None
 
     def __post_init__(self) -> None:
+        coerce_float_fields(self)
         if not math.isfinite(self.trim_sec) or self.trim_sec < 0:
             raise InvalidScanError(
                 "trim_sec",

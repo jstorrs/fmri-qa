@@ -202,6 +202,9 @@ def test_a_real_archive_from_an_older_build_still_loads(version: int) -> None:
     assert loaded.provenance.flip_angle == 77
     assert loaded.settings.roi_size == 9
     assert loaded.settings.trim_sec == 5.0
+    # Older builds stored the flip angle as an int; it loads as a float, or a
+    # re-save would publish it as NC_INT.
+    assert type(loaded.provenance.flip_angle) is float
     assert loaded.images.phantom_mask.sum() == 193
     assert loaded.curves.time[:3].tolist() == [0.0, 2.0, 4.0]
 
