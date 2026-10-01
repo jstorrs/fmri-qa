@@ -5,7 +5,8 @@ artifact*, not on the pipeline that produced it. That is easy to state and easy
 to erode one convenient import at a time, so it is checked mechanically here:
 every `fmriqc` import in the report package must land in `fmriqc.analysis` (the
 artifact), `fmriqc.types` (the shared array/option vocabulary), or
-`fmriqc.rename` (how a finished file is moved into place). An import of
+`fmriqc.rename` (how a finished file is moved into place), or
+`fmriqc.path_arguments` (wildcards and same-file checks on path arguments). An import of
 `fmriqc.metrics`, `fmriqc.pipeline`, `fmriqc.prep`, or `fmriqc.load` — or of the
 `fmriqc` package as a whole, which pulls all of them — fails this test.
 
@@ -35,7 +36,13 @@ import fmriqc_report
 # outwait a sync client holding a just-written file -- that the artifact's
 # writer and the page's writer must agree on, and a second copy kept in step by
 # hand is the worse way to say so.
-ALLOWED = frozenset({"fmriqc.analysis", "fmriqc.types", "fmriqc.rename"})
+#
+# `fmriqc.path_arguments` is the same kind of leaf: standard library only, and
+# what it carries is a shell quirk (an unexpanded wildcard) and an overwrite
+# guard that the report must apply exactly as the other commands do.
+ALLOWED = frozenset(
+    {"fmriqc.analysis", "fmriqc.types", "fmriqc.rename", "fmriqc.path_arguments"}
+)
 
 _SOURCE_ROOT = Path(fmriqc_report.__file__).parent
 

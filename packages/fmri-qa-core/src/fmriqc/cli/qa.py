@@ -14,10 +14,10 @@ from collections.abc import Sequence
 from pathlib import Path
 
 import fmriqc as q
+from fmriqc.path_arguments import expand_globs
 
 from .arguments import (
     PrintVersion,
-    expand_globs,
     nonempty,
     nonnegative_float,
     positive_int,

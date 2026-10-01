@@ -17,7 +17,8 @@ from pathlib import Path
 from typing import TextIO
 
 import fmriqc as q
-from fmriqc.load.paths import nifti_stem, same_file, sidecar_path
+from fmriqc.load.paths import nifti_stem, sidecar_path
+from fmriqc.path_arguments import same_file
 
 # Suffix for a saved artifact, so a batch's files are recognizable at a glance.
 ARTIFACT_SUFFIX = ".qa.nc"

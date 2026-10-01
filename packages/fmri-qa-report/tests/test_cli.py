@@ -1,19 +1,11 @@
 """The `fmri-qa-report` command line: an artifact on disk in, one HTML page out."""
 
-import inspect
 from pathlib import Path
 
 import pytest
 
 import fmriqc as q
 from fmriqc_report import cli
-
-
-def _body(fn) -> list[str]:
-    """The lines of `fn`'s source past its docstring, for comparing two copies."""
-    source = inspect.getsource(fn)
-    lines = source.split('"""')[-1].splitlines()  # past the docstring
-    return [line.strip() for line in lines if line.strip()]
 
 
 @pytest.fixture
@@ -148,29 +140,3 @@ def test_a_wildcard_matching_nothing_is_reported_not_dropped(tmp_path, capsys) -
     rc = cli.main([f"{tmp_path}/*.qa.nc", "--html", str(tmp_path / "qa.html")])
     assert rc == 1
     assert "*.qa.nc" in capsys.readouterr().err
-
-
-def test_the_two_glob_expanders_have_not_drifted() -> None:
-    """The seam forbids sharing the helper, so prove the copies still agree.
-
-    `fmriqc.cli.arguments.expand_globs` is the original; this package may not
-    import it (`test_layering`), so it keeps a twin. A fix applied to one and
-    not the other is the failure this catches.
-    """
-    from fmriqc.cli.arguments import expand_globs
-    from fmriqc_report.cli import _expand_globs
-
-    assert _body(_expand_globs) == _body(expand_globs)
-
-
-def test_the_two_same_file_guards_have_not_drifted() -> None:
-    """The seam forbids sharing the helper, so prove the copies still agree.
-
-    `fmriqc.load.paths.same_file` is the original; this package may not import
-    it (`test_layering`), so it keeps a twin. A fix applied to one and not the
-    other is the failure this catches.
-    """
-    from fmriqc.load.paths import same_file
-    from fmriqc_report.cli import _same_file
-
-    assert _body(_same_file) == _body(same_file)

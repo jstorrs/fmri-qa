@@ -28,20 +28,3 @@ def nifti_stem(path: str | Path) -> str:
 def sidecar_path(path: str | Path) -> Path:
     """Where the BIDS JSON sidecar of the NIfTI at `path` sits: beside it, `.json`."""
     return Path(path).with_name(nifti_stem(path) + ".json")
-
-
-def same_file(a: str | Path, b: str | Path) -> bool:
-    """Whether two paths name one file — through relative forms and links alike.
-
-    An output that names one of its own inputs destroys that input the moment
-    the writer moves its finished file into place, and the spelling of the two
-    paths says nothing about whether that will happen (`./scan.nii.gz` and an
-    absolute path, a symlink and its target, two hard links). Existing files are
-    compared by identity; a path that does not exist yet can only be compared
-    by where it would be created.
-    """
-    first, second = Path(a), Path(b)
-    try:
-        return first.samefile(second)
-    except OSError:
-        return first.resolve() == second.resolve()

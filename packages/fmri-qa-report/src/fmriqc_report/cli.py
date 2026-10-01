@@ -8,59 +8,14 @@ the acquisition data at hand.
 """
 
 import argparse
-import glob
-import re
 import sys
 from collections.abc import Sequence
 from pathlib import Path
 
 from fmriqc.analysis import InvalidArtifactError, QAArtifact, load_artifact
+from fmriqc.path_arguments import expand_globs, same_file
 
 from .summary import package_version
-
-# The characters that make an argument a pattern rather than a name.
-_WILDCARD = re.compile(r"[*?\[]")
-
-
-def _expand_globs(paths: Sequence[str]) -> list[str]:
-    """Every path, with any wildcard pattern that named nothing expanded here.
-
-    PowerShell and cmd do not expand a wildcard before starting the command, so
-    `fmri-qa-report artifacts/*.qa.nc` reaches this process with the `*` still
-    in it and fails as a missing artifact.
-
-    A deliberate twin of `fmriqc.cli.arguments.expand_globs` rather than an
-    import of it: the report package may reach into `fmriqc.analysis` and
-    `fmriqc.types` and nothing else (see `tests/test_layering.py`), and a shell
-    quirk on the way into a command line is not knowledge worth widening that
-    seam for. Keep the two in step.
-    """
-    expanded: list[str] = []
-    for path in paths:
-        if Path(path).exists() or not _WILDCARD.search(path):
-            expanded.append(path)
-            continue
-        # glob.glob, not Path.glob: the pattern is one string that may carry
-        # wildcards in its directory components too, and be absolute or
-        # relative. Path.glob cannot take that without being taken apart first.
-        matched = sorted(glob.glob(path, recursive=True))  # noqa: PTH207
-        expanded.extend(matched or [path])
-    return expanded
-
-
-def _same_file(a: str | Path, b: str | Path) -> bool:
-    """Whether two paths name one file — through relative forms and links alike.
-
-    The HTML is written by moving a finished file over its destination, and the
-    artifact is read first, so `--html` naming it would succeed and leave a
-    report where the archive was. Existing files are compared by identity; a
-    path that does not exist yet can only be compared by where it would go.
-    """
-    first, second = Path(a), Path(b)
-    try:
-        return first.samefile(second)
-    except OSError:
-        return first.resolve() == second.resolve()
 
 
 def _title(artifact: QAArtifact, path: str) -> str:
@@ -98,14 +53,14 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     # Before the overwrite check counts them: on Windows the wildcard is here.
-    artifacts = _expand_globs(args.artifacts)
+    artifacts = expand_globs(args.artifacts)
     if len(artifacts) != 1:
         parser.error("--html renders one artifact to one file")
     (path,) = artifacts
 
     # Refuse before reading anything: an output that names an input is a usage
     # error, and one that must be caught while the input is still intact.
-    if _same_file(args.html, path):
+    if same_file(args.html, path):
         print(
             f"ERROR: --html {args.html} would overwrite the input {path}",
             file=sys.stderr,

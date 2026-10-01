@@ -27,6 +27,8 @@ RANKS = {
     # A leaf over the standard library only. `convert` files its series with
     # it, and so does the launcher, from outside this package.
     "rename": 0,
+    # A leaf over the standard library only, shared with the report command.
+    "path_arguments": 0,
     "load": 1,
     # `convert` sits beside `load`, not under it: both are the tier that gets
     # data in, and convert produces exactly the files load reads. It borrows
