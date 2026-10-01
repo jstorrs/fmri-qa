@@ -10,13 +10,13 @@ header shows is derived here (`_pe_direction`) from that resolved axis.
 
 import json
 import math
-import warnings
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 from ..exceptions import InvalidScanError
 from ..types import Sidecar
+from ..warn import warn
 from .paths import sidecar_path
 from .pe_axis import PE_ROWCOL, in_plane
 
@@ -67,11 +67,10 @@ def _load_sidecar(path: str | Path) -> dict[str, object]:
     """
     sidecar = sidecar_path(path)
     if not sidecar.is_file():
-        warnings.warn(
+        warn(
             f"{path}: no BIDS JSON sidecar found beside the NIfTI; the "
             f"acquisition metadata, including the sidecar phase-encode "
             f"direction and TR, will be absent",
-            stacklevel=3,  # report at the caller of `QAScan.from_nifti`
         )
         return {}
     try:
@@ -111,11 +110,10 @@ def _malformed(key: str, value: object, expected: str) -> None:
     a malformed one is treated like an absent one — with a warning naming it,
     because the metadata exists and is being dropped. Coercing it instead (a
     string that happens to parse as a number) would be guessing at what the
-    converter meant. Reported at the caller of `QAScan.from_nifti`.
+    converter meant.
     """
-    warnings.warn(
+    warn(
         f"sidecar {key} {value!r} is not {expected}; recording it as unknown",
-        stacklevel=4,
     )
 
 

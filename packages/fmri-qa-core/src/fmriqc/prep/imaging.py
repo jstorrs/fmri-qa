@@ -8,7 +8,6 @@ types, so it can be shared without import cycles.
 """
 
 import math
-import warnings
 from typing import assert_never
 
 import numpy as np
@@ -17,6 +16,7 @@ from skimage import filters, segmentation
 
 from ..exceptions import InvalidChoiceError
 from ..types import ROI_CENTER_MODES, BoolArray, FloatArray, IntArray, RoiCenter
+from ..warn import warn
 
 # Open bounds on the plausible share of a frame a phantom mask covers. Outside
 # them the segmentation has collapsed rather than found an unusual phantom: a
@@ -186,11 +186,10 @@ def _largest_phantom_slice(data: FloatArray) -> tuple[int, BoolArray]:
         z = int(np.argmax(areas))
         return z, scored[z][0]
     z = int(data.shape[2] // 2)
-    warnings.warn(
+    warn(
         "no slice holds a recognizable phantom (every segmentation was "
         "degenerate or indistinguishable from background); using the "
         f"middle slice {z} as center='image' would.",
-        stacklevel=4,  # through `select_slice` to its caller (`preprocess`)
     )
     return z, scored[z][0]
 

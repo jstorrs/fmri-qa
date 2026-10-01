@@ -11,7 +11,6 @@ it was asked for into `QAResult.settings`, but that record is defined in
 module.
 """
 
-import warnings
 from dataclasses import dataclass, replace
 
 from ._arrays import readonly
@@ -50,6 +49,7 @@ from .prep.scale import UNKNOWN_VOXEL_SIZE, VoxelSize
 from .settings import AnalysisSettings
 from .types import BoolArray, PeAxis, RoiCenter
 from .validation import validate_qa_run
+from .warn import warn
 
 
 @dataclass(frozen=True, slots=True)
@@ -313,10 +313,9 @@ def _warn_if_roi_does_not_fit(
     if roi_fits(geom.phantom_mask, roi.index):
         return
     other: RoiCenter = "phantom" if center == "image" else "image"
-    warnings.warn(
+    warn(
         f"{roi.size}x{roi.size} ROI ({center} center) is not fully inside the "
         f"phantom; reduce roi_size or try center={other!r}.",
-        stacklevel=3,  # one frame in from `run_qa`: report at run_qa's caller
     )
 
 
@@ -334,12 +333,11 @@ def _build_ghost_family(
     can publish the regions the numbers were sampled on.
     """
     if pe_axis is None:
-        warnings.warn(
+        warn(
             "no phase-encode axis: absent from the header and the Nyquist ghost "
             "resolves neither in-plane axis, so the ghost metrics are undefined. "
             "Pass --pe-axis (AnalysisSettings.pe_axis_override) if the "
             "acquisition's direction is known.",
-            stacklevel=3,  # one frame in from `run_qa`: report at run_qa's caller
         )
         return None
     return estimate_ghost(

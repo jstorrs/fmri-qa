@@ -22,12 +22,12 @@ old -- which is what `test_artifact_archive.py` does -- proves the step matches
 its own docstring, not that a real file from that version still parses.
 """
 
-import warnings
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
 from ...exceptions import InvalidArtifactError
+from ...warn import warn
 from ..artifact import ARTIFACT_SCHEMA_VERSION
 
 
@@ -183,10 +183,9 @@ def migrated(document: dict[str, Any], path: Path) -> dict[str, Any]:
         version += 1
     document["schema_version"] = ARTIFACT_SCHEMA_VERSION
 
-    warnings.warn(
+    warn(
         f"{path}: artifact written under schema {found}, migrated to "
         f"{ARTIFACT_SCHEMA_VERSION}; fields the older schema did not carry are "
         f"recorded as unknown, not as measurements.",
-        stacklevel=3,
     )
     return document

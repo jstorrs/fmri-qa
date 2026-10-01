@@ -9,7 +9,6 @@ None, because estimating it from the Nyquist ghost is the *pipeline's* job (see
 TR likewise prefers the sidecar over the unit-converted header pixdim.
 """
 
-import warnings
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -17,6 +16,7 @@ import nibabel as nib
 
 from ..exceptions import InvalidScanError
 from ..types import FloatArray
+from ..warn import warn
 from .metadata import ScanMeta, _load_sidecar, _scan_meta
 from .pe_axis import _pe_axis_from_header, _pe_axis_from_sidecar
 from .repetition_time import _repetition_time
@@ -25,10 +25,9 @@ from .repetition_time import _repetition_time
 def _spatial_scale_mm(unit: str) -> float:
     """Resolve the header's spatial unit once for voxel sizes and the affine."""
     if unit == "unknown":
-        warnings.warn(
+        warn(
             "NIfTI spatial unit is unknown; assuming millimeters for voxel sizes "
             "and affine",
-            stacklevel=3,
         )
     return {"meter": 1000.0, "mm": 1.0, "micron": 0.001, "unknown": 1.0}[unit]
 
@@ -92,25 +91,23 @@ class QAScan:
         # The on-disk datatype, before `get_fdata` widened everything to float64.
         stored_integer = img.header.get_data_dtype().kind in "iu"
         if not stored_integer:
-            warnings.warn(
+            warn(
                 f"{path}: stored as {img.header.get_data_dtype()}, not an integer "
                 "type, so the scanner's ADC samples are gone and clipping cannot "
                 "be detected -- the saturation check will report 'not "
                 "determinable' rather than clean. Convert with a tool that "
                 "preserves the stored integer datatype (dcm2niix does by "
                 "default) if you need the receiver-gain check.",
-                stacklevel=2,
             )
 
         pe_axis = _pe_axis_from_sidecar(sidecar)
         if pe_axis is None:
             pe_axis = _pe_axis_from_header(img.header)
         if pe_axis is None:
-            warnings.warn(
+            warn(
                 f"{path}: no phase-encode axis in sidecar or NIfTI dim_info; "
                 "the pipeline will estimate it from the Nyquist ghost. Pass "
                 "--pe-axis to name the acquisition's direction instead.",
-                stacklevel=2,
             )
 
         tr = _repetition_time(img.header, sidecar, path)

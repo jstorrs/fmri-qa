@@ -32,10 +32,10 @@ import subprocess
 from collections.abc import Sequence
 from itertools import pairwise
 from pathlib import Path
-from warnings import warn
 
 from ..exceptions import ConversionError
 from ..types import Anonymize
+from ..warn import warn
 
 # dcm2niix's `-f` template for the staged conversion. Not the name a series is
 # finally filed under (see `naming`) — it is what dcm2niix distinguishes its own
@@ -154,7 +154,6 @@ def _warn_if_rescaling(extra: Sequence[str]) -> None:
                 f"passing -l {value} to dcm2niix rescales the stored integers, "
                 "so the saturation check will report a clipped acquisition as "
                 "clean rather than as not determinable; -l o keeps them",
-                stacklevel=3,
             )
 
 

@@ -16,12 +16,11 @@ flip-angle algebra, kept pure so it can be exercised directly.
 * `compatibility` -- the geometry/acquisition checks the two scans must satisfy
 """
 
-import warnings
-
 from ..exceptions import IncompatibleScansError
 from ..load.scan import QAScan
 from ..types import DetrendMethod
 from ..validation import validate_hilo_run
+from ..warn import warn
 from .compatibility import require_compatible_scans
 from .mask import HILO_ERODE, phantom_core_mask
 from .result import HiLoResult, separate_noise
@@ -64,10 +63,9 @@ def run_hilo(
     fh = high.meta.flip_angle if high.meta else None
     fl = low.meta.flip_angle if low.meta else None
     if fh is not None and fl is not None and fh <= fl:
-        warnings.warn(
+        warn(
             f"high-flip scan flip angle ({fh:g}) is not greater than the low-flip "
             f"scan ({fl:g}); check the argument order (high first, low second).",
-            stacklevel=2,
         )
 
     mean_h, sd_h, core_h = hilo_stats(high, trim_sec, detrend, erode)

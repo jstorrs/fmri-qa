@@ -56,7 +56,7 @@ def hilo_main(argv: Sequence[str] | None = None) -> int:
     res: q.HiLoResult | None = None
     # The pair is analyzed together, so a warning belongs to both scans; naming
     # them is still the difference between an actionable line and one that only
-    # names a source file inside this package (see `print_warnings`).
+    # names a source line that is no use to an operator (see `print_warnings`).
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
         try:

@@ -5,7 +5,6 @@ Operates on the preprocessed `QAImages`, turning the raw-array primitives in
 detected center (`PhantomGeometry`), and the fixed-size, on-image summary `ROI`.
 """
 
-import warnings
 from dataclasses import dataclass
 from typing import assert_never
 
@@ -14,6 +13,7 @@ import numpy as np
 from .._arrays import ArrayValue
 from ..exceptions import InvalidChoiceError
 from ..types import FBIRN_ROI_SIZE, ROI_CENTER_MODES, BoolArray, IntArray, RoiCenter
+from ..warn import warn
 from .images import QAImages
 from .imaging import (
     DEGENERATE_PHANTOM_MAX,
@@ -100,10 +100,9 @@ def detect_phantom(images: QAImages) -> PhantomGeometry:
         contrast=phantom_contrast(images.mip, phantom_mask),
     )
     if not geom.plausible:
-        warnings.warn(
+        warn(
             f"{_implausibility(geom)}, so the mask-based metrics (SFNR, ghost, "
             f"outliers, smoothness) are unusable.",
-            stacklevel=2,
         )
     return geom
 

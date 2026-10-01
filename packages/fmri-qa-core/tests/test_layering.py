@@ -21,6 +21,7 @@ RANKS = {
     "exceptions": 0,
     "_arrays": 0,
     "version": 0,
+    "warn": 0,
     "settings": 0,
     # A leaf over the standard library only. `convert` files its series with
     # it, and so does the launcher, from outside this package.

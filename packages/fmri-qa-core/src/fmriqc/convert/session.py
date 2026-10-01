@@ -34,12 +34,12 @@ from contextlib import suppress
 from dataclasses import dataclass
 from pathlib import Path
 from typing import assert_never
-from warnings import warn
 
 from ..exceptions import ConversionError, InvalidChoiceError
 from ..load.paths import NIFTI_SUFFIXES, nifti_stem, sidecar_path
 from ..rename import replace_patiently
 from ..types import ANONYMIZE_MODES, NAME_STYLES, Anonymize, NameStyle, Sidecar
+from ..warn import warn
 from . import naming
 from .dcm2niix import DEFAULT_TEMPLATE, build_args, find_dcm2niix, run, version
 
@@ -340,7 +340,6 @@ def _file_atomically(planned: Sequence[tuple[Path, Path]], destination: Path) ->
             warn(
                 f"could not remove {aside}; it holds the files this import "
                 "replaced and can be deleted",
-                stacklevel=4,  # report at the caller of `import_dicom`
             )
 
 

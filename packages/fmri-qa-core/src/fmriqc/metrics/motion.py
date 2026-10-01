@@ -6,7 +6,6 @@ phantom cannot rotate while gradient heating translates, scales, and shears the
 image. The analyzed series is not resampled from this fit; it is a diagnostic.
 """
 
-import warnings
 from dataclasses import dataclass
 
 import numpy as np
@@ -15,6 +14,7 @@ from scipy import ndimage
 from .._arrays import ArrayValue
 from ..prep.scale import UNKNOWN_VOXEL_SIZE, VoxelSize
 from ..types import BoolArray, FloatArray
+from ..warn import warn
 
 # Per-volume registration budget (in-plane phantom motion). Phantom drift is
 # sub-voxel, so a few Gauss-Newton steps converge; TOL is on the largest
@@ -199,9 +199,8 @@ def estimate_motion(
     result = MotionResult(params=params, voxel=voxel)
     failed = int((~result.converged).sum())
     if failed:
-        warnings.warn(
+        warn(
             f"motion fit failed or did not converge for {failed}/{nt} frames; "
             "their motion traces and the run's peak motion metrics are undefined",
-            stacklevel=2,
         )
     return result

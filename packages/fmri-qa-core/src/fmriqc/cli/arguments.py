@@ -103,8 +103,9 @@ def nonnegative_int(value: str) -> int:
 def print_warnings(caught: Iterable[warnings.WarningMessage], subject: str) -> None:
     """Reprint captured warnings on stderr, named for what was being analyzed.
 
-    Python's default formatter names the line that called `warn` — a path inside
-    this package — and the category, and says nothing about the data. In a batch
+    Python's default formatter names the source line the warning is attributed
+    to — for the package's own warnings, the console-script frame that called
+    into it — and the category, and says nothing about the data. In a batch
     that is exactly backwards: which scan provoked the warning is the only thing
     an operator can act on, and the source line is noise the pipeline's own
     authors read. So the warnings are captured around each scan's analysis and

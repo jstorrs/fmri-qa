@@ -11,11 +11,11 @@ misread, wins whenever it is there.
 """
 
 import math
-import warnings
 from pathlib import Path
 from typing import Any
 
 from ..types import Sidecar
+from ..warn import warn
 
 # NIfTI `xyzt_units` time codes, as nibabel spells them, in seconds. An unknown
 # unit is read as seconds: that is what an unlabelled pixdim has always meant in
@@ -57,19 +57,17 @@ def _repetition_time(header: Any, sidecar: Sidecar, path: str | Path) -> float:
 
     if sidecar_tr is None:
         if "RepetitionTime" in sidecar:
-            warnings.warn(
+            warn(
                 f"{path}: ignoring sidecar RepetitionTime "
                 f"{sidecar['RepetitionTime']!r} (expected a positive number of "
                 f"seconds); using the NIfTI header TR {header_tr:g} s",
-                stacklevel=3,  # report at the caller of `QAScan.from_nifti`
             )
         return header_tr
 
     header_is_usable = math.isfinite(header_tr) and header_tr > 0
     if header_is_usable and not math.isclose(sidecar_tr, header_tr, rel_tol=TR_RTOL):
-        warnings.warn(
+        warn(
             f"{path}: sidecar RepetitionTime {sidecar_tr:g} s disagrees with the "
             f"NIfTI header TR {header_tr:g} s; using the sidecar value",
-            stacklevel=3,
         )
     return sidecar_tr
