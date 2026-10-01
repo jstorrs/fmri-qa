@@ -14,12 +14,12 @@ zero-argument panel path all stay as cheap as parsing itself.
 """
 
 import argparse
-import math
 import sys
 from collections.abc import Sequence
 from importlib import import_module
 from pathlib import Path
 
+from fmriqc.cli.arguments import nonnegative_float, positive_int
 from fmriqc.settings import AnalysisSettings
 
 from .exceptions import LauncherError, PanelUnavailableError, RequestError
@@ -64,24 +64,6 @@ class _PrintVersion(argparse.Action):
         parser.exit()
 
 
-def _nonnegative_float(value: str) -> float:
-    """Mirrors `fmriqc.cli.arguments.nonnegative_float` -- see the module docstring."""
-    parsed = float(value)
-    if not math.isfinite(parsed) or parsed < 0:
-        raise argparse.ArgumentTypeError(
-            "expected a finite number greater than or equal to 0"
-        )
-    return parsed
-
-
-def _positive_int(value: str) -> int:
-    """Mirrors `fmriqc.cli.arguments.positive_int` -- see this module's docstring."""
-    parsed = int(value)
-    if parsed <= 0:
-        raise argparse.ArgumentTypeError("expected a positive integer")
-    return parsed
-
-
 def _build_parser() -> argparse.ArgumentParser:
     """The command line this command accepts."""
     parser = argparse.ArgumentParser(
@@ -95,7 +77,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("output_dir", nargs="?", default=None, help=OUTPUT_DIR_HELP)
     parser.add_argument(
         "--trim-sec",
-        type=_nonnegative_float,
+        type=nonnegative_float,
         default=DEFAULT_SETTINGS.trim_sec,
         help=TRIM_SEC_HELP,
     )
@@ -113,7 +95,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--roi-size",
-        type=_positive_int,
+        type=positive_int,
         default=DEFAULT_SETTINGS.roi_size,
         help=ROI_SIZE_HELP,
     )
