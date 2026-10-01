@@ -322,6 +322,7 @@ def test_a_callback_exception_reenables_inputs_and_records_the_failure(
     except RuntimeError as exc:
         panel._on_callback_exception(RuntimeError, exc, exc.__traceback__)
 
+    assert factory.last.cancel_called is True
     assert not panel._run_button.instate(["disabled"])
     assert "a callback blew up" in panel._status_var.get()
     assert "a callback blew up" in panel._log_widget.get("1.0", "end")

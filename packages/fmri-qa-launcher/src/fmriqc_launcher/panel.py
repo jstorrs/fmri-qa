@@ -606,6 +606,8 @@ class Panel:
         try:
             details = "".join(traceback.format_exception(exc_type, exc_value, exc_tb))
             message = f"{exc_type.__name__}: {exc_value}"
+            if self._background is not None:
+                self._background.cancel()  # do not leave the worker running unobserved
             self._background = None
             self._apply_bar_state(CRASHED_BAR)
             self._status_var.set(f"Internal error: {message}")
