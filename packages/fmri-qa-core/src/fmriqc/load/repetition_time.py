@@ -36,7 +36,9 @@ def _tr_from_header(header: Any) -> float:
 
 def _positive_seconds(value: object) -> float | None:
     """`value` as a positive, finite number of seconds; None if it is neither."""
-    if not isinstance(value, int | float):
+    # `isinstance(True, int)` is true, so a JSON boolean is excluded explicitly
+    # rather than loaded as a 1 s TR.
+    if isinstance(value, bool) or not isinstance(value, int | float):
         return None
     return float(value) if math.isfinite(value) and value > 0 else None
 

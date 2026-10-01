@@ -103,7 +103,7 @@ def test_sidecar_without_repetition_time_falls_back_to_the_header(tmp_path) -> N
     assert q.QAScan.from_nifti(nifti).tr == pytest.approx(2.5)
 
 
-@pytest.mark.parametrize("value", [0, -2.0, "2000", None, float("nan")])
+@pytest.mark.parametrize("value", [0, -2.0, "2000", None, float("nan"), True])
 def test_unusable_sidecar_repetition_time_falls_back_to_the_header(
     tmp_path, value: object
 ) -> None:
