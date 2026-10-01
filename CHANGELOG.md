@@ -13,36 +13,6 @@ versioning when the first stable public interface is released.
   closing returns to the figure rather than to the top of the Figures section.
   The mechanism is still CSS alone, so the page carries no script, and a
   printed report is unchanged.
-- **`fmri-qa-report` renders one artifact to one HTML file, and nothing else.**
-  `--html FILE` is now required rather than one of two output flags, and the
-  command takes exactly one artifact; a wildcard that matches several is a
-  usage error. Reporting is one command with one output.
-- **A published run report is one self-contained HTML file.** `fmri-qa-site`
-  no longer writes a `runs/<sha256>/figures/` directory: `write_run_page`
-  inlines the stylesheet in a `<style>` block and embeds all fourteen figures
-  as `data:image/svg+xml;base64,...` sources, so the page opens from `file://`
-  with no sibling asset and no network access — a PDF alternative a physicist
-  can double-click, email, or drop into their own site. `render_run` is
-  replaced by `render_run_page`/`write_run_page`, which take an artifact
-  directly rather than a run directory whose figures were written by a
-  separate step; a page published inside a site now carries a `SiteContext`
-  (its index route, and whether the site is incomplete) instead of loose
-  `incomplete`/directory arguments, and a standalone page takes no `site` at
-  all and carries no link out. Only the site index still depends on
-  `assets/report.css`. `FigureAsset` no longer carries a `path`: figures are
-  values rendered in memory, not files, so a disk location was never theirs to
-  hold. `render_figures` and `RenderedFigure` are new, and are what every HTML
-  page now builds on; `write_figures`, which wrote the same SVGs to files
-  nothing in `src` called any more, is removed in favour of `render_figures`.
-- **The HTML report and site have a new look.** Both pages are restyled to a
-  denser, more legible layout: a masthead with an identity block, metric and
-  count tiles, hairline key/value tables, and grouped figure panels. Dark mode
-  now follows the OS setting (figures stay on a white plate so plotted data
-  keeps its colors); a print stylesheet lays the report out for paper; a
-  figure enlarges to fill the viewport through a CSS-only `:target` toggle,
-  with no JavaScript; and the site index's run table now shows each run's
-  headline metrics (SNR, SFNR, ghost, drift, fluct) alongside its link, not
-  just a bare list.
 - **Loaded scan affines now use millimeters, matching their voxel sizes.**
   Equivalent NIfTI geometry encoded in meters, millimeters, or microns can now
   be paired for high/low analysis. Conversion includes affine translation;
@@ -336,391 +306,6 @@ versioning when the first stable public interface is released.
   `tool.coverage.run.omit`, the one exemption from the coverage floor, since
   everything it decides that can be a pure function already lives in
   `worker.py`/`panel_state.py`/`request.parse_form` and is covered there.
-
-### Added
-
-- **`make docs` builds one documentation site, with pages for every package.**
-  Each package keeps its own Sphinx project, and all of them build into
-  `build/site`: a landing page at the root, the analysis pages under `core/`,
-  and new pages for `fmri-qa-report` (the command, what the page shows and
-  what an embedding site must allow, rendering from Python) and
-  `fmri-qa-launcher` (the `fmri-qa-run` options and exit codes, the desktop
-  panel, what a run writes). Links between packages are checked against each
-  other's local inventories, never the network, and a final pass fails the
-  build on any relative link that does not land on a file inside the site.
-  The analysis pages move from `packages/fmri-qa-core/docs/_build/html` to
-  `build/site/core`, and now build from a fresh checkout.
-- **The `fmri-qa-launcher` package: `fmri-qa-run`, one command from a DICOM
-  directory to a report per series.** `fmri-qa-run DICOM_DIR OUTPUT_DIR`
-  converts, analyzes, and renders every series it finds, writing one folder
-  per series under `OUTPUT_DIR` — named for the series and holding the
-  converted scan, its sidecar, the `.qa.nc` artifact, and a self-contained
-  HTML report — with the four appearing together only once every one of them
-  is written. A series whose folder already exists is refused, never
-  replaced; a failure in one series is reported and every other series is
-  still attempted. Analysis defaults are `fmriqc`'s own, so the numbers match
-  a `fmri-qa` run by hand — a test pins the equality. `--trim-sec`,
-  `--detrend`, `--center`, `--roi-size`, `--anonymize`, and `--dcm2niix` cover
-  the same ground `fmri-qa`/`fmri-qa-import` do; `--open` opens the report
-  (or, for several series, the output folder) once the run finishes. stdout
-  carries only each published report's path, one per line; everything else —
-  progress, refusals, failures, warnings — goes to stderr, and the exit code
-  is `0` when every series published, `1` when any was refused or failed, `2`
-  on a usage error. With neither directory given, `fmri-qa-run` opens a
-  desktop panel instead, also reachable directly as `fmri-qa-panel`
-  (a `gui-scripts` entry point, so no console window on Windows): DICOM and
-  output folders, an advanced-options section for the four analysis knobs
-  above, a progress bar and log, and an "Open results" action. Closing the
-  window mid-run stops the run after the series in progress finishes;
-  closing again quits immediately without waiting. The package adds no
-  third-party dependency of its own — the panel is built on stdlib
-  `tkinter` — and a layering test keeps `tkinter` out of `fmri-qa-core` and
-  `fmri-qa-report`.
-- **`fmri-qa-report` can now write a single-file HTML report.** `--html FILE`
-  renders one artifact to one self-contained page — the same page
-  `fmri-qa-site` publishes per run — as a PDF alternative that opens by
-  double-click with no network and no sibling file, and carries no JavaScript.
-  `--pdf` is no longer required on its own; at least one of `--pdf` or `--html`
-  must be given, and both may be given together to write both from one run.
-  `--html` takes exactly one artifact; several scans still go through
-  `fmri-qa-site`.
-- **`fmri-qa-site` publishes saved artifacts as an offline static report.**
-  It creates a fresh directory with an index, per-artifact pages, assets, and a
-  versioned `summary.json` inventory; incomplete requests are published and
-  return a non-zero status.
-- **`InvalidArtifactError` is now reachable from `fmriqc.analysis`.** It is the
-  one error `load_artifact` raises, and it was previously only reachable
-  through `fmriqc.exceptions` — off limits to `fmri-qa-report`, which may
-  import only `fmriqc.analysis` and `fmriqc.types`. A reader of an artifact can
-  now catch it by name instead of a blanket `except Exception`.
-- **`fmri-qa-hilo --version` now works.** `fmri-qa` and `fmri-qa-import` each
-  carried their own copy of the flag and `fmri-qa-hilo` had none, so asking it
-  for its version was a usage error. All three now share one, and answer alike.
-- **`fmri-qa-import`: DICOM in, QA-ready NIfTI out.** Point it at a directory and
-  it runs [dcm2niix](https://github.com/rordenlab/dcm2niix), pinning the flags a
-  QA conversion cannot be left to chance on — above all `-l o`, which keeps the
-  scanner's stored integers. dcm2niix's `-l y` rescales them while still writing
-  an *integer* NIfTI, so `QAScan.stored_integer` sees nothing wrong and the
-  saturation check reports a clipped acquisition as clean rather than as not
-  determinable; `-g i` makes the pinning stick past a site's `~/.dcm2nii.ini`.
-  Each series is filed as `<date>_<time>_s<NNN>_<description>`, built from the
-  BIDS sidecar because dcm2niix's `-f` template cannot produce those four fields:
-  `%t` is the study's time (the same for every series in a session), `%s` is not
-  zero-padded (so series 11 sorts before series 2), and `%d` keeps the protocol's
-  punctuation. `--names dcm2niix` keeps dcm2niix's naming and `--filename` takes
-  any template; `--dcm2niix-arg` passes anything else through, warning if it
-  would undo `-l o`. The converter is the optional `fmri-qa-core[dicom]` extra,
-  which carries a bundled binary; a dcm2niix on `PATH` or named with
-  `--dcm2niix` works instead. New `fmriqc.convert` subpackage
-  (`import_dicom`, `ImportResult`, `ImportedSeries`, `ConversionError`). See the
-  README's *Importing DICOM* section.
-
-- **The saturation check now says when it cannot answer.** An ADC rail is an
-  integer artifact of the receiver, so the check requires a series that still
-  carries the scanner's integers. `QAScan.from_nifti` reads the NIfTI datatype,
-  records it as `QAScan.stored_integer`, and warns on a float-stored file naming
-  the fix; `detect_saturation` returns `None` there, and the artifact publishes
-  the whole clipping block (`clipped_any`, `clipped_kept`, `n_clipped_kept`,
-  `n_clipped_pre`) as `None` — *not determinable*, which is a third answer
-  distinct from "no clipping found". Shown as `?` in the `clip`/`clipPre`
-  columns, `null` in `fmri-qa --json`, and a `clip not determinable` note in the
-  PDF. Artifact schema version 7; an artifact from schema ≤ 6 keeps its stored
-  bool, which that build did measure. Previously a float-converted NIfTI of a
-  genuinely saturated acquisition reported clean, silently. Every other metric
-  is unaffected. See the README's *Saturation* section for the conversion
-  policy this makes explicit.
-
-- `Provenance.slice_index` / `n_slices` record which plane of the volume the
-  artifact describes, and `Measurements.phantom_contrast` the mask's
-  interior-over-background ratio beside the verdict reached from it. Artifact
-  schema version 5; an older archive reads them back as unknown. The report's
-  acquisition line shows the slice, and its BAD PHANTOM MASK note names the
-  contrast so a reader can see which test the mask failed. `fmri-qa --json`
-  records carry `slice_index` and `phantom_contrast`.
-- Batch failures travel with the output. The `fmri-qa --json` document lists
-  `requested` inputs and an `errors` inventory (`scan`, `source`, `error`) for
-  every input that failed to load, analyze, or save, beside the `scans` that
-  ran; JSON schema version 5. Both commands print a one-line tally of failures
-  on stderr. An `fmri-qa-report` packet missing an unreadable artifact says
-  so in the PDF itself: the cover counts scans against those requested and
-  lists the omitted with the reason, the appendix carries a row for each,
-  every scan page's footer reads INCOMPLETE PACKET, and the subject metadata
-  counts them (`write_report(..., omitted=...)`).
-- **The whole Nyquist-ghost family from one set of masks.** `estimate_ghost`
-  builds the region-matched signal/ghost masks once per in-plane axis and
-  returns a `GhostResult` carrying the masks and every ratio measured on them;
-  `QAMetrics.ghost` holds it, and the artifact's ghost regions are copied from
-  it rather than rebuilt. The four percentages a table shows are unchanged.
-- The BIDS sidecar is optional. A NIfTI exported without one (a scanner export
-  that never went through dcm2niix) now analyzes with a warning and empty
-  acquisition metadata instead of being refused.
-- The TR is taken from the sidecar `RepetitionTime` when it is there, and
-  otherwise from the header pixdim converted by the header's declared time
-  unit; a disagreement between the two warns and names both values.
-- `Provenance.n_trimmed` records how many warm-up volumes the analysis dropped,
-  so `outlier_worst_frame` and the curve time axis map back to acquired volume
-  numbers. Artifact schema version 4; older archives read it back as unknown.
-- `fmri-qa --json` records now carry `source`, `datetime`, `tr`, `n_frames`,
-  `n_trimmed`, `outlier_worst_frame`, the combined `fwhm`, and `fwhm_unit`.
-  JSON schema version 3.
-- `fmri-qa` and `fmri-qa-hilo` print each warning the analysis raised on
-  stderr as `<scan>: warning: <message>`, attributed to the scan that raised it,
-  instead of Python's default line naming a source file inside the package.
-- Both distributions ship the MIT license text, and CI asserts it is installed
-  with each wheel.
-
-- **The analysis artifact.** `QAArtifact` publishes one analyzed series — its
-  settings, provenance, scalar measurements, stability curves, and the four
-  fBIRN summary images — fully resolved, so no consumer recomputes a metric.
-  `analyze(scan)` produces one; `save_artifact`/`load_artifact` move it through
-  a single versioned netCDF-4 file.
-- `fmri-qa --artifact PATH` saves the artifact for each analyzed scan (a file
-  for one scan, a directory of `<scan>.qa.nc` for a batch).
-- `fmri-qa-report ARTIFACT... --pdf FILE`, the new reporting command.
-- Structured validation for scan data, analysis parameters, and high/low pairs.
-- A versioned, standards-compliant JSON output contract.
-- Atomic PDF writes and pagination for packet cover and provenance sections.
-- Build-artifact smoke tests in CI.
-- MIT licensing and distributable package-license metadata.
-- Localization diagnostics in the artifact. `Measurements` now carries
-  `phantom_fraction` (the share of the frame the phantom mask covers) and
-  `roi_inside_phantom`, so a stored artifact says whether the segmentation and
-  the summary ROI held — the difference between "the estimator declined" and
-  "the analysis was measuring background". A report calls either failure out on
-  the acquisition line, `fmri-qa` in a `loc` column, and `--json` in three
-  fields (`phantom_fraction`, `phantom_mask_ok`, `roi_inside_phantom`) so a
-  trend database can tell a measurement from a measurement of air. Artifact
-  schema version 3; JSON schema version 2.
-- Artifacts written under an older schema are migrated forward on read, with a
-  warning, instead of being refused: a QA archive outlives the build that wrote
-  it. Fields the older schema did not carry come back as "not recorded" — `None`
-  for the localization verdicts, which `fmri-qa` shows as `loc ?` and a report
-  as a quiet note — never as a fabricated pass. Only an artifact from a *newer*
-  build, whose layout this one cannot know, is still refused.
-- `python -m fmriqc_report`, matching `python -m fmriqc`.
-
-### Fixed
-
-- **The panel's progress bar bounces during DICOM import on every run, not
-  just the first.** A finished run leaves the bar's `maximum` at a handful of
-  ticks, and an indeterminate `ttk.Progressbar` sweeps once per `maximum`
-  steps, so a second run's bounce collapsed into a flicker between the two
-  ends. The range is now reset whenever the bar goes indeterminate.
-- **Published HTML reports, sites, and PDFs no longer come out `0600`/`0700`
-  regardless of the umask.** `write_run_page`, `write_site`, and the PDF
-  writer atomically wrote through `tempfile.mkstemp`/`tempfile.mkdtemp`, whose
-  results are always private-mode by design (they are meant for a process's
-  own scratch files, not something handed to a reader); a run page, a
-  published site directory, and a PDF inherited that private mode instead of
-  the caller's own umask-filtered default. All three now share one
-  `fmriqc_report.atomic.atomic_file` context manager (and a matching
-  uniquely-named sibling `Path.mkdir()` for the site's staging directory) that
-  lets the kernel apply the umask, same as every other file this project
-  writes. Nothing about the atomic-write guarantees changed: a reader never
-  observes a partial file, and a failed render or write never disturbs an
-  existing destination.
-- **A saved `.qa.nc` archive no longer comes out `0600` regardless of the
-  umask.** `save_artifact` reserved its temporary name with `tempfile.mkstemp`,
-  so the archive kept that private mode while the NIfTI and sidecar beside it
-  did not, and a colleague on a shared drive could open the scan but not its
-  results. The temporary is now created with the umask-filtered default; the
-  write is as atomic and as durable as before.
-- Undefined circular centroids, including uniform positive frames, are now
-  excluded per axis from the reference position. Near-zero temporal resultants
-  also remain undefined, so cancellation roundoff cannot fabricate displacement.
-
-- RDC panels use finite measurements for plot limits and mark unresolved points.
-  Blank scans and curves containing NaN or infinity now render in dashboard and
-  physics reports; all-zero curves retain a usable plot range.
-
-- Dashboard reports wrap acquisition metadata and warning notes, and size metric
-  tiles to fit their values across multiple rows. Plot heights share the remaining
-  space so combined clipping, phantom-mask, and ROI warnings remain visible on a
-  single Letter or A4 page without colliding with the footer.
-
-- **Sparse phantoms retain separate background and foreground seeds.** When
-  the watershed's intensity quantiles coincide, distinct minimum and maximum
-  intensities seed the two classes instead. Small phantoms over zero background
-  no longer flood the frame or contaminate the hi/lo core with background;
-  constant images return an empty, invalid mask with the existing warning.
-
-- **Imported companions stay with their own series when stems overlap.** NIfTIs
-  keep their parsed stems; other companions use the longest matching series stem.
-  File destination collisions are refused before any move, even with `--force`.
-- **Imported series names stay unique even when a QA name matches a retained
-  dcm2niix name.** Colliding series fall back to their original names until all
-  collisions are resolved, preventing one scan from silently replacing another.
-- **`fmri-qa --artifact ''` is now a usage error instead of a silent no-op.**
-  `qa.py` only ever tested `args.artifact` by truthiness, so an empty string
-  passed both `if` checks as false: the whole analysis ran, nothing was
-  written, and the command exited 0 as if `--artifact` had never been given.
-  `--artifact` now carries `arguments.nonempty` as its `type`, so an empty
-  value is rejected at parse time with a usage error naming `--artifact`,
-  before any scan is read; a run without the flag is unaffected.
-- **`fmri-qa-import` no longer prints a traceback when its destination cannot
-  be created.** `import_dicom` called `destination.mkdir(parents=True,
-  exist_ok=True)` unguarded, so a `-o` pointing at an existing regular file
-  raised a bare `FileExistsError` that `import_main` did not catch. The
-  `mkdir` is now wrapped as `ConversionError("destination", ...)`, and
-  `import_main` catches broadly like every other command, so the failure
-  prints one `ERROR: ...` line to stderr and exits 1.
-- **A BIDS sidecar whose `AcquisitionDate` is a JSON number no longer crashes
-  the load.** `load.metadata` built the acquisition datetime by joining
-  `AcquisitionDate` and `AcquisitionTime` with `" ".join(...)`, converting the
-  time to text first but not the date — so a sidecar with `"AcquisitionDate":
-  20260909` (unquoted, as some writers emit it) raised a bare
-  `TypeError: sequence item 0: expected str instance, int found` instead of
-  loading. The date is now converted the same way its neighbour already is;
-  a sidecar value that comes through unquoted is still parsed, the same
-  latitude `_optional_text` already gives a numeric serial number.
-- **Importing `fmriqc_report` no longer switches the matplotlib backend to
-  `Agg`.** The package called `matplotlib.use("Agg")` at import time, silently
-  overriding whatever backend the importing process — a notebook's inline
-  backend, say — had already chosen. Rendering never needed it: panels build
-  `matplotlib.figure.Figure` objects directly and save them with `fig.savefig`,
-  with no `pyplot` involved.
-- **`import_dicom` now raises `InvalidChoiceError` for a `names` or `anonymize`
-  value outside its permitted set.** It was the one public entry point that
-  took closed-set string options with no guard of its own — a bad `names`
-  reached `assert_never` and came back as a bare `AssertionError`, and a bad
-  `anonymize` reached `dcm2niix._BA` and came back as a bare `KeyError`,
-  either way escaping `except FmriqcError`. Both are now checked before
-  anything is staged or dcm2niix is even looked up. The CLI was never
-  affected — `--names`/`--anonymize` already restrict both flags with
-  `choices=`.
-- **`validate_artifact` now checks that a duplicated fact agrees with itself.**
-  Two groups of published fields are derived copies of others — `clipped_any`/
-  `clipped_kept` from the clipping counts, and the None-ness of `fwhm_pe`/
-  `fwhm_ro` from `pe_axis` — and nothing compared them. A hand-edited or
-  foreign document could carry `n_clipped_kept: 500` beside `clipped_kept:
-  false`, and it loaded anyway: the CLI table dropped its "!" flag, and the
-  PDF report either said nothing about the clipping (if `clipped_any` was
-  also left false) or printed a "pre-SS only" line for clipping that was
-  really in the analyzed data. Such a document now loads only if its
-  duplicated fields agree; a self-contradictory one is refused.
-- **`save_artifact` now checks the one field `load_artifact` checks first.**
-  It already held a written artifact to the reader's other checks, but let any
-  `schema_version` through uncaught — 99, 0, a float, a string, even `True` —
-  so a bad value was written successfully, replaced whatever valid archive
-  already stood at the path, and was refused only when something later tried
-  to read it back. A `schema_version` that is not exactly the version this
-  build writes is now refused before anything is written, the same way every
-  other mismatch between the artifact and the reader's contract already was.
-- The report's metric catalog (the physics tier's characterization and methods
-  pages) describes the calculations as implemented. SFNR is the ROI average
-  of voxelwise temporal-mean over detrended-SD ratios, not the ratio of the
-  ROI-mean series (which is what `fluct` uses, and now says); the ghost
-  denominator is the matched signal region, not the whole phantom; ACRg is
-  the absolute difference; RDC is read at the full ROI.
-- `save_artifact` holds an artifact to the same contract `load_artifact`
-  applies, and refuses (`InvalidArtifactError`, nothing written, an existing
-  archive untouched) one that would not read back. `fmri-qa` reports the
-  refusal as a per-scan write error and continues the batch. The optional
-  BIDS sidecar fields are now typed at the loader: a value of the wrong kind
-  (an `EchoTime` written as text, a `true` flip angle) is recorded as unknown
-  with a warning naming the field, instead of passing through calculation and
-  saving to fail when a report opened the result.
-- The phantom verdict (`phantom_mask_ok`, the table's `loc` column, the
-  report's BAD PHANTOM MASK note) now applies the same test slice selection
-  does: the mask must cover a plausible share of the frame *and* stand at
-  least 4x above the background it was cut from. A scan holding no phantom
-  segments to roughly half the frame, so the share test alone passed it, and
-  a run could warn that no slice held a phantom and then save an artifact
-  recording the mask as good. `PhantomGeometry` carries the measured
-  `contrast`, and the warning names which test failed.
-- `fmri-qa --artifact` and `fmri-qa-report --pdf` refuse an output path that
-  names one of the run's inputs — the scan, its sidecar, or an artifact — and
-  exit 1 before reading anything. Both writers move a finished file over the
-  destination, so an output aliasing an input used to succeed and leave an
-  archive where the NIfTI was, or a PDF where the archive was. Relative
-  spellings, symlinks, and hard links of the same file are all caught.
-- Preserve NIfTI proxy scaling for clipping detection and nulled-edge masks.
-  Convert meter/micron voxel sizes to millimeters; unknown spatial units retain
-  the millimeter assumption with an explicit warning.
-- Validate artifact scalar types, settings, array shapes, coordinates, masks,
-  and ROI bounds on load; malformed archives raise `InvalidArtifactError`.
-- Preprocessed images own read-only arrays so the full input volume can be
-  freed and caller mutations cannot invalidate cached summaries. Published
-  artifact arrays also own read-only copies.
-- Singular, non-finite, and unconverged motion fits now warn and publish NaN
-  traces and peak metrics. `MotionResult.converged` identifies usable frames;
-  motion plots label unresolved frames. Existing artifact layouts remain readable.
-- Reject polynomial and spline detrending with no residual degrees of freedom.
-
-- **A TR stored in milliseconds was read as seconds.** The loader took pixdim
-  without its unit, so a header in msec gave a TR of 2000 s: no warm-up volumes
-  were trimmed and the detrend order, which follows the run duration, exceeded
-  the frame count, so the fit absorbed the noise and every stability metric was
-  measured on a residual of nothing. The unit is converted now, the sidecar
-  value is preferred, and `detrend_fn` refuses an order the frames cannot
-  determine rather than returning zeros that look like a very stable scanner.
-- **The LICENSE never reached a built package.** `license-files` pointed
-  outside the package root, which the wheel dropped and the sdist recorded as
-  a `../../` path.
-- A directional FWHM the run could not name (no phase-encode axis resolved)
-  was printed under `fwPE`/`fwRO` as the combined FWHM, a number that answers a
-  different question. The table shows `?` and `--json` emits `null`.
-- A phantom mask that is a single row or column crashed `analyze` after the
-  whole analysis had run, from inside the convex-hull step; it now yields the
-  empty outline the artifact already allowed for.
-- `fmri-qa-hilo` raised a bare `ZeroDivisionError` on a zero low-flip mean.
-- The ROI-fit warning suggested `center='image'` even when that was the mode in
-  use; it names the other mode now.
-- `save_artifact` wrote the destination in place, so an interrupted write left
-  a truncated artifact in the archive. It writes a temporary file beside the
-  destination and moves it into place. A malformed document that failed inside
-  a schema migration escaped as a bare `KeyError` instead of
-  `InvalidArtifactError`.
-- A vendor-nulled image edge went undetected when the NIfTI carried a nonzero
-  `scl_inter`, since a stored zero reads back as the intercept.
-- `snr` and `sfnr` now return NaN, rather than infinity with a NumPy warning,
-  when the static-noise variance or a ROI voxel's fluctuation noise is zero.
-  The core test run went from 164 runtime warnings to none.
-
-- **Phantom segmentation on an exactly-zero background.** The intensity
-  quantiles seeding the watershed used strict comparisons, so an image whose air
-  is exactly 0 — a background-suppressed or mask-multiplied reconstruction —
-  seeded no background at all and the whole frame was labelled phantom. Every
-  mask-based metric then read background silently: the ROI-fit guard passed
-  vacuously, the N/2 ghost region eroded to nothing (NaN ghost percentages), and
-  SFNR divided by a noiseless floor. The seeds are now inclusive, and
-  `detect_phantom` warns when a mask comes out degenerate either way.
-- **`--center phantom` selecting a slice with no phantom in it.** The mode took
-  the slice with the largest *segmented* area, but segmenting a slice of pure
-  air still labels about half the frame — more than a real cross-section — so a
-  prescription running past the end of the phantom analyzed background instead.
-  A slice now counts only if what its mask selected stands clear of the
-  background it was separated from; if no slice does, the middle slice is used
-  and a warning says so.
-- **SNR biased low on an odd number of analyzed frames.** The static-noise
-  difference image sums the odd frames against the even ones; with an odd frame
-  count the two subsets differ by one, so the difference carried a whole frame of
-  *signal* and its spatial variation across the ROI — not noise — set the
-  denominator. A phantom shaded 25% across the FOV read 25% low, and because
-  parity follows `--trim-sec`, the same series scored differently for a
-  one-volume change in the warm-up trim. The difference is now formed over
-  balanced subsets; the signal still averages the full series.
-- **A phase-encode axis reported when none was measured.** The estimate picks
-  the axis whose Nyquist ghost region is brighter, but an axis the ratio could
-  not be measured on scores NaN — and every comparison against NaN is False, so
-  `max` returned whichever axis it looked at first. An image with no measurable
-  ghost (a collapsed segmentation, a phantom spanning the FOV) therefore always
-  reported "axis 0", with four ghost percentages sampled from wherever that
-  pointed, and an axis measurable on only one side could be resolved to the
-  other. Only measurable axes are candidates now, and when neither is,
-  `estimate_pe_axis` returns `None`: the run continues with the ghost metrics
-  undefined and a warning, the artifact records no axis, and a report labels the
-  direction "?" and draws no ghost regions.
-- **`fmri-qa --artifact` silently discarding a scan.** A batch names each
-  artifact after the scan's stem, so inputs sharing a file name across
-  directories (`a/scan.nii.gz`, `b/scan.nii.gz`) overwrote one another and a
-  later report packet was quietly missing scans. Such a batch is now refused
-  before any analysis runs.
-- `fmri-qa-report --pdf` creates the destination directory instead of failing on
-  the name of the atomic write's temporary file.
-
-### Changed
-
 - Every frozen value object in `fmriqc` now declares `slots=True`, as the
   artifact-side ones already did — an attribute a typo invents is rejected
   rather than silently created. `QAImages` is the one exception and now says so
@@ -810,16 +395,14 @@ versioning when the first stable public interface is released.
   `metrics.pe_axis` is unchanged; constructing a `QAMetrics` no longer takes
   (or accepts) a `pe_axis=` argument.
 
-- **Three files that had grown into several topics are now subpackages**, by
+- **Two files that had grown into several topics are now subpackages**, by
   the one-file-one-topic rule in `style/architecture.md`. `fmriqc.cli` splits
   into a module per command (`qa`, `hilo`) plus the pieces they report through
   (`table`, `record`, `destinations`, `arguments`);
-  `fmriqc.analysis.serialize` splits at its own section banners into
-  `decompose` / `compose` / `migrate`; and `fmriqc_report.formats.reportlab`
-  into `layout` / `pages` / `packet` / `svglib_patch`. Every import path a
-  caller uses is unchanged — `fmriqc.cli:main`, `fmriqc.cli:hilo_main`,
-  `fmriqc.save_artifact`/`load_artifact`, `fmriqc_report.write_report` — and
-  no rendered output changed.
+  and `fmriqc.analysis.serialize` splits at its own section banners into
+  `decompose` / `compose` / `migrate`. Every import path a caller uses is
+  unchanged — `fmriqc.cli:main`, `fmriqc.cli:hilo_main`,
+  `fmriqc.save_artifact`/`load_artifact` — and no rendered output changed.
 - `fmriqc.hilo` (307 lines) is now a subpackage by the same rule: `result`
   holds `HiLoResult` and the pure `separate_noise` algebra that fills it,
   `mask` holds `phantom_core_mask` and its `HILO_ERODE` tuning constant,
@@ -833,7 +416,7 @@ versioning when the first stable public interface is released.
 - The report's format-agnostic content API is spelled public, since the
   format drivers in `formats/` are documented to consume it: `panels.timeseries`
   exports `plot_*`, `panels.images` exports `panel_figs`, and `summary` exports
-  `acquisition_line` / `device_line` / `provenance_line` / `appendix_rows`.
+  `acquisition_line` / `device_line` / `provenance_line`.
   `fmriqc_report.__all__` is unchanged, so the distribution's public surface
   is the same. Likewise `prep.imaging.clamp_center` / `geomean`, which the
   geometry and smoothness modules already imported across module lines.
@@ -863,7 +446,7 @@ versioning when the first stable public interface is released.
 
 - **The project is now two distributions.** `fmri-qa-core` (import `fmriqc`)
   holds the calculation half and depends on nothing that draws; `fmri-qa-report`
-  (import `fmriqc_report`) holds the plots and PDF packets and consumes only a
+  (import `fmriqc_report`) holds the plots and the HTML report and consumes only a
   `QAArtifact`. Installing `fmri-qa-report` brings both. The single `fmri-qa`
   distribution is gone; see `notes/analysis_report_split.md`.
 - A report header now shows the phase-encode direction that was actually used.
@@ -871,33 +454,382 @@ versioning when the first stable public interface is released.
   overrode the axis, so the header could disagree with the metrics table.
 - Phase encoding is explicitly limited to the in-plane axes supported by the
   single-slice metrics.
-- The svglib image-alignment workaround now probes compatibility before use, and
-  is installed on the first render rather than at import: it mutates a
-  third-party class process-wide, and an unrecognized svglib should fail the
-  render that needs it rather than `import fmriqc_report`.
 - `fmri-qa-report` declares its dependency on `cycler`, which its `Theme` imports
   directly and which had until now arrived only as a matplotlib transitive.
 
+### Added
+
+- **`make docs` builds one documentation site, with pages for every package.**
+  Each package keeps its own Sphinx project, and all of them build into
+  `build/site`: a landing page at the root, the analysis pages under `core/`,
+  and new pages for `fmri-qa-report` (the command, what the page shows and
+  what an embedding site must allow, rendering from Python) and
+  `fmri-qa-launcher` (the `fmri-qa-run` options and exit codes, the desktop
+  panel, what a run writes). Links between packages are checked against each
+  other's local inventories, never the network, and a final pass fails the
+  build on any relative link that does not land on a file inside the site.
+  The analysis pages move from `packages/fmri-qa-core/docs/_build/html` to
+  `build/site/core`, and now build from a fresh checkout.
+- **The `fmri-qa-launcher` package: `fmri-qa-run`, one command from a DICOM
+  directory to a report per series.** `fmri-qa-run DICOM_DIR OUTPUT_DIR`
+  converts, analyzes, and renders every series it finds, writing one folder
+  per series under `OUTPUT_DIR` — named for the series and holding the
+  converted scan, its sidecar, the `.qa.nc` artifact, and a self-contained
+  HTML report — with the four appearing together only once every one of them
+  is written. A series whose folder already exists is refused, never
+  replaced; a failure in one series is reported and every other series is
+  still attempted. Analysis defaults are `fmriqc`'s own, so the numbers match
+  a `fmri-qa` run by hand — a test pins the equality. `--trim-sec`,
+  `--detrend`, `--center`, `--roi-size`, `--anonymize`, and `--dcm2niix` cover
+  the same ground `fmri-qa`/`fmri-qa-import` do; `--open` opens the report
+  (or, for several series, the output folder) once the run finishes. stdout
+  carries only each published report's path, one per line; everything else —
+  progress, refusals, failures, warnings — goes to stderr, and the exit code
+  is `0` when every series published, `1` when any was refused or failed, `2`
+  on a usage error. With neither directory given, `fmri-qa-run` opens a
+  desktop panel instead, also reachable directly as `fmri-qa-panel`
+  (a `gui-scripts` entry point, so no console window on Windows): DICOM and
+  output folders, an advanced-options section for the four analysis knobs
+  above, a progress bar and log, and an "Open results" action. Closing the
+  window mid-run stops the run after the series in progress finishes;
+  closing again quits immediately without waiting. The package adds no
+  third-party dependency of its own — the panel is built on stdlib
+  `tkinter` — and a layering test keeps `tkinter` out of `fmri-qa-core` and
+  `fmri-qa-report`.
+- **`fmri-qa-report`, the reporting command: one artifact in, one
+  self-contained HTML page out.** `fmri-qa-report ARTIFACT --html FILE` renders
+  a saved artifact to a single file that opens by double-click from `file://`
+  with no network and no sibling asset: the stylesheet is inlined in a
+  `<style>` block, all fourteen figures are embedded as
+  `data:image/svg+xml;base64,...` sources, and the page carries no JavaScript.
+  The layout is a masthead with an identity block, metric tiles, hairline
+  key/value tables, and grouped figure panels; dark mode follows the OS
+  setting (figures stay on a white plate so plotted data keeps its colors), a
+  print stylesheet lays the report out for paper, and a figure enlarges to fill
+  the viewport through a CSS-only `:target` toggle. `--html` is required and
+  takes exactly one artifact; a wildcard that matches several is a usage
+  error. The write is atomic and honours the umask: a reader never observes a
+  partial file, and a failed render or write never disturbs an existing
+  destination. From Python, `render_run_page` returns the document and
+  `write_run_page` writes it; `render_figures` and `RenderedFigure` are the
+  in-memory figures every page builds on.
+- **`InvalidArtifactError` is now reachable from `fmriqc.analysis`.** It is the
+  one error `load_artifact` raises, and it was previously only reachable
+  through `fmriqc.exceptions` — off limits to `fmri-qa-report`, which may
+  import only `fmriqc.analysis` and `fmriqc.types`. A reader of an artifact can
+  now catch it by name instead of a blanket `except Exception`.
+- **`fmri-qa-hilo --version` now works.** `fmri-qa` and `fmri-qa-import` each
+  carried their own copy of the flag and `fmri-qa-hilo` had none, so asking it
+  for its version was a usage error. All three now share one, and answer alike.
+- **`fmri-qa-import`: DICOM in, QA-ready NIfTI out.** Point it at a directory and
+  it runs [dcm2niix](https://github.com/rordenlab/dcm2niix), pinning the flags a
+  QA conversion cannot be left to chance on — above all `-l o`, which keeps the
+  scanner's stored integers. dcm2niix's `-l y` rescales them while still writing
+  an *integer* NIfTI, so `QAScan.stored_integer` sees nothing wrong and the
+  saturation check reports a clipped acquisition as clean rather than as not
+  determinable; `-g i` makes the pinning stick past a site's `~/.dcm2nii.ini`.
+  Each series is filed as `<date>_<time>_s<NNN>_<description>`, built from the
+  BIDS sidecar because dcm2niix's `-f` template cannot produce those four fields:
+  `%t` is the study's time (the same for every series in a session), `%s` is not
+  zero-padded (so series 11 sorts before series 2), and `%d` keeps the protocol's
+  punctuation. `--names dcm2niix` keeps dcm2niix's naming and `--filename` takes
+  any template; `--dcm2niix-arg` passes anything else through, warning if it
+  would undo `-l o`. The converter is the optional `fmri-qa-core[dicom]` extra,
+  which carries a bundled binary; a dcm2niix on `PATH` or named with
+  `--dcm2niix` works instead. New `fmriqc.convert` subpackage
+  (`import_dicom`, `ImportResult`, `ImportedSeries`, `ConversionError`). See the
+  README's *Importing DICOM* section.
+
+- **The saturation check now says when it cannot answer.** An ADC rail is an
+  integer artifact of the receiver, so the check requires a series that still
+  carries the scanner's integers. `QAScan.from_nifti` reads the NIfTI datatype,
+  records it as `QAScan.stored_integer`, and warns on a float-stored file naming
+  the fix; `detect_saturation` returns `None` there, and the artifact publishes
+  the whole clipping block (`clipped_any`, `clipped_kept`, `n_clipped_kept`,
+  `n_clipped_pre`) as `None` — *not determinable*, which is a third answer
+  distinct from "no clipping found". Shown as `?` in the `clip`/`clipPre`
+  columns, `null` in `fmri-qa --json`, and a `clip not determinable` note in the
+  report. Artifact schema version 7; an artifact from schema ≤ 6 keeps its stored
+  bool, which that build did measure. Previously a float-converted NIfTI of a
+  genuinely saturated acquisition reported clean, silently. Every other metric
+  is unaffected. See the README's *Saturation* section for the conversion
+  policy this makes explicit.
+
+- `Provenance.slice_index` / `n_slices` record which plane of the volume the
+  artifact describes, and `Measurements.phantom_contrast` the mask's
+  interior-over-background ratio beside the verdict reached from it. Artifact
+  schema version 5; an older archive reads them back as unknown. The report's
+  acquisition line shows the slice, and its BAD PHANTOM MASK note names the
+  contrast so a reader can see which test the mask failed. `fmri-qa --json`
+  records carry `slice_index` and `phantom_contrast`.
+- Batch failures travel with the output. The `fmri-qa --json` document lists
+  `requested` inputs and an `errors` inventory (`scan`, `source`, `error`) for
+  every input that failed to load, analyze, or save, beside the `scans` that
+  ran; JSON schema version 5. `fmri-qa` prints a one-line tally of failures on
+  stderr.
+- **The whole Nyquist-ghost family from one set of masks.** `estimate_ghost`
+  builds the region-matched signal/ghost masks once per in-plane axis and
+  returns a `GhostResult` carrying the masks and every ratio measured on them;
+  `QAMetrics.ghost` holds it, and the artifact's ghost regions are copied from
+  it rather than rebuilt. The four percentages a table shows are unchanged.
+- The BIDS sidecar is optional. A NIfTI exported without one (a scanner export
+  that never went through dcm2niix) now analyzes with a warning and empty
+  acquisition metadata instead of being refused.
+- The TR is taken from the sidecar `RepetitionTime` when it is there, and
+  otherwise from the header pixdim converted by the header's declared time
+  unit; a disagreement between the two warns and names both values.
+- `Provenance.n_trimmed` records how many warm-up volumes the analysis dropped,
+  so `outlier_worst_frame` and the curve time axis map back to acquired volume
+  numbers. Artifact schema version 4; older archives read it back as unknown.
+- `fmri-qa --json` records now carry `source`, `datetime`, `tr`, `n_frames`,
+  `n_trimmed`, `outlier_worst_frame`, the combined `fwhm`, and `fwhm_unit`.
+  JSON schema version 3.
+- `fmri-qa` and `fmri-qa-hilo` print each warning the analysis raised on
+  stderr as `<scan>: warning: <message>`, attributed to the scan that raised it,
+  instead of Python's default line naming a source file inside the package.
+- Both distributions ship the MIT license text, and CI asserts it is installed
+  with each wheel.
+
+- **The analysis artifact.** `QAArtifact` publishes one analyzed series — its
+  settings, provenance, scalar measurements, stability curves, and the four
+  fBIRN summary images — fully resolved, so no consumer recomputes a metric.
+  `analyze(scan)` produces one; `save_artifact`/`load_artifact` move it through
+  a single versioned netCDF-4 file.
+- `fmri-qa --artifact PATH` saves the artifact for each analyzed scan (a file
+  for one scan, a directory of `<scan>.qa.nc` for a batch).
+- Structured validation for scan data, analysis parameters, and high/low pairs.
+- A versioned, standards-compliant JSON output contract.
+- Build-artifact smoke tests in CI.
+- MIT licensing and distributable package-license metadata.
+- Localization diagnostics in the artifact. `Measurements` now carries
+  `phantom_fraction` (the share of the frame the phantom mask covers) and
+  `roi_inside_phantom`, so a stored artifact says whether the segmentation and
+  the summary ROI held — the difference between "the estimator declined" and
+  "the analysis was measuring background". A report calls either failure out on
+  the acquisition line, `fmri-qa` in a `loc` column, and `--json` in three
+  fields (`phantom_fraction`, `phantom_mask_ok`, `roi_inside_phantom`) so a
+  trend database can tell a measurement from a measurement of air. Artifact
+  schema version 3; JSON schema version 2.
+- Artifacts written under an older schema are migrated forward on read, with a
+  warning, instead of being refused: a QA archive outlives the build that wrote
+  it. Fields the older schema did not carry come back as "not recorded" — `None`
+  for the localization verdicts, which `fmri-qa` shows as `loc ?` and a report
+  as a quiet note — never as a fabricated pass. Only an artifact from a *newer*
+  build, whose layout this one cannot know, is still refused.
+- `python -m fmriqc_report`, matching `python -m fmriqc`.
+
+### Fixed
+
+- **The panel's progress bar bounces during DICOM import on every run, not
+  just the first.** A finished run leaves the bar's `maximum` at a handful of
+  ticks, and an indeterminate `ttk.Progressbar` sweeps once per `maximum`
+  steps, so a second run's bounce collapsed into a flicker between the two
+  ends. The range is now reset whenever the bar goes indeterminate.
+- **A saved `.qa.nc` archive no longer comes out `0600` regardless of the
+  umask.** `save_artifact` reserved its temporary name with `tempfile.mkstemp`,
+  so the archive kept that private mode while the NIfTI and sidecar beside it
+  did not, and a colleague on a shared drive could open the scan but not its
+  results. The temporary is now created with the umask-filtered default; the
+  write is as atomic and as durable as before.
+- Undefined circular centroids, including uniform positive frames, are now
+  excluded per axis from the reference position. Near-zero temporal resultants
+  also remain undefined, so cancellation roundoff cannot fabricate displacement.
+
+- RDC panels use finite measurements for plot limits and mark unresolved points.
+  Blank scans and curves containing NaN or infinity now render; all-zero curves
+  retain a usable plot range.
+
+- **Sparse phantoms retain separate background and foreground seeds.** When
+  the watershed's intensity quantiles coincide, distinct minimum and maximum
+  intensities seed the two classes instead. Small phantoms over zero background
+  no longer flood the frame or contaminate the hi/lo core with background;
+  constant images return an empty, invalid mask with the existing warning.
+
+- **Imported companions stay with their own series when stems overlap.** NIfTIs
+  keep their parsed stems; other companions use the longest matching series stem.
+  File destination collisions are refused before any move, even with `--force`.
+- **Imported series names stay unique even when a QA name matches a retained
+  dcm2niix name.** Colliding series fall back to their original names until all
+  collisions are resolved, preventing one scan from silently replacing another.
+- **`fmri-qa --artifact ''` is now a usage error instead of a silent no-op.**
+  `qa.py` only ever tested `args.artifact` by truthiness, so an empty string
+  passed both `if` checks as false: the whole analysis ran, nothing was
+  written, and the command exited 0 as if `--artifact` had never been given.
+  `--artifact` now carries `arguments.nonempty` as its `type`, so an empty
+  value is rejected at parse time with a usage error naming `--artifact`,
+  before any scan is read; a run without the flag is unaffected.
+- **`fmri-qa-import` no longer prints a traceback when its destination cannot
+  be created.** `import_dicom` called `destination.mkdir(parents=True,
+  exist_ok=True)` unguarded, so a `-o` pointing at an existing regular file
+  raised a bare `FileExistsError` that `import_main` did not catch. The
+  `mkdir` is now wrapped as `ConversionError("destination", ...)`, and
+  `import_main` catches broadly like every other command, so the failure
+  prints one `ERROR: ...` line to stderr and exits 1.
+- **A BIDS sidecar whose `AcquisitionDate` is a JSON number no longer crashes
+  the load.** `load.metadata` built the acquisition datetime by joining
+  `AcquisitionDate` and `AcquisitionTime` with `" ".join(...)`, converting the
+  time to text first but not the date — so a sidecar with `"AcquisitionDate":
+  20260909` (unquoted, as some writers emit it) raised a bare
+  `TypeError: sequence item 0: expected str instance, int found` instead of
+  loading. The date is now converted the same way its neighbour already is;
+  a sidecar value that comes through unquoted is still parsed, the same
+  latitude `_optional_text` already gives a numeric serial number.
+- **Importing `fmriqc_report` no longer switches the matplotlib backend to
+  `Agg`.** The package called `matplotlib.use("Agg")` at import time, silently
+  overriding whatever backend the importing process — a notebook's inline
+  backend, say — had already chosen. Rendering never needed it: panels build
+  `matplotlib.figure.Figure` objects directly and save them with `fig.savefig`,
+  with no `pyplot` involved.
+- **`import_dicom` now raises `InvalidChoiceError` for a `names` or `anonymize`
+  value outside its permitted set.** It was the one public entry point that
+  took closed-set string options with no guard of its own — a bad `names`
+  reached `assert_never` and came back as a bare `AssertionError`, and a bad
+  `anonymize` reached `dcm2niix._BA` and came back as a bare `KeyError`,
+  either way escaping `except FmriqcError`. Both are now checked before
+  anything is staged or dcm2niix is even looked up. The CLI was never
+  affected — `--names`/`--anonymize` already restrict both flags with
+  `choices=`.
+- **`validate_artifact` now checks that a duplicated fact agrees with itself.**
+  Two groups of published fields are derived copies of others — `clipped_any`/
+  `clipped_kept` from the clipping counts, and the None-ness of `fwhm_pe`/
+  `fwhm_ro` from `pe_axis` — and nothing compared them. A hand-edited or
+  foreign document could carry `n_clipped_kept: 500` beside `clipped_kept:
+  false`, and it loaded anyway: the CLI table dropped its "!" flag, and the
+  report either said nothing about the clipping (if `clipped_any` was
+  also left false) or printed a "pre-SS only" line for clipping that was
+  really in the analyzed data. Such a document now loads only if its
+  duplicated fields agree; a self-contradictory one is refused.
+- **`save_artifact` now checks the one field `load_artifact` checks first.**
+  It already held a written artifact to the reader's other checks, but let any
+  `schema_version` through uncaught — 99, 0, a float, a string, even `True` —
+  so a bad value was written successfully, replaced whatever valid archive
+  already stood at the path, and was refused only when something later tried
+  to read it back. A `schema_version` that is not exactly the version this
+  build writes is now refused before anything is written, the same way every
+  other mismatch between the artifact and the reader's contract already was.
+- The report's metric catalog (its definitions and methods) describes the
+  calculations as implemented. SFNR is the ROI average
+  of voxelwise temporal-mean over detrended-SD ratios, not the ratio of the
+  ROI-mean series (which is what `fluct` uses, and now says); the ghost
+  denominator is the matched signal region, not the whole phantom; ACRg is
+  the absolute difference; RDC is read at the full ROI.
+- `save_artifact` holds an artifact to the same contract `load_artifact`
+  applies, and refuses (`InvalidArtifactError`, nothing written, an existing
+  archive untouched) one that would not read back. `fmri-qa` reports the
+  refusal as a per-scan write error and continues the batch. The optional
+  BIDS sidecar fields are now typed at the loader: a value of the wrong kind
+  (an `EchoTime` written as text, a `true` flip angle) is recorded as unknown
+  with a warning naming the field, instead of passing through calculation and
+  saving to fail when a report opened the result.
+- The phantom verdict (`phantom_mask_ok`, the table's `loc` column, the
+  report's BAD PHANTOM MASK note) now applies the same test slice selection
+  does: the mask must cover a plausible share of the frame *and* stand at
+  least 4x above the background it was cut from. A scan holding no phantom
+  segments to roughly half the frame, so the share test alone passed it, and
+  a run could warn that no slice held a phantom and then save an artifact
+  recording the mask as good. `PhantomGeometry` carries the measured
+  `contrast`, and the warning names which test failed.
+- `fmri-qa --artifact` and `fmri-qa-report --html` refuse an output path that
+  names one of the run's inputs — the scan, its sidecar, or an artifact — and
+  exit 1 before reading anything. Both writers move a finished file over the
+  destination, so an output aliasing an input used to succeed and leave an
+  archive where the NIfTI was, or a report where the archive was. Relative
+  spellings, symlinks, and hard links of the same file are all caught.
+- Preserve NIfTI proxy scaling for clipping detection and nulled-edge masks.
+  Convert meter/micron voxel sizes to millimeters; unknown spatial units retain
+  the millimeter assumption with an explicit warning.
+- Validate artifact scalar types, settings, array shapes, coordinates, masks,
+  and ROI bounds on load; malformed archives raise `InvalidArtifactError`.
+- Preprocessed images own read-only arrays so the full input volume can be
+  freed and caller mutations cannot invalidate cached summaries. Published
+  artifact arrays also own read-only copies.
+- Singular, non-finite, and unconverged motion fits now warn and publish NaN
+  traces and peak metrics. `MotionResult.converged` identifies usable frames;
+  motion plots label unresolved frames. Existing artifact layouts remain readable.
+- Reject polynomial and spline detrending with no residual degrees of freedom.
+
+- **A TR stored in milliseconds was read as seconds.** The loader took pixdim
+  without its unit, so a header in msec gave a TR of 2000 s: no warm-up volumes
+  were trimmed and the detrend order, which follows the run duration, exceeded
+  the frame count, so the fit absorbed the noise and every stability metric was
+  measured on a residual of nothing. The unit is converted now, the sidecar
+  value is preferred, and `detrend_fn` refuses an order the frames cannot
+  determine rather than returning zeros that look like a very stable scanner.
+- **The LICENSE never reached a built package.** `license-files` pointed
+  outside the package root, which the wheel dropped and the sdist recorded as
+  a `../../` path.
+- A directional FWHM the run could not name (no phase-encode axis resolved)
+  was printed under `fwPE`/`fwRO` as the combined FWHM, a number that answers a
+  different question. The table shows `?` and `--json` emits `null`.
+- A phantom mask that is a single row or column crashed `analyze` after the
+  whole analysis had run, from inside the convex-hull step; it now yields the
+  empty outline the artifact already allowed for.
+- `fmri-qa-hilo` raised a bare `ZeroDivisionError` on a zero low-flip mean.
+- The ROI-fit warning suggested `center='image'` even when that was the mode in
+  use; it names the other mode now.
+- `save_artifact` wrote the destination in place, so an interrupted write left
+  a truncated artifact in the archive. It writes a temporary file beside the
+  destination and moves it into place. A malformed document that failed inside
+  a schema migration escaped as a bare `KeyError` instead of
+  `InvalidArtifactError`.
+- A vendor-nulled image edge went undetected when the NIfTI carried a nonzero
+  `scl_inter`, since a stored zero reads back as the intercept.
+- `snr` and `sfnr` now return NaN, rather than infinity with a NumPy warning,
+  when the static-noise variance or a ROI voxel's fluctuation noise is zero.
+  The core test run went from 164 runtime warnings to none.
+
+- **Phantom segmentation on an exactly-zero background.** The intensity
+  quantiles seeding the watershed used strict comparisons, so an image whose air
+  is exactly 0 — a background-suppressed or mask-multiplied reconstruction —
+  seeded no background at all and the whole frame was labelled phantom. Every
+  mask-based metric then read background silently: the ROI-fit guard passed
+  vacuously, the N/2 ghost region eroded to nothing (NaN ghost percentages), and
+  SFNR divided by a noiseless floor. The seeds are now inclusive, and
+  `detect_phantom` warns when a mask comes out degenerate either way.
+- **`--center phantom` selecting a slice with no phantom in it.** The mode took
+  the slice with the largest *segmented* area, but segmenting a slice of pure
+  air still labels about half the frame — more than a real cross-section — so a
+  prescription running past the end of the phantom analyzed background instead.
+  A slice now counts only if what its mask selected stands clear of the
+  background it was separated from; if no slice does, the middle slice is used
+  and a warning says so.
+- **SNR biased low on an odd number of analyzed frames.** The static-noise
+  difference image sums the odd frames against the even ones; with an odd frame
+  count the two subsets differ by one, so the difference carried a whole frame of
+  *signal* and its spatial variation across the ROI — not noise — set the
+  denominator. A phantom shaded 25% across the FOV read 25% low, and because
+  parity follows `--trim-sec`, the same series scored differently for a
+  one-volume change in the warm-up trim. The difference is now formed over
+  balanced subsets; the signal still averages the full series.
+- **A phase-encode axis reported when none was measured.** The estimate picks
+  the axis whose Nyquist ghost region is brighter, but an axis the ratio could
+  not be measured on scores NaN — and every comparison against NaN is False, so
+  `max` returned whichever axis it looked at first. An image with no measurable
+  ghost (a collapsed segmentation, a phantom spanning the FOV) therefore always
+  reported "axis 0", with four ghost percentages sampled from wherever that
+  pointed, and an axis measurable on only one side could be resolved to the
+  other. Only measurable axes are candidates now, and when neither is,
+  `estimate_pe_axis` returns `None`: the run continues with the ghost metrics
+  undefined and a warning, the artifact records no axis, and a report labels the
+  direction "?" and draws no ghost regions.
+- **`fmri-qa --artifact` silently discarding a scan.** A batch names each
+  artifact after the scan's stem, so inputs sharing a file name across
+  directories (`a/scan.nii.gz`, `b/scan.nii.gz`) overwrote one another and the
+  batch was quietly missing scans. Such a batch is now refused before any
+  analysis runs.
+
 ### Removed
 
-- **The ReportLab PDF packet.** `fmri-qa-report --pdf`, `--tier`, `--cover`,
-  and `--appendix` are gone, along with the `formats.reportlab` driver
-  (`write_report`, `add_report_pages`), the `document` block model (`Block`,
-  `Cover`, `ScanSection`, `Appendix`, `Tier`, `TIERS`, `compose`, `parts_for`),
-  `content.metric_tiles`, `content.characterization_rows`,
-  `summary.appendix_rows`, and every `Theme` field that only the page furniture
-  read (page geometry, fonts, gray levels, `logo`, `footer`, `cover_title`,
-  `pass_warn_fail`). `Theme` now carries only what the matplotlib panels use.
-  `MetricDoc.unit` and the `MetricUnit` alias are gone too — their last reader
-  was `web_summary`. `cli_shared` is folded into `cli`. The package no longer
-  depends on `reportlab` or `svglib`. The self-contained HTML page is the
-  report.
-- **`fmri-qa-site` and the multi-run static site.** `write_site`,
-  `SiteContext`, `SiteResult`, `SiteStatus`, the `templates/index.html`
-  inventory page, and the whole `fmriqc_report.web_summary` module (the
-  version-1 `summary.json` wire format) are gone. `render_run_page` and
-  `write_run_page` no longer take a `site` argument, and a run page carries no
-  link out of itself.
+- **The PDF report.** `fmri-qa --pdf`, `--pdf-tier`, `--pdf-cover`, and
+  `--pdf-appendix` are gone, and with them the ReportLab driver and everything
+  only it used: `write_report`, `add_report_pages`, the `document` block model
+  (`Block`, `Cover`, `ScanSection`, `Appendix`, `Tier`, `TIERS`, `compose`,
+  `parts_for`), `metric_tiles`, `characterization_rows`, `appendix_rows`, and
+  every `Theme` field that styled the page rather than the panels (page
+  geometry, fonts, gray levels, `logo`, `footer`, `cover_title`,
+  `pass_warn_fail`). Rendering moved to `fmri-qa-report`, which writes the
+  self-contained HTML page instead, so producing a report is now two commands.
+  Nothing depends on `reportlab` or `svglib` any more.
 - **`QAImages.pe_axis`.** Nothing read it since `validate_qa_run` began
   returning the resolved axis; the narrowing (`load.pe_axis.in_plane`) still
   happens, once, in `validate_qa_run`.
@@ -908,7 +840,3 @@ versioning when the first stable public interface is released.
 - `ghost_top_ratio`, `acr_ghosting_ratio`, and `phase_encode_axis`; their
   measurements come from `GhostResult`, and `QAMetrics` carries that result
   instead of four loose percentages.
-
-- `fmri-qa --pdf`, `--pdf-tier`, `--pdf-cover`, and `--pdf-appendix`. Rendering
-  moved to `fmri-qa-report`, whose equivalents are `--pdf`, `--tier`, `--cover`,
-  and `--appendix`; producing a report is now two commands.
