@@ -564,16 +564,6 @@ def test_launch_panel_runs_the_panels_run_panel_when_importable(
     assert cli._launch_panel() == 0
 
 
-def test_zero_arguments_reports_the_missing_panel(
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    rc = cli.main([])
-    captured = capsys.readouterr()
-    assert rc == 2
-    assert "tkinter" in captured.err
-    assert "fmri-qa-run" in captured.err
-
-
 @pytest.mark.parametrize("missing_name", ["tkinter", "tkinter.ttk", "_tkinter"])
 def test_zero_arguments_reports_the_missing_panel_by_a_failed_tkinter_import(
     monkeypatch: pytest.MonkeyPatch,
@@ -590,6 +580,7 @@ def test_zero_arguments_reports_the_missing_panel_by_a_failed_tkinter_import(
     captured = capsys.readouterr()
     assert rc == 2
     assert "tkinter" in captured.err
+    assert "fmri-qa-run" in captured.err
 
 
 def test_an_import_error_unrelated_to_tkinter_is_a_real_bug_and_propagates(
