@@ -26,16 +26,20 @@ from fmriqc.load.pe_axis import _pe_axis_from_header, _pe_axis_from_sidecar
         ({"PhaseEncodingDirection": "i"}, 0),
         ({"PhaseEncodingDirection": "j"}, 1),
         ({"PhaseEncodingDirection": "k"}, 2),
+        ({"PhaseEncodingDirection": "i-"}, 0),
         ({"PhaseEncodingDirection": "j-"}, 1),  # polarity is dropped
+        ({"PhaseEncodingDirection": "k-"}, 2),
         # What dcm2niix writes when it resolved the axis but not the polarity.
         ({"PhaseEncodingAxis": "i"}, 0),
         ({"PhaseEncodingAxis": "j"}, 1),
         ({"PhaseEncodingAxis": "k"}, 2),
+        ({"PhaseEncodingAxis": "i-"}, 0),
+        ({"PhaseEncodingAxis": "j-"}, 1),
+        ({"PhaseEncodingAxis": "k-"}, 2),
         ({"InPlanePhaseEncodingDirectionDICOM": "ROW"}, 0),
         ({"InPlanePhaseEncodingDirectionDICOM": "COL"}, 1),
         ({"InPlanePhaseEncodingDirectionDICOM": "col"}, 1),  # case-insensitive
         ({}, None),  # no PE field
-        ({"PhaseEncodingDirection": ""}, None),  # empty string is not a direction
     ],
 )
 def test_pe_axis_from_sidecar(sidecar: dict, expected: int | None) -> None:
@@ -54,6 +58,48 @@ def test_pe_axis_from_sidecar(sidecar: dict, expected: int | None) -> None:
 def test_pe_axis_from_sidecar_rejects_malformed_values(sidecar: dict) -> None:
     with pytest.raises(q.InvalidScanError):
         _pe_axis_from_sidecar(sidecar)
+
+
+@pytest.mark.parametrize("value", ["", None, False, 0, [], {}])
+@pytest.mark.parametrize(
+    ("field", "fallback"),
+    [
+        (
+            "PhaseEncodingDirection",
+            {"PhaseEncodingAxis": "j", "InPlanePhaseEncodingDirectionDICOM": "COL"},
+        ),
+        ("PhaseEncodingAxis", {"InPlanePhaseEncodingDirectionDICOM": "COL"}),
+        ("InPlanePhaseEncodingDirectionDICOM", {}),
+    ],
+)
+def test_present_empty_pe_values_reject_instead_of_falling_back(
+    field: str, value: object, fallback: dict[str, object]
+) -> None:
+    with pytest.raises(q.InvalidScanError) as excinfo:
+        _pe_axis_from_sidecar({field: value, **fallback})
+
+    assert excinfo.value.field == field
+    assert excinfo.value.value == value
+
+
+@pytest.mark.parametrize(
+    ("sidecar", "expected"),
+    [
+        (
+            {
+                "PhaseEncodingDirection": "i",
+                "PhaseEncodingAxis": None,
+                "InPlanePhaseEncodingDirectionDICOM": "diagonal",
+            },
+            0,
+        ),
+        ({"PhaseEncodingAxis": "j", "InPlanePhaseEncodingDirectionDICOM": False}, 1),
+    ],
+)
+def test_valid_authoritative_pe_field_ignores_malformed_weaker_fields(
+    sidecar: dict[str, object], expected: int
+) -> None:
+    assert _pe_axis_from_sidecar(sidecar) == expected
 
 
 def test_sidecar_bids_direction_wins_over_dicom() -> None:
@@ -164,6 +210,25 @@ def test_from_nifti_falls_back_to_header_dim_info(tmp_path) -> None:
     # No PE field in the sidecar; the header dim_info phase axis is used.
     nifti = _write_scan(tmp_path, {"FlipAngle": 77}, phase=1)
     assert q.QAScan.from_nifti(nifti).pe_axis == 1
+
+
+@pytest.mark.parametrize(
+    "field",
+    [
+        "PhaseEncodingDirection",
+        "PhaseEncodingAxis",
+        "InPlanePhaseEncodingDirectionDICOM",
+    ],
+)
+def test_from_nifti_rejects_null_pe_field_despite_valid_header(
+    tmp_path: Path, field: str
+) -> None:
+    nifti = _write_scan(tmp_path, {field: None}, phase=1)
+
+    with pytest.raises(q.InvalidScanError) as excinfo:
+        q.QAScan.from_nifti(nifti)
+
+    assert excinfo.value.field == field
 
 
 def test_from_nifti_leaves_an_unnamed_axis_to_the_pipeline(tmp_path) -> None:

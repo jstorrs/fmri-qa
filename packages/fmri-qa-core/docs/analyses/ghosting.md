@@ -23,8 +23,8 @@ difference of the two directions.
 Every ghost statistic is defined relative to an axis, so the axis is resolved
 first, from the most authoritative source available:
 
-1. the BIDS sidecar's `PhaseEncodingDirection`, or failing that
-   `InPlanePhaseEncodingDirectionDICOM`;
+1. the BIDS sidecar's `PhaseEncodingDirection`, then `PhaseEncodingAxis`, then
+   `InPlanePhaseEncodingDirectionDICOM`, moving on only when a field is absent;
 2. the NIfTI header's `dim_info` phase field;
 3. only if both are missing, an estimate from the data — the ghost masks are
    built for both in-plane axes and the axis whose ghost region is brighter
@@ -34,6 +34,11 @@ first, from the most authoritative source available:
    ratios (including two zeros), or no measurable axes, leave the estimate
    unresolved. Any strictly larger finite ratio wins; no near-tie tolerance is
    applied.
+
+The first present sidecar phase-encoding field must contain a valid value.
+Malformed values, including empty strings, nulls, booleans, and numbers, are
+rejected with an input error naming the field, even when a weaker source could
+supply an axis. A valid authoritative field takes precedence over weaker fields.
 
 `--pe-axis` overrides all three. Polarity is not needed and is dropped. The
 metrics work on one plane, so the phase-encode direction must be in-plane

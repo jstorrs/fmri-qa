@@ -82,28 +82,33 @@ def _pe_axis_from_sidecar(sidecar: Sidecar) -> int | None:
     dcm2niix's two BIDS answers are tried in turn, then
     `InPlanePhaseEncodingDirectionDICOM` (ROW/COL) as the DICOM fallback
     (row = i = axis 0, col = j = axis 1). See `_SIDECAR_PE_FIELDS` for the order.
+
+    Raises:
+        InvalidScanError: The first present PE field has an invalid value.
     """
     for field in _SIDECAR_PE_FIELDS:
-        if value := sidecar.get(field):
-            try:
-                return _BIDS_AXES[str(value)]
-            except KeyError:
-                raise InvalidScanError(
-                    field,
-                    value,
-                    "expected one of 'i', 'i-', 'j', 'j-', 'k', or 'k-'",
-                ) from None
-    if dicom := sidecar.get("InPlanePhaseEncodingDirectionDICOM"):
-        value = str(dicom).upper()
+        if field not in sidecar:
+            continue
+        value = sidecar[field]
         try:
-            return {"ROW": 0, "COL": 1}[value]
+            return _BIDS_AXES[str(value)]
         except KeyError:
             raise InvalidScanError(
-                "InPlanePhaseEncodingDirectionDICOM",
-                dicom,
-                "expected 'ROW' or 'COL'",
+                field,
+                value,
+                "expected one of 'i', 'i-', 'j', 'j-', 'k', or 'k-'",
             ) from None
-    return None
+    if "InPlanePhaseEncodingDirectionDICOM" not in sidecar:
+        return None
+    dicom = sidecar["InPlanePhaseEncodingDirectionDICOM"]
+    try:
+        return {"ROW": 0, "COL": 1}[str(dicom).upper()]
+    except KeyError:
+        raise InvalidScanError(
+            "InPlanePhaseEncodingDirectionDICOM",
+            dicom,
+            "expected 'ROW' or 'COL'",
+        ) from None
 
 
 def _pe_axis_from_header(header: Any) -> int | None:
