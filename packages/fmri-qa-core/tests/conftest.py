@@ -10,6 +10,7 @@ analysis rather than a scan.
 
 import dataclasses
 import json
+import stat
 from collections.abc import Callable, Iterator
 from pathlib import Path
 
@@ -184,3 +185,41 @@ def encode() -> Callable[[dict, dict[str, np.ndarray]], bytes]:
         return netcdf.encode(text, json.loads(text), arrays)
 
     return run
+
+
+@pytest.fixture
+def fake_dcm2niix(tmp_path):
+    """Build a stub dcm2niix that writes the outputs a test asks for.
+
+    Takes `{stem: sidecar-or-None}` and writes a NIfTI containing the
+    encoded stem for each, plus `<stem>.json` where a sidecar was given, into
+    whatever directory the `-o` argument names. Prints dcm2niix's real banner
+    line so the version parser has something true to read.
+    """
+
+    def build(
+        outputs, returncode=0, name="dcm2niix", *, suffix=".nii.gz", companions=None
+    ):
+        script = tmp_path / name
+        script.write_text(
+            "#!/usr/bin/env python3\n"
+            "import json, sys\n"
+            "from pathlib import Path\n"
+            f"outputs = {outputs!r}\n"
+            f"companions = {companions or {}!r}\n"
+            f"suffix = {suffix!r}\n"
+            "args = sys.argv[1:]\n"
+            "out = Path(args[args.index('-o') + 1])\n"
+            'print("Chris Rorden\'s dcm2niiX version v1.0.20260724 (JP2:OpenJPEG)")\n'
+            "for stem, sidecar in outputs.items():\n"
+            "    (out / f'{stem}{suffix}').write_bytes(stem.encode())\n"
+            "    if sidecar is not None:\n"
+            "        (out / f'{stem}.json').write_text(json.dumps(sidecar))\n"
+            "for filename, content in companions.items():\n"
+            "    (out / filename).write_bytes(content)\n"
+            f"sys.exit({returncode})\n"
+        )
+        script.chmod(script.stat().st_mode | stat.S_IXUSR)
+        return script
+
+    return build
