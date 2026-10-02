@@ -20,6 +20,7 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
+from fmriqc.convert.dcm2niix import DEFAULT_ANONYMIZE
 from fmriqc.exceptions import InvalidScanError
 from fmriqc.settings import AnalysisSettings
 from fmriqc.types import (
@@ -40,6 +41,7 @@ __all__ = [
     "CENTER_CHOICES",
     "CENTER_HELP",
     "CENTER_LABEL",
+    "DEFAULT_ANONYMIZE",
     "DEFAULT_SETTINGS",
     "DETREND_CHOICES",
     "DETREND_HELP",
@@ -72,9 +74,6 @@ DEFAULT_SETTINGS: AnalysisSettings = AnalysisSettings()
 DETREND_CHOICES: tuple[DetrendMethod, ...] = DETREND_METHODS
 CENTER_CHOICES: tuple[RoiCenter, ...] = ROI_CENTER_MODES
 ANONYMIZE_CHOICES: tuple[Anonymize, ...] = ANONYMIZE_MODES
-# `fmri-qa-import`'s own default: strips the patient and keeps the dates the
-# series names are built from.
-DEFAULT_ANONYMIZE: Anonymize = "pii"
 
 DICOM_DIR_LABEL = "DICOM directory"
 DICOM_DIR_HELP = "Directory of DICOM files (searched recursively)."

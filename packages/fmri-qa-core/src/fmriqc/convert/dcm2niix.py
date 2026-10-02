@@ -43,6 +43,9 @@ from ..warn import warn
 # who it is. `%t` is the study date+time, `%s` the series number, `%d` the
 # series description.
 DEFAULT_TEMPLATE = "%t_%s_%d"
+# `import_dicom`, `build_args` and `fmri-qa-import` all default to these.
+DEFAULT_ANONYMIZE: Anonymize = "pii"
+DEFAULT_DEPTH = 5
 
 # The flags an import fixes rather than inherits. Each one is load-bearing:
 #
@@ -111,8 +114,8 @@ def build_args(
     *,
     template: str = DEFAULT_TEMPLATE,
     compress: bool = True,
-    anonymize: Anonymize = "pii",
-    depth: int = 5,
+    anonymize: Anonymize = DEFAULT_ANONYMIZE,
+    depth: int = DEFAULT_DEPTH,
     extra: Sequence[str] = (),
 ) -> list[str]:
     """The dcm2niix argument list for one import, pinned flags first.

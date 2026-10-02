@@ -20,8 +20,8 @@ from collections.abc import Sequence
 from pathlib import Path
 
 import fmriqc as q
-from fmriqc.convert.dcm2niix import DEFAULT_TEMPLATE
-from fmriqc.convert.session import ImportResult, import_dicom
+from fmriqc.convert.dcm2niix import DEFAULT_ANONYMIZE, DEFAULT_DEPTH, DEFAULT_TEMPLATE
+from fmriqc.convert.session import DEFAULT_NAMES, ImportResult, import_dicom
 from fmriqc.load.paths import NIFTI_SUFFIXES
 
 from .arguments import PrintVersion, positive_int, print_warnings
@@ -51,10 +51,11 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--names",
         choices=q.NAME_STYLES,
-        default="qa",
+        default=DEFAULT_NAMES,
         help="'qa': <date>_<time>_s<NNN>_<description>, which sorts "
         "chronologically and pads the series number. 'dcm2niix': whatever "
-        "--filename produced. Default: qa.",
+        "--filename produced. "
+        f"Default: {DEFAULT_NAMES}.",
     )
     # argparse %-formats every help string, and the template is all %-codes,
     # so it has to reach the help already escaped.
@@ -70,7 +71,7 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--anonymize",
         choices=q.ANONYMIZE_MODES,
-        default="pii",
+        default=DEFAULT_ANONYMIZE,
         help="Sidecar content: 'pii' strips the patient and keeps the dates "
         "(default, and what 'qa' names need), 'all' strips the dates too, "
         "'none' keeps everything.",
@@ -83,8 +84,8 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--depth",
         type=positive_int,
-        default=5,
-        help="Sub-directory levels of SOURCE to search (default: 5).",
+        default=DEFAULT_DEPTH,
+        help=f"Sub-directory levels of SOURCE to search (default: {DEFAULT_DEPTH}).",
     )
     parser.add_argument(
         "--dcm2niix",

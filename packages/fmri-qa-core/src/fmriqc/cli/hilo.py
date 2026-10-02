@@ -18,6 +18,7 @@ from .arguments import PrintVersion, nonnegative_float, nonnegative_int, print_w
 
 def _parser() -> argparse.ArgumentParser:
     """The command line this command accepts."""
+    defaults = q.AnalysisSettings()
     parser = argparse.ArgumentParser(
         prog="fmri-qa-hilo",
         description="High/low flip-angle phantom QA: separate thermal from "
@@ -29,14 +30,16 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--trim-sec",
         type=nonnegative_float,
-        default=5.0,
-        help="Seconds of initial (non-steady-state) volumes to drop (default: 5).",
+        default=defaults.trim_sec,
+        help="Seconds of initial (non-steady-state) volumes to drop "
+        f"(default: {defaults.trim_sec:g}).",
     )
     parser.add_argument(
         "--detrend",
         choices=q.DETREND_METHODS,
-        default="poly",
-        help="Detrending method applied before the SD map (default: poly).",
+        default=defaults.detrend,
+        help="Detrending method applied before the SD map "
+        f"(default: {defaults.detrend}).",
     )
     parser.add_argument(
         "--erode",

@@ -18,6 +18,7 @@ flip-angle algebra, kept pure so it can be exercised directly.
 
 from ..exceptions import IncompatibleScansError
 from ..load.scan import QAScan
+from ..settings import AnalysisSettings
 from ..types import DetrendMethod
 from ..validation import validate_hilo_run
 from ..warn import warn
@@ -35,11 +36,14 @@ __all__ = [
 ]
 
 
+_DEFAULTS = AnalysisSettings()
+
+
 def run_hilo(
     high: QAScan,
     low: QAScan,
-    trim_sec: float = 5.0,
-    detrend: DetrendMethod = "poly",
+    trim_sec: float = _DEFAULTS.trim_sec,
+    detrend: DetrendMethod = _DEFAULTS.detrend,
     erode: int = HILO_ERODE,
 ) -> HiLoResult:
     """Separate thermal from instability noise using a high/low flip-angle scan pair.

@@ -41,7 +41,18 @@ from ..rename import replace_patiently
 from ..types import ANONYMIZE_MODES, NAME_STYLES, Anonymize, NameStyle, Sidecar
 from ..warn import warn
 from . import naming
-from .dcm2niix import DEFAULT_TEMPLATE, build_args, find_dcm2niix, run, version
+from .dcm2niix import (
+    DEFAULT_ANONYMIZE,
+    DEFAULT_DEPTH,
+    DEFAULT_TEMPLATE,
+    build_args,
+    find_dcm2niix,
+    run,
+    version,
+)
+
+# How `import_dicom` and `fmri-qa-import` name files unless told otherwise.
+DEFAULT_NAMES: NameStyle = "qa"
 
 
 @dataclass(frozen=True, slots=True)
@@ -130,11 +141,11 @@ def import_dicom(
     destination: Path | str,
     *,
     binary: str | Path | None = None,
-    names: NameStyle = "qa",
+    names: NameStyle = DEFAULT_NAMES,
     template: str = DEFAULT_TEMPLATE,
     compress: bool = True,
-    anonymize: Anonymize = "pii",
-    depth: int = 5,
+    anonymize: Anonymize = DEFAULT_ANONYMIZE,
+    depth: int = DEFAULT_DEPTH,
     extra: Sequence[str] = (),
     force: bool = False,
 ) -> ImportResult:
