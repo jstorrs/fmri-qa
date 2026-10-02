@@ -121,11 +121,14 @@ def save_artifact(artifact: QAArtifact, path: str | Path) -> Path:
                 f"this build writes"
             )
         validate_artifact(artifact)
-        # Through JSON and back, because that is what the reader will see: the
-        # in-memory document still holds numpy scalars where the file will hold
-        # plain numbers, and the type check is written against the file.
-        validate_document(json.loads(json.dumps(document)))
-        content = netcdf.encode(document, arrays)
+        # Through JSON and back, once, because that is what the reader will
+        # see: the in-memory document still holds numpy scalars where the file
+        # will hold plain numbers, and the type check is written against the
+        # file. The same parsed form is what the file publishes as attributes.
+        text = json.dumps(document)
+        stored = json.loads(text)
+        validate_document(stored)
+        content = netcdf.encode(text, stored, arrays)
     except _MALFORMED as exc:
         raise InvalidArtifactError(
             out, f"refusing to write an artifact that would not read back: {exc}"

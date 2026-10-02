@@ -179,7 +179,6 @@ touched, and `write` performs exactly one write to disk. `read` is the inverse
 of both.
 """
 
-import json
 import warnings
 from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
@@ -480,8 +479,13 @@ class NetcdfContent:
     attributes: dict[str, _AttributeValue]
 
 
-def encode(document: dict[str, Any], arrays: Mapping[str, Member]) -> NetcdfContent:
+def encode(
+    text: str, stored: dict[str, Any], arrays: Mapping[str, Member]
+) -> NetcdfContent:
     """Lay out an artifact's document and arrays as a netCDF-4 file.
+
+    `text` is the document's JSON, stored verbatim, and `stored` is that same
+    text parsed back: the caller round-trips once and hands over both.
 
     Raises:
         ValueError: If an array is not one this layout declares, disagrees with
@@ -503,8 +507,8 @@ def encode(document: dict[str, Any], arrays: Mapping[str, Member]) -> NetcdfCont
     return NetcdfContent(
         dimensions=dimensions,
         variables=variables,
-        coordinates=_coordinates(dimensions, arrays, document),
-        attributes=_global_attributes(document),
+        coordinates=_coordinates(dimensions, arrays, stored),
+        attributes=_global_attributes(text, stored),
     )
 
 
@@ -593,7 +597,7 @@ def _index_coordinate(axis: str, length: int, declared: _Index) -> _Variable:
     return _Variable(np.arange(length, dtype=np.int32), (axis,), attributes)
 
 
-def _global_attributes(document: dict[str, Any]) -> dict[str, _AttributeValue]:
+def _global_attributes(text: str, stored: dict[str, Any]) -> dict[str, _AttributeValue]:
     """The whole file's attributes: the JSON document, plus what it says.
 
     The document is the artifact's own record, unchanged from the `.npz` layout
@@ -606,28 +610,25 @@ def _global_attributes(document: dict[str, Any]) -> dict[str, _AttributeValue]:
     spelling and is derived from `provenance.core_version` -- which is a
     different attribute under a different name, carrying the bare version.
     """
-    # `json.dumps` defaults to ensure_ascii=True, and that default is
-    # load-bearing here rather than incidental. A netCDF text attribute written
-    # as NC_CHAR is bytes, and a consumer takes it as characters without being
-    # told an encoding -- MATLAB's `ncreadatt` and R's `ncatt_get` both do.
-    # Escaping every non-ASCII character to `\uXXXX` is what makes those the
-    # right characters, whatever a scanner or a file name put in the document --
-    # including the lone surrogate a Windows file name with an undecodable byte
-    # becomes in Python, which has no UTF-8 form at all.
-    text = json.dumps(document)
-    # The section attributes are read back out of the text rather than taken
-    # from `document` itself, so they are by construction the same values the
-    # document publishes: the in-memory document still holds numpy scalars and
-    # tuples where the file holds plain numbers and JSON lists, and a second
-    # encoding of those would be a second chance to disagree with the first.
-    stored = json.loads(text)
+    # Every attribute but the document is read out of `stored`, the parsed
+    # text, rather than the in-memory document, so they are by construction the
+    # same values the document publishes: the in-memory document still holds
+    # numpy scalars and tuples where the file holds plain numbers and JSON
+    # lists, and a second encoding of those would be a second chance to
+    # disagree with the first. The text itself is `json.dumps`'s default
+    # `ensure_ascii=True` and that is load-bearing: a netCDF text attribute is
+    # bytes, and a consumer takes it as characters without being told an
+    # encoding -- MATLAB's `ncreadatt` and R's `ncatt_get` both do. Escaping
+    # every non-ASCII character to `\uXXXX` makes those the right characters,
+    # including the lone surrogate an undecodable Windows file name becomes in
+    # Python, which has no UTF-8 form at all.
     return {
         "Conventions": _CONVENTIONS,
         "title": _TITLE,
-        "source": f"fmri-qa-core {document['provenance']['core_version']}".rstrip(),
+        "source": f"fmri-qa-core {stored['provenance']['core_version']}".rstrip(),
         # The same number the document carries, hoisted out so a reader can
         # check it without JSON.
-        "schema_version": np.int32(document["schema_version"]),
+        "schema_version": np.int32(stored["schema_version"]),
         # Ordered so that `ncdisp` lists the short attributes before the long
         # blob: the header, then what the run was asked for, what it measured
         # and what it measured it on, then the document.

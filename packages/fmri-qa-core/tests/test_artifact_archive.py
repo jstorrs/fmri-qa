@@ -939,12 +939,18 @@ def test_save_refuses_a_measurement_no_attribute_can_hold(tmp_path, artifact) ->
     assert not (tmp_path / "qa.nc").exists()
 
 
+def _encode(document, arrays):
+    """`netcdf.encode` as `save_artifact` calls it: text and its parse."""
+    text = json.dumps(document)
+    return netcdf.encode(text, json.loads(text), arrays)
+
+
 def test_encode_refuses_an_empty_list(artifact) -> None:
     """An attribute is a *typed* vector, and an empty list names no type."""
     document, arrays = decompose(artifact)
     document["provenance"]["voxel_mm"] = []
     with pytest.raises(ValueError, match="voxel_mm is an empty list"):
-        netcdf.encode(document, arrays)
+        _encode(document, arrays)
 
 
 def test_encode_refuses_a_value_no_attribute_can_hold(artifact) -> None:
@@ -959,7 +965,7 @@ def test_encode_refuses_a_value_no_attribute_can_hold(artifact) -> None:
     document, arrays = decompose(artifact)
     document["measurements"]["snr"] = [{"value": 1.0}]
     with pytest.raises(ValueError, match="no attribute can hold"):
-        netcdf.encode(document, arrays)
+        _encode(document, arrays)
 
 
 def test_the_stored_document_is_ascii_even_when_the_text_is_not(
@@ -1541,7 +1547,7 @@ def test_encode_omits_an_axis_whose_values_are_not_stored(artifact) -> None:
         for k, v in arrays.items()
         if k not in ("curves.spectrum_hz", "curves.time")
     }
-    content = netcdf.encode(document, without)
+    content = _encode(document, without)
 
     assert {"frequency", "frame"} <= set(content.dimensions)
     assert "frequency" not in content.coordinates
@@ -1561,7 +1567,7 @@ def test_encode_refuses_an_axis_with_no_coordinate_declared(
     document, arrays = decompose(artifact)
     monkeypatch.delitem(netcdf._COORDINATES, "frame")
     with pytest.raises(ValueError, match="frame axis has no coordinate"):
-        netcdf.encode(document, arrays)
+        _encode(document, arrays)
 
 
 def test_every_axis_the_layout_uses_has_a_coordinate_declared() -> None:
@@ -1695,7 +1701,7 @@ def test_a_flipped_byte_inside_an_array_is_refused(tmp_path, artifact) -> None:
     """
     noise = np.random.default_rng(0).standard_normal((256, 256))
     document, _ = decompose(artifact)
-    content = netcdf.encode(document, {"images.signal": noise})
+    content = _encode(document, {"images.signal": noise})
     path = tmp_path / "noise.nc"
     netcdf.write(content, path)
     raw = bytearray(path.read_bytes())
@@ -1885,27 +1891,27 @@ def test_the_layout_declares_every_array_the_artifact_publishes(artifact) -> Non
     axes; `encode` refuses it, and this says so before a save has to.
     """
     document, arrays = decompose(artifact)
-    content = netcdf.encode(document, arrays)
+    content = _encode(document, arrays)
     assert set(content.variables) == set(arrays)
 
 
 def test_encode_refuses_an_array_the_layout_does_not_declare(artifact) -> None:
     document, arrays = decompose(artifact)
     with pytest.raises(ValueError, match="not an array this artifact layout"):
-        netcdf.encode(document, arrays | {"curves.invented": np.zeros(3)})
+        _encode(document, arrays | {"curves.invented": np.zeros(3)})
 
 
 def test_encode_refuses_an_array_of_the_wrong_rank(artifact) -> None:
     document, arrays = decompose(artifact)
     with pytest.raises(ValueError, match="rank 2"):
-        netcdf.encode(document, arrays | {"curves.time": np.zeros((3, 3))})
+        _encode(document, arrays | {"curves.time": np.zeros((3, 3))})
 
 
 def test_encode_refuses_two_arrays_that_disagree_about_one_axis(artifact) -> None:
     """A shared dimension is a claim, and a file cannot make it two ways."""
     document, arrays = decompose(artifact)
     with pytest.raises(ValueError, match="already fixed it at"):
-        netcdf.encode(document, arrays | {"curves.roi_signal": np.zeros(3)})
+        _encode(document, arrays | {"curves.roi_signal": np.zeros(3)})
 
 
 def test_encode_refuses_a_dtype_the_container_would_narrow(artifact) -> None:
@@ -1913,7 +1919,7 @@ def test_encode_refuses_a_dtype_the_container_would_narrow(artifact) -> None:
     document, arrays = decompose(artifact)
     narrowed = arrays["curves.time"].astype(np.float32)
     with pytest.raises(ValueError, match="dtype float32"):
-        netcdf.encode(document, arrays | {"curves.time": narrowed})
+        _encode(document, arrays | {"curves.time": narrowed})
 
 
 # --------------------------------------------------------------------------
