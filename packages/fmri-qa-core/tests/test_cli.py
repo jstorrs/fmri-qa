@@ -9,6 +9,8 @@ a report is `fmri-qa-report`'s job and is tested there.
 
 import json
 import math
+import sys
+import warnings
 from dataclasses import replace
 from pathlib import Path
 
@@ -17,6 +19,7 @@ import pytest
 import fmriqc as q
 from fmriqc import cli
 from fmriqc.cli import qa, table
+from fmriqc.cli.arguments import attributed_warnings
 from fmriqc.cli.record import metric_record
 
 
@@ -351,6 +354,33 @@ def test_batch_warnings_name_the_scan_that_raised_them(
     assert attributed[1].startswith("second.nii.gz: warning: ")
     assert "UserWarning" not in err  # no category, and no path into this package
     assert "qa.py" not in err and "pipeline.py" not in err
+
+
+def test_attributed_warnings_reprint_after_the_blocks_own_error(capsys) -> None:
+    """A failing block prints its ERROR line first, then the warnings it raised."""
+    with attributed_warnings("bad.nii.gz"):
+        try:
+            warnings.warn("odd header", stacklevel=1)
+            raise ValueError("unreadable")
+        except ValueError as exc:
+            sys.stderr.write(f"ERROR: {exc}\n")
+
+    assert capsys.readouterr().err.splitlines() == [
+        "ERROR: unreadable",
+        "bad.nii.gz: warning: odd header",
+    ]
+
+
+def test_attributed_warnings_reprint_when_the_exception_escapes(capsys) -> None:
+    """The warnings still print when nothing inside the block handles the error."""
+    with (
+        pytest.raises(ValueError, match="unreadable"),
+        attributed_warnings("bad.nii.gz"),
+    ):
+        warnings.warn("odd header", stacklevel=1)
+        raise ValueError("unreadable")
+
+    assert capsys.readouterr().err == "bad.nii.gz: warning: odd header\n"
 
 
 def test_localization_flag_names_every_failure(tmp_path, write_scan) -> None:

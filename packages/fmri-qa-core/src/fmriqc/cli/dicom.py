@@ -15,7 +15,6 @@ through.
 
 import argparse
 import sys
-import warnings
 from collections.abc import Sequence
 from pathlib import Path
 
@@ -24,7 +23,7 @@ from fmriqc.convert.dcm2niix import DEFAULT_ANONYMIZE, DEFAULT_DEPTH, DEFAULT_TE
 from fmriqc.convert.session import DEFAULT_NAMES, ImportResult, import_dicom
 from fmriqc.load.paths import NIFTI_SUFFIXES
 
-from .arguments import PrintVersion, positive_int, print_warnings
+from .arguments import PrintVersion, attributed_warnings, positive_int
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -163,8 +162,7 @@ def import_main(argv: Sequence[str] | None = None) -> int:
     destination = _destination(args.source, args.out)
 
     result: ImportResult | None = None
-    with warnings.catch_warnings(record=True) as caught:
-        warnings.simplefilter("always")
+    with attributed_warnings(Path(args.source).name):
         try:
             result = import_dicom(
                 args.source,
@@ -180,7 +178,6 @@ def import_main(argv: Sequence[str] | None = None) -> int:
             )
         except Exception as exc:  # noqa: BLE001 - report cleanly and exit non-zero
             print(f"ERROR: {exc}", file=sys.stderr)
-    print_warnings(caught, Path(args.source).name)
     if result is None:
         return 1
 

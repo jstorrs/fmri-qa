@@ -10,7 +10,8 @@ import argparse
 import math
 import sys
 import warnings
-from collections.abc import Iterable
+from collections.abc import Iterable, Iterator
+from contextlib import contextmanager
 
 import fmriqc as q
 
@@ -75,3 +76,19 @@ def print_warnings(caught: Iterable[warnings.WarningMessage], subject: str) -> N
     """
     for entry in caught:
         print(f"{subject}: warning: {entry.message}", file=sys.stderr)
+
+
+@contextmanager
+def attributed_warnings(subject: str) -> Iterator[None]:
+    """Capture warnings raised in the block and reprint them naming `subject`.
+
+    The reprint happens on every exit, so a block that fails still reports the
+    warnings it raised on the way down; a handler inside the block prints its
+    own error first.
+    """
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        try:
+            yield
+        finally:
+            print_warnings(caught, subject)

@@ -9,7 +9,6 @@ reports every failure at the end, so one bad file does not cost the rest.
 import argparse
 import json
 import sys
-import warnings
 from collections.abc import Sequence
 from pathlib import Path
 
@@ -18,10 +17,10 @@ from fmriqc.path_arguments import expand_globs
 
 from .arguments import (
     PrintVersion,
+    attributed_warnings,
     nonempty,
     nonnegative_float,
     positive_int,
-    print_warnings,
 )
 from .destinations import (
     ARTIFACT_SUFFIX,
@@ -153,17 +152,16 @@ def main(argv: Sequence[str] | None = None) -> int:
     for path in args.paths:
         name = Path(path).name
         artifact: q.QAArtifact | None = None
-        with warnings.catch_warnings(record=True) as caught:
-            warnings.simplefilter("always")
+        # The attempt's own ERROR line prints inside the manager, so it comes
+        # first; a scan that failed may well have warned on the way down, and
+        # that warning is part of the diagnosis.
+        with attributed_warnings(name):
             try:
                 scan = q.QAScan.from_nifti(path)
                 artifact = q.analyze(scan, settings, name=name, source=str(path))
             except Exception as exc:  # noqa: BLE001 - report and continue the batch
                 errors.append({"scan": name, "source": str(path), "error": str(exc)})
                 print(f"{name:40s} ERROR: {exc}", file=sys.stderr)
-        # After the attempt either way: a scan that failed may well have warned
-        # on the way down, and that warning is part of the diagnosis.
-        print_warnings(caught, name)
         if artifact is None:
             continue
         if args.json:

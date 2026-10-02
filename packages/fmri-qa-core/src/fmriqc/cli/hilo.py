@@ -7,13 +7,17 @@ reports a different set of numbers than the single-scan table.
 
 import argparse
 import sys
-import warnings
 from collections.abc import Sequence
 from pathlib import Path
 
 import fmriqc as q
 
-from .arguments import PrintVersion, nonnegative_float, nonnegative_int, print_warnings
+from .arguments import (
+    PrintVersion,
+    attributed_warnings,
+    nonnegative_float,
+    nonnegative_int,
+)
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -60,8 +64,7 @@ def hilo_main(argv: Sequence[str] | None = None) -> int:
     # The pair is analyzed together, so a warning belongs to both scans; naming
     # them is still the difference between an actionable line and one that only
     # names a source line that is no use to an operator (see `print_warnings`).
-    with warnings.catch_warnings(record=True) as caught:
-        warnings.simplefilter("always")
+    with attributed_warnings(f"{hi_name} + {lo_name}"):
         try:
             high = q.QAScan.from_nifti(args.high)
             low = q.QAScan.from_nifti(args.low)
@@ -74,7 +77,6 @@ def hilo_main(argv: Sequence[str] | None = None) -> int:
             )
         except Exception as exc:  # noqa: BLE001 - report cleanly and exit non-zero
             print(f"ERROR: {exc}", file=sys.stderr)
-    print_warnings(caught, f"{hi_name} + {lo_name}")
     if res is None:
         return 1
 
