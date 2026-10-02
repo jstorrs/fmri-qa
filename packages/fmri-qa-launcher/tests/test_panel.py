@@ -294,6 +294,27 @@ def test_closing_mid_run_destroys_once_finished_with_no_auto_open(
         root.winfo_exists()
 
 
+def test_closing_mid_run_destroys_once_crashed_with_no_dialog(
+    root: tk.Tk, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    errors: list[tuple[object, ...]] = []
+    monkeypatch.setattr(
+        panel_module.messagebox, "showerror", lambda *a, **_k: errors.append(a)
+    )
+    factory = _Factory()
+    panel = Panel(root, background=factory)
+    _set_form(panel, _valid_form(tmp_path))
+    panel._on_run()
+
+    panel._on_close()
+    factory.last.push(Crashed("no converter is available", "Traceback: boom"))
+    panel._tick()
+
+    assert errors == []
+    with pytest.raises(tk.TclError):
+        root.winfo_exists()
+
+
 def test_a_second_close_destroys_immediately(root: tk.Tk, tmp_path: Path) -> None:
     factory = _Factory()
     panel = Panel(root, background=factory)

@@ -447,18 +447,21 @@ class Panel:
     def _on_open(self) -> None:
         if self._last_result is None:
             return
-        try:
-            open_results(self._last_result, opener=self._opener)
-        except OSError as exc:
+        if not self._open_results(self._last_result):
             self._status_var.set("Could not open results")
-            self._append_log(f"Could not open results: {exc}")
 
-    def _auto_open(self, result: RunResult) -> None:
-        """The "open when done" behaviour: same failure handling as the button's."""
+    def _open_results(self, result: RunResult) -> bool:
+        """Open `result`; on an `OSError`, log it and return False instead of raising.
+
+        Shared by the Open button and "open when done"; only the button also
+        reports the failure on the status line.
+        """
         try:
             open_results(result, opener=self._opener)
         except OSError as exc:
             self._append_log(f"Could not open results: {exc}")
+            return False
+        return True
 
     def _set_inputs_enabled(self, enabled: bool) -> None:
         """Enable or disable every input, via the ttk state API rather than `configure`.
@@ -538,52 +541,65 @@ class Panel:
                 self._status_var.set(describe(event))
             self._apply_bar_state(bar_state(event))
             return False
-        if isinstance(event, Finished):
-            self._on_finished(event)
-            return True
-        self._on_crashed(event)
-        return True
-
-    def _on_finished(self, event: Finished) -> None:
-        result = event.result
         try:
-            self._background = None
-            self._apply_bar_state(final_bar(result))
-            summary: Summary = summarize(result)
-            self._status_var.set(summary.headline)
-            for line in summary.details:
-                self._append_log(line)
-            self._set_inputs_enabled(True)
-            self._last_result = result
-            self.exit_code = exit_code(event)
-            if self._closing:
-                return
-            if summary.offer_open:
-                self._open_button.configure(state="normal")
-                if self._open_var.get():
-                    self._auto_open(result)
+            if isinstance(event, Finished):
+                self._on_finished(event)
+            else:
+                self._on_crashed(event)
         finally:
-            # Unconditional, and last: whatever happened above (including an
-            # opener raising, were it ever reached on this path) must not
+            # Unconditional, and last: whatever the handler raised must not
             # leave a window that a close request can no longer dismiss.
             if self._closing:
                 self._destroy()
+        return True
+
+    def _end_run(
+        self,
+        *,
+        bar: BarState,
+        status: str,
+        log_lines: tuple[str, ...],
+        code: int,
+    ) -> None:
+        """Put the panel back at rest after a run ends, however it ended.
+
+        Drops the background run, rests the bar on `bar`, shows `status`,
+        logs `log_lines`, re-enables the inputs, and records `code` as the
+        exit code. Callers that may still have a run in flight cancel it
+        first; this only forgets it.
+        """
+        self._background = None
+        self._apply_bar_state(bar)
+        self._status_var.set(status)
+        for line in log_lines:
+            self._append_log(line)
+        self._set_inputs_enabled(True)
+        self.exit_code = code
+
+    def _on_finished(self, event: Finished) -> None:
+        result = event.result
+        summary: Summary = summarize(result)
+        self._end_run(
+            bar=final_bar(result),
+            status=summary.headline,
+            log_lines=summary.details,
+            code=exit_code(event),
+        )
+        self._last_result = result
+        if self._closing or not summary.offer_open:
+            return
+        self._open_button.configure(state="normal")
+        if self._open_var.get():
+            self._open_results(result)
 
     def _on_crashed(self, event: Crashed) -> None:
-        try:
-            self._background = None
-            self._apply_bar_state(CRASHED_BAR)
-            self._status_var.set(f"Crashed: {event.message}")
-            self._append_log(f"Crashed: {event.message}")
-            if event.details:
-                self._append_log(event.details)
-            self._set_inputs_enabled(True)
-            self.exit_code = exit_code(event)
-            if not self._closing:
-                messagebox.showerror(_TITLE, event.message, parent=self._root)
-        finally:
-            if self._closing:
-                self._destroy()
+        crashed = f"Crashed: {event.message}"
+        log_lines = (crashed, event.details) if event.details else (crashed,)
+        self._end_run(
+            bar=CRASHED_BAR, status=crashed, log_lines=log_lines, code=exit_code(event)
+        )
+        if not self._closing:
+            messagebox.showerror(_TITLE, event.message, parent=self._root)
 
     def _on_callback_exception(
         self,
@@ -606,13 +622,10 @@ class Panel:
             message = f"{exc_type.__name__}: {exc_value}"
             if self._background is not None:
                 self._background.cancel()  # do not leave the worker running unobserved
-            self._background = None
-            self._apply_bar_state(CRASHED_BAR)
-            self._status_var.set(f"Internal error: {message}")
-            self._append_log(f"Internal error: {message}")
-            self._append_log(details)
-            self._set_inputs_enabled(True)
-            self.exit_code = 1
+            internal = f"Internal error: {message}"
+            self._end_run(
+                bar=CRASHED_BAR, status=internal, log_lines=(internal, details), code=1
+            )
             messagebox.showerror(_TITLE, message, parent=self._root)
         except tk.TclError:
             pass  # the window is already gone; nothing left to report to
