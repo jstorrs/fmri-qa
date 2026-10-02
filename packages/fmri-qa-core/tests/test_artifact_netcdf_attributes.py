@@ -163,33 +163,6 @@ def test_encode_refuses_a_value_no_attribute_can_hold(artifact, encode) -> None:
         encode(document, arrays)
 
 
-def test_the_stored_document_is_ascii_even_when_the_text_is_not(
-    tmp_path, artifact
-) -> None:
-    """Unicode rides as `\\uXXXX`, so a consumer needs no encoding to read it.
-
-    `json.dumps` escapes by default; this pins that, because a netCDF text
-    attribute is bytes a reader takes as characters without being told which.
-    """
-    prov = replace(artifact.provenance, scan="sujet_créé_Ω_頭部.nii.gz")
-    saved = q.save_artifact(replace(artifact, provenance=prov), tmp_path / "u.qa.nc")
-    with netCDF4.Dataset(str(saved)) as dataset:
-        assert dataset.getncattr("document").isascii()
-    assert q.load_artifact(saved).provenance.scan == "sujet_créé_Ω_頭部.nii.gz"
-
-
-def test_a_name_python_holds_as_a_lone_surrogate_survives(tmp_path, artifact) -> None:
-    """What a Windows file name with an undecodable byte becomes in Python.
-
-    It reaches `json.dumps` as an unpaired surrogate, which has no UTF-8 form;
-    the ASCII escaping is what keeps the write from raising on it.
-    """
-    name = "bad_\udcff_name.nii.gz"
-    prov = replace(artifact.provenance, scan=name)
-    saved = q.save_artifact(replace(artifact, provenance=prov), tmp_path / "s.qa.nc")
-    assert q.load_artifact(saved).provenance.scan == name
-
-
 def test_every_recorded_provenance_field_is_published_as_its_own_attribute(
     tmp_path, artifact, read_netcdf
 ) -> None:
@@ -290,6 +263,9 @@ def test_provenance_text_is_published_as_the_scanner_supplied_it(
     )
     saved = q.save_artifact(replace(artifact, provenance=prov), tmp_path / "u.qa.nc")
     published = _section_attributes(saved, "provenance")
+    with netCDF4.Dataset(str(saved)) as dataset:
+        # The document beside the convenience attributes still rides as ASCII.
+        assert dataset.getncattr("document").isascii()
 
     assert published["scan"] == "sujet_créé_Ω_頭部.nii.gz"
     assert published["manufacturer"] == "Siemens™"

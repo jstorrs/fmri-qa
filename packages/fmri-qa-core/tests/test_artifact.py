@@ -201,14 +201,6 @@ def test_an_oversized_roi_is_recorded_as_outside_the_phantom(
     assert artifact.measurements.roi_inside_phantom is False
 
 
-def test_pe_label_follows_an_axis_override(tmp_path, write_scan) -> None:
-    """An explicit axis wins over the sidecar, so the label names what was used."""
-    scan = q.QAScan.from_nifti(write_scan(tmp_path))
-    artifact = q.analyze(scan, q.AnalysisSettings(roi_size=9, pe_axis_override=0))
-    assert artifact.measurements.pe_axis == 0
-    assert artifact.measurements.pe_label == "row"
-
-
 def test_the_direction_and_the_label_are_the_same_axis(tmp_path, write_scan) -> None:
     """`provenance.pe_dir` and `measurements.pe_label` cannot name two axes.
 
@@ -225,6 +217,7 @@ def test_the_direction_and_the_label_are_the_same_axis(tmp_path, write_scan) -> 
 
     overridden = q.analyze(scan, q.AnalysisSettings(roi_size=9, pe_axis_override=0))
     assert overridden.provenance.pe_dir == "col"  # what the sidecar resolved
+    assert overridden.measurements.pe_axis == 0  # the override, not the sidecar
     assert overridden.measurements.pe_label == "row"  # what the run measured
 
 
