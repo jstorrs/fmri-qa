@@ -98,8 +98,8 @@ notebooks (DICOM conversion, BIDS, and interactive viewers) are development
 tooling; so is the Sphinx build for the analysis documentation:
 
 ```bash
-make sync-notebooks    # uv sync --all-packages --all-extras --group notebooks
-make sync-docs         # uv sync --all-packages --all-extras --group docs
+make sync-notebooks    # uv sync --all-packages --group notebooks
+make sync-docs         # uv sync --all-packages --group docs
 make docs              # build the documentation site into build/site
 ```
 

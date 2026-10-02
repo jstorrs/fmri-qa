@@ -1,10 +1,11 @@
 # Standard development loop for fmri-qa. See style/tooling.md.
 #
-# The repo is a uv workspace of two distributions (fmri-qa-core and
-# fmri-qa-report); every target runs against the whole workspace, so a change
-# to the analysis artifact is checked on both sides at once. Sync the whole
-# workspace once before anything else (see style/tooling.md); the heavy
-# notebook stack is a separate group, `make sync-notebooks`.
+# The repo is a uv workspace of three distributions (fmri-qa-core,
+# fmri-qa-report and fmri-qa-launcher); every target runs against the whole
+# workspace, so a change to the analysis artifact is checked on every side at
+# once. Sync the whole workspace once before anything else (see
+# style/tooling.md); the heavy notebook stack is a separate group,
+# `make sync-notebooks`.
 
 .PHONY: all format lint typecheck pyright test license check sync sync-notebooks \
 	sync-docs docs docs-core docs-report docs-launcher docs-clean build bundle
@@ -12,18 +13,18 @@
 all: lint typecheck pyright test
 
 sync:
-	uv sync --all-packages --all-extras
+	uv sync --all-packages
 
 # The exploratory notebook stack (JupyterLab, nilearn, dcm2bids, ...) is a
 # separate dependency group because it is heavy and nothing in the gate needs
 # it, so `make sync` deliberately leaves it out. Take it when you want to open
 # a notebook.
 sync-notebooks:
-	uv sync --all-packages --all-extras --group notebooks
+	uv sync --all-packages --group notebooks
 
 # The Sphinx stack for the analysis documentation, likewise its own group.
 sync-docs:
-	uv sync --all-packages --all-extras --group docs
+	uv sync --all-packages --group docs
 
 # The documentation is one site under build/site: a landing page at the root and
 # each package's own Sphinx project in a directory beneath it (core/, report/,

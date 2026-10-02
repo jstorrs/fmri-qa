@@ -37,4 +37,5 @@ documentation site into `build/site`, these pages under `build/site/core`.
 
 - `fmri-qa SCAN... [--artifact PATH]` — the metrics table (or `--json`), and
   optionally the saved artifact.
+- `fmri-qa-import SOURCE [-o DIR]` — DICOM directory to QA-ready NIfTI with dcm2niix.
 - `fmri-qa-hilo HIGH LOW` — high/low flip-angle thermal/instability separation.

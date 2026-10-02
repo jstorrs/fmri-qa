@@ -23,9 +23,9 @@ declares `[tool.uv.workspace]` members, `.python-version` pins the interpreter (
 
 - Everything runs through `uv run` — `uv run pytest`, `uv run ruff check`, `uv run mypy`.
   Don't reach for a system `python`/`pip`; the locked environment is the source of truth.
-- Sync with **`uv sync --all-packages --all-extras`** (`make sync`) — syncing one member
-  leaves the other's dependencies out, and the gate runs across both. Always take the whole
-  workspace.
+- Sync with **`uv sync --all-packages`** (`make sync`) — syncing one member
+  leaves the other members' dependencies out, and the gate runs across every package.
+  Always take the whole workspace.
 - **Development tooling belongs to a root dependency group, not to a package's extras.** An
   extra is published metadata: whoever installs `fmri-qa-core` is offered it. The heavy
   exploratory notebook stack (JupyterLab, nilearn, dcm2bids) is a `notebooks` group on the

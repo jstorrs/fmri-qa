@@ -33,12 +33,12 @@ jobs:
       - name: Sync the locked environment
         # The docs group comes too: `make check` ends by building the
         # documentation site, whose figures are rendered by running the pipeline.
-        run: uv sync --all-packages --all-extras --group docs --locked
+        run: uv sync --all-packages --group docs --locked
 
       - name: Run the gate
         run: make check
 
-      - name: Build both wheels and source distributions
+      - name: Build every wheel and source distribution
         run: uv build --all-packages
 
       # Exercise the artifacts users install, independently of the editable

@@ -30,18 +30,24 @@ alongside the code. Integration tests go through the import surface a real calle
 API ([architecture.md](architecture.md#simple-public-interfaces)) is actually usable.
 
 The workspace pins the layout once, in the root `pyproject.toml` — one `pytest` run
-covers both packages, so a change to the artifact is tested on both sides of the seam
+covers every package, so a change to the artifact is tested on both sides of the seam
 together:
 
 ```toml
 [tool.pytest.ini_options]
-testpaths = ["packages/fmri-qa-core/tests", "packages/fmri-qa-report/tests"]
+testpaths = [
+    "packages/fmri-qa-core/tests",
+    "packages/fmri-qa-report/tests",
+    "packages/fmri-qa-launcher/tests",
+    "scripts/tests",
+]
+pythonpath = ["scripts"]
 python_files = ["test_*.py"]
 python_functions = ["test_*"]
 addopts = "-v --tb=short --import-mode=importlib"
 ```
 
-`--import-mode=importlib` is what lets both packages name a test file for what it tests —
+`--import-mode=importlib` is what lets every package name a test file for what it tests —
 each has a `test_cli.py` — without the module names colliding.
 
 ## `assert` and `pytest.raises` Are the Assertion
@@ -128,7 +134,7 @@ repeatable, and keep it out of `make check`.
 Part of the standard loop in [tooling.md](tooling.md):
 
 ```bash
-make test        # uv run pytest across both packages
+make test        # uv run pytest across every package
 make all         # lint typecheck pyright test
 make check       # the gate: the above, plus a 90% coverage floor
 ```
