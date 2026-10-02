@@ -1,13 +1,10 @@
 """Rebuild a `QAArtifact` from its JSON document and named arrays.
 
 The read half of the archive layout, mirroring `decompose`. Beyond assembling
-the value objects it *narrows* what the file carries back to what the types
-promise: a closed-set field arrives as a plain string and leaves as a `Literal`
-(`_one_of`), and an array member is checked for the dtype its field is declared
-with (`_floats`, `_bools`). Checking on the way back in is what makes those
-promises true of a *loaded* artifact rather than only of a freshly built one —
-a hand-edited or foreign document fails here instead of reaching a reader that
-switches on the value.
+the value objects it checks each array member for the dtype its field is
+declared with (`_floats`, `_bools`). The document's own fields -- closed-set
+strings included -- are not re-checked here: `load_artifact` runs
+`validate_document` first, so `compose` trusts what it is handed.
 """
 
 from collections.abc import Mapping
@@ -17,7 +14,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from ...settings import AnalysisSettings
-from ...types import LENGTH_UNITS, PE_LABELS, BoolArray, FloatArray
+from ...types import BoolArray, FloatArray
 from ..artifact import (
     ArtifactImages,
     Curves,
@@ -32,17 +29,6 @@ from ..artifact import (
 
 # Provenance fields stored as JSON lists that must come back as tuples.
 _PROVENANCE_TUPLES = ("voxel_mm", "matrix")
-
-
-def _one_of[T: str](value: Any, allowed: tuple[T, ...], field: str) -> T:
-    """`value` as one of `allowed`, or a `ValueError` naming the field.
-
-    Raised as an `InvalidArtifactError` by `load_artifact`, which converts it.
-    """
-    for candidate in allowed:
-        if value == candidate:
-            return candidate
-    raise ValueError(f"{field} {value!r} is not one of {allowed}")
 
 
 def _floats(arrays: Mapping[str, NDArray[Any]], key: str) -> FloatArray:
@@ -66,13 +52,6 @@ def compose(document: dict[str, Any], arrays: Mapping[str, NDArray[Any]]) -> QAA
         if provenance.get(field) is not None:
             provenance[field] = tuple(provenance[field])
     measurements = dict(document["measurements"])
-    measurements["fwhm_unit"] = _one_of(
-        measurements["fwhm_unit"], LENGTH_UNITS, "fwhm_unit"
-    )
-    measurements["displacement_unit"] = _one_of(
-        measurements["displacement_unit"], LENGTH_UNITS, "displacement_unit"
-    )
-    measurements["pe_label"] = _one_of(measurements["pe_label"], PE_LABELS, "pe_label")
     return QAArtifact(
         schema_version=document["schema_version"],
         settings=AnalysisSettings(**document["settings"]),
@@ -112,7 +91,7 @@ def _curves_section(
         psf=PsfCurves(
             labels=(labels[0], labels[1]),
             fwhm=(fwhm[0], fwhm[1]),
-            unit=_one_of(psf["unit"], LENGTH_UNITS, "psf.unit"),
+            unit=psf["unit"],
             displacement=_floats(arrays, "curves.psf.displacement"),
             empirical=_floats(arrays, "curves.psf.empirical"),
             model_x=_floats(arrays, "curves.psf.model_x"),

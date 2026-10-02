@@ -57,13 +57,11 @@ ROI_CENTER_MODES: tuple[RoiCenter, ...] = get_args(RoiCenter)
 # voxels when it did not. Published on `Measurements.fwhm_unit` and
 # `PsfCurves.unit`, so it is a closed set a reader can switch on.
 LengthUnit = Literal["mm", "vox"]
-LENGTH_UNITS: tuple[LengthUnit, ...] = get_args(LengthUnit)
 
 # Phase-encode direction as *displayed*: the two DICOM in-plane words, or "?"
 # when no axis resolved. "?" is a real answer, not a missing one -- see
 # `analysis.artifact.Measurements`.
 PeLabel = Literal["row", "col", "?"]
-PE_LABELS: tuple[PeLabel, ...] = get_args(PeLabel)
 
 # The phase-encode axis, as a *resolved, in-plane* NIfTI voxel-array index. The
 # single-slice pipeline measures the Nyquist ghost by rolling the phantom half
