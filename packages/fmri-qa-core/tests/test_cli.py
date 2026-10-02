@@ -383,10 +383,9 @@ def test_attributed_warnings_reprint_when_the_exception_escapes(capsys) -> None:
     assert capsys.readouterr().err == "bad.nii.gz: warning: odd header\n"
 
 
-def test_localization_flag_names_every_failure(tmp_path, write_scan) -> None:
+def test_localization_flag_names_every_failure(artifact) -> None:
     """Both localizations can fail at once, and the cell says so."""
-    scan = q.QAScan.from_nifti(write_scan(tmp_path))
-    m = q.analyze(scan, q.AnalysisSettings(roi_size=9)).measurements
+    m = artifact.measurements
     assert table.localization_flag(m) == "ok"
     assert table.localization_flag(replace(m, phantom_mask_ok=False)) == "MASK"
     assert table.localization_flag(replace(m, roi_inside_phantom=False)) == "ROI"
@@ -407,7 +406,7 @@ def test_json_document_is_strict_json(tmp_path, write_scan, capsys) -> None:
     assert doc["scans"][0]["snr"] > 0
 
 
-def test_json_record_maps_undefined_metrics_to_null(tmp_path, write_scan) -> None:
+def test_json_record_maps_undefined_metrics_to_null(artifact) -> None:
     """A NaN measurement becomes `null`, not Python's non-standard `NaN` token.
 
     Driven by injecting the NaN rather than by finding a phantom that produces
@@ -415,8 +414,6 @@ def test_json_record_maps_undefined_metrics_to_null(tmp_path, write_scan) -> Non
     and pinning it to whichever metric happens to be NaN on the fixture would
     make this test a hostage to the fixture's geometry.
     """
-    scan = q.QAScan.from_nifti(write_scan(tmp_path))
-    artifact = q.analyze(scan, q.AnalysisSettings(roi_size=9))
     undefined = replace(
         artifact.measurements, ghost_pct=float("nan"), sfnr=float("inf")
     )
@@ -426,7 +423,7 @@ def test_json_record_maps_undefined_metrics_to_null(tmp_path, write_scan) -> Non
     assert record["snr"] == artifact.measurements.snr  # finite values pass through
 
 
-def test_json_record_leaves_an_unnamed_direction_null(tmp_path, write_scan) -> None:
+def test_json_record_leaves_an_unnamed_direction_null(artifact) -> None:
     """No phase-encode axis means no PE or RO number -- not the combined one.
 
     `fwhm` is the geometric mean of both axes; publishing it as `fw_pe` would
@@ -434,8 +431,6 @@ def test_json_record_leaves_an_unnamed_direction_null(tmp_path, write_scan) -> N
     see the substitution. The combined value rides along under its own key, so
     nothing is lost by refusing to rename it.
     """
-    scan = q.QAScan.from_nifti(write_scan(tmp_path))
-    artifact = q.analyze(scan, q.AnalysisSettings(roi_size=9))
     unnamed = replace(
         artifact.measurements,
         pe_axis=None,
@@ -450,7 +445,7 @@ def test_json_record_leaves_an_unnamed_direction_null(tmp_path, write_scan) -> N
     assert record["fwhm_unit"] == "mm"
 
 
-def test_json_record_carries_the_displacement_unit(tmp_path, write_scan) -> None:
+def test_json_record_carries_the_displacement_unit(artifact) -> None:
     """`motn`/`com` carry their unit the same way `fwhm`/`fwhm_unit` do.
 
     `motn` is left loose against NaN-as-null (see
@@ -458,8 +453,6 @@ def test_json_record_carries_the_displacement_unit(tmp_path, write_scan) -> None
     motion fit does not converge for every frame, so `max_translation` is
     itself NaN and the record maps it to `null` rather than the raw float.
     """
-    scan = q.QAScan.from_nifti(write_scan(tmp_path))
-    artifact = q.analyze(scan, q.AnalysisSettings(roi_size=9))
     m = artifact.measurements
     record = metric_record(artifact)
     assert record["motn"] == (
@@ -470,10 +463,8 @@ def test_json_record_carries_the_displacement_unit(tmp_path, write_scan) -> None
     assert record["displacement_unit"] == "mm"  # the fixture's voxel size is known
 
 
-def test_table_marks_an_unnamed_direction_unknown(tmp_path, write_scan) -> None:
+def test_table_marks_an_unnamed_direction_unknown(artifact) -> None:
     """The `fwPE`/`fwRO` cells read `?`, not a plausible number from elsewhere."""
-    scan = q.QAScan.from_nifti(write_scan(tmp_path))
-    artifact = q.analyze(scan, q.AnalysisSettings(roi_size=9))
     unnamed = replace(
         artifact.measurements,
         pe_axis=None,
@@ -501,14 +492,12 @@ def test_the_table_header_is_the_one_operators_read() -> None:
     assert rule == "-" * len(header)
 
 
-def test_a_table_row_lines_up_under_the_header(tmp_path, write_scan) -> None:
+def test_a_table_row_lines_up_under_the_header(artifact) -> None:
     """The column widths are spelled in the header and again in the row.
 
     Nothing else holds the two together: a column added or resized in one and
     not the other would misalign the table without failing anything.
     """
-    scan = q.QAScan.from_nifti(write_scan(tmp_path))
-    artifact = q.analyze(scan, q.AnalysisSettings(roi_size=9), name="scan.nii.gz")
     header, _ = table.header_lines()
     row = table.format_row(artifact)
     assert len(row) == len(header)

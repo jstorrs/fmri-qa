@@ -4,12 +4,13 @@
 `write_scan` writes one to disk as a NIfTI + BIDS sidecar, so the tests that need
 the real file-I/O path (`QAScan.from_nifti`, the CLI) get one without each of
 them rebuilding the phantom. `artifact` runs the whole pipeline over that
-phantom once per test, for the artifact and CLI tests that need a finished
+phantom once per session, for the artifact and CLI tests that need a finished
 analysis rather than a scan.
 """
 
+import dataclasses
 import json
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from pathlib import Path
 
 import nibabel as nib
@@ -61,13 +62,20 @@ def make_scan() -> MakeScan:
     return factory
 
 
-@pytest.fixture
-def write_scan() -> WriteScan:
-    """Return a factory writing a synthetic phantom NIfTI + sidecar.
+def _write_phantom(
+    directory: Path,
+    name: str = "scan",
+    n: int = 32,
+    z: int = 3,
+    t: int = 40,
+    seed: int = 0,
+    flip: float = 77,
+) -> str:
+    """Write a synthetic phantom NIfTI + sidecar; return the NIfTI path.
 
     A bright central disk with seeded temporal noise, 3 mm isotropic voxels and
     TR 2 s. The sidecar sets `PhaseEncodingDirection` so the PE axis resolves
-    from metadata (no ghost-estimate fallback warning). Returns the NIfTI path.
+    from metadata (no ghost-estimate fallback warning).
 
     The background carries a Rician-like noise floor, as a real magnitude image
     does. That matters: on an *exactly* constant background the intensity
@@ -83,34 +91,50 @@ def write_scan() -> WriteScan:
     rescaling them onto the type's own maximum -- which would be a `2**16 - 1`
     rail, and would have the fixture report clipping it does not have.
     """
+    data = synthetic_series(n=n, z=z, t=t, seed=seed)
 
-    def factory(
-        directory: Path,
-        name: str = "scan",
-        n: int = 32,
-        z: int = 3,
-        t: int = 40,
-        seed: int = 0,
-        flip: float = 77,
-    ) -> str:
-        data = synthetic_series(n=n, z=z, t=t, seed=seed)
+    img = nib.Nifti1Image(data.astype(np.uint16), affine=np.eye(4))
+    img.header.set_zooms((3.0, 3.0, 3.0, 2.0))
+    img.header.set_xyzt_units("mm", "sec")
+    nifti = directory / f"{name}.nii.gz"
+    nib.save(img, str(nifti))
+    (directory / f"{name}.json").write_text(
+        json.dumps({"PhaseEncodingDirection": "j", "FlipAngle": flip})
+    )
+    return str(nifti)
 
-        img = nib.Nifti1Image(data.astype(np.uint16), affine=np.eye(4))
-        img.header.set_zooms((3.0, 3.0, 3.0, 2.0))
-        img.header.set_xyzt_units("mm", "sec")
-        nifti = directory / f"{name}.nii.gz"
-        nib.save(img, str(nifti))
-        (directory / f"{name}.json").write_text(
-            json.dumps({"PhaseEncodingDirection": "j", "FlipAngle": flip})
-        )
-        return str(nifti)
 
-    return factory
+def _arrays(obj: object) -> Iterator[np.ndarray]:
+    """Every ndarray reachable through dataclass fields of `obj`."""
+    if isinstance(obj, np.ndarray):
+        yield obj
+    elif dataclasses.is_dataclass(obj) and not isinstance(obj, type):
+        for f in dataclasses.fields(obj):
+            yield from _arrays(getattr(obj, f.name))
 
 
 @pytest.fixture
-def artifact(tmp_path, write_scan) -> q.QAArtifact:
-    """An artifact from the synthetic phantom, at a small ROI."""
-    scan = q.QAScan.from_nifti(write_scan(tmp_path))
+def write_scan() -> WriteScan:
+    """Return `_write_phantom`: write a synthetic phantom NIfTI + sidecar.
+
+    Function-scoped factory so each test writes into its own `tmp_path`.
+    """
+    return _write_phantom
+
+
+@pytest.fixture(scope="session")
+def artifact(tmp_path_factory: pytest.TempPathFactory) -> q.QAArtifact:
+    """An artifact from the synthetic phantom, at a small ROI.
+
+    Built once per session and shared: the artifact is a frozen dataclass whose
+    arrays are read-only, so no test can change it for another. The assertion
+    below checks that premise rather than assuming it.
+    """
+    nifti = _write_phantom(tmp_path_factory.mktemp("artifact"))
+    scan = q.QAScan.from_nifti(nifti)
     settings = q.AnalysisSettings(roi_size=9)
-    return q.analyze(scan, settings, name="scan.nii.gz", source="scan.nii.gz")
+    result = q.analyze(scan, settings, name="scan.nii.gz", source="scan.nii.gz")
+    assert not any(a.flags.writeable for a in _arrays(result)), (
+        "shared artifact has a writeable array"
+    )
+    return result
