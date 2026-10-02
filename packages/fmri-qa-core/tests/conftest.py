@@ -13,11 +13,13 @@ import json
 from collections.abc import Callable, Iterator
 from pathlib import Path
 
+import netCDF4
 import nibabel as nib
 import numpy as np
 import pytest
 
 import fmriqc as q
+from fmriqc.analysis.serialize import netcdf
 
 WriteScan = Callable[..., str]
 MakeScan = Callable[..., "q.QAScan"]
@@ -138,3 +140,47 @@ def artifact(tmp_path_factory: pytest.TempPathFactory) -> q.QAArtifact:
         "shared artifact has a writeable array"
     )
     return result
+
+
+@pytest.fixture
+def read_netcdf() -> Callable[[Path], tuple[dict, dict[str, np.ndarray]]]:
+    """Return a reader of a stored artifact that drives `netCDF4` directly.
+
+    Tests that corrupt or inspect a stored artifact read it back through a plain
+    netCDF reader rather than the package's own `netcdf` module: reading the file
+    that way is itself the claim this container was chosen for.
+    """
+
+    def read(path: Path) -> tuple[dict, dict[str, np.ndarray]]:
+        """The document and every array of a stored artifact, read with netCDF4 alone.
+
+        The coordinate variables are skipped -- a variable named for a dimension is
+        that axis, derived on the way out and not part of what the artifact
+        carries -- so what this returns is what `decompose` produced.
+        """
+        with netCDF4.Dataset(str(path)) as dataset:
+            dataset.set_auto_mask(False)
+            document = json.loads(dataset.getncattr("document"))
+            arrays = {
+                name: (
+                    np.asarray(variable[...] != 0)
+                    if "flag_values" in variable.ncattrs()
+                    else np.asarray(variable[...])
+                )
+                for name, variable in dataset.variables.items()
+                if name not in dataset.dimensions
+            }
+        return document, arrays
+
+    return read
+
+
+@pytest.fixture
+def encode() -> Callable[[dict, dict[str, np.ndarray]], bytes]:
+    """Return `netcdf.encode` as `save_artifact` calls it: text and its parse."""
+
+    def run(document: dict, arrays: dict[str, np.ndarray]) -> bytes:
+        text = json.dumps(document)
+        return netcdf.encode(text, json.loads(text), arrays)
+
+    return run
