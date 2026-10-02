@@ -65,6 +65,21 @@ def _frames_after_trim(scan: QAScan, trim_sec: float) -> int:
     return int(scan.data.shape[-1]) - trim_count(tr=scan.tr, trim_sec=trim_sec)
 
 
+def _require_enough_frames(scan: QAScan, trim_sec: float, frames: str) -> None:
+    """Require that the trim leaves `scan` the frames the analysis needs.
+
+    `frames` names what is left in the message: "frames", or "high-flip frames".
+    """
+    remaining = _frames_after_trim(scan, trim_sec)
+    if remaining < MIN_ANALYSIS_FRAMES:
+        raise InvalidScanError(
+            "trim_sec",
+            trim_sec,
+            f"leaves {max(remaining, 0)} {frames}; "
+            f"at least {MIN_ANALYSIS_FRAMES} are required",
+        )
+
+
 def validate_qa_run(scan: QAScan, settings: AnalysisSettings) -> PeAxis | None:
     """Validate a scan against the request the single-slice QA pipeline got.
 
@@ -80,15 +95,7 @@ def validate_qa_run(scan: QAScan, settings: AnalysisSettings) -> PeAxis | None:
     when the return here is None.
     """
     validate_scan(scan)
-    trim_sec = settings.trim_sec
-    remaining = _frames_after_trim(scan, trim_sec)
-    if remaining < MIN_ANALYSIS_FRAMES:
-        raise InvalidScanError(
-            "trim_sec",
-            trim_sec,
-            f"leaves {max(remaining, 0)} frames; "
-            f"at least {MIN_ANALYSIS_FRAMES} are required",
-        )
+    _require_enough_frames(scan, settings.trim_sec, "frames")
 
     override = settings.pe_axis_override
     candidate = scan.pe_axis if override is None else override
@@ -120,11 +127,4 @@ def validate_hilo_run(
             "erode", erode, "expected an integer greater than or equal to zero"
         )
     for label, scan in (("high", high), ("low", low)):
-        remaining = _frames_after_trim(scan, trim_sec)
-        if remaining < MIN_ANALYSIS_FRAMES:
-            raise InvalidScanError(
-                "trim_sec",
-                trim_sec,
-                f"leaves {max(remaining, 0)} {label}-flip frames; "
-                f"at least {MIN_ANALYSIS_FRAMES} are required",
-            )
+        _require_enough_frames(scan, trim_sec, f"{label}-flip frames")

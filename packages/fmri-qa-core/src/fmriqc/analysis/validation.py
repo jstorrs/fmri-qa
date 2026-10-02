@@ -24,8 +24,15 @@ import numpy as np
 
 from .._records import UNIONS, resolved_annotations
 from ..settings import AnalysisSettings
-from ..types import LengthUnit
-from .artifact import Measurements, Provenance, QAArtifact, RoiBox, _require
+from .artifact import (
+    Curves,
+    Measurements,
+    Provenance,
+    PsfCurves,
+    QAArtifact,
+    RoiBox,
+    _require,
+)
 
 
 def _matches(value: object, annotation: Any) -> bool:
@@ -71,15 +78,13 @@ def validate_document(document: dict[str, Any]) -> None:
     if type(images["has_ghost"]) is not bool:
         raise ValueError("images.has_ghost must be boolean")
     psf = _object(curves["psf"], "curves.psf")
-    for name, annotation in (
-        ("labels", tuple[str, str]),
-        ("fwhm", tuple[float, float]),
-        ("xmax", float),
-        ("unit", LengthUnit),
-    ):
-        if not _matches(psf[name], annotation):
+    psf_annotations = resolved_annotations(PsfCurves)
+    for name in ("labels", "fwhm", "xmax", "unit"):
+        if not _matches(psf[name], psf_annotations[name]):
             raise ValueError(f"curves.psf.{name} has an invalid type or length")
-    if not _matches(curves["outlier_qthr"], float):
+    if not _matches(
+        curves["outlier_qthr"], resolved_annotations(Curves)["outlier_qthr"]
+    ):
         raise ValueError("curves.outlier_qthr must be numeric")
 
 

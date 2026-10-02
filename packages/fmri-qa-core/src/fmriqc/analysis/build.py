@@ -70,7 +70,7 @@ def build_artifact(result: QAResult, *, name: str = "", source: str = "") -> QAA
     return QAArtifact(
         settings=result.settings,
         provenance=_provenance(result, name=name, source=source),
-        measurements=_measurements(result, result.settings),
+        measurements=_measurements(result),
         curves=_curves(result),
         images=_images(result),
     )
@@ -137,7 +137,7 @@ def _pe_label(result: QAResult) -> PeLabel:
     return "?" if axis is None else PE_ROWCOL[axis]
 
 
-def _measurements(result: QAResult, settings: AnalysisSettings) -> Measurements:
+def _measurements(result: QAResult) -> Measurements:
     """Settle every reported scalar, resolving the metric objects' properties."""
     m = result.metrics
     sat, sm, ghost = m.saturation, m.smoothness, m.ghost
