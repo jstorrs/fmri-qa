@@ -932,37 +932,29 @@ def test_a_measurement_the_document_calls_null_has_no_attribute(
 
 
 def test_save_refuses_a_measurement_no_attribute_can_hold(tmp_path, artifact) -> None:
-    """An integer past NC_INT is refused rather than published wrapped around.
-
-    The other two ways an attribute could fail are not reachable from a valid
-    artifact: the three string measurements are closed vocabularies (`"mm"`,
-    `"row"`, ...) that `validate_document` holds them to, so a non-ASCII or
-    non-scalar measurement can only arrive in a hand-built document -- which is
-    what the `encode` tests below cover.
-    """
+    """An integer past NC_INT is refused rather than published wrapped around."""
     counts = replace(artifact.measurements, n_clipped_pre=2**31, clipped_any=True)
     with pytest.raises(q.InvalidArtifactError, match="netCDF integer"):
         q.save_artifact(replace(artifact, measurements=counts), tmp_path / "qa.nc")
     assert not (tmp_path / "qa.nc").exists()
 
 
-def test_encode_refuses_a_measurement_that_is_not_ascii(artifact) -> None:
-    """A netCDF text attribute is characters, and ASCII is what fixes which."""
+def test_encode_refuses_an_empty_list(artifact) -> None:
+    """An attribute is a *typed* vector, and an empty list names no type."""
     document, arrays = decompose(artifact)
-    document["measurements"]["fwhm_unit"] = "µm"
-    with pytest.raises(ValueError, match="not ASCII"):
+    document["provenance"]["voxel_mm"] = []
+    with pytest.raises(ValueError, match="voxel_mm is an empty list"):
         netcdf.encode(document, arrays)
 
 
 def test_encode_refuses_a_value_no_attribute_can_hold(artifact) -> None:
-    """A list of objects: the one JSON shape with no attribute form at all.
+    """A list of objects: a JSON shape with no attribute form at all.
 
-    A nested object flattens into the name and a list becomes a vector or a
-    line of words, so every shape a document takes on its own has a home. An
-    object *inside* a list is the kind with nowhere to go, which only a
-    hand-edited document can put here -- and `validate_document` refuses it
-    before `save_artifact` reaches this, so the guard answers for `encode`
-    called directly.
+    A nested object flattens into the name, and a list of ints, floats or
+    strings becomes a vector or a line of words. An object *inside* a list has
+    nowhere to go;
+    `validate_document` refuses it before `save_artifact` reaches this, so the
+    fallthrough answers for `encode` called directly.
     """
     document, arrays = decompose(artifact)
     document["measurements"]["snr"] = [{"value": 1.0}]
@@ -1157,22 +1149,6 @@ def test_a_voxel_size_mixing_ints_and_floats_saves_as_doubles(
     assert q.load_artifact(saved).provenance.voxel_mm == (3.0, 3.0, 3.0)
 
 
-def test_encode_refuses_a_provenance_list_with_no_element_type(artifact) -> None:
-    """An attribute is a *typed* vector, and an empty list names no type."""
-    document, arrays = decompose(artifact)
-    document["provenance"]["voxel_mm"] = []
-    with pytest.raises(ValueError, match="list of nothing"):
-        netcdf.encode(document, arrays)
-
-
-def test_encode_refuses_a_provenance_list_that_mixes_kinds(artifact) -> None:
-    """One vector, one type -- two kinds in a list name no attribute either."""
-    document, arrays = decompose(artifact)
-    document["provenance"]["voxel_mm"] = [3.0, 3, 3.0]
-    with pytest.raises(ValueError, match="list of float, int"):
-        netcdf.encode(document, arrays)
-
-
 def test_every_curve_and_image_scalar_is_published_as_its_own_attribute(
     tmp_path, artifact
 ) -> None:
@@ -1211,14 +1187,6 @@ def test_every_curve_and_image_scalar_is_published_as_its_own_attribute(
 
     assert _section_attributes(saved, "curves")["psf.labels"] == "PE RO"
     assert np.asarray(_section_attributes(saved, "images")["has_ghost"]) == 1
-
-
-def test_encode_refuses_a_word_list_whose_word_is_not_one_word(artifact) -> None:
-    """`PE RO` must mean two words: a space inside one would read as three."""
-    document, arrays = decompose(artifact)
-    document["curves"]["psf"]["labels"] = ["P E", "RO"]
-    with pytest.raises(ValueError, match="not a single word"):
-        netcdf.encode(document, arrays)
 
 
 # The axes the layout publishes, as a reader meets them. Spelled out rather
@@ -1594,18 +1562,6 @@ def test_encode_refuses_an_axis_with_no_coordinate_declared(
     monkeypatch.delitem(netcdf._COORDINATES, "frame")
     with pytest.raises(ValueError, match="frame axis has no coordinate"):
         netcdf.encode(document, arrays)
-
-
-def test_encode_refuses_a_labelled_axis_that_is_not_as_long_as_its_labels() -> None:
-    """Two labels and three positions is a flag table a reader cannot apply.
-
-    `image_axis` is (row, col) and nothing else, so an array claiming a third
-    in-plane axis is refused rather than published with a flag for two of the
-    three.
-    """
-    document = {"schema_version": 7, "provenance": {}}
-    with pytest.raises(ValueError, match="image_axis axis is 3 long"):
-        netcdf.encode(document, {"curves.translation": np.zeros((2, 3))})
 
 
 def test_every_axis_the_layout_uses_has_a_coordinate_declared() -> None:

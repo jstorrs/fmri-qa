@@ -187,12 +187,10 @@ can also be missing, but only on an artifact migrated from a schema that
 predates them — the trim and the slice choice happened, but nothing wrote them
 down.
 
-The two sections part company on one point: text. A measurement's strings are
-closed vocabularies this package fixes (`mm`/`vox`, `row`/`col`/`?`), so one
-that is not ASCII can only be a hand-edited document and is refused. Provenance
-strings are not this package's to constrain — they come from file names and
-scanner headers — so they are written as text rather than refused, UTF-8
-encoded as `NC_CHAR`. The one string with no UTF-8 form at all is the lone
+Text is written as `NC_CHAR`, UTF-8 encoded. A measurement's strings are
+closed vocabularies this package fixes (`mm`/`vox`, `row`/`col`/`?`), all
+ASCII. Provenance strings are not this package's to constrain — they come from
+file names and scanner headers — and the one string with no UTF-8 form at all is the lone
 surrogate a Windows file name with an undecodable byte becomes in Python, and
 it rides as its `\udcff` escape; that attribute is lossy where the document
 beside it is not, which is the trade a convenience copy should make rather than

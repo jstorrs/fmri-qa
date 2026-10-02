@@ -110,30 +110,24 @@ NC_UBYTE 0 or 1, a string NC_CHAR, and a JSON list of numbers the vector of its
 element type: `provenance.voxel_mm` is three NC_DOUBLEs and `provenance.matrix`
 two NC_INTs, which is a shape a netCDF attribute has and a reader gets whole. A
 list of words is one space-separated NC_CHAR text, the way CF itself spells
-`flag_meanings`: `curves.psf.labels` reads `PE RO`, and a word with a space in
-it would be unrecoverable from that and is refused. An empty list, or one that
-mixes kinds, names no type the file can hold and is refused too. A field the
-document spells `null` gets **no attribute at all**, and that absence is the
-encoding: the document distinguishes
+`flag_meanings`: `curves.psf.labels` reads `PE RO`. A field the document spells
+`null` gets **no attribute at all**, and that absence is the encoding: the
+document distinguishes
 a NaN ("the estimator could not resolve this") from a null ("the quantity does
 not apply here", in provenance "nothing recorded it", and in settings "not
 overridden"), an attribute cannot be null, and writing NaN for both would
 collapse the distinction. So a NaN attribute means what a NaN measurement means,
 and a missing one means the other thing.
 
-The sections part company on one point, text. A measurement's strings are
-closed vocabularies this package fixes ("mm"/"vox", "row"/"col"/"?"), and so
-are a setting's ("poly"/"spline", "image"/"phantom") and the curve and image
-scalars' ("PE"/"RO", "mm"/"vox"), so one that is not ASCII can only be a
-hand-edited document and is refused. Provenance strings are not
-this package's to constrain -- `scan` and `source` come from
-file names, `coil`, `manufacturer`, `model`, `serial` and `software` from
-scanner headers -- so they are written as text rather than refused: netCDF4
-encodes a `str` attribute as the UTF-8 bytes of NC_CHAR. The one string with no
-UTF-8 form at all is the lone surrogate a Windows file name with an undecodable
-byte becomes in Python, and it rides as its `\\udcff` escape. That attribute is
-lossy where the document beside it is not, which is the trade a convenience copy
-should make rather than failing the save.
+Text is written as NC_CHAR, which netCDF4 encodes as a `str`'s UTF-8 bytes.
+Every string outside provenance is a closed vocabulary this package fixes
+("mm"/"vox", "poly"/"spline", "PE"/"RO", ...), all ASCII. Provenance strings
+are not this package's to constrain -- `scan` and `source` come from file
+names, `coil`, `manufacturer`, `model`, `serial` and `software` from scanner
+headers -- and the one string with no UTF-8 form at all is the lone surrogate a
+Windows file name with an undecodable byte becomes in Python, which rides as its
+`\\udcff` escape. That attribute is lossy where the document beside it is not,
+which is the trade a convenience copy should make rather than failing the save.
 
 Because these are a convenience for a foreign reader and nothing else, `read`
 never consults them, and the JSON document stays the single source of truth for
@@ -189,7 +183,6 @@ import json
 import warnings
 from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
-from enum import Enum, auto
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Final, Literal
 
@@ -222,16 +215,6 @@ _COMPLEVEL: Final = 4
 # the arrays beside it, and a global attribute is not beside them.
 _DOCUMENT = "document"
 
-# The document sections published field by field as global attributes, and
-# what each attribute is called: the document path the value came from, so
-# `measurements.snr` in the file is `measurements.snr` in the document and in
-# this package's vocabulary.
-_SETTINGS = "settings"
-_MEASUREMENTS = "measurements"
-_PROVENANCE = "provenance"
-_CURVES = "curves"
-_IMAGES = "images"
-
 # The rest of the global attributes, for a reader that never decodes the JSON.
 _CONVENTIONS = "CF-1.10"
 _TITLE = "fmri-qa phantom fMRI quality-assurance artifact"
@@ -251,20 +234,6 @@ type _AttributeValue = (
     | NDArray[np.int32]
     | NDArray[np.float64]
 )
-
-
-class _Text(Enum):
-    """Which strings a document section is allowed to publish as an attribute.
-
-    `CLOSED` is a vocabulary this package fixes, where anything outside ASCII
-    is a hand-edited document and refusing beats writing bytes a reader would
-    have to guess an encoding for. `FREE` is text a file system or a scanner
-    header supplied, which this package does not get to constrain, so it is
-    encoded rather than refused. See the module docstring.
-    """
-
-    CLOSED = auto()
-    FREE = auto()
 
 
 # What marks a `u1` variable as a boolean mask, in CF's flag vocabulary, and
@@ -479,9 +448,6 @@ _AUXILIARY: dict[str, str] = {
     "psf_model_sample": "curves.psf.model_x",
 }
 
-# The CF attribute naming a variable's auxiliary coordinates, space separated.
-_AUXILIARY_ATTRIBUTE = "coordinates"
-
 
 @dataclass(frozen=True, slots=True)
 class _Variable:
@@ -552,9 +518,7 @@ def _coordinates(
     is handed, and a made-up abscissa would be worse than none.
 
     Raises:
-        ValueError: If an axis has no coordinate declared for it, or if a
-            labelled axis is not as long as it has labels.
-        KeyError: If the document lacks the labels a coordinate reads from it.
+        ValueError: If an axis has no coordinate declared for it.
     """
     coordinates: dict[str, _Variable] = {}
     for axis, length in dimensions.items():
@@ -598,18 +562,7 @@ def _value_coordinate(
 def _label_coordinate(
     axis: str, length: int, declared: _Labels, document: dict[str, Any]
 ) -> _Variable:
-    """An axis whose positions are named, as CF flags on the position itself.
-
-    Raises:
-        ValueError: If the axis is not as long as it has labels, which would
-            publish a flag table a reader cannot apply.
-        KeyError: If the labels are read from the document and it lacks them.
-    """
-    meanings = _label_meanings(declared, document)
-    if len(meanings) != length:
-        raise ValueError(
-            f"the {axis} axis is {length} long, but its labels are {meanings}"
-        )
+    """An axis whose positions are named, as CF flags on the position itself."""
     positions = np.arange(length, dtype=np.int32)
     return _Variable(
         positions,
@@ -617,7 +570,7 @@ def _label_coordinate(
         {
             "long_name": declared.long_name,
             _FLAG_VALUES: positions,
-            "flag_meanings": " ".join(meanings),
+            "flag_meanings": " ".join(_label_meanings(declared, document)),
         },
     )
 
@@ -668,47 +621,48 @@ def _global_attributes(document: dict[str, Any]) -> dict[str, _AttributeValue]:
     # tuples where the file holds plain numbers and JSON lists, and a second
     # encoding of those would be a second chance to disagree with the first.
     stored = json.loads(text)
-    core_version = str(document["provenance"].get("core_version") or "")
     return {
         "Conventions": _CONVENTIONS,
         "title": _TITLE,
-        "source": f"fmri-qa-core {core_version}".rstrip(),
+        "source": f"fmri-qa-core {document['provenance']['core_version']}".rstrip(),
         # The same number the document carries, hoisted out so a reader can
         # check it without JSON.
         "schema_version": np.int32(document["schema_version"]),
         # Ordered so that `ncdisp` lists the short attributes before the long
         # blob: the header, then what the run was asked for, what it measured
         # and what it measured it on, then the document.
-        **_section_attributes(_SETTINGS, stored, _Text.CLOSED),
-        **_section_attributes(_MEASUREMENTS, stored, _Text.CLOSED),
-        **_section_attributes(_PROVENANCE, stored, _Text.FREE),
-        **_section_attributes(_CURVES, stored, _Text.CLOSED),
-        **_section_attributes(_IMAGES, stored, _Text.CLOSED),
+        **_section_attributes("settings", stored),
+        **_section_attributes("measurements", stored),
+        **_section_attributes("provenance", stored),
+        **_section_attributes("curves", stored),
+        **_section_attributes("images", stored),
         _DOCUMENT: text,
     }
 
 
 def _section_attributes(
-    section: str, document: dict[str, Any], text: _Text
+    section: str, document: dict[str, Any]
 ) -> dict[str, _AttributeValue]:
     """Every recorded field of one document section, as an attribute apiece.
 
-    One encoder for every published section, so the kind-to-type table is
-    stated once and `measurements.snr`, `provenance.tr` and `settings.trim_sec`
-    are NC_DOUBLEs for the same reason. `text` is the only thing the sections
-    disagree about. A nested object -- the `psf` block of `curves`, the `roi`
-    box of `images` -- flattens into the name, so its fields are attributes
-    under their full document path (`curves.psf.fwhm`, `images.roi.row0`).
+    Each attribute is named for the document path its value came from, so
+    `measurements.snr` in the file is `measurements.snr` in the document and in
+    this package's vocabulary. One encoder serves every section, so the
+    kind-to-type table is stated once and `measurements.snr`, `provenance.tr`
+    and `settings.trim_sec` are NC_DOUBLEs for the same reason. A nested object
+    -- the `psf` block of `curves`, the `roi` box of `images` -- flattens into
+    the name, so its fields are attributes under their full document path
+    (`curves.psf.fwhm`, `images.roi.row0`).
 
     A `null` field is skipped rather than written as anything: see the module
     docstring -- absence is how "the quantity does not apply", "nothing
     recorded it" and "not overridden" are spelled, because NaN already means
     "the estimator could not resolve it".
     """
-    attributes: dict[str, _AttributeValue] = {}
-    for path, value in _leaves(section, document.get(section) or {}):
-        attributes[path] = _attribute(path, value, text)
-    return attributes
+    return {
+        path: _attribute(path, value)
+        for path, value in _leaves(section, document[section])
+    }
 
 
 def _leaves(prefix: str, mapping: dict[str, Any]) -> Iterator[tuple[str, Any]]:
@@ -727,102 +681,67 @@ def _leaves(prefix: str, mapping: dict[str, Any]) -> Iterator[tuple[str, Any]]:
             yield path, value
 
 
-def _attribute(name: str, value: Any, text: _Text) -> _AttributeValue:
-    """One JSON value as the netCDF attribute that holds it.
+def _attribute(name: str, value: Any) -> _AttributeValue:
+    """One JSON value, already validated, as the netCDF attribute that holds it.
 
-    Raises:
-        ValueError: If the value is an integer outside NC_INT, a closed-set
-            string that is not ASCII, a list that is empty, mixes kinds or holds
-            a word with a space in it, or of a kind no attribute can hold.
-    """
-    if isinstance(value, list):
-        return _vector(name, value, text)
-    return _scalar(name, value, text)
-
-
-def _vector(name: str, values: list[Any], text: _Text) -> _AttributeValue:
-    """A JSON list as one attribute: a typed vector, or a line of words.
-
-    `provenance.voxel_mm` is three NC_DOUBLEs and `provenance.matrix` two
-    NC_INTs, which is a shape a netCDF attribute has natively and a reader gets
-    in one call rather than as three attributes it has to reassemble.
-
-    An empty list and a list of two kinds are both refused: an attribute is a
-    *typed* vector, and neither of those names a type the file could hold. A
-    list of strings has no vector form either -- that would be NC_STRING, the
-    netCDF-4-only type the label axes already avoid -- so it is one
-    space-separated NC_CHAR text, the way CF itself spells `flag_meanings`:
-    `curves.psf.labels` reads `PE RO`. A word with a space in it could not be
-    told apart from two, and is refused.
-
-    Raises:
-        ValueError: If the list is empty, mixes kinds, holds a word with
-            whitespace in it, or holds an element `_scalar` refuses.
-    """
-    kinds = {type(value).__name__ for value in values}
-    if len(kinds) != 1:
-        named = ", ".join(sorted(kinds)) if kinds else "nothing"
-        raise ValueError(f"{name} is a list of {named}, which no attribute can hold")
-    if all(isinstance(value, str) for value in values):
-        return _words(name, values, text)
-    return np.array([_scalar(name, value, text) for value in values])
-
-
-def _words(name: str, words: list[str], text: _Text) -> str:
-    """A list of strings as one space-separated text attribute.
-
-    Raises:
-        ValueError: If a word has whitespace in it, or `_text` refuses it.
-    """
-    for word in words:
-        if not word or any(character.isspace() for character in word):
-            raise ValueError(f"{name} holds {word!r}, which is not a single word")
-    return _text(name, " ".join(words), text)
-
-
-def _scalar(name: str, value: Any, text: _Text) -> _AttributeValue:
-    """One JSON scalar as the netCDF attribute that holds it.
-
-    Bools are tested before ints because `bool` *is* an `int` in Python, and a
+    Bools are matched before ints because `bool` *is* an `int` in Python, and a
     verdict published as a number a reader has to know is a verdict would be
     exactly the kind of guessing the flagged masks avoid.
 
+    A list of numbers is the vector of its element type: `provenance.voxel_mm`
+    is three NC_DOUBLEs and `provenance.matrix` two NC_INTs, which is a shape a
+    netCDF attribute has natively and a reader gets in one call. A list of
+    strings has no vector form -- that would be NC_STRING, the netCDF-4-only
+    type the label axes already avoid -- so it is one space-separated NC_CHAR
+    text, the way CF itself spells `flag_meanings`: `curves.psf.labels` reads
+    `PE RO`.
+
     Raises:
-        ValueError: If the value is an integer outside NC_INT, a closed-set
-            string that is not ASCII, or of a kind no attribute can hold.
+        ValueError: If an integer is outside NC_INT, or the value is of a kind
+            no attribute can hold.
     """
-    if isinstance(value, bool):
-        return np.uint8(value)
-    if isinstance(value, int):
-        if not _INT32.min <= value <= _INT32.max:
-            raise ValueError(f"{name} is {value}, which does not fit a netCDF integer")
-        return np.int32(value)
-    if isinstance(value, float):
-        return np.float64(value)
-    if isinstance(value, str):
-        return _text(name, value, text)
+    match value:
+        case bool():
+            return np.uint8(value)
+        case int():
+            return _nc_int(name, value)
+        case float():
+            return np.float64(value)
+        case str():
+            return _escaped(value)
+        case []:
+            raise ValueError(f"{name} is an empty list, which names no attribute type")
+        case list() if all(type(element) is int for element in value):
+            return np.array([_nc_int(name, element) for element in value])
+        case list() if all(type(element) is float for element in value):
+            return np.array(value, dtype=np.float64)
+        case list() if all(type(element) is str for element in value):
+            return _escaped(" ".join(value))
     raise ValueError(f"{name} is a {type(value).__name__}, which no attribute can hold")
 
 
-def _text(name: str, value: str, allowed: _Text) -> str:
+def _nc_int(name: str, value: int) -> np.int32:
+    """An integer as NC_INT, refused rather than wrapped around if it does not fit.
+
+    Validation bounds counts below but not above, so a count past NC_INT is a
+    valid artifact this layout cannot publish faithfully.
+    """
+    if not _INT32.min <= value <= _INT32.max:
+        raise ValueError(f"{name} is {value}, which does not fit a netCDF integer")
+    return np.int32(value)
+
+
+def _escaped(text: str) -> str:
     """One string as the NC_CHAR text a reader is handed.
 
-    netCDF4 writes a `str` attribute as the UTF-8 bytes of NC_CHAR. A closed
-    vocabulary is held to ASCII, which cannot fail to encode and cannot be
-    misread by a consumer that takes the bytes as characters without being told
-    which encoding they are. Free text is whatever a file system or a scanner
-    header supplied, so the one string with no UTF-8 form -- the lone surrogate
-    an undecodable byte in a Windows file name becomes in Python -- is escaped
-    rather than allowed to fail the save; the document beside it still spells
-    the name exactly, and that is what `load_artifact` reads.
-
-    Raises:
-        ValueError: If a closed-vocabulary string is not ASCII, which can only
-            reach here from a hand-edited document.
+    netCDF4 writes a `str` attribute as the UTF-8 bytes of NC_CHAR, and ASCII
+    and any other encodable text pass through unchanged. The one string with no
+    UTF-8 form -- the lone surrogate an undecodable byte in a Windows file name
+    becomes in Python -- is escaped rather than allowed to fail the save; the
+    document beside it still spells the name exactly, and that is what
+    `load_artifact` reads.
     """
-    if allowed is _Text.CLOSED and not value.isascii():
-        raise ValueError(f"{name} is not ASCII: {value!r}")
-    return value.encode("utf-8", errors="backslashreplace").decode("utf-8")
+    return text.encode("utf-8", errors="backslashreplace").decode("utf-8")
 
 
 def _variable(
@@ -854,7 +773,7 @@ def _variable(
         attributes |= _mask_attributes()
     labelled = _labelling(name, layout.dimensions, auxiliary)
     if labelled:
-        attributes[_AUXILIARY_ATTRIBUTE] = labelled
+        attributes["coordinates"] = labelled
     return _Variable(_stored(name, array), layout.dimensions, attributes)
 
 
