@@ -6,10 +6,8 @@ from xml.etree import ElementTree
 import matplotlib
 import numpy as np
 import pytest
-from matplotlib.figure import Figure
 
 from fmriqc_report.formats.html import figures
-from fmriqc_report.panels.timeseries import plot_fig
 
 
 def _hrefs_bytes(svg: bytes) -> list[str]:
@@ -132,64 +130,6 @@ def test_render_figures_forces_inline_images_without_leaking_configuration(
         any(href.startswith("data:image/") for href in _hrefs_bytes(item.svg))
         for item in rendered[:5]
     )
-
-
-def test_render_figures_clears_every_figure_when_saving_fails(
-    artifact, monkeypatch
-) -> None:
-    built = [Figure().add_subplot(111).figure for _ in figures.FIGURE_ASSETS]
-
-    monkeypatch.setattr(figures, "_build_figures", lambda _artifact: built)
-
-    def fail_save(*_args, **_kwargs) -> None:
-        raise OSError("disk full")
-
-    monkeypatch.setattr(figures, "_save_svg", fail_save)
-
-    with pytest.raises(OSError, match="disk full"):
-        figures.render_figures(artifact)
-
-    assert all(not figure.axes for figure in built)
-
-
-def test_build_figures_clears_completed_figures_when_a_later_plot_fails(
-    artifact, monkeypatch
-) -> None:
-    image = Figure()
-    image.add_subplot(111)
-    first_plot = Figure()
-    first_plot.add_subplot(111)
-    calls = 0
-
-    def build_plot(*_args, **_kwargs) -> Figure:
-        nonlocal calls
-        calls += 1
-        if calls == 1:
-            return first_plot
-        raise RuntimeError("plot failed")
-
-    monkeypatch.setattr(figures, "panel_figs", lambda _artifact: [image])
-    monkeypatch.setattr(figures, "plot_fig", build_plot)
-
-    with pytest.raises(RuntimeError, match="plot failed"):
-        figures._build_figures(artifact)
-
-    assert not image.axes
-    assert not first_plot.axes
-
-
-def test_plot_fig_clears_its_figure_when_its_callback_fails() -> None:
-    captured: list[Figure] = []
-
-    def fail_draw(ax) -> None:
-        captured.append(ax.figure)
-        raise RuntimeError("draw failed")
-
-    with pytest.raises(RuntimeError, match="draw failed"):
-        plot_fig(fail_draw, (1.0, 1.0))
-
-    assert len(captured) == 1
-    assert not captured[0].axes
 
 
 def test_a_theme_font_family_reaches_the_rc_params() -> None:

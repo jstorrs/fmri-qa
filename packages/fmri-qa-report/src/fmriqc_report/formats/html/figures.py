@@ -42,7 +42,6 @@ __all__ = [
 
 
 _PLOT_FIGSIZE = (6.4, 4.0)
-_PLOT_FONT_SIZE = 11
 _SVG_HASHSALT = "fmriqc-report"
 
 
@@ -170,40 +169,18 @@ def _build_figures(artifact: QAArtifact) -> list[Figure]:
 
     curves, measurements = artifact.curves, artifact.measurements
     draws: tuple[Callable[[Axes], object], ...] = (
-        lambda ax: plot_weisskoff(
-            ax, curves.weisskoff, measurements.rdc, fs=_PLOT_FONT_SIZE
-        ),
-        lambda ax: plot_rdc(ax, curves.weisskoff, fs=_PLOT_FONT_SIZE),
-        lambda ax: plot_signal(ax, curves, fs=_PLOT_FONT_SIZE),
-        lambda ax: plot_residual(
-            ax,
-            curves,
-            fs=_PLOT_FONT_SIZE,
-            tc_outlier=measurements.tc_outlier,
-        ),
-        lambda ax: plot_spectrum(
-            ax,
-            curves,
-            fs=_PLOT_FONT_SIZE,
-            spec_outlier=measurements.spec_outlier,
-        ),
-        lambda ax: plot_outliers(ax, curves, fs=_PLOT_FONT_SIZE),
-        lambda ax: plot_motion(ax, curves, fs=_PLOT_FONT_SIZE),
-        lambda ax: plot_com(ax, curves, fs=_PLOT_FONT_SIZE),
-        lambda ax: plot_psf(ax, curves.psf, fs=_PLOT_FONT_SIZE),
+        lambda ax: plot_weisskoff(ax, curves.weisskoff, measurements.rdc),
+        lambda ax: plot_rdc(ax, curves.weisskoff),
+        lambda ax: plot_signal(ax, curves),
+        lambda ax: plot_residual(ax, curves, tc_outlier=measurements.tc_outlier),
+        lambda ax: plot_spectrum(ax, curves, spec_outlier=measurements.spec_outlier),
+        lambda ax: plot_outliers(ax, curves),
+        lambda ax: plot_motion(ax, curves),
+        lambda ax: plot_com(ax, curves),
+        lambda ax: plot_psf(ax, curves.psf),
     )
-    try:
-        figures.extend(plot_fig(draw, _PLOT_FIGSIZE) for draw in draws)
-    except Exception:
-        for figure in figures:
-            figure.clear()
-        raise
+    figures.extend(plot_fig(draw, _PLOT_FIGSIZE) for draw in draws)
     return figures
-
-
-def _save_svg(figure: Figure, buffer: io.BytesIO) -> None:
-    """Save one figure as SVG bytes without a creation timestamp."""
-    figure.savefig(buffer, format="svg", metadata={"Date": None})
 
 
 def render_figures(
@@ -211,21 +188,21 @@ def render_figures(
 ) -> tuple[RenderedFigure, ...]:
     """Render the fixed inventory as self-contained SVG documents, in order.
 
-    Rendering happens inside a local matplotlib ``rc_context`` and figures are
-    cleared in a ``finally`` block, including when a save fails; this driver
-    neither selects a backend nor uses pyplot.
+    Rendering happens inside a local matplotlib ``rc_context``; this driver
+    neither selects a backend nor uses pyplot. Figures are built with the object
+    API, so nothing global holds them and they are freed with their references.
     """
-    with matplotlib.rc_context(theme.rc_params()):
-        matplotlib.rcParams["svg.image_inline"] = True
-        matplotlib.rcParams["svg.hashsalt"] = _SVG_HASHSALT
+    with matplotlib.rc_context(
+        {
+            **theme.rc_params(),
+            "svg.image_inline": True,
+            "svg.hashsalt": _SVG_HASHSALT,
+        }
+    ):
         figures = _build_figures(artifact)
-        try:
-            rendered = []
-            for asset, figure in zip(FIGURE_ASSETS, figures, strict=True):
-                buffer = io.BytesIO()
-                _save_svg(figure, buffer)
-                rendered.append(RenderedFigure(asset, buffer.getvalue()))
-        finally:
-            for figure in figures:
-                figure.clear()
+        rendered = []
+        for asset, figure in zip(FIGURE_ASSETS, figures, strict=True):
+            buffer = io.BytesIO()
+            figure.savefig(buffer, format="svg", metadata={"Date": None})
+            rendered.append(RenderedFigure(asset, buffer.getvalue()))
     return tuple(rendered)

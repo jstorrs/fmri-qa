@@ -15,19 +15,18 @@ from matplotlib.figure import Figure
 from fmriqc.analysis import Curves, PsfCurves, WeisskoffCurve
 from fmriqc.types import FloatArray
 
+# Base font size (pt) for panel titles; legends and annotations derive from it.
+_FONT_SIZE = 11
+
 
 def plot_fig(draw: Callable[[Axes], object], figsize: tuple[float, float]) -> Figure:
     """Run an ax-drawing callback on a fresh constrained-layout figure."""
     fig = Figure(figsize=figsize, layout="constrained")
-    try:
-        draw(fig.add_subplot(111))
-    except Exception:
-        fig.clear()
-        raise
+    draw(fig.add_subplot(111))
     return fig
 
 
-def plot_weisskoff(ax: Axes, wk: WeisskoffCurve, rdc: float, fs: int = 9) -> None:
+def plot_weisskoff(ax: Axes, wk: WeisskoffCurve, rdc: float) -> None:
     """Measured CV vs the ideal slope=-1 line, anchored at the pooled cv1.
 
     The ideal line is anchored at `cv1_pooled` (the single-voxel CV pooled over
@@ -48,11 +47,11 @@ def plot_weisskoff(ax: Axes, wk: WeisskoffCurve, rdc: float, fs: int = 9) -> Non
     )
     ax.set_xlabel("ROI width (voxels)")
     ax.set_ylabel("CV")
-    ax.set_title(f"Weisskoff (RDC {rdc:.1f})", fontsize=fs)
-    ax.legend(fontsize=fs - 2)
+    ax.set_title(f"Weisskoff (RDC {rdc:.1f})", fontsize=_FONT_SIZE)
+    ax.legend(fontsize=_FONT_SIZE - 2)
 
 
-def plot_rdc(ax: Axes, wk: WeisskoffCurve, fs: int = 9) -> None:
+def plot_rdc(ax: Axes, wk: WeisskoffCurve) -> None:
     """RDC vs ROI size: pooled single-voxel CV / ROI-averaged CV, vs identity."""
     r, rdc = wk.roi_sizes, wk.rdc
     # Match the Weisskoff plot: measured is C0/"o-" on top and first in the
@@ -73,26 +72,24 @@ def plot_rdc(ax: Axes, wk: WeisskoffCurve, fs: int = 9) -> None:
             transform=ax.transAxes,
             ha="right",
             va="bottom",
-            fontsize=fs - 2,
+            fontsize=_FONT_SIZE - 2,
         )
     ax.set_xlabel("ROI width (voxels)")
     ax.set_ylabel("RDC")
-    ax.set_title("RDC vs ROI size", fontsize=fs)
-    ax.legend(fontsize=fs - 2, loc="upper left")
+    ax.set_title("RDC vs ROI size", fontsize=_FONT_SIZE)
+    ax.legend(fontsize=_FONT_SIZE - 2, loc="upper left")
 
 
-def plot_signal(ax: Axes, curves: Curves, fs: int = 9) -> None:
+def plot_signal(ax: Axes, curves: Curves) -> None:
     ax.plot(curves.time, curves.roi_signal, lw=0.5, label="ROI signal")
     ax.plot(curves.time, curves.roi_trend, "r", lw=1.2, label="trend")
     ax.set_xlabel("time (s)")
     ax.set_ylabel("intensity")
-    ax.set_title("ROI mean signal", fontsize=fs)
-    ax.legend(fontsize=fs - 2)
+    ax.set_title("ROI mean signal", fontsize=_FONT_SIZE)
+    ax.legend(fontsize=_FONT_SIZE - 2)
 
 
-def plot_residual(
-    ax: Axes, curves: Curves, fs: int = 9, tc_outlier: float | None = None
-) -> None:
+def plot_residual(ax: Axes, curves: Curves, tc_outlier: float) -> None:
     """ROI-mean detrended residual; the title carries the cran `tc_outlier` score.
 
     `tc_outlier` (max|residual| / MAD) is the peak-to-spread ratio of exactly this
@@ -103,21 +100,18 @@ def plot_residual(
     ax.axhline(0, color="gray", lw=0.5)
     ax.set_xlabel("time (s)")
     ax.set_ylabel("residual")
-    title = "ROI mean residual"
-    if tc_outlier is not None:
-        title += f" (tcOut {tc_outlier:.1f})"
-    ax.set_title(title, fontsize=fs)
+    ax.set_title(f"ROI mean residual (tcOut {tc_outlier:.1f})", fontsize=_FONT_SIZE)
 
 
-def plot_outliers(ax: Axes, curves: Curves, fs: int = 9) -> None:
+def plot_outliers(ax: Axes, curves: Curves) -> None:
     """Per-TR outlier-voxel fraction (3dToutcount), displayed as a percentage."""
     ax.plot(curves.time, 100.0 * curves.outlier_fraction, lw=0.7)
     ax.set_xlabel("time (s)")
     ax.set_ylabel("outliers (%)")
-    ax.set_title("outlier fraction", fontsize=fs)
+    ax.set_title("outlier fraction", fontsize=_FONT_SIZE)
 
 
-def plot_motion(ax: Axes, curves: Curves, fs: int = 9) -> None:
+def plot_motion(ax: Axes, curves: Curves) -> None:
     """Per-volume in-plane phantom motion: translation (voxels) + strain (%).
 
     3dvolreg-style registration to the temporal mean with the rotation dropped
@@ -131,7 +125,7 @@ def plot_motion(ax: Axes, curves: Curves, fs: int = 9) -> None:
     ax.plot(t, curves.translation[:, 1], lw=0.7, color="tab:cyan", label="trans1")
     ax.set_xlabel("time (s)")
     ax.set_ylabel("translation (vox)")
-    ax.set_title("in-plane motion", fontsize=fs)
+    ax.set_title("in-plane motion", fontsize=_FONT_SIZE)
     valid = (
         np.isfinite(curves.translation).all(axis=1)
         & np.isfinite(curves.scale_pct).all(axis=1)
@@ -145,7 +139,7 @@ def plot_motion(ax: Axes, curves: Curves, fs: int = 9) -> None:
             transform=ax.transAxes,
             ha="right",
             va="bottom",
-            fontsize=fs - 2,
+            fontsize=_FONT_SIZE - 2,
         )
     ax2 = ax.twinx()
     ax2.plot(t, curves.scale_pct[:, 0], lw=0.7, color="tab:red", label="scale0")
@@ -154,10 +148,10 @@ def plot_motion(ax: Axes, curves: Curves, fs: int = 9) -> None:
     ax2.set_ylabel("strain (%)")
     h1, l1 = ax.get_legend_handles_labels()
     h2, l2 = ax2.get_legend_handles_labels()
-    ax.legend(h1 + h2, l1 + l2, fontsize=fs - 4, ncol=2, loc="upper left")
+    ax.legend(h1 + h2, l1 + l2, fontsize=_FONT_SIZE - 4, ncol=2, loc="upper left")
 
 
-def plot_com(ax: Axes, curves: Curves, fs: int = 9) -> None:
+def plot_com(ax: Axes, curves: Curves) -> None:
     """Per-volume phantom center-of-mass shift from the temporal mean (voxels).
 
     Circular intensity centroid (bxh volmeasures) along each in-plane axis,
@@ -172,13 +166,11 @@ def plot_com(ax: Axes, curves: Curves, fs: int = 9) -> None:
     ax.plot(curves.time, dev[:, 1], lw=0.7, color="tab:cyan", label="com1")
     ax.set_xlabel("time (s)")
     ax.set_ylabel("COM shift (vox)")
-    ax.set_title("center of mass", fontsize=fs)
-    ax.legend(fontsize=fs - 2, ncol=2, loc="upper left")
+    ax.set_title("center of mass", fontsize=_FONT_SIZE)
+    ax.legend(fontsize=_FONT_SIZE - 2, ncol=2, loc="upper left")
 
 
-def plot_spectrum(
-    ax: Axes, curves: Curves, fs: int = 9, spec_outlier: float | None = None
-) -> None:
+def plot_spectrum(ax: Axes, curves: Curves, spec_outlier: float) -> None:
     """Residual FFT magnitude (DC dropped); title carries cran `spec_outlier`.
 
     `spec_outlier` (max magnitude / MAD) is the peak-to-spread ratio of exactly
@@ -188,13 +180,10 @@ def plot_spectrum(
     ax.plot(curves.spectrum_hz, curves.spectrum_magnitude, lw=0.7)
     ax.set_xlabel("frequency (Hz)")
     ax.set_ylabel("magnitude")
-    title = "residual spectrum"
-    if spec_outlier is not None:
-        title += f" (spec {spec_outlier:.1f})"
-    ax.set_title(title, fontsize=fs)
+    ax.set_title(f"residual spectrum (spec {spec_outlier:.1f})", fontsize=_FONT_SIZE)
 
 
-def plot_psf(ax: Axes, psf: PsfCurves, fs: int = 9) -> None:
+def plot_psf(ax: Axes, psf: PsfCurves) -> None:
     """Directional point-spread profiles (PE, RO) of the noise field (3dFWHMx).
 
     Markers are the empirical PSF (the squared spatial autocorrelation of the
@@ -223,5 +212,5 @@ def plot_psf(ax: Axes, psf: PsfCurves, fs: int = 9) -> None:
     ax.set_ylim(0, 1.03)
     ax.set_xlabel(f"displacement ({psf.unit})")
     ax.set_ylabel("PSF")
-    ax.set_title("PSF (PE / RO)", fontsize=fs)
-    ax.legend(fontsize=fs - 2)
+    ax.set_title("PSF (PE / RO)", fontsize=_FONT_SIZE)
+    ax.legend(fontsize=_FONT_SIZE - 2)
