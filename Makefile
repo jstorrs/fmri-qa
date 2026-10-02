@@ -7,7 +7,7 @@
 # style/tooling.md); the heavy notebook stack is a separate group,
 # `make sync-notebooks`.
 
-.PHONY: all format lint typecheck pyright test license check sync sync-notebooks \
+.PHONY: all format format-check lint typecheck pyright test test-cov license check sync sync-notebooks \
 	sync-docs docs docs-core docs-report docs-launcher docs-clean build bundle
 
 all: lint typecheck pyright test
@@ -80,6 +80,9 @@ docs-clean:
 format:
 	uv run ruff format .
 
+format-check:
+	uv run ruff format --check .
+
 lint:
 	uv run ruff check .
 
@@ -91,6 +94,9 @@ pyright:
 
 test:
 	uv run pytest
+
+test-cov:
+	uv run pytest --cov --cov-report=term-missing --cov-fail-under=90
 
 # Each distribution ships its own copy of the root LICENSE, because a
 # license-files path reaching out of the package root does not survive the
@@ -129,10 +135,5 @@ bundle:
 # rendered by running the pipeline: a clean build is a check that the pages
 # still describe the package, and building the whole site checks the links
 # between packages too. It costs about 25 s.
-check: license
-	uv run ruff format --check .
-	uv run ruff check .
-	uv run mypy
-	uv run pyright
-	uv run pytest --cov --cov-report=term-missing --cov-fail-under=90
+check: license format-check lint typecheck pyright test-cov
 	$(MAKE) docs
