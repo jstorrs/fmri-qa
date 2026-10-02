@@ -17,17 +17,27 @@ copies an already-analyzable `prepared_series` pair into the `-o` directory
 under dcm2niix-style stems instead, so `import_dicom`'s real staging, naming
 (`names="qa"`) and filing all run for real, and the series that comes out the
 other end is one `run_session` can actually analyze.
+
+`stub_series`, `fast_render` and `warn_during_analysis` are the setup that
+`test_session.py` and `test_cli.py` would otherwise each paste. They are
+fixtures, not helpers, because under `--import-mode=importlib` a test module
+cannot import from conftest or from a sibling test module; this overrides
+testing.md's "helper functions over fixtures" preference.
 """
 
 import json
 import stat
 import sys
-from collections.abc import Callable
+import warnings
+from collections.abc import Callable, Sequence
 from pathlib import Path
 
 import nibabel as nib
 import numpy as np
 import pytest
+
+import fmriqc
+from fmriqc.convert import naming
 
 # Mirrors `fmri-qa-core/tests/conftest.py::BACKGROUND_SCALE`/`PHANTOM_SIGNAL`.
 _BACKGROUND_SCALE = 8.0
@@ -35,6 +45,8 @@ _PHANTOM_SIGNAL = 1000.0
 
 PreparedSeries = Callable[..., tuple[Path, dict[str, object]]]
 StubDcm2niix = Callable[..., Path]
+SeriesSidecar = Callable[[dict[str, object], int, str], dict[str, object]]
+StubSeries = Callable[..., tuple[Path, list[str]]]
 
 
 def _synthetic_series(
@@ -119,6 +131,93 @@ def stub_dcm2niix(tmp_path: Path) -> StubDcm2niix:
         return script
 
     return build
+
+
+@pytest.fixture
+def series_sidecar() -> SeriesSidecar:
+    """Return `(base, series_number, description) -> sidecar`.
+
+    `base` is the sidecar `prepared_series` returned; the result adds the
+    naming fields `naming.qa_stem` reads.
+    """
+
+    def build(
+        base: dict[str, object], series_number: int, description: str
+    ) -> dict[str, object]:
+        return {
+            **base,
+            "SeriesNumber": series_number,
+            "AcquisitionDateTime": f"2026-09-09T14:{10 + series_number:02d}:12.500000",
+            "SeriesDescription": description,
+        }
+
+    return build
+
+
+@pytest.fixture
+def stub_series(
+    prepared_series: PreparedSeries,
+    series_sidecar: SeriesSidecar,
+    stub_dcm2niix: StubDcm2niix,
+) -> StubSeries:
+    """Return `build(frames=(40,)) -> (converter, names)` for N analyzable series.
+
+    One series per entry of `frames` (its length in volumes; a series of 2
+    cannot be analyzed, which is how a test gets a failing one), numbered
+    1..N in that order. `converter` is the stub dcm2niix that produces them and
+    `names` the `naming.qa_stem` name each is published under, in the same order.
+    """
+
+    def build(frames: Sequence[int] = (40,)) -> tuple[Path, list[str]]:
+        series: dict[str, tuple[Path, dict[str, object]]] = {}
+        names: list[str] = []
+        for number, volumes in enumerate(frames, start=1):
+            nifti, base = prepared_series(
+                name=f"series{number}", t=volumes, seed=number - 1
+            )
+            sidecar = series_sidecar(base, number, "QA_EPI")
+            name = naming.qa_stem(sidecar)
+            assert name is not None, f"no qa_stem for {sidecar}"
+            series[f"stem{number}"] = (nifti, sidecar)
+            names.append(name)
+        return stub_dcm2niix(series), names
+
+    return build
+
+
+@pytest.fixture
+def fast_render(monkeypatch: pytest.MonkeyPatch) -> Callable[..., Path]:
+    """Replace `write_run_page` with a stand-in that skips the ~8 s render.
+
+    The stand-in still leaves a file behind for `Published.report` to point at.
+    It is returned too, for a test that wraps it.
+    """
+
+    def render(artifact: object, path: Path, **_kwargs: object) -> Path:
+        target = Path(path)
+        target.write_text("<html><body>stub report</body></html>", encoding="utf-8")
+        return target
+
+    monkeypatch.setattr("fmriqc_launcher.session.write_run_page", render)
+    return render
+
+
+@pytest.fixture
+def warn_during_analysis(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Make `fmriqc.analyze` warn "a stub warning from the analysis" first.
+
+    `session.py` calls `fmriqc.analyze(...)` as an attribute of the `fmriqc`
+    module, so the warning has to come from there, not from a fake render:
+    only warnings around `from_nifti`/`analyze` are captured, exactly as
+    `fmriqc.cli.qa` does.
+    """
+    real = fmriqc.analyze
+
+    def analyze(*args: object, **kwargs: object) -> object:
+        warnings.warn("a stub warning from the analysis", stacklevel=2)
+        return real(*args, **kwargs)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(fmriqc, "analyze", analyze)
 
 
 @pytest.fixture

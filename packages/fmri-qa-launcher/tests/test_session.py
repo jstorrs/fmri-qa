@@ -2,7 +2,7 @@
 
 Only `test_one_series_is_imported_analyzed_and_published` renders a real
 report (~8 s); every other test that needs an outcome for a *published*
-series monkeypatches `write_run_page` with `_fast_render`, a few
+series monkeypatches `write_run_page` with the `fast_render` fixture, a few
 milliseconds' stand-in that still leaves a file behind for `Published.report`
 to point at.
 """
@@ -20,7 +20,6 @@ from pathlib import Path
 import pytest
 
 import fmriqc
-from fmriqc.convert import naming
 from fmriqc.settings import AnalysisSettings
 from fmriqc_launcher.exceptions import SessionError
 from fmriqc_launcher.outcome import Failed, Published, Refused
@@ -30,6 +29,7 @@ from fmriqc_launcher.session import _copy_durably, _publish, run_session
 
 PreparedSeries = Callable[..., tuple[Path, dict[str, object]]]
 StubDcm2niix = Callable[..., Path]
+StubSeries = Callable[..., tuple[Path, list[str]]]
 
 _SETTINGS = AnalysisSettings(roi_size=9)
 
@@ -48,67 +48,42 @@ def staging_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     return root
 
 
-def _sidecar(
-    base: dict[str, object], series_number: int, description: str
-) -> dict[str, object]:
-    """`base` (from `prepared_series`) plus the naming fields `naming.qa_stem` reads."""
-    return {
-        **base,
-        "SeriesNumber": series_number,
-        "AcquisitionDateTime": f"2026-09-09T14:{10 + series_number:02d}:12.500000",
-        "SeriesDescription": description,
-    }
-
-
-def _fast_render(artifact: object, path: Path, **_kwargs: object) -> Path:
-    """A stand-in for `write_run_page` that skips the ~8 s matplotlib render."""
-    target = Path(path)
-    target.write_text("<html><body>stub report</body></html>", encoding="utf-8")
-    return target
-
-
-def _warn_then_render(artifact: object, path: Path, **_kwargs: object) -> Path:
-    """`_fast_render`, but warns first -- proves a render warning is not captured."""
-    warnings.warn("a stub warning from the render step", stacklevel=2)
-    return _fast_render(artifact, path)
-
-
 def _fail_render(_artifact: object, _path: Path, **_kwargs: object) -> Path:
     """A render that always fails -- pairs an analysis warning with a later failure."""
     raise RuntimeError("stub render failure")
 
 
-def _warning_wrapper(
-    real: Callable[..., object],
-) -> Callable[..., object]:
-    """Wrap `real` (`fmriqc.analyze`) to warn first -- for the warnings contract.
+def _stop(*_args: object, **_kwargs: object) -> None:
+    raise SessionError("stopped before any series")
 
-    `session.py` calls `fmriqc.analyze(...)` as an attribute of the `fmriqc`
-    module, so the warning has to come from there, not from a fake render:
-    `_publish_series` only captures warnings around `from_nifti`/`analyze`
-    now, exactly as `fmriqc.cli.qa` does.
-    """
 
-    def wrapper(*args: object, **kwargs: object) -> object:
-        warnings.warn("a stub warning from the analysis", stacklevel=2)
-        return real(*args, **kwargs)
+def _never(*_args: object, **_kwargs: object) -> None:
+    raise AssertionError("must not be called")
 
-    return wrapper
+
+def _held(*_args: object, **_kwargs: object) -> None:
+    raise PermissionError(13, "held open by a sync client")
+
+
+def _rmtree_except(prefix: str) -> Callable[..., None]:
+    """`shutil.rmtree`, except that a directory named `prefix*` is left in place."""
+    real = shutil.rmtree
+
+    def rmtree(path: Path, **kwargs: object) -> None:
+        if not Path(path).name.startswith(prefix):
+            real(path, **kwargs)
+
+    return rmtree
 
 
 @pytest.mark.skipif(sys.platform == "win32", reason="POSIX permission bits only")
 def test_one_series_is_imported_analyzed_and_published(
     tmp_path: Path,
     dicom_dir: Path,
-    prepared_series: PreparedSeries,
-    stub_dcm2niix: StubDcm2niix,
+    stub_series: StubSeries,
     staging_root: Path,
 ) -> None:
-    nifti, base = prepared_series(name="scan")
-    sidecar = _sidecar(base, series_number=1, description="QA_EPI")
-    name = naming.qa_stem(sidecar)
-    assert name is not None
-    converter = stub_dcm2niix({"stem1": (nifti, sidecar)})
+    converter, (name,) = stub_series()
 
     output_dir = tmp_path / "output"
     request = RunRequest(
@@ -170,19 +145,13 @@ def test_one_series_is_imported_analyzed_and_published(
     assert result.published == (published,)
 
 
+@pytest.mark.usefixtures("fast_render")
 def test_a_series_whose_name_already_exists_is_refused_untouched(
     tmp_path: Path,
     dicom_dir: Path,
-    prepared_series: PreparedSeries,
-    stub_dcm2niix: StubDcm2niix,
-    monkeypatch: pytest.MonkeyPatch,
+    stub_series: StubSeries,
 ) -> None:
-    monkeypatch.setattr("fmriqc_launcher.session.write_run_page", _fast_render)
-    nifti, base = prepared_series(name="scan")
-    sidecar = _sidecar(base, series_number=1, description="QA_EPI")
-    name = naming.qa_stem(sidecar)
-    assert name is not None
-    converter = stub_dcm2niix({"stem1": (nifti, sidecar)})
+    converter, (name,) = stub_series()
 
     output_dir = tmp_path / "output"
     existing = output_dir / name
@@ -208,30 +177,13 @@ def test_a_series_whose_name_already_exists_is_refused_untouched(
     assert not result.complete
 
 
+@pytest.mark.usefixtures("fast_render")
 def test_one_series_failing_does_not_stop_the_other(
     tmp_path: Path,
     dicom_dir: Path,
-    prepared_series: PreparedSeries,
-    stub_dcm2niix: StubDcm2niix,
-    monkeypatch: pytest.MonkeyPatch,
+    stub_series: StubSeries,
 ) -> None:
-    monkeypatch.setattr("fmriqc_launcher.session.write_run_page", _fast_render)
-    healthy_nifti, healthy_base = prepared_series(name="healthy", t=40)
-    healthy_sidecar = _sidecar(healthy_base, series_number=1, description="Healthy")
-    broken_nifti, broken_base = prepared_series(name="broken", t=2)
-    broken_sidecar = _sidecar(broken_base, series_number=2, description="Broken")
-
-    healthy_name = naming.qa_stem(healthy_sidecar)
-    broken_name = naming.qa_stem(broken_sidecar)
-    assert healthy_name is not None
-    assert broken_name is not None
-
-    converter = stub_dcm2niix(
-        {
-            "stem1": (healthy_nifti, healthy_sidecar),
-            "stem2": (broken_nifti, broken_sidecar),
-        }
-    )
+    converter, (healthy_name, broken_name) = stub_series(frames=(40, 2))
     output_dir = tmp_path / "output"
     request = RunRequest(
         dicom_dir=dicom_dir,
@@ -256,30 +208,13 @@ def test_one_series_failing_does_not_stop_the_other(
     assert [p.name for p in output_dir.iterdir()] == [healthy_name]
 
 
+@pytest.mark.usefixtures("fast_render")
 def test_cancelling_between_series_stops_before_the_next_one(
     tmp_path: Path,
     dicom_dir: Path,
-    prepared_series: PreparedSeries,
-    stub_dcm2niix: StubDcm2niix,
-    monkeypatch: pytest.MonkeyPatch,
+    stub_series: StubSeries,
 ) -> None:
-    monkeypatch.setattr("fmriqc_launcher.session.write_run_page", _fast_render)
-    first_nifti, first_base = prepared_series(name="first", t=40, seed=1)
-    first_sidecar = _sidecar(first_base, series_number=1, description="First")
-    second_nifti, second_base = prepared_series(name="second", t=40, seed=2)
-    second_sidecar = _sidecar(second_base, series_number=2, description="Second")
-
-    first_name = naming.qa_stem(first_sidecar)
-    second_name = naming.qa_stem(second_sidecar)
-    assert first_name is not None
-    assert second_name is not None
-
-    converter = stub_dcm2niix(
-        {
-            "stem1": (first_nifti, first_sidecar),
-            "stem2": (second_nifti, second_sidecar),
-        }
-    )
+    converter, (first_name, second_name) = stub_series(frames=(40, 40))
     output_dir = tmp_path / "output"
     request = RunRequest(
         dicom_dir=dicom_dir,
@@ -366,9 +301,6 @@ def test_an_output_directory_that_cannot_be_written_to_stops_the_run_at_once(
 ) -> None:
     """Before any work: staging is elsewhere, so publishing would find out last."""
 
-    def _never(*_args: object, **_kwargs: object) -> None:
-        raise AssertionError("started work for an output directory it cannot fill")
-
     monkeypatch.setattr("fmriqc_launcher.session._run_in_staging", _never)
     output_dir = tmp_path / "output"
     output_dir.mkdir()
@@ -384,9 +316,6 @@ def test_an_output_directory_that_cannot_be_written_to_stops_the_run_at_once(
 def test_the_writability_probe_leaves_nothing_behind(
     tmp_path: Path, dicom_dir: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    def _stop(*_args: object, **_kwargs: object) -> None:
-        raise SessionError("stopped before any series")
-
     monkeypatch.setattr("fmriqc_launcher.session._run_in_staging", _stop)
     request = RunRequest(dicom_dir=dicom_dir, output_dir=tmp_path / "output")
 
@@ -408,22 +337,15 @@ def test_a_probe_that_cannot_be_removed_is_logged_and_does_not_stop_the_run(
     very race `fmriqc.rename` exists for. Treated as "cannot write", it would
     refuse every run into a watched directory before the run began.
     """
-    real = shutil.rmtree
-
-    def _held(path: Path, **kwargs: object) -> None:
-        if not Path(path).name.startswith(".fmri-qa-probe."):
-            real(path, **kwargs)
-
-    def _stop(*_args: object, **_kwargs: object) -> None:
-        raise SessionError("got as far as starting work")
-
-    monkeypatch.setattr("fmriqc_launcher.session.shutil.rmtree", _held)
+    monkeypatch.setattr(
+        "fmriqc_launcher.session.shutil.rmtree", _rmtree_except(".fmri-qa-probe.")
+    )
     monkeypatch.setattr("fmriqc_launcher.session._run_in_staging", _stop)
     request = RunRequest(dicom_dir=dicom_dir, output_dir=tmp_path / "output")
 
     with (
         caplog.at_level(logging.WARNING, logger="fmriqc_launcher.session"),
-        pytest.raises(SessionError, match="got as far as starting work"),
+        pytest.raises(SessionError, match="stopped before any series"),
     ):
         run_session(request)
 
@@ -448,16 +370,11 @@ def test_a_staging_directory_that_cannot_be_created_is_a_session_error(
 def test_a_target_that_appears_mid_run_fails_that_series(
     tmp_path: Path,
     dicom_dir: Path,
-    prepared_series: PreparedSeries,
-    stub_dcm2niix: StubDcm2niix,
+    stub_series: StubSeries,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """A race the code defends against: the target exists by the time of publish."""
-    nifti, base = prepared_series(name="scan")
-    sidecar = _sidecar(base, series_number=1, description="QA_EPI")
-    name = naming.qa_stem(sidecar)
-    assert name is not None
-    converter = stub_dcm2niix({"stem1": (nifti, sidecar)})
+    converter, (name,) = stub_series()
     output_dir = tmp_path / "output"
 
     def _render_then_collide(artifact: object, path: Path, **_kwargs: object) -> Path:
@@ -481,12 +398,12 @@ def test_a_target_that_appears_mid_run_fails_that_series(
     assert "was created while this run was in progress" in outcome.reason
 
 
+@pytest.mark.usefixtures("fast_render")
 def test_two_series_with_a_dotted_prefix_pair_each_publish_their_own_files(
     tmp_path: Path,
     dicom_dir: Path,
     prepared_series: PreparedSeries,
     stub_dcm2niix: StubDcm2niix,
-    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """`scan.rep.json` must land beside `scan.rep`, not get stolen by `scan`.
 
@@ -495,7 +412,6 @@ def test_two_series_with_a_dotted_prefix_pair_each_publish_their_own_files(
     "scan.rep" -- reproducing the dotted-prefix collision that the converter's
     longest-stem rule resolves.
     """
-    monkeypatch.setattr("fmriqc_launcher.session.write_run_page", _fast_render)
     scan_nifti, scan_base = prepared_series(name="scan")
     rep_nifti, rep_base = prepared_series(name="scan.rep", seed=1)
     converter = stub_dcm2niix(
@@ -533,27 +449,17 @@ def test_two_series_with_a_dotted_prefix_pair_each_publish_their_own_files(
 def test_a_series_whose_directory_appears_mid_run_is_refused_not_analyzed(
     tmp_path: Path,
     dicom_dir: Path,
-    prepared_series: PreparedSeries,
-    stub_dcm2niix: StubDcm2niix,
+    fast_render: Callable[..., Path],
+    stub_series: StubSeries,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Another run publishing the second name during the first's render is no cost."""
-    first_nifti, first_base = prepared_series(name="a")
-    second_nifti, second_base = prepared_series(name="b", seed=1)
-    first = _sidecar(first_base, series_number=1, description="QA_EPI")
-    second = _sidecar(second_base, series_number=2, description="QA_EPI")
-    first_name = naming.qa_stem(first)
-    second_name = naming.qa_stem(second)
-    assert first_name is not None
-    assert second_name is not None
-    converter = stub_dcm2niix(
-        {"stem1": (first_nifti, first), "stem2": (second_nifti, second)}
-    )
+    converter, (first_name, second_name) = stub_series(frames=(40, 40))
     output_dir = tmp_path / "output"
 
     def render_then_race(artifact: object, path: Path, **kwargs: object) -> Path:
         (output_dir / second_name).mkdir()
-        return _fast_render(artifact, path, **kwargs)
+        return fast_render(artifact, path, **kwargs)
 
     monkeypatch.setattr("fmriqc_launcher.session.write_run_page", render_then_race)
     request = RunRequest(
@@ -572,13 +478,12 @@ def test_a_series_whose_directory_appears_mid_run_is_refused_not_analyzed(
     assert second_name not in {e.series for e in events}
 
 
+@pytest.mark.usefixtures("fast_render")
 def test_a_series_with_no_sidecar_is_published_without_one(
     tmp_path: Path,
     dicom_dir: Path,
     prepared_series: PreparedSeries,
-    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr("fmriqc_launcher.session.write_run_page", _fast_render)
     nifti, _ = prepared_series(name="scan")
     converter = tmp_path / "bare-dcm2niix"
     converter.write_text(
@@ -607,15 +512,10 @@ def test_a_series_with_no_sidecar_is_published_without_one(
 def test_a_progress_callback_that_raises_propagates_and_fails_no_series(
     tmp_path: Path,
     dicom_dir: Path,
-    prepared_series: PreparedSeries,
-    stub_dcm2niix: StubDcm2niix,
+    stub_series: StubSeries,
 ) -> None:
     """A broken callback is the caller's bug, not this series' -- see `run_session`."""
-    nifti, base = prepared_series(name="scan")
-    sidecar = _sidecar(base, series_number=1, description="QA_EPI")
-    name = naming.qa_stem(sidecar)
-    assert name is not None
-    converter = stub_dcm2niix({"stem1": (nifti, sidecar)})
+    converter, _ = stub_series()
     output_dir = tmp_path / "output"
 
     def _raise_at_analyze(event: Progress) -> None:
@@ -638,21 +538,13 @@ def test_a_progress_callback_that_raises_propagates_and_fails_no_series(
     assert list(output_dir.iterdir()) == []
 
 
+@pytest.mark.usefixtures("fast_render", "warn_during_analysis")
 def test_a_warning_during_analysis_lands_on_the_published_outcome(
     tmp_path: Path,
     dicom_dir: Path,
-    prepared_series: PreparedSeries,
-    stub_dcm2niix: StubDcm2niix,
-    monkeypatch: pytest.MonkeyPatch,
+    stub_series: StubSeries,
 ) -> None:
-    monkeypatch.setattr("fmriqc_launcher.session.write_run_page", _fast_render)
-    real = fmriqc.analyze
-    monkeypatch.setattr(fmriqc, "analyze", _warning_wrapper(real))
-    nifti, base = prepared_series(name="scan")
-    sidecar = _sidecar(base, series_number=1, description="QA_EPI")
-    name = naming.qa_stem(sidecar)
-    assert name is not None
-    converter = stub_dcm2niix({"stem1": (nifti, sidecar)})
+    converter, _ = stub_series()
 
     request = RunRequest(
         dicom_dir=dicom_dir,
@@ -670,8 +562,8 @@ def test_a_warning_during_analysis_lands_on_the_published_outcome(
 def test_a_warning_during_render_is_not_captured(
     tmp_path: Path,
     dicom_dir: Path,
-    prepared_series: PreparedSeries,
-    stub_dcm2niix: StubDcm2niix,
+    fast_render: Callable[..., Path],
+    stub_series: StubSeries,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Only analysis is captured now, exactly as `fmriqc.cli.qa` does.
@@ -682,12 +574,13 @@ def test_a_warning_during_render_is_not_captured(
     warns is proof the fix holds: the warning still fires (`pytest.warns`
     around the whole call), but nothing lands on the outcome.
     """
+
+    def _warn_then_render(artifact: object, path: Path, **_kwargs: object) -> Path:
+        warnings.warn("a stub warning from the render step", stacklevel=2)
+        return fast_render(artifact, path)
+
     monkeypatch.setattr("fmriqc_launcher.session.write_run_page", _warn_then_render)
-    nifti, base = prepared_series(name="scan")
-    sidecar = _sidecar(base, series_number=1, description="QA_EPI")
-    name = naming.qa_stem(sidecar)
-    assert name is not None
-    converter = stub_dcm2niix({"stem1": (nifti, sidecar)})
+    converter, _ = stub_series()
 
     request = RunRequest(
         dicom_dir=dicom_dir,
@@ -709,8 +602,7 @@ def test_a_warning_during_render_is_not_captured(
 def test_a_failure_staging_a_series_is_a_failed_outcome(
     tmp_path: Path,
     dicom_dir: Path,
-    prepared_series: PreparedSeries,
-    stub_dcm2niix: StubDcm2niix,
+    stub_series: StubSeries,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """The pre-analysis stage (moving the NIfTI and its companions) is guarded too."""
@@ -719,11 +611,7 @@ def test_a_failure_staging_a_series_is_a_failed_outcome(
         raise OSError("disk full while staging")
 
     monkeypatch.setattr("fmriqc_launcher.session._move_files", _raise)
-    nifti, base = prepared_series(name="scan")
-    sidecar = _sidecar(base, series_number=1, description="QA_EPI")
-    name = naming.qa_stem(sidecar)
-    assert name is not None
-    converter = stub_dcm2niix({"stem1": (nifti, sidecar)})
+    converter, _ = stub_series()
 
     request = RunRequest(
         dicom_dir=dicom_dir,
@@ -738,22 +626,16 @@ def test_a_failure_staging_a_series_is_a_failed_outcome(
     assert "disk full while staging" in outcome.reason
 
 
+@pytest.mark.usefixtures("warn_during_analysis")
 def test_a_warning_during_analysis_lands_on_the_failed_outcome(
     tmp_path: Path,
     dicom_dir: Path,
-    prepared_series: PreparedSeries,
-    stub_dcm2niix: StubDcm2niix,
+    stub_series: StubSeries,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """A warning during analysis, then a *later* stage (render) fails: both survive."""
     monkeypatch.setattr("fmriqc_launcher.session.write_run_page", _fail_render)
-    real = fmriqc.analyze
-    monkeypatch.setattr(fmriqc, "analyze", _warning_wrapper(real))
-    nifti, base = prepared_series(name="scan")
-    sidecar = _sidecar(base, series_number=1, description="QA_EPI")
-    name = naming.qa_stem(sidecar)
-    assert name is not None
-    converter = stub_dcm2niix({"stem1": (nifti, sidecar)})
+    converter, _ = stub_series()
 
     request = RunRequest(
         dicom_dir=dicom_dir,
@@ -769,28 +651,22 @@ def test_a_warning_during_analysis_lands_on_the_failed_outcome(
     assert any("stub warning from the analysis" in w for w in outcome.warnings)
 
 
+@pytest.mark.usefixtures("warn_during_analysis")
 def test_a_failure_saving_the_artifact_is_a_failed_outcome_with_its_warnings(
     tmp_path: Path,
     dicom_dir: Path,
-    prepared_series: PreparedSeries,
-    stub_dcm2niix: StubDcm2niix,
+    stub_series: StubSeries,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """`save_artifact` failing is `Failed`, carrying the analysis warnings, nothing
     staged left over.
     """
-    real = fmriqc.analyze
-    monkeypatch.setattr(fmriqc, "analyze", _warning_wrapper(real))
 
     def _failing_save(*_args: object, **_kwargs: object) -> None:
         raise OSError("disk full while saving the artifact")
 
     monkeypatch.setattr(fmriqc, "save_artifact", _failing_save)
-    nifti, base = prepared_series(name="scan")
-    sidecar = _sidecar(base, series_number=1, description="QA_EPI")
-    name = naming.qa_stem(sidecar)
-    assert name is not None
-    converter = stub_dcm2niix({"stem1": (nifti, sidecar)})
+    converter, _ = stub_series()
 
     output_dir = tmp_path / "output"
     request = RunRequest(
@@ -812,8 +688,8 @@ def test_a_failure_saving_the_artifact_is_a_failed_outcome_with_its_warnings(
 def test_the_output_directory_holds_no_intermediates_while_a_series_is_worked_on(
     tmp_path: Path,
     dicom_dir: Path,
-    prepared_series: PreparedSeries,
-    stub_dcm2niix: StubDcm2niix,
+    fast_render: Callable[..., Path],
+    stub_series: StubSeries,
     staging_root: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -830,18 +706,15 @@ def test_the_output_directory_holds_no_intermediates_while_a_series_is_worked_on
     def _look_then_render(artifact: object, path: Path, **kwargs: object) -> Path:
         seen["output"] = sorted(p.name for p in output_dir.rglob("*"))
         seen["staging"] = sorted(p.name for p in staging_root.rglob("*") if p.is_file())
-        return _fast_render(artifact, path, **kwargs)
+        return fast_render(artifact, path, **kwargs)
 
     monkeypatch.setattr("fmriqc_launcher.session.write_run_page", _look_then_render)
-    nifti, base = prepared_series(name="scan")
-    sidecar = _sidecar(base, series_number=1, description="QA_EPI")
-    name = naming.qa_stem(sidecar)
-    assert name is not None
+    converter, (name,) = stub_series()
     request = RunRequest(
         dicom_dir=dicom_dir,
         output_dir=output_dir,
         settings=_SETTINGS,
-        dcm2niix=stub_dcm2niix({"stem1": (nifti, sidecar)}),
+        dcm2niix=converter,
     )
 
     result = run_session(request)
@@ -857,8 +730,8 @@ def test_the_output_directory_holds_no_intermediates_while_a_series_is_worked_on
 def test_a_published_series_is_dropped_from_staging_before_the_next_one_starts(
     tmp_path: Path,
     dicom_dir: Path,
-    prepared_series: PreparedSeries,
-    stub_dcm2niix: StubDcm2niix,
+    fast_render: Callable[..., Path],
+    stub_series: StubSeries,
     staging_root: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -872,27 +745,15 @@ def test_a_published_series_is_dropped_from_staging_before_the_next_one_starts(
 
     def _look_then_render(artifact: object, path: Path, **kwargs: object) -> Path:
         staged_at_each_render.append({p.name for p in staging_root.rglob("*.qa.nc")})
-        return _fast_render(artifact, path, **kwargs)
+        return fast_render(artifact, path, **kwargs)
 
     monkeypatch.setattr("fmriqc_launcher.session.write_run_page", _look_then_render)
-    first_nifti, first_base = prepared_series(name="first", t=40, seed=1)
-    first_sidecar = _sidecar(first_base, series_number=1, description="First")
-    second_nifti, second_base = prepared_series(name="second", t=40, seed=2)
-    second_sidecar = _sidecar(second_base, series_number=2, description="Second")
-    first_name = naming.qa_stem(first_sidecar)
-    second_name = naming.qa_stem(second_sidecar)
-    assert first_name is not None
-    assert second_name is not None
+    converter, (first_name, second_name) = stub_series(frames=(40, 40))
     request = RunRequest(
         dicom_dir=dicom_dir,
         output_dir=tmp_path / "output",
         settings=_SETTINGS,
-        dcm2niix=stub_dcm2niix(
-            {
-                "stem1": (first_nifti, first_sidecar),
-                "stem2": (second_nifti, second_sidecar),
-            }
-        ),
+        dcm2niix=converter,
     )
 
     result = run_session(request)
@@ -983,9 +844,6 @@ def test_a_rename_that_is_refused_leaves_nothing_in_the_output_directory(
     output.mkdir()
     (work / "a").write_bytes(b"x")
 
-    def _held(*_args: object, **_kwargs: object) -> None:
-        raise PermissionError(13, "held open by a sync client")
-
     monkeypatch.setattr("fmriqc_launcher.session.replace_patiently", _held)
 
     with pytest.raises(PermissionError, match="held open"):
@@ -1033,9 +891,6 @@ def test_publishing_onto_an_existing_series_is_refused_before_any_rename(
     work.mkdir()
     target.mkdir()
 
-    def _never(*_args: object, **_kwargs: object) -> None:
-        raise AssertionError("renamed onto a directory that already existed")
-
     monkeypatch.setattr("fmriqc_launcher.session.replace_patiently", _never)
 
     with pytest.raises(SessionError, match="created while this run was in progress"):
@@ -1066,21 +921,6 @@ def test_a_series_published_by_another_run_mid_rename_is_named_as_that(
     assert work.exists()
 
 
-def test_a_rename_refused_for_any_other_reason_keeps_its_own_error(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    work, target = tmp_path / "work", tmp_path / "series"
-    work.mkdir()
-
-    def _held(*_args: object, **_kwargs: object) -> None:
-        raise PermissionError(13, "held open by a sync client")
-
-    monkeypatch.setattr("fmriqc_launcher.session.replace_patiently", _held)
-
-    with pytest.raises(PermissionError, match="held open by a sync client"):
-        _publish(work, target)
-
-
 def test_a_staging_directory_that_cannot_be_removed_is_logged_by_name(
     tmp_path: Path,
     dicom_dir: Path,
@@ -1090,17 +930,10 @@ def test_a_staging_directory_that_cannot_be_removed_is_logged_by_name(
 ) -> None:
     """`ignore_errors=True` must not mean a silent residue beside the reports."""
 
-    def _stop(*_args: object, **_kwargs: object) -> None:
-        raise SessionError("stopped before any series")
-
-    real = shutil.rmtree
-
-    def _held(path: Path, **kwargs: object) -> None:
-        if not Path(path).name.startswith("fmri-qa-run."):
-            real(path, **kwargs)
-
     monkeypatch.setattr("fmriqc_launcher.session._run_in_staging", _stop)
-    monkeypatch.setattr("fmriqc_launcher.session.shutil.rmtree", _held)
+    monkeypatch.setattr(
+        "fmriqc_launcher.session.shutil.rmtree", _rmtree_except("fmri-qa-run.")
+    )
     request = RunRequest(
         dicom_dir=dicom_dir, output_dir=tmp_path / "output", settings=_SETTINGS
     )
@@ -1125,9 +958,6 @@ def test_a_staging_directory_that_was_removed_is_not_mentioned(
     monkeypatch: pytest.MonkeyPatch,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    def _stop(*_args: object, **_kwargs: object) -> None:
-        raise SessionError("stopped before any series")
-
     monkeypatch.setattr("fmriqc_launcher.session._run_in_staging", _stop)
     request = RunRequest(
         dicom_dir=dicom_dir, output_dir=tmp_path / "output", settings=_SETTINGS

@@ -2,9 +2,9 @@
 
 Only `test_the_published_run_matches_a_direct_analyze` (the equivalence claim
 that matters) pays for a real analysis; the other end-to-end tests
-monkeypatch `fmriqc_launcher.session.write_run_page` with `_fast_render`, the
-same stand-in `tests/test_session.py` uses. What the command prints for each
-kind of outcome is pinned by calling `_print_outcomes` on a hand-built
+monkeypatch `fmriqc_launcher.session.write_run_page` with the `fast_render`
+fixture, the same stand-in `tests/test_session.py` uses. What the command
+prints for each kind of outcome is pinned by calling `_print_outcomes` on a hand-built
 `RunResult`, with no run at all.
 """
 
@@ -17,33 +17,29 @@ from pathlib import Path
 import pytest
 
 import fmriqc
-from fmriqc.convert import naming
+import fmriqc_launcher.session as session_module
 from fmriqc.convert.dcm2niix import find_dcm2niix
 from fmriqc.settings import AnalysisSettings
 from fmriqc_launcher import cli
 from fmriqc_launcher.outcome import Failed, Published, Refused, RunResult
 from fmriqc_launcher.results import open_results
 
-PreparedSeries = Callable[..., tuple[Path, dict[str, object]]]
-StubDcm2niix = Callable[..., Path]
+StubSeries = Callable[..., tuple[Path, list[str]]]
 
 
-def _fast_render(artifact: object, path: Path, **_kwargs: object) -> Path:
-    """A stand-in for `write_run_page` that skips the ~8 s matplotlib render."""
-    target = Path(path)
-    target.write_text("<html><body>stub report</body></html>", encoding="utf-8")
-    return target
-
-
-def _sidecar(
-    base: dict[str, object], series_number: int, description: str
+@pytest.fixture
+def fake_run_session(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> dict[str, object]:
-    return {
-        **base,
-        "SeriesNumber": series_number,
-        "AcquisitionDateTime": f"2026-09-09T14:{10 + series_number:02d}:12.500000",
-        "SeriesDescription": description,
-    }
+    """Replace `run_session` with a stub that records its request and runs nothing."""
+    captured: dict[str, object] = {}
+
+    def _fake_run_session(request: object, **_kwargs: object) -> RunResult:
+        captured["request"] = request
+        return RunResult(tmp_path / "output", ())
+
+    monkeypatch.setattr(session_module, "run_session", _fake_run_session)
+    return captured
 
 
 def test_help_renders(capsys: pytest.CaptureFixture[str]) -> None:
@@ -82,26 +78,17 @@ def test_a_flag_with_no_directories_is_a_usage_error(
 
 
 def test_no_flags_builds_the_default_analysis_settings(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, fake_run_session: dict[str, object]
 ) -> None:
     """Structural pin: no flags builds exactly `fmriqc.AnalysisSettings()`."""
     dicom_dir = tmp_path / "dicom"
     dicom_dir.mkdir()
     output_dir = tmp_path / "output"
-    captured: dict[str, object] = {}
-
-    def _fake_run_session(request: object, **_kwargs: object) -> RunResult:
-        captured["request"] = request
-        return RunResult(output_dir, ())
-
-    import fmriqc_launcher.session as session_module
-
-    monkeypatch.setattr(session_module, "run_session", _fake_run_session)
 
     rc = cli.main([str(dicom_dir), str(output_dir)])
 
     assert rc == 1  # no series at all is not a complete run
-    request = captured["request"]
+    request = fake_run_session["request"]
     assert request.settings == fmriqc.AnalysisSettings()  # type: ignore[attr-defined]
     assert request.anonymize == "pii"  # type: ignore[attr-defined]
     assert request.dcm2niix is None  # type: ignore[attr-defined]
@@ -109,22 +96,13 @@ def test_no_flags_builds_the_default_analysis_settings(
 
 
 def test_each_flag_lands_in_the_right_field(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, fake_run_session: dict[str, object]
 ) -> None:
     dicom_dir = tmp_path / "dicom"
     dicom_dir.mkdir()
     output_dir = tmp_path / "output"
     converter = tmp_path / "dcm2niix"
     converter.write_text("stub")
-    captured: dict[str, object] = {}
-
-    def _fake_run_session(request: object, **_kwargs: object) -> RunResult:
-        captured["request"] = request
-        return RunResult(output_dir, ())
-
-    import fmriqc_launcher.session as session_module
-
-    monkeypatch.setattr(session_module, "run_session", _fake_run_session)
 
     rc = cli.main(
         [
@@ -147,7 +125,7 @@ def test_each_flag_lands_in_the_right_field(
     )
 
     assert rc == 1
-    request = captured["request"]
+    request = fake_run_session["request"]
     settings = request.settings  # type: ignore[attr-defined]
     assert settings == AnalysisSettings(
         trim_sec=3.0, detrend="spline", center="phantom", roi_size=11
@@ -158,7 +136,9 @@ def test_each_flag_lands_in_the_right_field(
 
 
 def test_a_dot_slash_dcm2niix_runs_the_file_here_not_one_on_path(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    fake_run_session: dict[str, object],
 ) -> None:
     """`--dcm2niix ./dcm2niix` reaches `find_dcm2niix` with its `./` intact."""
     dicom_dir = tmp_path / "dicom"
@@ -173,19 +153,10 @@ def test_a_dot_slash_dcm2niix_runs_the_file_here_not_one_on_path(
     elsewhere.mkdir()
     monkeypatch.chdir(here)
     monkeypatch.setenv("PATH", str(elsewhere))
-    captured: dict[str, object] = {}
-
-    def _fake_run_session(request: object, **_kwargs: object) -> RunResult:
-        captured["request"] = request
-        return RunResult(output_dir, ())
-
-    import fmriqc_launcher.session as session_module
-
-    monkeypatch.setattr(session_module, "run_session", _fake_run_session)
 
     cli.main([str(dicom_dir), str(output_dir), "--dcm2niix", "./dcm2niix"])
 
-    named = captured["request"].dcm2niix  # type: ignore[attr-defined]
+    named = fake_run_session["request"].dcm2niix  # type: ignore[attr-defined]
     assert Path(find_dcm2niix(named)).resolve() == converter.resolve()
 
 
@@ -211,20 +182,15 @@ def test_bad_flag_values_are_usage_errors(
 def test_the_published_run_matches_a_direct_analyze(
     tmp_path: Path,
     dicom_dir: Path,
-    prepared_series: PreparedSeries,
-    stub_dcm2niix: StubDcm2niix,
+    stub_series: StubSeries,
 ) -> None:
     """The claim that matters: `fmri-qa-run` matches a direct `fmriqc.analyze`."""
-    nifti, base = prepared_series(name="scan")
-    sidecar = _sidecar(base, series_number=1, description="QA_EPI")
-    converter = stub_dcm2niix({"stem1": (nifti, sidecar)})
+    converter, (name,) = stub_series()
     output_dir = tmp_path / "output"
 
     rc = cli.main([str(dicom_dir), str(output_dir), "--dcm2niix", str(converter)])
     assert rc == 0
 
-    name = naming.qa_stem(sidecar)
-    assert name is not None
     published_nifti = output_dir / name / f"{name}.nii.gz"
     published_artifact = output_dir / name / f"{name}.qa.nc"
 
@@ -239,20 +205,14 @@ def test_the_published_run_matches_a_direct_analyze(
     assert reloaded.measurements.rdc == direct.measurements.rdc
 
 
+@pytest.mark.usefixtures("fast_render")
 def test_clean_run_exits_zero_and_prints_the_report_path(
     tmp_path: Path,
     dicom_dir: Path,
-    prepared_series: PreparedSeries,
-    stub_dcm2niix: StubDcm2niix,
-    monkeypatch: pytest.MonkeyPatch,
+    stub_series: StubSeries,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    monkeypatch.setattr("fmriqc_launcher.session.write_run_page", _fast_render)
-    nifti, base = prepared_series(name="scan")
-    sidecar = _sidecar(base, series_number=1, description="QA_EPI")
-    name = naming.qa_stem(sidecar)
-    assert name is not None
-    converter = stub_dcm2niix({"stem1": (nifti, sidecar)})
+    converter, (name,) = stub_series()
     output_dir = tmp_path / "output"
 
     rc = cli.main([str(dicom_dir), str(output_dir), "--dcm2niix", str(converter)])
@@ -501,27 +461,14 @@ def test_open_results_opens_nothing_when_nothing_was_published(tmp_path: Path) -
     assert called is False
 
 
+@pytest.mark.usefixtures("fast_render")
 def test_one_failed_series_does_not_stop_the_report_of_another(
     tmp_path: Path,
     dicom_dir: Path,
-    prepared_series: PreparedSeries,
-    stub_dcm2niix: StubDcm2niix,
-    monkeypatch: pytest.MonkeyPatch,
+    stub_series: StubSeries,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    monkeypatch.setattr("fmriqc_launcher.session.write_run_page", _fast_render)
-    healthy_nifti, healthy_base = prepared_series(name="healthy", t=40)
-    healthy_sidecar = _sidecar(healthy_base, series_number=2, description="Healthy")
-    broken_nifti, broken_base = prepared_series(name="broken", t=2)
-    broken_sidecar = _sidecar(broken_base, series_number=1, description="Broken")
-    converter = stub_dcm2niix(
-        {
-            "stem1": (broken_nifti, broken_sidecar),
-            "stem2": (healthy_nifti, healthy_sidecar),
-        }
-    )
-    healthy_name = naming.qa_stem(healthy_sidecar)
-    assert healthy_name is not None
+    converter, (_, healthy_name) = stub_series(frames=(2, 40))
     output_dir = tmp_path / "output"
 
     rc = cli.main([str(dicom_dir), str(output_dir), "--dcm2niix", str(converter)])
