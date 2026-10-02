@@ -12,6 +12,7 @@ import numpy as np
 import pytest
 
 import fmriqc as q
+from fmriqc.prep.geometry import roi_fits
 
 from .conftest import MakeScan, synthetic_series
 
@@ -178,7 +179,7 @@ def test_phantom_centering_localizes_slice_and_roi(make_scan: MakeScan) -> None:
     """
     result = q.run_qa(make_scan(), q.AnalysisSettings(roi_size=9, center="phantom"))
     assert result.roi.size == 9
-    assert q.roi_fits(result.geom.phantom_mask, result.roi.index)
+    assert roi_fits(result.geom.phantom_mask, result.roi.index)
     assert np.isfinite(result.metrics.snr) and result.metrics.snr > 0
 
 

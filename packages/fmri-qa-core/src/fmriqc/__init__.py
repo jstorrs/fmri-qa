@@ -1,55 +1,21 @@
 """Phantom fMRI quality-assurance metrics (SNR, SFNR, RDC, ghost, and more).
 
-The public surface is re-exported here; the implementation lives in topical
-subpackages (`ls` the package to find a concern):
-
-* `convert`   -- DICOM -> NIfTI import: `dcm2niix` (running the converter
-                 with the flags a QA series cannot be converted without),
-                 `naming` (the date/time/series/description file name), and
-                 `session` (`import_dicom`: a directory in, named series out)
-* `load`      -- NIfTI + BIDS-sidecar I/O: `scan` (`QAScan`), `metadata`
-                 (`ScanMeta`), `pe_axis` (phase-encode resolution),
-                 `repetition_time` (TR resolution)
-* `prep`      -- preprocessing infrastructure: `imaging` (raw-array ops),
-                 `detrend`, `geometry` (phantom/ROI), `images` (`QAImages`),
-                 `scale` (`VoxelSize`: the in-plane voxel size, and the unit
-                 every length measured against it carries)
-* `metrics`   -- the physics tests, one module per family: `fbirn`
-                 (SNR/SFNR/RDC/drift), `artifacts` (spikes/outliers), `ghost`
-                 (`estimate_ghost`: the whole Nyquist-ghost family off one build
-                 of the region-matched masks, which the result carries;
-                 `ghost_ratios`/`estimate_pe_axis` score and pick a PE axis
-                 before one is settled), `saturation`, `motion`,
-                 `center_of_mass`, `smoothness`
-* `pipeline`  -- `preprocess`, the full `run_qa` orchestration, and the
-                 aggregate `QAMetrics`/`QAResult`
-* `analysis`  -- the publishable `QAArtifact`: `artifact` (the value objects),
-                 `build` (`analyze`: scan -> artifact), `validation` (the
-                 contract), and `serialize` (the netCDF-4 on-disk form, with
-                 the per-version migrations that keep an old archive readable)
-* `hilo`      -- high/low flip-angle thermal/instability separation (its own pipeline)
-* `cli`       -- the three commands (`fmri-qa`, `fmri-qa-hilo`,
-                 `fmri-qa-import`) and the two forms the analyzing two report
-                 in: the fixed-width `table` and the JSON `record`
-* `types`     -- the shared array dtypes and option Literals
-* `settings`  -- `AnalysisSettings`, the record of what a run was asked for
+The root exports the analysis chain (`import_dicom`, `QAScan`, `analyze`,
+`run_qa`, the metric estimators), its result and value types, the exceptions,
+and the shared option types. Helpers live in their subpackages; import them
+from there (`fmriqc.prep.geometry`, `fmriqc.metrics.ghost`, ...).
 
 This package is the *calculation* half of fmri-qa. Reports and plots live in the
 separate `fmri-qa-report` distribution, which consumes a `QAArtifact` and never
 imports the layers above.
 
-Everything named in `__all__` below is importable straight from `fmriqc`.
-
-Every one of those names, though, is re-exported *lazily*: this module defines
-no eager `from .x import Y` at all. Reaching just far enough to build an
-`argparse.ArgumentParser` -- `--version`, `--help`, a bad flag -- used to pay
-for every subpackage's imports, scipy and scikit-image included, before a
-single argument was parsed. `__getattr__` below (PEP 562) resolves a name to
-its owning module and imports that module -- and only that module's chain --
-on first access, so `import fmriqc` stays cheap and the cost lands on the call
-site that actually uses the name. `_EXPORTS` is the map from defining module to
-the names it contributes; `test_lazy_imports.py` asserts its flattened contents
-equal `__all__` exactly, so the two cannot silently drift apart.
+Every name in `__all__` is re-exported *lazily*: this module defines no eager
+`from .x import Y`. Building an `argparse.ArgumentParser` (`--version`,
+`--help`, a bad flag) would otherwise pay for every subpackage's imports, scipy
+and scikit-image included, before a single argument was parsed. `__getattr__`
+(PEP 562) imports a name's owning module on first access, so `import fmriqc`
+stays cheap. `_EXPORTS` maps each defining module to its names;
+`test_lazy_imports.py` asserts it flattens to exactly `__all__`.
 """
 
 import logging
@@ -87,12 +53,9 @@ if TYPE_CHECKING:
     from .hilo import (
         HILO_ERODE,
         HiLoResult,
-        phantom_core_mask,
         run_hilo,
-        separate_noise,
     )
     from .load.metadata import ScanMeta
-    from .load.pe_axis import PE_ROWCOL
     from .load.scan import QAScan
     from .metrics.artifacts import (
         OutlierResult,
@@ -111,13 +74,9 @@ if TYPE_CHECKING:
     )
     from .metrics.ghost import (
         GHOST_RADIUS,
-        GHOST_TOP_FRACTION,
         GhostResult,
         estimate_ghost,
         estimate_pe_axis,
-        ghost_masks,
-        ghost_ratio,
-        ghost_ratios,
     )
     from .metrics.motion import MotionResult, estimate_motion
     from .metrics.saturation import ClipRail, SaturationResult, detect_saturation
@@ -125,34 +84,13 @@ if TYPE_CHECKING:
     from .pipeline import QAMetrics, QAResult, preprocess, run_qa
     from .prep.detrend import (
         Detrender,
-        poly_degree,
-        poly_residuals,
-        spline_nodes,
-        spline_residuals,
     )
     from .prep.geometry import (
         ROI,
         PhantomGeometry,
         detect_phantom,
-        resolve_roi,
-        roi_fits,
     )
     from .prep.images import QAImages
-    from .prep.imaging import (
-        edge_valid_mask,
-        find_phantom_center,
-        fluctuation_noise,
-        image_center,
-        odd_even_difference,
-        phantom_area,
-        phantom_contrast,
-        phantom_plausible,
-        roi_indexes,
-        segment_phantom,
-        select_slice,
-        trim_count,
-        trim_initial,
-    )
     from .prep.scale import VoxelSize
     from .settings import AnalysisSettings
     from .types import (
@@ -179,11 +117,9 @@ __all__ = [
     "DETREND_METHODS",
     "FBIRN_ROI_SIZE",
     "GHOST_RADIUS",
-    "GHOST_TOP_FRACTION",
     "HILO_ERODE",
     "NAME_STYLES",
     "PE_AXES",
-    "PE_ROWCOL",
     "ROI",
     "ROI_CENTER_MODES",
     "AnalysisSettings",
@@ -233,54 +169,27 @@ __all__ = [
     "detect_phantom",
     "detect_saturation",
     "drift_percent",
-    "edge_valid_mask",
     "estimate_center_of_mass",
     "estimate_ghost",
     "estimate_motion",
     "estimate_pe_axis",
     "estimate_smoothness",
-    "find_phantom_center",
-    "fluctuation_noise",
-    "ghost_masks",
-    "ghost_ratio",
-    "ghost_ratios",
-    "image_center",
     "import_dicom",
     "load_artifact",
-    "odd_even_difference",
     "outlier_fraction",
     "percent_fluctuation",
-    "phantom_area",
-    "phantom_contrast",
-    "phantom_core_mask",
-    "phantom_plausible",
-    "poly_degree",
-    "poly_residuals",
     "preprocess",
-    "resolve_roi",
-    "roi_fits",
-    "roi_indexes",
     "run_hilo",
     "run_qa",
     "save_artifact",
-    "segment_phantom",
-    "select_slice",
-    "separate_noise",
     "sfnr",
     "snr",
     "spike_scores",
-    "spline_nodes",
-    "spline_residuals",
-    "trim_count",
-    "trim_initial",
     "weisskoff",
 ]
 
-# Single source of truth for the lazy re-export: which submodule defines each
-# name in `__all__`. Keyed by module path (not name) so one dict entry covers
-# a whole `from .x import (...)` block, mirroring the import statements above.
-# `test_lazy_imports.py` asserts this flattens to exactly `__all__` -- the
-# check that stops the two from drifting apart the way two hand-kept lists would.
+# Which submodule defines each name in `__all__`, keyed by module path so one
+# entry mirrors one `from .x import (...)` block above.
 _EXPORTS: dict[str, tuple[str, ...]] = {
     ".analysis": (
         "ARTIFACT_SCHEMA_VERSION",
@@ -310,12 +219,9 @@ _EXPORTS: dict[str, tuple[str, ...]] = {
     ".hilo": (
         "HILO_ERODE",
         "HiLoResult",
-        "phantom_core_mask",
         "run_hilo",
-        "separate_noise",
     ),
     ".load.metadata": ("ScanMeta",),
-    ".load.pe_axis": ("PE_ROWCOL",),
     ".load.scan": ("QAScan",),
     ".metrics.artifacts": (
         "OutlierResult",
@@ -334,48 +240,21 @@ _EXPORTS: dict[str, tuple[str, ...]] = {
     ),
     ".metrics.ghost": (
         "GHOST_RADIUS",
-        "GHOST_TOP_FRACTION",
         "GhostResult",
         "estimate_ghost",
         "estimate_pe_axis",
-        "ghost_masks",
-        "ghost_ratio",
-        "ghost_ratios",
     ),
     ".metrics.motion": ("MotionResult", "estimate_motion"),
     ".metrics.saturation": ("ClipRail", "SaturationResult", "detect_saturation"),
     ".metrics.smoothness": ("SmoothnessResult", "estimate_smoothness"),
     ".pipeline": ("QAMetrics", "QAResult", "preprocess", "run_qa"),
-    ".prep.detrend": (
-        "Detrender",
-        "poly_degree",
-        "poly_residuals",
-        "spline_nodes",
-        "spline_residuals",
-    ),
+    ".prep.detrend": ("Detrender",),
     ".prep.geometry": (
         "ROI",
         "PhantomGeometry",
         "detect_phantom",
-        "resolve_roi",
-        "roi_fits",
     ),
     ".prep.images": ("QAImages",),
-    ".prep.imaging": (
-        "edge_valid_mask",
-        "find_phantom_center",
-        "fluctuation_noise",
-        "image_center",
-        "odd_even_difference",
-        "phantom_area",
-        "phantom_contrast",
-        "phantom_plausible",
-        "roi_indexes",
-        "segment_phantom",
-        "select_slice",
-        "trim_count",
-        "trim_initial",
-    ),
     ".prep.scale": ("VoxelSize",),
     ".settings": ("AnalysisSettings",),
     ".version": ("core_version",),
@@ -394,8 +273,7 @@ _EXPORTS: dict[str, tuple[str, ...]] = {
     ),
 }
 
-# Built once from `_EXPORTS`, never hand-maintained: the reverse lookup
-# `__getattr__` needs to find a name's owning module in O(1).
+# Reverse lookup of `_EXPORTS`, for `__getattr__`.
 _NAME_TO_MODULE: dict[str, str] = {
     name: module for module, names in _EXPORTS.items() for name in names
 }
