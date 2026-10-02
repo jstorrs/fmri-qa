@@ -23,14 +23,24 @@ class WeisskoffResult(ArrayValue):
 
     `cv` is the ROI-averaged CV and `cv1` the single-voxel CV pooled within each
     ROI size; `rdc_curve = cv1 / cv` is the effective decorrelation factor at
-    each size (ideal = ROI width). `rdc` is the scalar value at the full ROI.
+    each size (ideal = ROI width). The last entry of each curve is the full
+    ROI, so `cv1_pooled` and `rdc` are read off the curves rather than stored
+    beside them, where they could disagree.
     """
 
     roi_sizes: IntArray
     cv: FloatArray
     cv1: FloatArray
-    cv1_pooled: float
-    rdc: float
+
+    @property
+    def cv1_pooled(self) -> float:
+        """Single-voxel CV pooled over the full ROI (the last `cv1` entry)."""
+        return float(self.cv1[-1])
+
+    @property
+    def rdc(self) -> float:
+        """Radius of decorrelation at the full ROI: `cv1_pooled / cv[-1]`."""
+        return float(self.cv1_pooled / self.cv[-1])
 
     @property
     def rdc_curve(self) -> FloatArray:
@@ -90,7 +100,7 @@ def weisskoff(images: QAImages, roi: ROI) -> WeisskoffResult:
 
     For each ROI size, `cv` is the CV of the ROI-mean fluctuation and `cv1` is
     the single-voxel CV pooled within the ROI; `rdc_curve = cv1 / cv`.
-    `cv1_pooled` is the pooled CV over the full ROI and `rdc = cv1_pooled/cv[-1]`.
+    The result's `cv1_pooled` and `rdc` are the full-ROI values of those curves.
     """
     # derived images are properties; read each once rather than per ROI size
     fluctuations, mean_image = images.fluctuations, images.mean_image
@@ -120,19 +130,7 @@ def weisskoff(images: QAImages, roi: ROI) -> WeisskoffResult:
             for k in roi_sizes
         ]
     )
-    # cv1[-1] is _roi_cv1 at k = roi.size, which is exactly the pooled CV over
-    # the full ROI: reuse it rather than recomputing the same ratio inline,
-    # which would bypass `_relative_to_signal`'s zero-signal guard and re-open
-    # the warning this function exists to avoid.
-    cv1_pooled = float(cv1[-1])
-
-    return WeisskoffResult(
-        roi_sizes=roi_sizes,
-        cv=cv,
-        cv1=cv1,
-        cv1_pooled=cv1_pooled,
-        rdc=cv1_pooled / cv[-1],
-    )
+    return WeisskoffResult(roi_sizes=roi_sizes, cv=cv, cv1=cv1)
 
 
 def snr(images: QAImages, roi: ROI) -> float:

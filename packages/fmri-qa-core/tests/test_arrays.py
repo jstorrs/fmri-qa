@@ -64,8 +64,6 @@ def _sample_instances() -> list[tuple[ArrayValue, str]]:
                 roi_sizes=np.arange(1, 4),
                 cv=np.array([0.1, 0.2, 0.3]),
                 cv1=np.array([0.4, 0.5, 0.6]),
-                cv1_pooled=0.4,
-                rdc=4.0,
             ),
             "roi_sizes",
         ),
