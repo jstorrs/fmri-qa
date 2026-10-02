@@ -14,7 +14,6 @@ import pytest
 import fmriqc as q
 from fmriqc_report.content import METRIC_DOCS
 from fmriqc_report.formats.html import resources
-from fmriqc_report.formats.html import run as run_module
 from fmriqc_report.formats.html.figures import FIGURE_ASSETS, RenderedFigure
 from fmriqc_report.formats.html.run import render_run_page, write_run_page
 
@@ -240,38 +239,18 @@ def test_run_page_marks_nonfinite_values_and_analysis_warnings(
     assert "CLIP 2 in analyzed data (+1 pre-SS) @ 4095 (12-bit)" in page
 
 
-@pytest.mark.parametrize(
-    ("fmt_output", "expected_markup"),
-    [
-        ("449.7", "449.7"),
-        ("4.03%", "4.03<small>%</small>"),
-        ("0.04mm", "0.04<small>mm</small>"),
-        ("-0.5%", "-0.5<small>%</small>"),
-        ("nan", "nan"),
-        ("< 0.01", "&lt; 0.01"),
-        ("−0.5%", "−0.5%"),  # U+2212 MINUS SIGN, not ASCII '-'
-    ],
-)
-def test_split_value_never_invents_a_space_and_always_keeps_the_text(
-    fmt_output: str, expected_markup: str
-) -> None:
-    assert run_module._split_value(fmt_output) == expected_markup
-
-
-def test_run_page_splits_metric_values_from_their_units(
+def test_run_page_puts_metric_units_in_small_and_leaves_bare_numbers(
     standalone_page, artifact
 ) -> None:
     page = standalone_page
     measurements = artifact.measurements
-    # A unit-bearing metric ("4.03%") splits its formatted text into a number
-    # and a <small> unit with no inserted space; a dimensionless one ("449.7")
-    # stays a bare number. "ghost" and "SNR" are picked by label rather than a
-    # unit lookup: the former always formats with a "%" suffix, the latter never.
+    # "ghost" always carries a "%" unit and "SNR" never does; picked by label
+    # rather than a unit lookup so the test names what it expects.
     unit_bearing = next(doc for doc in METRIC_DOCS if doc.label == "ghost")
     dimensionless = next(doc for doc in METRIC_DOCS if doc.label == "SNR")
-    assert run_module._split_value(unit_bearing.fmt(measurements)) in page
-    dimensionless_text = dimensionless.fmt(measurements)
-    assert f'<span class="v num">{dimensionless_text}</span>' in page
+    number = unit_bearing.number(measurements)
+    assert f"{number}<small>%</small>" in page
+    assert f'<span class="v num">{dimensionless.number(measurements)}</span>' in page
 
 
 def test_run_page_handles_missing_metadata_without_inventing_acquisition_time(

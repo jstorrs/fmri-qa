@@ -8,7 +8,6 @@ double-click it, email it, or drop it into their own website.
 
 import html
 import math
-import re
 from base64 import b64encode
 from pathlib import Path
 from string import Template
@@ -33,10 +32,6 @@ __all__ = ["render_run_page", "write_run_page"]
 
 
 _UNAVAILABLE = "Unavailable — estimator unresolved"
-
-# Splits a formatted metric value ("4.03%", "0.04mm", "449.7") into its
-# leading number and trailing unit; a bare number leaves ``u`` empty.
-_VALUE = re.compile(r"(?P<n>-?[\d.,]+(?:[eE][-+]?\d+)?)\s*(?P<u>.*)\Z")
 
 
 def render_run_page(
@@ -159,7 +154,9 @@ def _metrics(artifact: QAArtifact) -> str:
 def _metric_tile(doc: MetricDoc, measurements: Measurements) -> str:
     value = doc.value(measurements)
     if math.isfinite(value):
-        value_html = _split_value(doc.fmt(measurements))
+        unit = doc.unit_for(measurements)
+        number = doc.number(measurements)
+        value_html = f"{number}<small>{_text(unit)}</small>" if unit else number
         note_html = _text(doc.definition)
     else:
         value_html = "—"
@@ -173,13 +170,6 @@ def _metric_tile(doc: MetricDoc, measurements: Measurements) -> str:
         f'<span class="v num">{value_html}</span>'
         f'<span class="n">{note_html}</span></div>'
     )
-
-
-def _split_value(text: str) -> str:
-    match = _VALUE.match(text)
-    if not match or not match.group("u"):
-        return _text(text)
-    return f"{_text(match.group('n'))}<small>{_text(match.group('u'))}</small>"
 
 
 def _kv_row(label: str, value: object) -> str:

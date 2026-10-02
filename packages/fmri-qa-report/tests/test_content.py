@@ -1,30 +1,37 @@
 """The per-metric catalog: one source for every metric's label and format."""
 
+import dataclasses
 import math
 from dataclasses import replace
 
+from fmriqc.analysis import Measurements
 from fmriqc_report import content
 
 
 def test_metric_docs_keep_their_existing_labels_order_and_formatting(artifact) -> None:
     m = artifact.measurements
-    assert [(d.label, d.fmt(m)) for d in content.METRIC_DOCS] == [
-        ("SNR", f"{m.snr:.1f}"),
-        ("SFNR", f"{m.sfnr:.1f}"),
-        ("RDC", f"{m.rdc:.2f}"),
-        ("ghost", f"{m.ghost_pct:.2f}%"),
-        ("ghostT", f"{m.ghost_top_pct:.2f}%"),
-        ("RO", f"{m.ro_ghost_pct:.2f}%"),
-        ("ACRg", f"{m.acr_ghost_pct:.2f}%"),
-        ("drift", f"{m.drift_pct:.3f}%"),
-        ("fluct", f"{m.percent_fluctuation:.3f}%"),
-        ("outl", f"{m.outlier_max_pct:.2f}%"),
-        ("tcOut", f"{m.tc_outlier:.1f}"),
-        ("spec", f"{m.spec_outlier:.1f}"),
-        ("motn", f"{m.max_translation:.2f}{m.displacement_unit}"),
-        ("com", f"{m.max_com_displacement:.2f}{m.displacement_unit}"),
-        ("fwhm", f"{m.fwhm:.2f}{m.fwhm_unit}"),
+    assert [(d.label, d.number(m), d.unit_for(m)) for d in content.METRIC_DOCS] == [
+        ("SNR", f"{m.snr:.1f}", ""),
+        ("SFNR", f"{m.sfnr:.1f}", ""),
+        ("RDC", f"{m.rdc:.2f}", ""),
+        ("ghost", f"{m.ghost_pct:.2f}", "%"),
+        ("ghostT", f"{m.ghost_top_pct:.2f}", "%"),
+        ("RO", f"{m.ro_ghost_pct:.2f}", "%"),
+        ("ACRg", f"{m.acr_ghost_pct:.2f}", "%"),
+        ("drift", f"{m.drift_pct:.3f}", "%"),
+        ("fluct", f"{m.percent_fluctuation:.3f}", "%"),
+        ("outl", f"{m.outlier_max_pct:.2f}", "%"),
+        ("tcOut", f"{m.tc_outlier:.1f}", ""),
+        ("spec", f"{m.spec_outlier:.1f}", ""),
+        ("motn", f"{m.max_translation:.2f}", m.displacement_unit),
+        ("com", f"{m.max_com_displacement:.2f}", m.displacement_unit),
+        ("fwhm", f"{m.fwhm:.2f}", m.fwhm_unit),
     ]
+
+
+def test_every_metric_name_is_a_measurements_field() -> None:
+    fields = {f.name for f in dataclasses.fields(Measurements)}
+    assert {doc.name for doc in content.METRIC_DOCS} <= fields
 
 
 def test_metric_names_are_stable_unique_measurement_fields() -> None:
@@ -98,7 +105,7 @@ def test_every_metric_doc_is_documented(artifact) -> None:
     m = artifact.measurements
     for doc in content.METRIC_DOCS:
         assert doc.label and doc.definition and doc.method
-        assert doc.fmt(m)  # the formatter returns a non-empty string
+        assert doc.number(m)  # the number is a non-empty string
 
 
 def test_outlier_method_describes_threshold_tuning() -> None:
@@ -119,9 +126,9 @@ def test_motn_and_com_tiles_carry_the_displacement_unit(
     """
     by_label = {doc.label: doc for doc in content.METRIC_DOCS}
     m = artifact.measurements
-    assert by_label["motn"].fmt(m) == f"{m.max_translation:.2f}mm"
-    assert by_label["com"].fmt(m) == f"{m.max_com_displacement:.2f}mm"
+    assert by_label["motn"].unit_for(m) == "mm"
+    assert by_label["com"].unit_for(m) == "mm"
 
     bare = bare_artifact.measurements
-    assert by_label["motn"].fmt(bare) == f"{bare.max_translation:.2f}vox"
-    assert by_label["com"].fmt(bare) == f"{bare.max_com_displacement:.2f}vox"
+    assert by_label["motn"].unit_for(bare) == "vox"
+    assert by_label["com"].unit_for(bare) == "vox"
