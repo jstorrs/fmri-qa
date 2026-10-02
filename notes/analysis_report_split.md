@@ -143,7 +143,7 @@ $ fmri-qa-report artifacts/*.qa.nc --pdf packet.pdf --tier physics --cover --app
 
 ## Follow-ups
 
-- The deferred acceptance-threshold subsystem (see `report_redesign.md`) now has
+- The deferred acceptance-threshold subsystem (the "Acceptance thresholds" gap in `IMPLEMENTATION_STATUS.md`) now has
   an obvious home: thresholds are evaluated against `Measurements`, and could be
   carried in the artifact as a `Verdicts` section.
 - A second format driver (HTML) costs a file in `formats/`, unchanged content

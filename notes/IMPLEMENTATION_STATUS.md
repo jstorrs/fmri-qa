@@ -102,6 +102,12 @@ Ranked by value for phantom QA.
 3. **FFT spectrum normalization.** The report's `plot_spectrum`
    (`fmriqc_report.panels.timeseries`) plots raw magnitude; `bxh` normalizes to
    percent-of-mean (`·100/m`) for cross-scan comparability. Cosmetic.
+4. **Acceptance thresholds.** The report is descriptive: metric tiles show
+   measured values only, with no pass/warn/fail colouring, and the report states
+   that no acceptance thresholds are applied. Pass/warn/fail limits, evaluated
+   against `Measurements`, would colour the tiles and give each metric an
+   acceptance window with its provenance. The FBIRN correctness bar sets the
+   default limits.
 
 ---
 
@@ -136,18 +142,18 @@ Ranked by value for phantom QA.
   fraction over the phantom mask — per-voxel `sigma = sqrt(π/2)·MAD`, outlier if
   `|r| > Q⁻¹(qthr/N)·sigma`, `qthr = 0.001` — on the pipeline's Legendre-
   detrended fluctuations (afni_proc.py detrend-before-classify; our fit is L2
-  vs. AFNI's L1). Surfaced as the `outl%` column, a PDF tile, and a per-frame
+  vs. AFNI's L1). Surfaced as the `outl%` column, a metric tile, and a per-frame
   trace plot. Validated: clean data sits at the `qthr` chance level.
 - **Saturation / clipping check** (was a gap): `detect_saturation` infers the
   `2**n - 1` rail and counts the pile-up over the full untrimmed series, split
   into analyzed (`clip`) vs. dropped warm-up (`clipPre`) volumes; surfaced as
-  two CLI columns and a PDF annotation.
+  two CLI columns and a report note.
 - **In-plane phantom motion / deformation** (3dvolreg-style): `estimate_motion`
   registers each volume to the temporal-mean image under a rotation-free 2-D
   affine — translation + symmetric strain (anisotropic scale + shear), the only
   degrees of freedom a rigid phantom has under gradient heating — by
   forward-additive Lucas-Kanade over the phantom mask. Surfaced as the
-  `motn`/`scl%`/`shr%` columns, a PDF tile, and a per-frame translation/strain
+  `motn`/`scl%`/`shr%` columns, a metric tile, and a per-frame translation/strain
   trace; a slow monotonic strain ramp is the thermal-drift signature (visible on
   ABCD). Diagnostic only — the analyzed series is not resampled, so this stays
   FBIRN-correct.
@@ -159,7 +165,7 @@ Ranked by value for phantom QA.
   `-unif` per-voxel median/MAD standardization, per frame over the phantom mask,
   aggregated across frames by geometric mean (`-geom`). Resolved to physical
   directions with the PE axis: surfaced as the `fwPE`/`fwRO` columns (phase-
-  encode / readout FWHM in mm), a combined-FWHM PDF tile (AFNI `ccomb`), and
+  encode / readout FWHM in mm), a combined-FWHM metric tile (AFNI `ccomb`), and
   directional **point-spread curves** — the empirical PSF (squared spatial
   autocorrelation of the noise field, the Gaussian-model point spread from AFNI's
   empirical ACF) overlaid on the Gaussian PSF from the Classic FWHM, per PE/RO,
@@ -206,7 +212,7 @@ Ranked by value for phantom QA.
   instead of punching a hole in the periodic ring (pedestal subtraction also kills
   the background DC term outright). Deviations are reported relative to the
   temporal-mean centroid with the same circular wrapping, so a boundary crossing
-  is a small shift, not a full-FOV jump. Surfaced as the `com` CLI column, a PDF
+  is a small shift, not a full-FOV jump. Surfaced as the `com` CLI column, a metric
   tile, and a per-frame center-of-mass trace. Diagnostic only — the analyzed
   series is untouched. Validated: a synthetic zeroed row biases the raw centroid
   0.38 vox and the healing restores it exactly; an 8% N/2 ghost moves it 0.00
@@ -223,7 +229,7 @@ Ranked by value for phantom QA.
   DC-dropped residual spectrum (a dominant periodic artifact). The denominator is
   R's `mad()` (`1.4826·median|x − median x|`, matched to `scipy` `scale='normal'`
   to 1e-6), so a clean phantom sits at a few and a spike stands well above.
-  Surfaced as the `tcOut`/`spcOut` CLI columns, two PDF tiles, and inline in the
+  Surfaced as the `tcOut`/`spcOut` CLI columns, two metric tiles, and inline in the
   existing residual/spectrum plot titles (same series). Diagnostic only.
   Validated: matches a manual recompute exactly; an injected one-frame spike
   drives `tcOut` 2.5 → 19.3 and an injected sinusoid drives `spec` 5.2 → 37.5;
@@ -234,7 +240,7 @@ Ranked by value for phantom QA.
   of ghost-region voxels (`GhostResult.pe_top_ratio`, `GHOST_TOP_FRACTION =
   0.10`), on the **same** region-matched masks as the mean ghost — so it shares the
   scale, is always ≥ the mean ghost, and a concentrated bright ghost the region
-  mean dilutes still shows. Surfaced as the `ghT%` CLI column and a `ghostT` PDF
+  mean dilutes still shows. Surfaced as the `ghT%` CLI column and a `ghostT` metric
   tile. Validated: matches an explicit top-k sort exactly and never drops below
   the mean ghost; a localized ghost injected into a few ghost voxels moves `ghT%`
   ~10× more than `ghost%` (FBIRN 4.1→6.6, ABCD 5.1→10.1 at rest); an empty ghost
