@@ -2,8 +2,9 @@
 
 Status: implemented.
 
-This document records why fmri-qa ships as two distributions, what crosses the
-boundary between them, and the rules that keep the boundary from eroding.
+This document records why fmri-qa is split into separate distributions, what
+crosses the boundary between calculation and presentation, and the rules that
+keep the boundary from eroding.
 
 ## Motivation
 
@@ -15,19 +16,18 @@ changes. *Presentation* draws curves and lays out pages. It is typographic,
 fast, needs no acquisition at all, and changes when someone wants a different
 report.
 
-Fusing them costs on every axis:
+Keeping them apart pays on every axis:
 
 - **Deployment.** A trend database, a scanner-console script, or a nightly
-  cron job wants the numbers. Installing them dragged in matplotlib, ReportLab,
-  and svglib — a drawing stack none of them ever calls.
-- **Coupling.** `report/` reached into `QAResult.images.center_slice` to
-  re-derive ROI time series, rebuilt the ghost masks the ghost metric had
-  already built, recomputed the SFNR image and the phantom convex hull, and
-  re-sampled the PSF model. Analysis decisions were being made in plotting code,
-  where they could silently disagree with the metric that reported the number.
-- **Time.** Re-rendering a packet with a different theme, a different tier, or a
-  fixed typo meant re-running the whole pipeline over the original NIfTI — which
-  had to still be on that machine.
+  cron job wants the numbers. Installing the calculation half does not install
+  matplotlib, a drawing stack none of them calls.
+- **Coupling.** Analysis decisions are made once, in the analysis, and
+  published as fields. Plotting code does not re-derive ROI time series, ghost
+  masks, the SFNR image, the phantom convex hull, or the PSF model, so it cannot
+  silently disagree with the metric that reported the number.
+- **Time.** Re-rendering a report with a different theme or a fixed typo does
+  not re-run the pipeline, and does not need the original NIfTI on that
+  machine.
 
 ## The seam: `QAArtifact`
 
@@ -54,99 +54,64 @@ Two rules decide what belongs in it:
    the per-voxel fluctuations stay behind in `pipeline.QAResult`. They are large,
    and no report has ever needed a voxel it could not get from a summary image.
 
-`QAResult` still exists and `run_qa` still returns it: it is the pipeline's
-working output, and `build_artifact` projects it. `analyze` is the front door
+`QAResult` is the pipeline's working output and `run_qa` returns it;
+`build_artifact` projects it. `analyze` is the front door
 that does both.
 
-## On disk
+## Serialized form
 
-`save_artifact` / `load_artifact` move an artifact through a single netCDF-4
-file (`<scan>.qa.nc`): every array is a compressed, checksummed variable under
-its dotted path (`curves.weisskoff.cv`, `images.ghost.pe_ghost`), declared over
-shared named dimensions (`frame`, `frequency`, `row`, `col`, …), each of which
-carries a coordinate variable of its own so a reader gets the values along an
-axis and not only its name; everything that
-is not an array rides in a JSON document held in the global attribute
-`document`; and every scalar measurement and every recorded provenance field is
-published as an attribute of its own beside it. The file needs nothing a site does not already have to inspect —
-MATLAB's built-in `ncread`/`ncdisp`, R's `ncdf4`, `ncdump`, xarray — and one
-array can be pulled out without materializing the rest.
+The artifact is saved as one netCDF-4 file (`<scan>.qa.nc`) carrying
+`ARTIFACT_SCHEMA_VERSION`, which a reader checks and refuses by name on a
+mismatch. The layout, the reasons for netCDF, and the NaN-versus-`null`
+convention are in
+[`packages/fmri-qa-core/docs/artifact.md`](../packages/fmri-qa-core/docs/artifact.md).
 
-netCDF replaced a compressed `.npz` for exactly that reason: the `.npz` was
-readable with `numpy` and `json` and with little else, needing npy-matlab and a
-manual unzip in MATLAB and offering R nothing but numeric arrays. The costs are
-a ~10 MB `netCDF4` wheel (libhdf5 and libnetcdf, the library those readers use
-themselves), HDF5's advisory file locking on network shares, and size: HDF5
-spends about 110 KB of fixed metadata on a layout this size, so the test
-phantom's artifact is 135 KB against the `.npz`'s 24 KB, and a real
-128×128×300 acquisition 441 KB against 230 KB. `load_artifact` reads both
-containers, telling them apart by the file's leading bytes rather than its
-suffix; nothing writes an `.npz` any more.
+## The packages
 
-`ARTIFACT_SCHEMA_VERSION` pins the layout, and a mismatch is refused by name
-rather than misread field by field. The mapping in `analysis/serialize/` is
-written out explicitly rather than reflected over the dataclasses: the layout is
-a published contract, so adding a field should be a deliberate edit to the file
-format, not a side effect of adding an attribute.
-
-The embedded JSON uses Python's `NaN` tokens. This is deliberate: a NaN
-measurement says *an estimator could not resolve this*, which is different from
-the `null` that says *this quantity does not apply*, and flattening the two
-would lose information a physicist reads.
-
-## The two distributions
-
-```
-packages/fmri-qa-core     fmriqc         numpy, scipy, nibabel, scikit-image
-packages/fmri-qa-report   fmriqc_report  fmri-qa-core, numpy, matplotlib, reportlab, svglib
-```
+| Distribution | Import | Role | Dependencies |
+|---|---|---|---|
+| `fmri-qa-core` | `fmriqc` | Calculation: load, prep, metrics, pipeline, the artifact and its file format, DICOM conversion. No drawing stack. | numpy, scipy, nibabel, scikit-image, netCDF4, dcm2niix |
+| `fmri-qa-report` | `fmriqc_report` | One artifact rendered as one self-contained HTML page. | fmri-qa-core, numpy, matplotlib, cycler |
+| `fmri-qa-launcher` | `fmriqc_launcher` | The one-step DICOM-to-report command (`fmri-qa-run`) and the desktop panel (`fmri-qa-panel`). | fmri-qa-core, fmri-qa-report; tkinter from the standard library |
 
 The dependency points one way: report depends on core, core knows nothing of
-report. Within that, the report half may import only `fmriqc.analysis` (the
-artifact) and `fmriqc.types` (the shared array/option vocabulary) — never
-`load`, `prep`, `metrics`, or `pipeline`, and never the `fmriqc` package as a
-whole, which would pull all of them.
+report, and the launcher sits on top of both. Within that, the report half may
+import only `fmriqc.analysis` (the artifact), `fmriqc.types` (the shared
+array/option vocabulary), and two standard-library leaves it shares with core
+(`fmriqc.rename` for the atomic write, `fmriqc.path_arguments` for command-line
+paths) -- never `load`, `prep`, `metrics`, or `pipeline`, and never the
+`fmriqc` package as a whole, which would pull all of them.
 
-That is a rule that erodes one convenient import at a time, so it is checked
-mechanically: `packages/fmri-qa-report/tests/test_layering.py` parses every
-report source file and fails on an import outside the allowlist. CI checks the
-other direction against the built wheels — the core wheel is installed alone and
-asserted to have no matplotlib and no ReportLab importable.
+A rule like that erodes one convenient import at a time, so layering tests check
+it mechanically:
+
+- `packages/fmri-qa-report/tests/test_layering.py` parses every report source
+  file and fails on an import outside the allowlist.
+- `packages/fmri-qa-core/tests/test_layering.py` checks the ordering of the
+  stack inside calculation: a lower layer never imports a higher one.
 
 ## Using it
 
 ```console
-$ fmri-qa scan.nii.gz --artifact qa.nc           # calculate once
-$ fmri-qa-report qa.nc --pdf report.pdf          # render as often as you like
-```
-
-A batch writes one artifact per scan into a directory, and `fmri-qa-report`
-takes several artifacts to build one packet:
-
-```console
-$ fmri-qa run-*.nii.gz --artifact artifacts/
-$ fmri-qa-report artifacts/*.qa.nc --pdf packet.pdf --tier physics --cover --appendix
+$ fmri-qa scan.nii.gz --artifact qa.nc    # calculate once
+$ fmri-qa-report qa.nc --html qa.html    # render as often as you like
 ```
 
 ## Consequences worth knowing
 
-- **`fmri-qa` no longer writes PDFs.** The `--pdf`, `--pdf-tier`, `--pdf-cover`,
-  and `--pdf-appendix` flags moved to `fmri-qa-report` as `--pdf`, `--tier`,
-  `--cover`, `--appendix`. Producing a report is now two commands.
-- **A `--pe-axis` override now shows in the report header.** The header used to
-  prefer the sidecar's DICOM direction unconditionally, disagreeing with the
-  axis the ghost masks actually used. The artifact resolves one `pe_label`, so
-  the table and the report cannot differ.
+- **Producing a report is two commands**, or one with `fmri-qa-run`.
+- **The report states one phase-encode axis.** The artifact resolves a single
+  `pe_label`, so a `--pe-axis` override shows in the header and the table and
+  the report cannot differ.
 - **The report is testable without any acquisition.** Its tests build an
-  artifact in memory and never touch a NIfTI — which is itself evidence that the
-  seam holds.
+  artifact in memory and never touch a NIfTI, which is evidence that the seam
+  holds.
 
 ## Follow-ups
 
-- The deferred acceptance-threshold subsystem (the "Acceptance thresholds" gap in `IMPLEMENTATION_STATUS.md`) now has
-  an obvious home: thresholds are evaluated against `Measurements`, and could be
-  carried in the artifact as a `Verdicts` section.
-- A second format driver (HTML) costs a file in `formats/`, unchanged content
-  modules, and no analysis work at all.
-- Trending across artifacts — reading a directory of `.qa.nc` files into a table
-  — needs nothing from either package that is not already public.
+- The deferred acceptance-threshold subsystem (the "Acceptance thresholds" gap
+  in `IMPLEMENTATION_STATUS.md`) has an obvious home: thresholds are evaluated
+  against `Measurements`, and could be carried in the artifact as a `Verdicts`
+  section.
+- Trending across artifacts -- reading a directory of `.qa.nc` files into a
+  table -- needs nothing from either package that is not already public.
