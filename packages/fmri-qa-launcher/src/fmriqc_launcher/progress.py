@@ -9,6 +9,7 @@ never decides how progress is displayed, only what happened.
 from collections.abc import Callable
 from dataclasses import dataclass
 from enum import StrEnum
+from pathlib import Path
 from typing import assert_never
 
 
@@ -62,3 +63,14 @@ def describe(progress: Progress) -> str:
 
 
 type ProgressCallback = Callable[[Progress], None]
+
+
+@dataclass(frozen=True, slots=True)
+class CleanupNotice:
+    """A working directory left behind; `message` explains what to do with `path`."""
+
+    path: Path
+    message: str
+
+
+type CleanupNoticeCallback = Callable[[CleanupNotice], None]

@@ -64,7 +64,8 @@ series being worked on; each series' files leave it once they are published.
 Where the temporary directory is small or held in memory, point `TMPDIR`
 somewhere larger. The staging directory is removed when the run ends, whether
 or not it succeeded; one left behind holds nothing finished and can be
-deleted.
+deleted. Cleanup warnings name leftovers in the console (stderr) or panel log,
+without changing the run result or exit code.
 
 A finished series is copied into a dot-named directory (hidden on macOS and
 Linux) beside its final place, `.<series>.<token>.partial`, and that is renamed
@@ -72,11 +73,13 @@ to `<series>` once every file is copied. A reader of the output directory, or a
 sync client watching it, therefore only ever sees a series folder that is
 complete, never one still being copied. If the copy or the rename fails, the
 `.partial` directory is removed and the series fails. A run killed before the
-rename completes can leave one behind, and so can a failure whose cleanup is
-itself refused (a sync client holding a file open can refuse it), and nothing
-reports a leftover. It is never taken for a series, never blocks one, no later
+rename completes can leave one behind without any notification: no cleanup
+or reporting code can run after an outright process kill. If cleanup itself
+is refused (a sync client holding a file open can refuse it), a warning names
+the leftover path. It is never taken for a series, never blocks one, no later
 run removes it, and it is safe to delete by hand.
 
 Before starting, a run also checks that the output directory can be written
 to by making and removing an empty dot-named directory (hidden on macOS and
-Linux), `.fmri-qa-probe.<token>`.
+Linux), `.fmri-qa-probe.<token>`. If removal is refused, the same cleanup
+warning names this probe; the run can still proceed.

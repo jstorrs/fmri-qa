@@ -70,7 +70,8 @@ Start it with `fmri-qa-run` and no arguments, or directly with
   progress bar and a status line track the run stage by stage; a scrolling
   log records the same detail `fmri-qa-run` sends to stderr, plus the finish
   summary (how many series published, and one line per refusal, failure, or
-  warning).
+  warning). Cleanup warnings name any temporary working directories left
+  behind; they do not change the progress bar or the run result.
 - **Closing the window** while a run is in progress asks it to stop after
   the series in progress finishes (never mid-series; or after import itself
   finishes, if closed before any series has started), and says so on the
@@ -88,12 +89,14 @@ Start it with `fmri-qa-run` and no arguments, or directly with
   viewer that opens each in turn).
 - **stderr** carries everything else: one line of progress per stage of each
   series, one line per refused series, one line per failed series and its
-  reason, one line per warning a series raised along the way, and a final
-  summary line (`# N of M series published to OUTPUT_DIR`).
+  reason, one line per warning a series raised along the way, cleanup warnings
+  naming temporary directories left behind (including after an error), and a
+  final summary line (`# N of M series published to OUTPUT_DIR`).
 - **Exit code** is `0` when every series found was published; `1` when any
   series was refused or failed, when the DICOM directory produced no series
   to import, or when the run could not start at all (a bad request, a
-  converter that could not run); `2` for a command-line usage error.
+  converter that could not run); `2` for a command-line usage error. Cleanup
+  warnings do not change the exit code.
 
 ## What's here
 
@@ -121,8 +124,10 @@ Start it with `fmri-qa-run` and no arguments, or directly with
   converter's raw output or a file on its way to being renamed. Those files
   arrive in a hidden `.<series>.<token>.partial` directory that is renamed
   to the series name once complete; a run killed outright mid-copy can leave
-  one behind, which is safe to delete. The temporary directory needs room
-  for the converted session plus one series being worked on, and is wherever
+  one behind, which is safe to delete. A refused cleanup also leaves one
+  behind and reports its path to stderr or the panel log. The temporary
+  directory needs room for the converted session plus one series being worked
+  on, and is wherever
   `TMPDIR` (or `TEMP` on Windows) says -- worth setting where `/tmp` is small
   or RAM-backed.
 - **Refusal, not replacement.** A series whose name already exists in the
@@ -137,8 +142,8 @@ Start it with `fmri-qa-run` and no arguments, or directly with
   open it. Imports only `outcome`, so it loads without `fmriqc`'s analysis stack or
   `fmriqc_report`'s renderer.
 - `worker.BackgroundRun` -- runs `session.run_session` on its own
-  non-daemon thread, delivering `Progress` events and one terminal
-  `Finished`/`Crashed` event through a queue a caller polls. No `tkinter`
+  non-daemon thread, delivering `Progress` and `CleanupNotice` events before
+  one terminal `Finished`/`Crashed` event through a queue a caller polls. No `tkinter`
   import; this is what lets the panel stay responsive during a run.
 - `panel_state.bar_state` / `panel_state.summarize` -- the panel's pure
   decisions: where the progress bar sits for a given `Progress`, and what to

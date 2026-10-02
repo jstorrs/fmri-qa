@@ -1,8 +1,9 @@
 """`BackgroundRun`: one run on its own thread, delivering typed events.
 
-Every test injects a fake `run` -- never `session.run_session` -- so this
-module never pays for `fmriqc`'s analysis stack; `worker.py` itself imports
-none of it either (see its docstring), and these tests are what pin that.
+Most tests inject a fake `run`; focused integration tests exercise the lazy
+wrapper and real session cleanup to pin callback wiring and terminal-event
+ordering. `worker.py` itself imports none of the analysis stack (see its
+docstring).
 """
 
 import threading
@@ -11,9 +12,14 @@ from pathlib import Path
 
 import pytest
 
-from fmriqc_launcher.exceptions import RequestError
+from fmriqc_launcher.exceptions import RequestError, SessionError
 from fmriqc_launcher.outcome import RunResult
-from fmriqc_launcher.progress import Progress, Stage
+from fmriqc_launcher.progress import (
+    CleanupNotice,
+    CleanupNoticeCallback,
+    Progress,
+    Stage,
+)
 from fmriqc_launcher.request import RunRequest
 from fmriqc_launcher.worker import BackgroundRun, Crashed, Finished
 
@@ -36,6 +42,7 @@ def _fake_series_run(
         request: RunRequest,
         *,
         progress: Callable[[Progress], None],
+        notice: CleanupNoticeCallback,
         should_continue: Callable[[], bool],
     ) -> RunResult:
         seen = []
@@ -97,6 +104,7 @@ def test_cancel_flips_should_continue_and_the_result_is_cancelled(
         request: RunRequest,
         *,
         progress: Callable[[Progress], None],
+        notice: CleanupNoticeCallback,
         should_continue: Callable[[], bool],
     ) -> RunResult:
         seen = []
@@ -220,6 +228,7 @@ def test_poll_drains_incrementally_while_the_run_is_still_going(
         request: RunRequest,
         *,
         progress: Callable[[Progress], None],
+        notice: CleanupNoticeCallback,
         should_continue: Callable[[], bool],
     ) -> RunResult:
         progress(Progress(Stage.ANALYZE, 1, 2, "a"))
@@ -271,6 +280,7 @@ def test_the_default_run_calls_the_real_session_lazily(
         request: RunRequest,
         *,
         progress: Callable[[Progress], None],
+        notice: CleanupNoticeCallback,
         should_continue: Callable[[], bool],
     ) -> RunResult:
         called["request"] = request
@@ -302,3 +312,40 @@ def test_the_thread_is_non_daemon(request_: RunRequest) -> None:
     assert background._thread is not None
     assert background._thread.daemon is False
     background.join(_JOIN_TIMEOUT)
+
+
+@pytest.mark.parametrize("crashes", [False, True], ids=["success", "error"])
+def test_real_session_cleanup_notices_precede_the_only_terminal_event(
+    request_: RunRequest,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    crashes: bool,
+) -> None:
+    import fmriqc_launcher.session as session_module
+
+    def run_in_staging(*_args: object, **_kwargs: object) -> RunResult:
+        if crashes:
+            raise SessionError("import stopped")
+        return RunResult(request_.output_dir, ())
+
+    staging = tmp_path / "staging"
+    staging.mkdir()
+    monkeypatch.setattr(session_module, "_run_in_staging", run_in_staging)
+    monkeypatch.setattr(
+        session_module.tempfile, "mkdtemp", lambda **_kwargs: str(staging)
+    )
+    monkeypatch.setattr(session_module.shutil, "rmtree", lambda *_args, **_kwargs: None)
+    background = BackgroundRun(request_)
+    background.start()
+    background.join(_JOIN_TIMEOUT)
+
+    events = background.poll()
+    assert len(events) == 3
+    assert isinstance(events[0], CleanupNotice)
+    assert events[0].path.name.startswith(".fmri-qa-probe.")
+    assert isinstance(events[1], CleanupNotice)
+    assert events[1].path == staging
+    assert isinstance(events[2], Crashed if crashes else Finished)
+    if isinstance(events[2], Crashed):
+        assert events[2].message == "import stopped"
+    assert not background.running

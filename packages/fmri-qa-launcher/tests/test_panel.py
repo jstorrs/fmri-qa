@@ -21,7 +21,7 @@ import pytest
 from fmriqc_launcher import panel as panel_module
 from fmriqc_launcher.outcome import Published, Refused, RunResult
 from fmriqc_launcher.panel import Panel
-from fmriqc_launcher.progress import Progress, Stage
+from fmriqc_launcher.progress import CleanupNotice, Progress, Stage
 from fmriqc_launcher.request import FormValues, RunRequest
 from fmriqc_launcher.results import Opener
 from fmriqc_launcher.worker import Crashed, Event, Finished
@@ -389,3 +389,49 @@ def test_the_open_button_reports_an_oserror_without_dying(
 
     assert "Could not open results" in panel._status_var.get()
     assert "no browser configured" in panel._log_widget.get("1.0", "end")
+
+
+@pytest.mark.parametrize("crashes", [False, True], ids=["success", "error"])
+def test_cleanup_notices_append_to_log_and_allow_following_events(
+    root: tk.Tk,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    crashes: bool,
+) -> None:
+    monkeypatch.setattr(panel_module.messagebox, "showerror", lambda *_a, **_k: None)
+    factory = _Factory()
+    panel = Panel(root, background=factory)
+    _set_form(panel, _valid_form(tmp_path, open_report=False))
+    panel._on_run()
+    progress = Progress(Stage.ANALYZE, 1, 2, "scan")
+    factory.last.push(progress)
+    panel._tick()
+    status = panel._status_var.get()
+    bar = panel._progress["value"]
+    leftover = tmp_path / "leftover"
+    factory.last.push(CleanupNotice(leftover, "can be deleted"))
+    panel._tick()
+
+    assert panel._status_var.get() == status
+    assert panel._progress["value"] == bar
+    assert panel._last_progress is progress
+    assert panel._run_button.instate(["disabled"])
+    assert f"WARNING: {leftover}: can be deleted" in panel._log_widget.get("1.0", "end")
+
+    output_dir = factory.last.request.output_dir
+    factory.last.push(Progress(Stage.REPORT, 1, 2, "scan"))
+    factory.last.push(CleanupNotice(leftover, "still present"))
+    factory.last.push(
+        Crashed("import stopped")
+        if crashes
+        else Finished(RunResult(output_dir, (_published("scan", output_dir),)))
+    )
+    panel._tick()
+    assert not panel._run_button.instate(["disabled"])
+    assert panel.exit_code == (1 if crashes else 0)
+    log = panel._log_widget.get("1.0", "end")
+    assert "Rendering report" in log
+    assert "still present" in log
+    assert (
+        "import stopped" if crashes else "1 of 1 series published"
+    ) in panel._status_var.get()

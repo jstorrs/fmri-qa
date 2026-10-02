@@ -30,7 +30,7 @@ from dataclasses import dataclass
 
 from .exceptions import LauncherError
 from .outcome import RunResult
-from .progress import Progress, ProgressCallback
+from .progress import CleanupNotice, CleanupNoticeCallback, Progress, ProgressCallback
 from .request import RunRequest
 
 __all__ = ["BackgroundRun", "Crashed", "Event", "Finished"]
@@ -62,7 +62,7 @@ class Crashed:
     details: str = ""
 
 
-type Event = Progress | Finished | Crashed
+type Event = Progress | CleanupNotice | Finished | Crashed
 
 type _Runner = Callable[..., "RunResult"]
 
@@ -71,23 +71,28 @@ def _run_session(
     request: RunRequest,
     *,
     progress: ProgressCallback,
+    notice: CleanupNoticeCallback,
     should_continue: Callable[[], bool],
 ) -> RunResult:
     """The real pipeline, imported only once a run starts. See the module docstring."""
     from .session import run_session
 
-    return run_session(request, progress=progress, should_continue=should_continue)
+    return run_session(
+        request, progress=progress, notice=notice, should_continue=should_continue
+    )
 
 
 class BackgroundRun:
     """One `run_session` call on its own thread, polled rather than awaited.
 
     `start()` launches a non-daemon thread that calls `run` (by default the
-    real pipeline) with `progress=queue.put` and a `should_continue` this
-    object controls via `cancel()`. `poll()` drains whatever events have
+    real pipeline) with `progress=queue.put`, `notice=queue.put`, and a
+    `should_continue` this object controls via `cancel()`. `poll()` drains
+    whatever events have
     arrived since the last call without blocking; the thread always ends by
     putting exactly one terminal event, `Finished` or `Crashed`, so a caller
-    that keeps draining until it sees one has seen the whole run.
+    that keeps draining until it sees one has seen the whole run, including
+    cleanup notices produced during exception unwinding.
     """
 
     def __init__(self, request: RunRequest, *, run: _Runner | None = None) -> None:
@@ -115,6 +120,7 @@ class BackgroundRun:
             result = self._run(
                 self._request,
                 progress=self._queue.put,
+                notice=self._queue.put,
                 should_continue=lambda: not self._cancelled.is_set(),
             )
         except LauncherError as exc:

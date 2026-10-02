@@ -21,6 +21,7 @@ import fmriqc_launcher.session as session_module
 from fmriqc.convert.dcm2niix import find_dcm2niix
 from fmriqc.settings import AnalysisSettings
 from fmriqc_launcher import cli
+from fmriqc_launcher.exceptions import SessionError
 from fmriqc_launcher.outcome import Failed, Published, Refused, RunResult
 from fmriqc_launcher.results import open_results
 
@@ -283,7 +284,7 @@ def test_open_flag_opens_the_report_and_exits_zero_for_a_complete_run(
     output_dir = tmp_path / "output"
     result = RunResult(output_dir, (_published(output_dir, "a"),))
     monkeypatch.setattr(
-        "fmriqc_launcher.session.run_session", lambda _request, progress: result
+        "fmriqc_launcher.session.run_session", lambda _request, progress, notice: result
     )
     opened: list[RunResult] = []
     monkeypatch.setattr("fmriqc_launcher.cli.open_results", opened.append)
@@ -300,7 +301,7 @@ def test_a_refused_series_exits_one_and_is_not_opened_without_the_flag(
     output_dir = tmp_path / "output"
     result = RunResult(output_dir, (Refused(name="a", existing=output_dir / "a"),))
     monkeypatch.setattr(
-        "fmriqc_launcher.session.run_session", lambda _request, progress: result
+        "fmriqc_launcher.session.run_session", lambda _request, progress, notice: result
     )
     opened: list[RunResult] = []
     monkeypatch.setattr("fmriqc_launcher.cli.open_results", opened.append)
@@ -622,3 +623,37 @@ def test_module_entry_point_version_works() -> None:
         check=True,
     )
     assert "fmri-qa-run" in result.stdout
+
+
+@pytest.mark.parametrize("crashes", [False, True], ids=["success", "error"])
+def test_cleanup_warnings_use_stderr_and_preserve_result_and_exit_code(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    crashes: bool,
+) -> None:
+    output_dir = tmp_path / "output"
+    published = _published(output_dir, "scan")
+
+    def run_in_staging(*_args: object, **_kwargs: object) -> RunResult:
+        if crashes:
+            raise SessionError("import stopped")
+        return RunResult(output_dir, (published,))
+
+    staging = tmp_path / "staging"
+    staging.mkdir()
+    monkeypatch.setattr(session_module, "_run_in_staging", run_in_staging)
+    monkeypatch.setattr(
+        session_module.tempfile, "mkdtemp", lambda **_kwargs: str(staging)
+    )
+    monkeypatch.setattr(session_module.shutil, "rmtree", lambda *_args, **_kwargs: None)
+
+    code = cli.main([str(tmp_path), str(output_dir)])
+    captured = capsys.readouterr()
+    assert code == (1 if crashes else 0)
+    assert captured.out == ("" if crashes else f"{published.report}\n")
+    assert ".fmri-qa-probe." in captured.err
+    assert f"WARNING: {staging}:" in captured.err
+    assert "can be deleted" in captured.err
+    if crashes:
+        assert captured.err.endswith("ERROR: import stopped\n")

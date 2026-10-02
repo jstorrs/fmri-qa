@@ -23,7 +23,7 @@ import fmriqc
 from fmriqc.settings import AnalysisSettings
 from fmriqc_launcher.exceptions import SessionError
 from fmriqc_launcher.outcome import Failed, Published, Refused
-from fmriqc_launcher.progress import Progress, Stage
+from fmriqc_launcher.progress import CleanupNotice, Progress, Stage
 from fmriqc_launcher.request import RunRequest
 from fmriqc_launcher.session import _copy_durably, _publish, run_session
 
@@ -94,13 +94,15 @@ def test_one_series_is_imported_analyzed_and_published(
     )
 
     events: list[Progress] = []
+    notices: list[CleanupNotice] = []
     old_umask = os.umask(0o022)
     try:
-        result = run_session(request, progress=events.append)
+        result = run_session(request, progress=events.append, notice=notices.append)
     finally:
         os.umask(old_umask)
 
     assert result.complete
+    assert notices == []
     assert not result.cancelled
     assert len(result.outcomes) == 1
     published = result.outcomes[0]
@@ -343,15 +345,19 @@ def test_a_probe_that_cannot_be_removed_is_logged_and_does_not_stop_the_run(
     monkeypatch.setattr("fmriqc_launcher.session._run_in_staging", _stop)
     request = RunRequest(dicom_dir=dicom_dir, output_dir=tmp_path / "output")
 
+    notices: list[CleanupNotice] = []
     with (
         caplog.at_level(logging.WARNING, logger="fmriqc_launcher.session"),
         pytest.raises(SessionError, match="stopped before any series"),
     ):
-        run_session(request)
+        run_session(request, notice=notices.append)
 
     (probe,) = (tmp_path / "output").iterdir()
     assert str(probe) in caplog.text
     assert "can be deleted" in caplog.text
+    assert len(notices) == 1
+    assert notices[0].path == probe
+    assert "can be deleted" in notices[0].message
 
 
 def test_a_staging_directory_that_cannot_be_created_is_a_session_error(
@@ -938,15 +944,19 @@ def test_a_staging_directory_that_cannot_be_removed_is_logged_by_name(
         dicom_dir=dicom_dir, output_dir=tmp_path / "output", settings=_SETTINGS
     )
 
+    notices: list[CleanupNotice] = []
     with (
         caplog.at_level(logging.WARNING, logger="fmriqc_launcher.session"),
         pytest.raises(SessionError, match="stopped before any series"),
     ):
-        run_session(request)
+        run_session(request, notice=notices.append)
 
     (left_behind,) = staging_root.glob("fmri-qa-run.*")
     assert str(left_behind) in caplog.text
     assert "can be deleted" in caplog.text
+    assert len(notices) == 1
+    assert notices[0].path == left_behind
+    assert "can be deleted" in notices[0].message
     # Wherever it was left, it was not among the reports.
     assert list((tmp_path / "output").iterdir()) == []
 
@@ -963,11 +973,117 @@ def test_a_staging_directory_that_was_removed_is_not_mentioned(
         dicom_dir=dicom_dir, output_dir=tmp_path / "output", settings=_SETTINGS
     )
 
+    notices: list[CleanupNotice] = []
     with (
         caplog.at_level(logging.WARNING, logger="fmriqc_launcher.session"),
         pytest.raises(SessionError),
     ):
-        run_session(request)
+        run_session(request, notice=notices.append)
 
     assert list(staging_root.iterdir()) == []
     assert "could not remove" not in caplog.text
+    assert notices == []
+
+
+@pytest.mark.usefixtures("fast_render")
+@pytest.mark.parametrize("partial", [False, True], ids=["series-work", "partial"])
+def test_series_cleanup_notices_reach_the_session_caller(
+    tmp_path: Path,
+    dicom_dir: Path,
+    staging_root: Path,
+    stub_series: StubSeries,
+    monkeypatch: pytest.MonkeyPatch,
+    partial: bool,
+) -> None:
+    converter, (name,) = stub_series()
+    request = RunRequest(
+        dicom_dir=dicom_dir,
+        output_dir=tmp_path / "output",
+        settings=_SETTINGS,
+        dcm2niix=converter,
+    )
+    prefix = f".{name}." if partial else name
+    monkeypatch.setattr("fmriqc_launcher.session.shutil.rmtree", _rmtree_except(prefix))
+    if partial:
+        monkeypatch.setattr("fmriqc_launcher.session._copy_durably", _held)
+    notices: list[CleanupNotice] = []
+    result = run_session(request, notice=notices.append)
+
+    assert len(notices) == 1
+    leftover = notices[0].path
+    assert "can be deleted" in notices[0].message
+    if partial:
+        assert isinstance(result.outcomes[0], Failed)
+        assert "held open" in result.outcomes[0].reason
+        assert leftover.parent == request.output_dir
+        assert leftover.name.startswith(f".{name}.")
+        assert leftover.name.endswith(".partial")
+        assert leftover.is_dir()
+    else:
+        assert result.complete
+        assert leftover.name == name
+        assert leftover.parent.parent == staging_root
+        # The later staging cleanup can remove a previously reported leftover.
+        assert not leftover.exists()
+
+
+def test_a_broken_cleanup_callback_preserves_the_original_session_error(
+    tmp_path: Path,
+    dicom_dir: Path,
+    staging_root: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    monkeypatch.setattr("fmriqc_launcher.session._run_in_staging", _stop)
+    monkeypatch.setattr(
+        "fmriqc_launcher.session.shutil.rmtree", _rmtree_except("fmri-qa-run.")
+    )
+
+    def broken(_notice: CleanupNotice) -> None:
+        raise RuntimeError("notice sink is closed")
+
+    request = RunRequest(dicom_dir=dicom_dir, output_dir=tmp_path / "output")
+    with pytest.raises(SessionError, match="stopped before any series"):
+        run_session(request, notice=broken)
+    assert "cleanup notice callback failed" in caplog.text
+    assert "notice sink is closed" in caplog.text
+
+
+@pytest.mark.parametrize("exception", [KeyboardInterrupt, SystemExit])
+def test_cleanup_callbacks_do_not_swallow_base_exceptions(
+    tmp_path: Path,
+    dicom_dir: Path,
+    staging_root: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    exception: type[BaseException],
+) -> None:
+    monkeypatch.setattr("fmriqc_launcher.session._run_in_staging", _stop)
+    monkeypatch.setattr(
+        "fmriqc_launcher.session.shutil.rmtree", _rmtree_except("fmri-qa-run.")
+    )
+
+    def interrupted(_notice: CleanupNotice) -> None:
+        raise exception("stop reporting")
+
+    request = RunRequest(dicom_dir=dicom_dir, output_dir=tmp_path / "output")
+    with pytest.raises(exception, match="stop reporting"):
+        run_session(request, notice=interrupted)
+
+
+def test_cleanup_leftovers_are_silent_without_a_notice_callback(
+    tmp_path: Path,
+    dicom_dir: Path,
+    staging_root: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setattr("fmriqc_launcher.session._run_in_staging", _stop)
+    monkeypatch.setattr(
+        "fmriqc_launcher.session.shutil.rmtree", _rmtree_except("fmri-qa-run.")
+    )
+    request = RunRequest(dicom_dir=dicom_dir, output_dir=tmp_path / "output")
+    with pytest.raises(SessionError, match="stopped before any series"):
+        run_session(request)
+    assert tuple(staging_root.iterdir())
+    captured = capsys.readouterr()
+    assert captured.out == captured.err == ""

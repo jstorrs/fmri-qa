@@ -56,7 +56,7 @@ from .panel_state import (
     stopping_message,
     summarize,
 )
-from .progress import Progress, describe
+from .progress import CleanupNotice, Progress, describe
 from .request import (
     CENTER_CHOICES,
     CENTER_HELP,
@@ -531,6 +531,9 @@ class Panel:
 
     def _handle_event(self, event: Event) -> bool:
         """Apply one `Event`; return True once the run has reached a terminal event."""
+        if isinstance(event, CleanupNotice):
+            self._append_log(f"WARNING: {event.path}: {event.message}")
+            return False
         if isinstance(event, Progress):
             self._last_progress = event
             self._append_log(describe(event))

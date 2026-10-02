@@ -25,7 +25,7 @@ from fmriqc.settings import AnalysisSettings
 
 from .exceptions import LauncherError, PanelUnavailableError, RequestError
 from .outcome import Failed, Published, Refused, RunResult
-from .progress import Progress, describe
+from .progress import CleanupNotice, Progress, describe
 from .request import (
     ANONYMIZE_CHOICES,
     ANONYMIZE_HELP,
@@ -261,8 +261,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     def _report_progress(event: Progress) -> None:
         print(describe(event), file=sys.stderr)
 
+    def _report_notice(event: CleanupNotice) -> None:
+        print(f"WARNING: {event.path}: {event.message}", file=sys.stderr)
+
     try:
-        result = run_session(request, progress=_report_progress)
+        result = run_session(request, progress=_report_progress, notice=_report_notice)
     except LauncherError as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1

@@ -48,7 +48,13 @@ from fmriqc_report.formats.html import write_run_page
 
 from .exceptions import SessionError
 from .outcome import Failed, Published, Refused, RunResult, SeriesOutcome
-from .progress import Progress, ProgressCallback, Stage
+from .progress import (
+    CleanupNotice,
+    CleanupNoticeCallback,
+    Progress,
+    ProgressCallback,
+    Stage,
+)
 from .request import RunRequest
 
 __all__ = ["run_session"]
@@ -83,6 +89,7 @@ def run_session(
     request: RunRequest,
     *,
     progress: ProgressCallback = _silent,
+    notice: CleanupNoticeCallback | None = None,
     should_continue: Callable[[], bool] = _always,
 ) -> RunResult:
     """Run one import-analyze-report-publish pass over `request`.
@@ -107,6 +114,11 @@ def run_session(
     not in the series, so it propagates out of this function unchanged
     (staging is still removed either way -- see below).
 
+    `notice` receives cleanup leftovers, including while an error unwinds;
+    by default only diagnostic logging records them. Ordinary exceptions from
+    this best-effort callback are logged and suppressed to preserve the run's
+    result or original error. `KeyboardInterrupt` and `SystemExit` propagate.
+
     Raises:
         SessionError: If `output_dir` cannot be created or written to, no
             staging directory can be made, the DICOM import fails outright
@@ -121,7 +133,7 @@ def run_session(
     except OSError as exc:
         raise SessionError(f"cannot create {request.output_dir}: {exc}") from exc
 
-    _require_writable(request.output_dir)
+    _require_writable(request.output_dir, notice)
 
     # `mkdtemp`'s `0700` is wanted here, where it was not when staging was
     # renamed into `output_dir`: what sits in it is a scan on a machine's shared
@@ -132,12 +144,12 @@ def run_session(
     except OSError as exc:
         raise SessionError(f"cannot create a staging directory: {exc}") from exc
     try:
-        return _run_in_staging(request, staging, progress, should_continue)
+        return _run_in_staging(request, staging, progress, should_continue, notice)
     finally:
-        _discard(staging)
+        _discard(staging, notice)
 
 
-def _require_writable(output_dir: Path) -> None:
+def _require_writable(output_dir: Path, notice: CleanupNoticeCallback | None) -> None:
     """Refuse an `output_dir` nothing can be published into, before any work.
 
     Staging used to be made inside `output_dir`, so an unwritable one stopped
@@ -157,10 +169,10 @@ def _require_writable(output_dir: Path) -> None:
         probe.mkdir()
     except OSError as exc:
         raise SessionError(f"cannot write to {output_dir}: {exc}") from exc
-    _discard(probe)
+    _discard(probe, notice)
 
 
-def _discard(directory: Path) -> None:
+def _discard(directory: Path, notice: CleanupNoticeCallback | None) -> None:
     """Remove `directory` and what is in it, saying so by name if that fails.
 
     `ignore_errors` is what lets this run while an exception unwinds, and it is
@@ -177,6 +189,17 @@ def _discard(directory: Path) -> None:
             "finished and can be deleted",
             directory,
         )
+        if notice is not None:
+            try:
+                notice(
+                    CleanupNotice(
+                        directory,
+                        "could not remove working directory; "
+                        "it holds nothing finished and can be deleted",
+                    )
+                )
+            except Exception:  # noqa: BLE001 - best-effort reporting must not mask a run error
+                _LOG.exception("cleanup notice callback failed for %s", directory)
 
 
 def _run_in_staging(
@@ -184,6 +207,7 @@ def _run_in_staging(
     staging: Path,
     progress: ProgressCallback,
     should_continue: Callable[[], bool],
+    notice: CleanupNoticeCallback | None,
 ) -> RunResult:
     """Import into `staging`, then analyze, report and publish each series."""
     progress(Progress(Stage.IMPORT))
@@ -232,7 +256,7 @@ def _run_in_staging(
             break
         index += 1
         planned = _PlannedSeries(series, target, index, total)
-        outcomes.append(_publish_series(request, staging, planned, progress))
+        outcomes.append(_publish_series(request, staging, planned, progress, notice))
     return RunResult(request.output_dir, tuple(outcomes), cancelled=cancelled)
 
 
@@ -254,6 +278,7 @@ def _publish_series(
     staging: Path,
     planned: _PlannedSeries,
     progress: ProgressCallback,
+    notice: CleanupNoticeCallback | None,
 ) -> SeriesOutcome:
     """Analyze, report, and publish one planned series; `Failed` on any error.
 
@@ -317,14 +342,14 @@ def _publish_series(
 
     progress(Progress(Stage.PUBLISH, planned.index, planned.total, name))
     try:
-        _publish(work_dir, planned.target)
+        _publish(work_dir, planned.target, notice)
     except Exception as exc:  # noqa: BLE001 - one series' failure, reported and skipped
         return _failed(name, exc, noted)
     # Publishing is a copy now, where it was a move, so without this staging
     # would hold every series the run has finished until the run ended -- on a
     # temporary directory that is often small, RAM-backed, or under a quota,
     # while the output directory the user chose has room to spare.
-    _discard(work_dir)
+    _discard(work_dir, notice)
 
     sidecar_name = f"{name}.json"
     has_sidecar = any(file.name == sidecar_name for file in planned.series.files)
@@ -339,7 +364,9 @@ def _publish_series(
     )
 
 
-def _publish(work_dir: Path, target: Path) -> None:
+def _publish(
+    work_dir: Path, target: Path, notice: CleanupNoticeCallback | None = None
+) -> None:
     """Copy a finished `work_dir` out of staging and into place as `target`.
 
     In two steps, because the copy crosses filesystems and so cannot be the
@@ -389,7 +416,7 @@ def _publish(work_dir: Path, target: Path) -> None:
         # Renamed away on success, so this finds nothing; after any failure it
         # is what keeps a half-copied series out of `output_dir`.
         if partial.exists():
-            _discard(partial)
+            _discard(partial, notice)
 
 
 def _copy_durably(source: Path, destination: Path) -> None:
