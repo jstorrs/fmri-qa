@@ -268,8 +268,8 @@ def estimate_pe_axis(
     ratio could actually be measured on: comparing against a NaN ratio is what
     a plain float comparison silently gets wrong, always answering False and
     leaving whichever axis was looked at first as the winner. When neither axis
-    is measurable there is nothing to compare and the answer is None, not a
-    coin flip presented as a measurement.
+    is measurable, or both finite ratios are exactly equal, the answer is None.
+    A single measurable axis wins even when its ratio is zero.
 
     NOTE: shares the tuning caveats of `ghost_ratio` — a win by a hair is still
     a guess, so verify against the acquisition's known PE direction before
@@ -281,6 +281,6 @@ def estimate_pe_axis(
     measurable: list[PeAxis] = [
         axis for axis, ratio in ratios.items() if np.isfinite(ratio)
     ]
-    if not measurable:
+    if not measurable or ratios[0] == ratios[1]:
         return None
     return max(measurable, key=ratios.__getitem__)

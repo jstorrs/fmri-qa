@@ -29,7 +29,11 @@ first, from the most authoritative source available:
 3. only if both are missing, an estimate from the data — the ghost masks are
    built for both in-plane axes and the axis whose ghost region is brighter
    wins, since rolling along the true axis lands the region on real ghost
-   signal and rolling along the wrong one lands it on background.
+   signal and rolling along the wrong one lands it on background. Only finite
+   ratios participate: a single measurable axis wins, but exactly equal finite
+   ratios (including two zeros), or no measurable axes, leave the estimate
+   unresolved. Any strictly larger finite ratio wins; no near-tie tolerance is
+   applied.
 
 `--pe-axis` overrides all three. Polarity is not needed and is dropped. The
 metrics work on one plane, so the phase-encode direction must be in-plane

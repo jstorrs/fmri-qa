@@ -9,6 +9,7 @@ the region-matched masks exactly the injected blocks (no erosion/edge trimming).
 import warnings
 
 import numpy as np
+import pytest
 
 from fmriqc.metrics.ghost import (
     GhostResult,
@@ -16,6 +17,7 @@ from fmriqc.metrics.ghost import (
     estimate_pe_axis,
     ghost_ratios,
 )
+from fmriqc.types import PeAxis, readout_axis
 
 ALL_VALID = np.ones((8, 8), dtype=bool)
 
@@ -54,12 +56,44 @@ def test_readout_ratio_is_near_zero_on_the_axis_the_ghost_missed() -> None:
     assert np.isclose(result.ro_ratio, 0.0)
 
 
-def test_estimate_pe_axis_picks_the_axis_the_ghost_lands_on() -> None:
+@pytest.mark.parametrize("expected_axis", [0, 1])
+def test_estimate_pe_axis_picks_the_axis_the_ghost_lands_on(
+    expected_axis: PeAxis,
+) -> None:
     img, mask = _phantom_with_axis0_ghost(np.full((2, 2), 5.0))
+    if expected_axis == 1:
+        img, mask = img.T, mask.T
     ratios = ghost_ratios(img, mask, radius=0, valid_mask=ALL_VALID)
     axis = estimate_pe_axis(img, mask, radius=0, valid_mask=ALL_VALID)
-    assert axis == 0
-    assert ratios[0] > ratios[1]
+    assert axis == expected_axis
+    assert ratios[expected_axis] > ratios[readout_axis(expected_axis)]
+
+
+@pytest.mark.parametrize("ghost", [0.0, 5.0])
+def test_estimate_pe_axis_is_none_when_finite_ratios_are_equal(ghost: float) -> None:
+    img, mask = _phantom_with_axis0_ghost(np.full((2, 2), ghost))
+    img[2:4, 6:8] = ghost  # the axis-1 N/2 ghost matches axis 0 exactly
+
+    ratios = ghost_ratios(img, mask, radius=0, valid_mask=ALL_VALID)
+
+    assert ratios[0] == ratios[1] == ghost / 100.0
+    assert estimate_pe_axis(img, mask, radius=0, valid_mask=ALL_VALID) is None
+
+
+@pytest.mark.parametrize("expected_axis", [0, 1])
+def test_estimate_pe_axis_resolves_a_strict_win_even_for_nearly_equal_ratios(
+    expected_axis: PeAxis,
+) -> None:
+    img, mask = _phantom_with_axis0_ghost(np.full((2, 2), 5.0 + 1e-12))
+    img[2:4, 6:8] = 5.0
+    if expected_axis == 1:
+        img, mask = img.T, mask.T
+
+    ratios = ghost_ratios(img, mask, radius=0, valid_mask=ALL_VALID)
+
+    assert ratios[expected_axis] > ratios[readout_axis(expected_axis)]
+    assert np.isclose(ratios[0], ratios[1])
+    assert estimate_pe_axis(img, mask, radius=0, valid_mask=ALL_VALID) == expected_axis
 
 
 def test_estimate_pe_axis_is_none_when_neither_axis_is_measurable() -> None:
@@ -77,7 +111,11 @@ def test_estimate_pe_axis_is_none_when_neither_axis_is_measurable() -> None:
     assert all(np.isnan(r) for r in ratios.values())
 
 
-def test_estimate_pe_axis_ignores_an_unmeasurable_axis() -> None:
+@pytest.mark.parametrize("expected_axis", [0, 1])
+@pytest.mark.parametrize("ghost", [0.0, 5.0])
+def test_estimate_pe_axis_ignores_an_unmeasurable_axis(
+    expected_axis: PeAxis, ghost: float
+) -> None:
     """The one axis a ratio exists for wins, whichever order they come in.
 
     A phantom spanning the FOV along axis 0 has no clear ghost region there, so
@@ -89,13 +127,16 @@ def test_estimate_pe_axis_ignores_an_unmeasurable_axis() -> None:
     mask = np.zeros((8, 8), dtype=bool)
     mask[:, 2:4] = True  # spans axis 0, so its N/2 roll never clears the phantom
     img[:, 2:4] = 100.0
-    img[:, 6:8] = 5.0  # the axis-1 ghost
+    img[:, 6:8] = ghost  # the axis-1 ghost
+    if expected_axis == 0:
+        img, mask = img.T, mask.T
 
     ratios = ghost_ratios(img, mask, radius=0, valid_mask=ALL_VALID)
     axis = estimate_pe_axis(img, mask, radius=0, valid_mask=ALL_VALID)
 
-    assert np.isnan(ratios[0]) and np.isfinite(ratios[1])
-    assert axis == 1
+    assert np.isnan(ratios[readout_axis(expected_axis)])
+    assert ratios[expected_axis] == ghost / 100.0
+    assert axis == expected_axis
 
 
 def test_top_ratio_isolates_the_brightest_ghost_voxel() -> None:
