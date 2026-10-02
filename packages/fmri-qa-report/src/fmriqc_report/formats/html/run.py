@@ -12,6 +12,7 @@ import re
 from base64 import b64encode
 from pathlib import Path
 from string import Template
+from typing import Literal
 
 from fmriqc.analysis import Measurements, QAArtifact
 from fmriqc.rename import atomic_file
@@ -224,9 +225,14 @@ def _figure(rendered: RenderedFigure) -> str:
 
 
 def _figures(rendered_figures: tuple[RenderedFigure, ...]) -> tuple[str, str]:
-    image_html = "\n".join(_figure(rendered) for rendered in rendered_figures[:5])
-    stability_html = "\n".join(_figure(rendered) for rendered in rendered_figures[5:])
-    return image_html, stability_html
+    def section_html(section: Literal["image", "stability"]) -> str:
+        return "\n".join(
+            _figure(rendered)
+            for rendered in rendered_figures
+            if rendered.asset.section == section
+        )
+
+    return section_html("image"), section_html("stability")
 
 
 def _methods() -> str:

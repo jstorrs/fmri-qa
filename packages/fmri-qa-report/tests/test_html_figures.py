@@ -57,6 +57,29 @@ def test_render_figures_returns_standalone_svg_documents(rendered) -> None:
         )
 
 
+def test_figure_assets_pin_their_report_sections() -> None:
+    """The five image panels lead; every plot after them is a stability plot."""
+    sections = {asset.name: asset.section for asset in figures.FIGURE_ASSETS}
+    assert [name for name, section in sections.items() if section == "image"] == [
+        "signal",
+        "sfnr",
+        "fluctuation_noise",
+        "static_noise",
+        "ghost_regions",
+    ]
+    assert [name for name, section in sections.items() if section == "stability"] == [
+        "weisskoff",
+        "rdc",
+        "roi_signal",
+        "roi_residual",
+        "spectrum",
+        "outliers",
+        "motion",
+        "center_of_mass",
+        "psf",
+    ]
+
+
 def test_render_figures_renders_unknown_ghost_and_unresolved_values(artifact) -> None:
     curves = artifact.curves
     unresolved = replace(

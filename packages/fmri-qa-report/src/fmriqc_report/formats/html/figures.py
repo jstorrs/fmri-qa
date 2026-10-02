@@ -10,6 +10,7 @@ the artifact; it neither loads inputs nor recomputes measurements.
 import io
 from collections.abc import Callable
 from dataclasses import dataclass
+from typing import Literal
 
 import matplotlib
 from matplotlib.axes import Axes
@@ -47,11 +48,12 @@ _SVG_HASHSALT = "fmriqc-report"
 
 @dataclass(frozen=True, slots=True)
 class FigureAsset:
-    """One fixed figure's stable identity and the text a renderer can expose."""
+    """One fixed figure's identity, caption text, and the report section it fills."""
 
     name: str
     title: str
     description: str
+    section: Literal["image", "stability"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -62,89 +64,103 @@ class RenderedFigure:
     svg: bytes
 
 
-# The stable figure inventory: names, titles, and descriptions in render order.
+# The stable figure inventory in render order; each asset names its own section.
 # Keeping this vocabulary at module scope means the HTML composer can use it
 # without duplicating its fourteen figure identities.
-FIGURE_ASSETS: tuple[FigureAsset, ...] = tuple(
-    FigureAsset(name, title, description)
-    for name, title, description in (
-        (
-            "signal",
-            "Signal",
-            "Mean phantom signal with the phantom outline and summary ROI.",
+FIGURE_ASSETS: tuple[FigureAsset, ...] = (
+    FigureAsset(
+        name="signal",
+        title="Signal",
+        description="Mean phantom signal with the phantom outline and summary ROI.",
+        section="image",
+    ),
+    FigureAsset(
+        name="sfnr",
+        title="SFNR",
+        description="Voxelwise signal-to-fluctuation-noise ratio with the summary ROI.",
+        section="image",
+    ),
+    FigureAsset(
+        name="fluctuation_noise",
+        title="Fluctuation noise",
+        description=(
+            "Log-scaled temporal fluctuation-noise image with phantom and ROI overlays."
         ),
-        (
-            "sfnr",
-            "SFNR",
-            "Voxelwise signal-to-fluctuation-noise ratio with the summary ROI.",
+        section="image",
+    ),
+    FigureAsset(
+        name="static_noise",
+        title="Static noise",
+        description="Odd-even static-noise image with the summary ROI.",
+        section="image",
+    ),
+    FigureAsset(
+        name="ghost_regions",
+        title="N/2 ghost regions",
+        description=(
+            "Mean image with the phase-encode and readout ghost sampling regions."
         ),
-        (
-            "fluctuation_noise",
-            "Fluctuation noise",
-            (
-                "Log-scaled temporal fluctuation-noise image with phantom and ROI "
-                "overlays."
-            ),
+        section="image",
+    ),
+    FigureAsset(
+        name="weisskoff",
+        title="Weisskoff curve",
+        description=(
+            "Measured coefficient of variation by ROI width against the ideal "
+            "reference."
         ),
-        (
-            "static_noise",
-            "Static noise",
-            "Odd-even static-noise image with the summary ROI.",
+        section="stability",
+    ),
+    FigureAsset(
+        name="rdc",
+        title="Decorrelation factor by ROI width",
+        description=(
+            "Measured decorrelation factor by ROI width against the ideal reference."
         ),
-        (
-            "ghost_regions",
-            "N/2 ghost regions",
-            "Mean image with the phase-encode and readout ghost sampling regions.",
-        ),
-        (
-            "weisskoff",
-            "Weisskoff curve",
-            (
-                "Measured coefficient of variation by ROI width against the ideal "
-                "reference."
-            ),
-        ),
-        (
-            "rdc",
-            "Decorrelation factor by ROI width",
-            ("Measured decorrelation factor by ROI width against the ideal reference."),
-        ),
-        (
-            "roi_signal",
-            "ROI mean signal",
-            "ROI mean signal over time with its fitted trend.",
-        ),
-        (
-            "roi_residual",
-            "ROI residual",
-            "Detrended ROI mean residual over time.",
-        ),
-        (
-            "spectrum",
-            "Residual spectrum",
-            "Magnitude spectrum of the detrended ROI residual.",
-        ),
-        (
-            "outliers",
-            "Outlier fraction",
-            "Per-volume fraction of outlier voxels over time.",
-        ),
-        (
-            "motion",
-            "In-plane motion",
-            "Registration translation and strain estimates over time.",
-        ),
-        (
-            "center_of_mass",
-            "Whole-slice center of mass",
-            "Whole-slice center-of-mass deviation over time.",
-        ),
-        (
-            "psf",
-            "Directional point-spread function",
-            ("Empirical and Gaussian directional point-spread profiles."),
-        ),
-    )
+        section="stability",
+    ),
+    FigureAsset(
+        name="roi_signal",
+        title="ROI mean signal",
+        description="ROI mean signal over time with its fitted trend.",
+        section="stability",
+    ),
+    FigureAsset(
+        name="roi_residual",
+        title="ROI residual",
+        description="Detrended ROI mean residual over time.",
+        section="stability",
+    ),
+    FigureAsset(
+        name="spectrum",
+        title="Residual spectrum",
+        description="Magnitude spectrum of the detrended ROI residual.",
+        section="stability",
+    ),
+    FigureAsset(
+        name="outliers",
+        title="Outlier fraction",
+        description="Per-volume fraction of outlier voxels over time.",
+        section="stability",
+    ),
+    FigureAsset(
+        name="motion",
+        title="In-plane motion",
+        description="Registration translation and strain estimates over time.",
+        section="stability",
+    ),
+    FigureAsset(
+        name="center_of_mass",
+        title="Whole-slice center of mass",
+        description="Whole-slice center-of-mass deviation over time.",
+        section="stability",
+    ),
+    FigureAsset(
+        name="psf",
+        title="Directional point-spread function",
+        description="Empirical and Gaussian directional point-spread profiles.",
+        section="stability",
+    ),
 )
 
 
