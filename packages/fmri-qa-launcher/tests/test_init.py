@@ -12,9 +12,12 @@ def test_a_request_name_is_reachable() -> None:
     assert fmriqc_launcher.parse_form is not None
 
 
-def test_a_session_name_resolves_lazily() -> None:
-    assert fmriqc_launcher.run_session is not None
+def test_an_outcome_name_is_reachable() -> None:
     assert fmriqc_launcher.Published is not None
+
+
+def test_run_session_resolves_lazily() -> None:
+    assert fmriqc_launcher.run_session is not None
 
 
 def test_an_unknown_name_raises_attribute_error() -> None:

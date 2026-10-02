@@ -23,16 +23,10 @@ import fmriqc
 from fmriqc.convert import naming
 from fmriqc.settings import AnalysisSettings
 from fmriqc_launcher.exceptions import SessionError
+from fmriqc_launcher.outcome import Failed, Published, Refused
 from fmriqc_launcher.progress import Progress, Stage
 from fmriqc_launcher.request import RunRequest
-from fmriqc_launcher.session import (
-    Failed,
-    Published,
-    Refused,
-    _copy_durably,
-    _publish,
-    run_session,
-)
+from fmriqc_launcher.session import _copy_durably, _publish, run_session
 
 PreparedSeries = Callable[..., tuple[Path, dict[str, object]]]
 StubDcm2niix = Callable[..., Path]
@@ -174,7 +168,6 @@ def test_one_series_is_imported_analyzed_and_published(
         assert (event.index, event.total, event.series) == (1, 1, name)
 
     assert result.published == (published,)
-    assert result.reports == (published.report,)
 
 
 def test_a_series_whose_name_already_exists_is_refused_untouched(

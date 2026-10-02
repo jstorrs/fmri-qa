@@ -104,6 +104,10 @@ Start it with `fmri-qa-run` and no arguments, or directly with
   every problem it finds into one `exceptions.RequestError` rather than
   stopping at the first, so a submission with several mistakes is reported
   with all of them at once.
+- `outcome.Published` / `Refused` / `Failed` / `RunResult` -- what a run
+  reports: one outcome per series, and the run's result. Plain frozen values
+  with no dependency beyond the standard library, so everything that only
+  presents a run imports them without `fmriqc`'s analysis stack.
 - `session.run_session` -- the pipeline itself: import a DICOM directory,
   then for each series analyze it, save its `.qa.nc` artifact, render a
   self-contained HTML report, and publish all four files (the converted scan,
@@ -130,8 +134,8 @@ Start it with `fmri-qa-run` and no arguments, or directly with
 - `cli.main` -- the `fmri-qa-run` command line above.
 - `results.open_results` -- what `--open` (and the panel's "Open when done" /
   "Open results") calls: pick a single report or the output directory, and
-  open it. Kept apart from `session` so it can be imported without pulling in
-  `fmriqc`'s analysis stack or `fmriqc_report`'s renderer.
+  open it. Imports only `outcome`, so it loads without `fmriqc`'s analysis stack or
+  `fmriqc_report`'s renderer.
 - `worker.BackgroundRun` -- runs `session.run_session` on its own
   non-daemon thread, delivering `Progress` events and one terminal
   `Finished`/`Crashed` event through a queue a caller polls. No `tkinter`

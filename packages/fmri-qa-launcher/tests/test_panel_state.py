@@ -3,6 +3,7 @@ pure presentation decisions."""
 
 from pathlib import Path
 
+from fmriqc_launcher.outcome import Failed, Published, Refused, RunResult
 from fmriqc_launcher.panel_state import (
     CRASHED_BAR,
     Determinate,
@@ -14,7 +15,6 @@ from fmriqc_launcher.panel_state import (
     summarize,
 )
 from fmriqc_launcher.progress import Progress, Stage
-from fmriqc_launcher.session import Failed, Published, Refused, RunResult
 from fmriqc_launcher.worker import Crashed, Finished
 
 # -- bar_state ------------------------------------------------------------

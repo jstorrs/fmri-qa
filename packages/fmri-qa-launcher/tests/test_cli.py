@@ -19,8 +19,8 @@ from fmriqc.convert import naming
 from fmriqc.convert.dcm2niix import find_dcm2niix
 from fmriqc.settings import AnalysisSettings
 from fmriqc_launcher import cli
+from fmriqc_launcher.outcome import Published, Refused, RunResult
 from fmriqc_launcher.results import open_results
-from fmriqc_launcher.session import Published, Refused, RunResult
 
 PreparedSeries = Callable[..., tuple[Path, dict[str, object]]]
 StubDcm2niix = Callable[..., Path]

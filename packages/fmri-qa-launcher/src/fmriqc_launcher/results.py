@@ -1,21 +1,14 @@
 """Where to look at a finished run: one report, or the folder of them.
 
-A leaf module, deliberately kept apart from `session` at *import* time: it
-only needs `RunResult`'s shape (`published`/`output_dir`), never its heavy
-dependencies, so a future `panel` module can present an "open results" button
-by importing this and nothing else -- no `argparse`, no `fmriqc`, no
-`fmriqc_report`. The `RunResult` import below is `TYPE_CHECKING`-only for
-exactly that reason; at runtime this module never touches `.session`.
+A leaf module: it needs only `RunResult`'s shape (`published`/`output_dir`),
+so the panel can present an "open results" button by importing this and
+nothing else -- no `argparse`, no `fmriqc`, no `fmriqc_report`.
 """
-
-from __future__ import annotations
 
 import webbrowser
 from collections.abc import Callable
-from typing import TYPE_CHECKING
 
-if TYPE_CHECKING:
-    from .session import RunResult
+from .outcome import RunResult
 
 __all__ = ["Opener", "open_results"]
 

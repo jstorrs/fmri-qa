@@ -11,16 +11,11 @@ be tested without a display: every `if` about *what happened* belongs in
 this module, and `panel.py` is left with only *how to show it*.
 """
 
-from __future__ import annotations
-
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
 
+from .outcome import Published, Refused, RunResult
 from .progress import Progress, Stage
 from .worker import Crashed, Finished
-
-if TYPE_CHECKING:
-    from .session import RunResult
 
 __all__ = [
     "CRASHED_BAR",
@@ -148,8 +143,6 @@ class Summary:
 
 def _outcome_lines(result: RunResult) -> tuple[str, ...]:
     """One line per outcome, and per warning it carries, in outcome order."""
-    from .session import Published, Refused
-
     lines: list[str] = []
     for outcome in result.outcomes:
         if isinstance(outcome, Published):
@@ -169,8 +162,6 @@ def _outcome_lines(result: RunResult) -> tuple[str, ...]:
 
 def _all_refused(result: RunResult) -> bool:
     """Whether `result` found series at all, and every one was refused."""
-    from .session import Refused
-
     return bool(result.outcomes) and all(
         isinstance(o, Refused) for o in result.outcomes
     )

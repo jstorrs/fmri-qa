@@ -41,9 +41,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
 from types import TracebackType
-from typing import TYPE_CHECKING, Literal, Protocol
+from typing import Literal, Protocol
 
 from .exceptions import PanelUnavailableError, RequestError
+from .outcome import RunResult
 from .panel_state import (
     CRASHED_BAR,
     BarState,
@@ -78,9 +79,6 @@ from .request import (
 )
 from .results import Opener, open_results
 from .worker import BackgroundRun, Crashed, Event, Finished
-
-if TYPE_CHECKING:
-    from .session import RunResult
 
 __all__ = ["Panel", "main", "run_panel"]
 

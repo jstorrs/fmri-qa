@@ -23,6 +23,7 @@ from fmriqc.cli.arguments import nonnegative_float, positive_int
 from fmriqc.settings import AnalysisSettings
 
 from .exceptions import LauncherError, PanelUnavailableError, RequestError
+from .outcome import Published, Refused
 from .progress import Progress, describe
 from .request import (
     ANONYMIZE_CHOICES,
@@ -220,7 +221,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     # import that pulls in scipy, scikit-image, and matplotlib behind
     # `fmriqc`'s pipeline and `fmriqc_report`'s renderer -- see the module
     # docstring.
-    from .session import Published, Refused, run_session
+    from .session import run_session
 
     def _report_progress(event: Progress) -> None:
         print(describe(event), file=sys.stderr)

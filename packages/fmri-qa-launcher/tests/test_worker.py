@@ -12,9 +12,9 @@ from pathlib import Path
 import pytest
 
 from fmriqc_launcher.exceptions import RequestError
+from fmriqc_launcher.outcome import RunResult
 from fmriqc_launcher.progress import Progress, Stage
 from fmriqc_launcher.request import RunRequest
-from fmriqc_launcher.session import RunResult
 from fmriqc_launcher.worker import BackgroundRun, Crashed, Finished
 
 _JOIN_TIMEOUT = 5.0

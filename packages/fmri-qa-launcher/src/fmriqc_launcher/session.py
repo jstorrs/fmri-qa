@@ -47,95 +47,13 @@ from fmriqc.rename import replace_patiently
 from fmriqc_report.formats.html import write_run_page
 
 from .exceptions import SessionError
+from .outcome import Failed, Published, Refused, RunResult, SeriesOutcome
 from .progress import Progress, ProgressCallback, Stage
 from .request import RunRequest
 
-__all__ = [
-    "Failed",
-    "Published",
-    "Refused",
-    "RunResult",
-    "SeriesOutcome",
-    "run_session",
-]
+__all__ = ["run_session"]
 
 _LOG = logging.getLogger(__name__)
-
-
-@dataclass(frozen=True, slots=True)
-class Published:
-    """One series filed under `output_dir / name`, with all four of its files."""
-
-    name: str
-    directory: Path
-    scan: Path
-    sidecar: Path | None
-    artifact: Path
-    report: Path
-    warnings: tuple[str, ...] = ()
-
-
-@dataclass(frozen=True, slots=True)
-class Refused:
-    """A series whose name already exists in `output_dir`.
-
-    Never overwritten -- see `run_session`'s docstring -- so a refused series
-    is one the converter did import into staging, but whose analysis, render,
-    and publish are all skipped: this costs it no analysis time and no render
-    time, only the import it shared with every other series in the run.
-    """
-
-    name: str
-    existing: Path
-
-
-@dataclass(frozen=True, slots=True)
-class Failed:
-    """A series that raised somewhere between import and publish.
-
-    `reason` is `str(exc)`, or the exception's type name when that string is
-    empty. Whatever this series produced in staging is discarded with the rest
-    of it; nothing partial ever reaches `output_dir`.
-    """
-
-    name: str
-    reason: str
-    warnings: tuple[str, ...] = ()
-
-
-type SeriesOutcome = Published | Refused | Failed
-
-
-@dataclass(frozen=True, slots=True)
-class RunResult:
-    """Every series a run touched, in the order it found them."""
-
-    output_dir: Path
-    outcomes: tuple[SeriesOutcome, ...]
-    cancelled: bool = False
-
-    @property
-    def published(self) -> tuple[Published, ...]:
-        """The series that made it all the way to `output_dir`."""
-        return tuple(o for o in self.outcomes if isinstance(o, Published))
-
-    @property
-    def reports(self) -> tuple[Path, ...]:
-        """The report of every published series, in the same order."""
-        return tuple(o.report for o in self.published)
-
-    @property
-    def complete(self) -> bool:
-        """Whether every series found was published and nothing was cancelled.
-
-        False for a run that found nothing at all: a report of "0 of 0,
-        complete" is not a run a caller should treat as a success.
-        """
-        return (
-            bool(self.outcomes)
-            and not self.cancelled
-            and all(isinstance(o, Published) for o in self.outcomes)
-        )
 
 
 @dataclass(frozen=True, slots=True)

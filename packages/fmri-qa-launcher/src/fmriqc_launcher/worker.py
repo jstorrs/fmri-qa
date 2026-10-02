@@ -2,14 +2,10 @@
 
 `panel.py` is the only module that ever knows about `tkinter`; this one does
 not import it at all, so `BackgroundRun` and the pure `Event` types below are
-fully unit-testable without a display. `run_session` itself -- and the
-`RunResult` type `Finished` carries -- are only reached through `.session`,
-imported lazily inside the thread target rather than at module top, so that
-importing `fmriqc_launcher.worker` stays as cheap as importing
-`.request`/`.progress` -- see `session.py`'s own docstring for why that stack
-is heavy. The `TYPE_CHECKING`-only import of `RunResult` below mirrors
-`results.py`'s: it types `Finished.result` without ever touching `.session`
-at runtime unless a run actually starts.
+fully unit-testable without a display. `run_session` itself is reached only
+through `.session`, imported lazily inside the thread target rather than at
+module top, so that importing `fmriqc_launcher.worker` stays as cheap as
+importing `.request`/`.progress`.
 
 The thread is non-daemon on purpose: a windowed build has no console for a
 half-copied series to complain from, and `run_session` already promises
@@ -25,22 +21,17 @@ windowed executable's `sys.stderr` is `None`, so an error that only ever
 reached a thread's default excepthook would be lost silently.
 """
 
-from __future__ import annotations
-
 import logging
 import queue
 import threading
 import traceback
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
 
 from .exceptions import LauncherError
+from .outcome import RunResult
 from .progress import Progress, ProgressCallback
 from .request import RunRequest
-
-if TYPE_CHECKING:
-    from .session import RunResult
 
 __all__ = ["BackgroundRun", "Crashed", "Event", "Finished"]
 

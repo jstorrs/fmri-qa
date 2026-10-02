@@ -19,11 +19,11 @@ from pathlib import Path
 import pytest
 
 from fmriqc_launcher import panel as panel_module
+from fmriqc_launcher.outcome import Published, Refused, RunResult
 from fmriqc_launcher.panel import Panel
 from fmriqc_launcher.progress import Progress, Stage
 from fmriqc_launcher.request import FormValues, RunRequest
 from fmriqc_launcher.results import Opener
-from fmriqc_launcher.session import Published, Refused, RunResult
 from fmriqc_launcher.worker import Crashed, Event, Finished
 
 
