@@ -22,6 +22,7 @@ Nothing here imports the metric, prep, or load layers: an artifact is inert data
 
 import math
 from dataclasses import dataclass
+from typing import ClassVar
 
 from .._arrays import ArrayValue
 from .._records import coerce_float_fields
@@ -449,8 +450,8 @@ class QAArtifact:
 
     The output of the calculation half (`analyze`) and the only input the report
     half accepts. Immutable, self-describing, and round-trippable through
-    `save_artifact`/`load_artifact`; `schema_version` pins the layout those two
-    agree on.
+    `save_artifact`/`load_artifact`; the class constant `schema_version` is the
+    layout those two agree on (loading migrates every file up to it).
     """
 
     settings: AnalysisSettings
@@ -458,4 +459,4 @@ class QAArtifact:
     measurements: Measurements
     curves: Curves
     images: ArtifactImages
-    schema_version: int = ARTIFACT_SCHEMA_VERSION
+    schema_version: ClassVar[int] = ARTIFACT_SCHEMA_VERSION

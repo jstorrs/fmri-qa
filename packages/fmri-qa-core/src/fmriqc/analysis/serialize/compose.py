@@ -53,7 +53,6 @@ def compose(document: dict[str, Any], arrays: Mapping[str, NDArray[Any]]) -> QAA
             provenance[field] = tuple(provenance[field])
     measurements = dict(document["measurements"])
     return QAArtifact(
-        schema_version=document["schema_version"],
         settings=AnalysisSettings(**document["settings"]),
         provenance=Provenance(**provenance),
         measurements=Measurements(**measurements),
