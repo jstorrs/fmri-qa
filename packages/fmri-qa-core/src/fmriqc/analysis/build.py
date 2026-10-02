@@ -182,13 +182,13 @@ def _measurements(result: QAResult) -> Measurements:
         phantom_fraction=result.geom.fraction,
         phantom_contrast=result.geom.contrast,
         phantom_mask_ok=result.geom.plausible,
-        roi_inside_phantom=roi_fits(result.geom.phantom_mask, result.roi.index),
+        roi_inside_phantom=roi_fits(result.geom.phantom_mask, result.roi),
     )
 
 
 def _roi_series(arr: FloatArray, roi: ROI) -> FloatArray:
     """ROI-mean time series of a 3-D (X, Y, T) array."""
-    return np.asarray(arr[roi.index].mean(axis=(0, 1)), dtype=np.float64)
+    return np.asarray(roi.mean(arr), dtype=np.float64)
 
 
 def _curves(result: QAResult) -> Curves:

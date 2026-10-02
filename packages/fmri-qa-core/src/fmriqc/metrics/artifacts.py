@@ -136,6 +136,6 @@ def spike_scores(images: QAImages, roi: ROI) -> SpikeResult:
     fluctuations, i.e. the detrended ROI-mean time course (detrending commutes
     with the spatial mean).
     """
-    resid = images.fluctuations[*roi.index].mean(axis=(0, 1))
+    resid = roi.mean(images.fluctuations)
     spec = np.abs(np.fft.rfft(resid))[1:]  # magnitude, DC bin dropped (as cran does)
     return SpikeResult(tc_outlier=_spike_ratio(resid), spec_outlier=_spike_ratio(spec))

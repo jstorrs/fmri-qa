@@ -179,7 +179,7 @@ def test_phantom_centering_localizes_slice_and_roi(make_scan: MakeScan) -> None:
     """
     result = q.run_qa(make_scan(), q.AnalysisSettings(roi_size=9, center="phantom"))
     assert result.roi.size == 9
-    assert roi_fits(result.geom.phantom_mask, result.roi.index)
+    assert roi_fits(result.geom.phantom_mask, result.roi)
     assert np.isfinite(result.metrics.snr) and result.metrics.snr > 0
 
 

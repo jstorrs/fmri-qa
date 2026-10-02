@@ -6,13 +6,20 @@ detected center (`PhantomGeometry`), and the fixed-size, on-image summary `ROI`.
 """
 
 from dataclasses import dataclass
-from typing import assert_never
+from typing import Any, assert_never
 
 import numpy as np
 
 from .._arrays import ArrayValue
 from ..exceptions import InvalidChoiceError
-from ..types import FBIRN_ROI_SIZE, ROI_CENTER_MODES, BoolArray, IntArray, RoiCenter
+from ..types import (
+    FBIRN_ROI_SIZE,
+    ROI_CENTER_MODES,
+    BoolArray,
+    FloatArray,
+    IntArray,
+    RoiCenter,
+)
 from ..warn import warn
 from .images import QAImages
 from .imaging import (
@@ -77,6 +84,13 @@ class ROI(ArrayValue):
     def index(self) -> tuple[slice, slice]:
         """The (rows, cols) slice pair for indexing an image."""
         return roi_indexes(self.center, self.size)
+
+    def mean(self, image: FloatArray) -> Any:
+        """Mean of `image` over the ROI's rows and columns.
+
+        A scalar for an (X, Y) image; a per-frame series for an (X, Y, T) one.
+        """
+        return image[self.index].mean(axis=(0, 1))
 
 
 def detect_phantom(images: QAImages) -> PhantomGeometry:
@@ -155,13 +169,14 @@ def resolve_roi(
     return ROI(center=clamp_center(c, n, shape), size=n)
 
 
-def roi_fits(phantom_mask: BoolArray, roi: tuple[slice, slice]) -> bool:
+def roi_fits(phantom_mask: BoolArray, roi: ROI) -> bool:
     """True if `roi` is on-image and every voxel of it lies inside the phantom.
 
     An out-of-bounds ROI (negative/overflowing slice) counts as not fitting —
     `np.all` of the empty selection it would produce is vacuously True otherwise.
     """
-    (r, c), (h, w) = roi, phantom_mask.shape[:2]
+    index = roi.index
+    (r, c), (h, w) = index, phantom_mask.shape[:2]
     if r.start < 0 or c.start < 0 or r.stop > h or c.stop > w:
         return False
-    return bool(np.all(phantom_mask[roi]))
+    return bool(np.all(phantom_mask[index]))

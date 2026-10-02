@@ -13,7 +13,6 @@ import numpy as np
 from .._arrays import ArrayValue
 from ..prep.geometry import ROI
 from ..prep.images import QAImages
-from ..prep.imaging import roi_indexes
 from ..types import FloatArray, IntArray
 
 
@@ -61,10 +60,8 @@ def _relative_to_signal(value: float, *, signal: float) -> float:
     return float(value / signal)
 
 
-def _roi_cv(
-    *, fluctuations: FloatArray, mean_image: FloatArray, roi_center: IntArray, k: int
-) -> float:
-    """CV over a k x k ROI: RMS of the ROI-mean fluctuation / ROI-mean signal.
+def _roi_cv(*, fluctuations: FloatArray, mean_image: FloatArray, roi: ROI) -> float:
+    """CV over an ROI: RMS of the ROI-mean fluctuation / ROI-mean signal.
 
     ROI-averaging the per-voxel `fluctuations` equals detrending the ROI-mean
     timeseries (detrending commutes with the spatial mean), and the temporal
@@ -72,9 +69,8 @@ def _roi_cv(
 
     NaN on a zero ROI mean signal; see `_relative_to_signal`.
     """
-    roi = roi_indexes(roi_center, k)
-    roi_fluct = fluctuations[*roi].mean(axis=(0, 1))
-    roi_signal = mean_image[*roi].mean()
+    roi_fluct = roi.mean(fluctuations)
+    roi_signal = roi.mean(mean_image)
     return _relative_to_signal(np.std(roi_fluct, mean=0), signal=roi_signal)
 
 
@@ -82,16 +78,14 @@ def _roi_cv1(
     *,
     fluctuation_noise: FloatArray,
     mean_image: FloatArray,
-    roi_center: IntArray,
-    k: int,
+    roi: ROI,
 ) -> float:
-    """Single-voxel CV pooled over a k x k ROI: RMS(noise) / ROI mean signal.
+    """Single-voxel CV pooled over an ROI: RMS(noise) / ROI mean signal.
 
     NaN on a zero ROI mean signal; see `_relative_to_signal`.
     """
-    roi = roi_indexes(roi_center, k)
-    s = fluctuation_noise[*roi]
-    roi_signal = mean_image[*roi].mean()
+    s = fluctuation_noise[roi.index]
+    roi_signal = roi.mean(mean_image)
     return _relative_to_signal(np.sqrt(np.mean(s**2)), signal=roi_signal)
 
 
@@ -113,8 +107,7 @@ def weisskoff(images: QAImages, roi: ROI) -> WeisskoffResult:
             _roi_cv(
                 fluctuations=fluctuations,
                 mean_image=mean_image,
-                roi_center=roi.center,
-                k=int(k),
+                roi=ROI(center=roi.center, size=int(k)),
             )
             for k in roi_sizes
         ]
@@ -124,8 +117,7 @@ def weisskoff(images: QAImages, roi: ROI) -> WeisskoffResult:
             _roi_cv1(
                 fluctuation_noise=noise,
                 mean_image=mean_image,
-                roi_center=roi.center,
-                k=int(k),
+                roi=ROI(center=roi.center, size=int(k)),
             )
             for k in roi_sizes
         ]
@@ -161,8 +153,8 @@ def snr(images: QAImages, roi: ROI) -> float:
         return float("nan")
     paired = cs[..., :n_frames]
     diff = paired[..., 1::2].sum(axis=-1) - paired[..., 0::2].sum(axis=-1)
-    signal = images.mean_image[*idx].mean()
-    var_summary = float(diff[*idx].var())
+    signal = roi.mean(images.mean_image)
+    var_summary = float(diff[idx].var())
     if var_summary == 0.0:
         return float("nan")
     return float(signal / np.sqrt(var_summary / n_frames))
@@ -181,10 +173,10 @@ def sfnr(images: QAImages, roi: ROI) -> float:
     noiseless voxel renders instead of blanking the map.)
     """
     idx = roi.index
-    noise = images.fluctuation_noise[*idx]
+    noise = images.fluctuation_noise[idx]
     if not np.all(noise):
         return float("nan")
-    return float((images.mean_image[*idx] / noise).mean())
+    return float((images.mean_image[idx] / noise).mean())
 
 
 def drift_percent(images: QAImages, roi: ROI) -> float:
@@ -192,9 +184,8 @@ def drift_percent(images: QAImages, roi: ROI) -> float:
 
     NaN on a zero ROI mean signal; see `_relative_to_signal`.
     """
-    idx = roi.index
-    trend_roi = images.trend[*idx].mean(axis=(0, 1))
-    signal = images.mean_image[*idx].mean()
+    trend_roi = roi.mean(images.trend)
+    signal = roi.mean(images.mean_image)
     return _relative_to_signal(
         100.0 * (trend_roi.max() - trend_roi.min()), signal=signal
     )
@@ -205,7 +196,6 @@ def percent_fluctuation(images: QAImages, roi: ROI) -> float:
 
     NaN on a zero ROI mean signal; see `_relative_to_signal`.
     """
-    idx = roi.index
-    resid_roi = images.fluctuations[*idx].mean(axis=(0, 1))
-    signal = images.mean_image[*idx].mean()
-    return _relative_to_signal(100.0 * np.std(resid_roi, mean=0), signal=signal)
+    return 100.0 * _roi_cv(
+        fluctuations=images.fluctuations, mean_image=images.mean_image, roi=roi
+    )

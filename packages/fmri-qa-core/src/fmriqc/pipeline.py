@@ -284,7 +284,7 @@ def _warn_if_roi_does_not_fit(
     on an off-center phantom, which is exactly when one of them can rescue an
     ROI the other cannot fit.
     """
-    if roi_fits(geom.phantom_mask, roi.index):
+    if roi_fits(geom.phantom_mask, roi):
         return
     other: RoiCenter = "phantom" if center == "image" else "image"
     warn(
