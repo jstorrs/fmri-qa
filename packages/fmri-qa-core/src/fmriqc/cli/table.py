@@ -12,6 +12,9 @@ same numbers is `record`.
 # `--help` or a usage error from paying for numpy, scipy and nibabel.
 from __future__ import annotations
 
+from collections.abc import Callable
+from dataclasses import dataclass
+
 import fmriqc as q
 
 
@@ -55,66 +58,94 @@ def clip_cell(count: int | None, *, flag: bool = False) -> str:
     return "?" if count is None else f"{count}{'!' if flag else ''}"
 
 
-def header_lines() -> tuple[str, str]:
-    """The fixed-width table header and its rule, as literal strings."""
-    header = (
-        f"{'scan':40s} {'PE':>3s} {'loc':>8s} "
-        f"{'SNR':>9s} {'SFNR':>9s} {'RDC':>8s} {'drift%':>8s} "
-        f"{'ghost%':>8s} {'ghT%':>8s} {'RO%':>8s} {'ACRg%':>8s} {'outl%':>7s} "
-        f"{'tcOut':>7s} {'spcOut':>7s} "
-        f"{'clip':>6s} {'clipPre':>8s} {'motn':>7s} {'scl%':>7s} {'shr%':>7s} "
-        f"{'com':>6s} {'fwPE':>6s} {'fwRO':>6s}"
-    )
-    return header, "-" * len(header)
+@dataclass(frozen=True)
+class Column:
+    """One table column: its header title, field width, and how a row fills it.
+
+    `cell` returns the unpadded text; the width and alignment are applied by
+    `Column.pad`, so the header and every row share them.
+    """
+
+    title: str
+    width: int
+    cell: Callable[[q.QAArtifact], str]
+    left: bool = False
+
+    def pad(self, text: str) -> str:
+        """`text` padded to this column's width (right-aligned unless `left`)."""
+        return f"{text:<{self.width}s}" if self.left else f"{text:>{self.width}s}"
 
 
-def format_row(artifact: q.QAArtifact) -> str:
-    """Format one fixed-width metrics row for the human table."""
-    m = artifact.measurements
+def _clip_kept(a: q.QAArtifact) -> str:
+    m = a.measurements
+    return clip_cell(m.n_clipped_kept, flag=bool(m.clipped_kept))
+
+
+# Each entry's comment says what the column means; the header has no room to.
+COLUMNS: tuple[Column, ...] = (
+    Column("scan", 40, lambda a: a.provenance.scan, left=True),
+    Column("PE", 3, lambda a: a.measurements.pe_label),
     # loc: whether the phantom mask and the summary ROI landed where they must.
     # "ok", or MASK/ROI naming what failed -- in which case every mask-based
     # column to its right was measured on background (see `localization_flag`).
+    Column("loc", 8, lambda a: localization_flag(a.measurements)),
+    Column("SNR", 9, lambda a: f"{a.measurements.snr:.1f}"),
+    Column("SFNR", 9, lambda a: f"{a.measurements.sfnr:.1f}"),
+    Column("RDC", 8, lambda a: f"{a.measurements.rdc:.3f}"),
+    Column("drift%", 8, lambda a: f"{a.measurements.drift_pct:.3f}"),
+    Column("ghost%", 8, lambda a: f"{a.measurements.ghost_pct:.3f}"),
     # ghT%: PE percent ghost of the brightest 10% of ghost voxels (Greve /
     # bxh fmriqa_ghostiness), same scale as ghost% -- a localized bright ghost
     # the region-mean ghost% dilutes shows here (ghT% >= ghost% always).
+    Column("ghT%", 8, lambda a: f"{a.measurements.ghost_top_pct:.3f}"),
+    Column("RO%", 8, lambda a: f"{a.measurements.ro_ghost_pct:.3f}"),
+    Column("ACRg%", 8, lambda a: f"{a.measurements.acr_ghost_pct:.3f}"),
+    # outl%: worst single-frame outlier-voxel fraction (3dToutcount), using a
+    # threshold tuned by qthr and the number of analyzed frames.
+    Column("outl%", 7, lambda a: f"{a.measurements.outlier_max_pct:.3f}"),
+    # tcOut/spcOut: cran MAD-normalized spike scores of the ROI-mean residual
+    # -- peak / robust spread in the time domain (a transient volume) and on
+    # its DC-dropped FFT magnitude (a dominant periodic artifact). Unitless; a
+    # clean phantom sits low (a few), a spike stands well above.
+    Column("tcOut", 7, lambda a: f"{a.measurements.tc_outlier:.2f}"),
+    Column("spcOut", 7, lambda a: f"{a.measurements.spec_outlier:.2f}"),
     # clip: samples clipped in the analyzed data (they bias the metrics); a
     # trailing "!" flags any. clipPre: samples clipped only in the dropped
     # warm-up volumes -- reported apart because they don't reach the stats.
     # "?" in both: the series did not arrive as the scanner's integers, so the
     # rail test could not run -- which is not the same as finding no clipping,
     # and is why it is not shown as 0 (see `Measurements`).
-    clip = clip_cell(m.n_clipped_kept, flag=bool(m.clipped_kept))
-    clip_pre = clip_cell(m.n_clipped_pre)
-    # outl%: worst single-frame outlier-voxel fraction (3dToutcount), using a
-    # threshold tuned by qthr and the number of analyzed frames.
+    Column("clip", 6, _clip_kept),
+    Column("clipPre", 8, lambda a: clip_cell(a.measurements.n_clipped_pre)),
     # motn/scl%/shr%: peak per-volume in-plane phantom motion vs the temporal
     # mean (3dvolreg-style, rotation dropped) -- translation (mm when the voxel
     # size is known, else voxels; same convention as fwPE/fwRO), and the
     # gradient-heating scale/shear strain (percent).
-    # tcOut/spcOut: cran MAD-normalized spike scores of the ROI-mean residual
-    # -- peak / robust spread in the time domain (a transient volume) and on
-    # its DC-dropped FFT magnitude (a dominant periodic artifact). Unitless; a
-    # clean phantom sits low (a few), a spike stands well above.
+    Column("motn", 7, lambda a: f"{a.measurements.max_translation:.3f}"),
+    Column("scl%", 7, lambda a: f"{a.measurements.max_scale_pct:.3f}"),
+    Column("shr%", 7, lambda a: f"{a.measurements.max_shear_pct:.3f}"),
     # com: peak per-volume shift of the whole-slice intensity centroid from
     # its temporal mean (circular COM, bxh volmeasures), in mm when the voxel
     # size is known, else voxels -- the circular mean cancels uniform background
     # and the N/2 ghost, so no phantom mask is used (only a Siemens zeroed edge
     # is healed); a cheap first-moment jump/drift trace complementing motn.
+    Column("com", 6, lambda a: f"{a.measurements.max_com_displacement:.3f}"),
     # fwPE/fwRO: spatial smoothness of the noise field along the phase-encode
     # and readout axes (AFNI 3dFWHMx), in mm when the voxel size is known --
     # the RDC smoothness confound; PE/RO asymmetry is anisotropic smoothing.
     # "?" where no PE axis resolved, so neither direction has a name (the
     # combined FWHM is not substituted -- see `fwhm_cell`).
-    return (
-        f"{artifact.provenance.scan:40s} {m.pe_label:>3s} "
-        f"{localization_flag(m):>8s} "
-        f"{m.snr:>9.1f} {m.sfnr:>9.1f} {m.rdc:>8.3f} "
-        f"{m.drift_pct:>8.3f} {m.ghost_pct:>8.3f} {m.ghost_top_pct:>8.3f} "
-        f"{m.ro_ghost_pct:>8.3f} {m.acr_ghost_pct:>8.3f} {m.outlier_max_pct:>7.3f} "
-        f"{m.tc_outlier:>7.2f} {m.spec_outlier:>7.2f} "
-        f"{clip:>6s} {clip_pre:>8s} "
-        f"{m.max_translation:>7.3f} "
-        f"{m.max_scale_pct:>7.3f} {m.max_shear_pct:>7.3f} "
-        f"{m.max_com_displacement:>6.3f} "
-        f"{fwhm_cell(m.fwhm_pe):>6s} {fwhm_cell(m.fwhm_ro):>6s}"
-    )
+    Column("fwPE", 6, lambda a: fwhm_cell(a.measurements.fwhm_pe)),
+    Column("fwRO", 6, lambda a: fwhm_cell(a.measurements.fwhm_ro)),
+)
+
+
+def header_lines() -> tuple[str, str]:
+    """The fixed-width table header and its rule, as literal strings."""
+    header = " ".join(c.pad(c.title) for c in COLUMNS)
+    return header, "-" * len(header)
+
+
+def format_row(artifact: q.QAArtifact) -> str:
+    """Format one fixed-width metrics row for the human table."""
+    return " ".join(c.pad(c.cell(artifact)) for c in COLUMNS)
