@@ -18,12 +18,13 @@ import sys
 from collections.abc import Sequence
 from importlib import import_module
 from pathlib import Path
+from typing import assert_never
 
 from fmriqc.cli.arguments import nonnegative_float, positive_int
 from fmriqc.settings import AnalysisSettings
 
 from .exceptions import LauncherError, PanelUnavailableError, RequestError
-from .outcome import Published, Refused
+from .outcome import Failed, Published, Refused, RunResult
 from .progress import Progress, describe
 from .request import (
     ANONYMIZE_CHOICES,
@@ -172,6 +173,53 @@ def _launch_panel() -> int:
         return 2
 
 
+def _request_from(args: argparse.Namespace) -> RunRequest:
+    """The run `args` ask for; raises `RequestError` naming every problem."""
+    settings = AnalysisSettings(
+        trim_sec=args.trim_sec,
+        detrend=args.detrend,
+        center=args.center,
+        roi_size=args.roi_size,
+    )
+    return RunRequest(
+        dicom_dir=Path(args.dicom_dir),
+        output_dir=Path(args.output_dir),
+        settings=settings,
+        anonymize=args.anonymize,
+        dcm2niix=args.dcm2niix,
+        open_report=args.open,
+    )
+
+
+def _print_outcomes(result: RunResult, output_dir: Path) -> None:
+    """Report each series: published report paths on stdout, the rest on stderr.
+
+    Stdout carries only report paths, one per line, so the command composes;
+    refusals, failures, warnings and the closing tally go to stderr.
+    """
+    for outcome in result.outcomes:
+        match outcome:
+            case Published():
+                print(outcome.report)
+                for warning in outcome.warnings:
+                    print(f"WARNING: {outcome.name}: {warning}", file=sys.stderr)
+            case Refused():
+                print(
+                    f"refusing to replace existing results: {outcome.existing}",
+                    file=sys.stderr,
+                )
+            case Failed():
+                print(f"ERROR: {outcome.name}: {outcome.reason}", file=sys.stderr)
+                for warning in outcome.warnings:
+                    print(f"WARNING: {outcome.name}: {warning}", file=sys.stderr)
+            case _ as unreachable:
+                assert_never(unreachable)
+
+    published = len(result.published)
+    total = len(result.outcomes)
+    print(f"# {published} of {total} series published to {output_dir}", file=sys.stderr)
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Run one session from the command line, or open the panel with no arguments.
 
@@ -198,20 +246,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _launch_panel()
 
     try:
-        settings = AnalysisSettings(
-            trim_sec=args.trim_sec,
-            detrend=args.detrend,
-            center=args.center,
-            roi_size=args.roi_size,
-        )
-        request = RunRequest(
-            dicom_dir=Path(args.dicom_dir),
-            output_dir=Path(args.output_dir),
-            settings=settings,
-            anonymize=args.anonymize,
-            dcm2niix=args.dcm2niix,
-            open_report=args.open,
-        )
+        request = _request_from(args)
     except RequestError as exc:
         for problem in exc.problems:
             print(f"ERROR: {problem}", file=sys.stderr)
@@ -232,28 +267,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
 
-    for outcome in result.outcomes:
-        if isinstance(outcome, Published):
-            print(outcome.report)
-            for warning in outcome.warnings:
-                print(f"WARNING: {outcome.name}: {warning}", file=sys.stderr)
-        elif isinstance(outcome, Refused):
-            print(
-                f"refusing to replace existing results: {outcome.existing}",
-                file=sys.stderr,
-            )
-        else:
-            # The union's last member: a fourth would fail to type-check here.
-            print(f"ERROR: {outcome.name}: {outcome.reason}", file=sys.stderr)
-            for warning in outcome.warnings:
-                print(f"WARNING: {outcome.name}: {warning}", file=sys.stderr)
-
-    published = len(result.published)
-    total = len(result.outcomes)
-    print(
-        f"# {published} of {total} series published to {request.output_dir}",
-        file=sys.stderr,
-    )
+    _print_outcomes(result, request.output_dir)
 
     if args.open:
         open_results(result)

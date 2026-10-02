@@ -1,9 +1,11 @@
 """`fmri-qa-run`, exercised over a stub converter and a fast fake render.
 
 Only `test_the_published_run_matches_a_direct_analyze` (the equivalence claim
-that matters) pays for a real analysis; every other test that needs a
-published outcome monkeypatches `fmriqc_launcher.session.write_run_page` with
-`_fast_render`, the same stand-in `tests/test_session.py` uses.
+that matters) pays for a real analysis; the other end-to-end tests
+monkeypatch `fmriqc_launcher.session.write_run_page` with `_fast_render`, the
+same stand-in `tests/test_session.py` uses. What the command prints for each
+kind of outcome is pinned by calling `_print_outcomes` on a hand-built
+`RunResult`, with no run at all.
 """
 
 import stat
@@ -19,7 +21,7 @@ from fmriqc.convert import naming
 from fmriqc.convert.dcm2niix import find_dcm2niix
 from fmriqc.settings import AnalysisSettings
 from fmriqc_launcher import cli
-from fmriqc_launcher.outcome import Published, Refused, RunResult
+from fmriqc_launcher.outcome import Failed, Published, Refused, RunResult
 from fmriqc_launcher.results import open_results
 
 PreparedSeries = Callable[..., tuple[Path, dict[str, object]]]
@@ -263,38 +265,6 @@ def test_clean_run_exits_zero_and_prints_the_report_path(
     assert f"# 1 of 1 series published to {output_dir}" in captured.err
 
 
-def test_a_refused_series_leaves_its_directory_untouched(
-    tmp_path: Path,
-    dicom_dir: Path,
-    prepared_series: PreparedSeries,
-    stub_dcm2niix: StubDcm2niix,
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    monkeypatch.setattr("fmriqc_launcher.session.write_run_page", _fast_render)
-    nifti, base = prepared_series(name="scan")
-    sidecar = _sidecar(base, series_number=1, description="QA_EPI")
-    name = naming.qa_stem(sidecar)
-    assert name is not None
-    converter = stub_dcm2niix({"stem1": (nifti, sidecar)})
-
-    output_dir = tmp_path / "output"
-    existing = output_dir / name
-    existing.mkdir(parents=True)
-    marker = existing / "keep-me.txt"
-    marker.write_text("do not touch")
-
-    rc = cli.main([str(dicom_dir), str(output_dir), "--dcm2niix", str(converter)])
-
-    captured = capsys.readouterr()
-    assert rc == 1
-    assert marker.read_text() == "do not touch"
-    assert [p.name for p in existing.iterdir()] == ["keep-me.txt"]
-    assert "refusing to replace existing results" in captured.err
-    assert str(existing) in captured.err
-    assert captured.out == ""
-
-
 def test_a_converter_producing_nothing_is_reported_without_a_traceback(
     tmp_path: Path, dicom_dir: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -332,32 +302,142 @@ def test_a_missing_dicom_directory_prints_every_problem(
     assert "Traceback" not in captured.err
 
 
-def test_open_flag_opens_the_single_report(
-    tmp_path: Path,
-    dicom_dir: Path,
-    prepared_series: PreparedSeries,
-    stub_dcm2niix: StubDcm2niix,
-    monkeypatch: pytest.MonkeyPatch,
+def _published(
+    output_dir: Path, name: str, warnings: tuple[str, ...] = ()
+) -> Published:
+    directory = output_dir / name
+    return Published(
+        name=name,
+        directory=directory,
+        scan=directory / f"{name}.nii.gz",
+        sidecar=None,
+        artifact=directory / f"{name}.qa.nc",
+        report=directory / f"{name}.html",
+        warnings=warnings,
+    )
+
+
+def test_open_flag_opens_the_report_and_exits_zero_for_a_complete_run(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setattr("fmriqc_launcher.session.write_run_page", _fast_render)
-    nifti, base = prepared_series(name="scan")
-    sidecar = _sidecar(base, series_number=1, description="QA_EPI")
-    name = naming.qa_stem(sidecar)
-    assert name is not None
-    converter = stub_dcm2niix({"stem1": (nifti, sidecar)})
     output_dir = tmp_path / "output"
-
-    opened: list[str] = []
+    result = RunResult(output_dir, (_published(output_dir, "a"),))
     monkeypatch.setattr(
-        "fmriqc_launcher.cli.open_results",
-        lambda result: opened.append("called") or None,
+        "fmriqc_launcher.session.run_session", lambda _request, progress: result
+    )
+    opened: list[RunResult] = []
+    monkeypatch.setattr("fmriqc_launcher.cli.open_results", opened.append)
+
+    rc = cli.main([str(tmp_path), str(output_dir), "--open"])
+
+    assert rc == 0
+    assert opened == [result]
+
+
+def test_a_refused_series_exits_one_and_is_not_opened_without_the_flag(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    output_dir = tmp_path / "output"
+    result = RunResult(output_dir, (Refused(name="a", existing=output_dir / "a"),))
+    monkeypatch.setattr(
+        "fmriqc_launcher.session.run_session", lambda _request, progress: result
+    )
+    opened: list[RunResult] = []
+    monkeypatch.setattr("fmriqc_launcher.cli.open_results", opened.append)
+
+    rc = cli.main([str(tmp_path), str(output_dir)])
+
+    assert rc == 1
+    assert opened == []
+
+
+def test_a_published_series_prints_its_report_path_and_tally(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    output_dir = tmp_path / "output"
+    published = _published(output_dir, "scan")
+
+    cli._print_outcomes(RunResult(output_dir, (published,)), output_dir)
+
+    captured = capsys.readouterr()
+    assert captured.out == f"{output_dir / 'scan' / 'scan.html'}\n"
+    assert captured.err == f"# 1 of 1 series published to {output_dir}\n"
+
+
+def test_a_published_series_prints_each_warning_on_stderr(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    output_dir = tmp_path / "output"
+    published = _published(output_dir, "scan", warnings=("first", "second"))
+
+    cli._print_outcomes(RunResult(output_dir, (published,)), output_dir)
+
+    captured = capsys.readouterr()
+    assert captured.out == f"{published.report}\n"
+    assert captured.err == (
+        "WARNING: scan: first\n"
+        "WARNING: scan: second\n"
+        f"# 1 of 1 series published to {output_dir}\n"
     )
 
-    rc = cli.main(
-        [str(dicom_dir), str(output_dir), "--dcm2niix", str(converter), "--open"]
+
+def test_a_refused_series_names_the_existing_directory_on_stderr_only(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    output_dir = tmp_path / "output"
+    existing = output_dir / "scan"
+
+    cli._print_outcomes(
+        RunResult(output_dir, (Refused(name="scan", existing=existing),)), output_dir
     )
-    assert rc == 0
-    assert opened == ["called"]
+
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert captured.err == (
+        f"refusing to replace existing results: {existing}\n"
+        f"# 0 of 1 series published to {output_dir}\n"
+    )
+
+
+def test_a_failed_series_prints_its_reason_then_its_warnings_on_stderr_only(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    output_dir = tmp_path / "output"
+    failed = Failed(
+        name="scan",
+        reason="stub render failure",
+        warnings=("a stub warning from the analysis",),
+    )
+
+    cli._print_outcomes(RunResult(output_dir, (failed,)), output_dir)
+
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert captured.err == (
+        "ERROR: scan: stub render failure\n"
+        "WARNING: scan: a stub warning from the analysis\n"
+        f"# 0 of 1 series published to {output_dir}\n"
+    )
+
+
+def test_outcomes_print_in_run_order_and_only_reports_reach_stdout(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    output_dir = tmp_path / "output"
+    first = _published(output_dir, "a")
+    second = _published(output_dir, "c")
+    result = RunResult(
+        output_dir,
+        (first, Failed(name="b", reason="boom"), second),
+    )
+
+    cli._print_outcomes(result, output_dir)
+
+    captured = capsys.readouterr()
+    assert captured.out == f"{first.report}\n{second.report}\n"
+    assert captured.err == (
+        f"ERROR: b: boom\n# 2 of 3 series published to {output_dir}\n"
+    )
 
 
 def test_open_results_opens_the_folder_for_several_series(tmp_path: Path) -> None:
@@ -419,103 +499,6 @@ def test_open_results_opens_nothing_when_nothing_was_published(tmp_path: Path) -
 
     assert open_results(result, opener=_opener) is None
     assert called is False
-
-
-def test_a_failed_series_is_reported_with_its_warnings(
-    tmp_path: Path,
-    dicom_dir: Path,
-    prepared_series: PreparedSeries,
-    stub_dcm2niix: StubDcm2niix,
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    """A too-short series fails analysis; its render warning never fires."""
-    monkeypatch.setattr("fmriqc_launcher.session.write_run_page", _fast_render)
-    nifti, base = prepared_series(name="scan", t=2)
-    sidecar = _sidecar(base, series_number=1, description="Broken")
-    converter = stub_dcm2niix({"stem1": (nifti, sidecar)})
-
-    rc = cli.main(
-        [str(dicom_dir), str(tmp_path / "output"), "--dcm2niix", str(converter)]
-    )
-
-    captured = capsys.readouterr()
-    assert rc == 1
-    assert "ERROR:" in captured.err
-    assert "expected at least 4 frame" in captured.err
-    assert captured.out == ""
-
-
-def _warning_wrapper(real: Callable[..., object]) -> Callable[..., object]:
-    """Wrap `real` (`fmriqc.analyze`) to warn first -- for the warnings contract.
-
-    `session.py` calls `fmriqc.analyze(...)` as an attribute of the `fmriqc`
-    module, so a warning meant to land on an outcome has to come from there:
-    `_publish_series` only captures warnings around `from_nifti`/`analyze`
-    now, exactly as `fmriqc.cli.qa` does.
-    """
-
-    def wrapper(*args: object, **kwargs: object) -> object:
-        import warnings
-
-        warnings.warn("a stub warning from the analysis", stacklevel=2)
-        return real(*args, **kwargs)
-
-    return wrapper
-
-
-def test_a_warning_from_a_published_series_is_printed(
-    tmp_path: Path,
-    dicom_dir: Path,
-    prepared_series: PreparedSeries,
-    stub_dcm2niix: StubDcm2niix,
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    monkeypatch.setattr("fmriqc_launcher.session.write_run_page", _fast_render)
-    real = fmriqc.analyze
-    monkeypatch.setattr(fmriqc, "analyze", _warning_wrapper(real))
-    nifti, base = prepared_series(name="scan")
-    sidecar = _sidecar(base, series_number=1, description="QA_EPI")
-    converter = stub_dcm2niix({"stem1": (nifti, sidecar)})
-
-    rc = cli.main(
-        [str(dicom_dir), str(tmp_path / "output"), "--dcm2niix", str(converter)]
-    )
-
-    captured = capsys.readouterr()
-    assert rc == 0
-    assert "WARNING:" in captured.err
-    assert "a stub warning from the analysis" in captured.err
-
-
-def test_a_warning_before_a_failure_is_printed_on_a_failed_series(
-    tmp_path: Path,
-    dicom_dir: Path,
-    prepared_series: PreparedSeries,
-    stub_dcm2niix: StubDcm2niix,
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    def _fail_render(_artifact: object, _path: Path, **_kwargs: object) -> Path:
-        raise RuntimeError("stub render failure")
-
-    monkeypatch.setattr("fmriqc_launcher.session.write_run_page", _fail_render)
-    real = fmriqc.analyze
-    monkeypatch.setattr(fmriqc, "analyze", _warning_wrapper(real))
-    nifti, base = prepared_series(name="scan")
-    sidecar = _sidecar(base, series_number=1, description="QA_EPI")
-    converter = stub_dcm2niix({"stem1": (nifti, sidecar)})
-
-    rc = cli.main(
-        [str(dicom_dir), str(tmp_path / "output"), "--dcm2niix", str(converter)]
-    )
-
-    captured = capsys.readouterr()
-    assert rc == 1
-    assert "ERROR:" in captured.err and "stub render failure" in captured.err
-    assert "WARNING:" in captured.err
-    assert "a stub warning from the analysis" in captured.err
 
 
 def test_one_failed_series_does_not_stop_the_report_of_another(
