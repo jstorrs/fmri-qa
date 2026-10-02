@@ -160,10 +160,11 @@ def import_dicom(
             `anonymize` is not one of `ANONYMIZE_MODES`.
         ConversionError: If `source` is not a directory, if no dcm2niix can be
             found or it exits non-zero, if imported files would share a
-            destination, if the import would overwrite files already in
-            `destination` and `force` is not set, or if a file cannot be moved
-            into `destination`. Both destination checks happen before any file
-            moves, and a move that fails is undone (see `_file_atomically`).
+            destination, if a target is a directory (including a symlink to
+            one), if the import would overwrite files already in `destination`
+            and `force` is not set, or if a file cannot be moved into
+            `destination`. All destination checks happen before any file moves,
+            and a move that fails is undone (see `_file_atomically`).
     """
     # Guarded up front so an untyped caller still gets the named error, then
     # matched exhaustively: `assert_never` is unreachable for a `NameStyle`, so
@@ -261,7 +262,7 @@ def _file_series(
 def _refuse_collisions(
     planned: Sequence[tuple[Path, Path]], destination: Path, force: bool
 ) -> None:
-    """Refuse duplicate destinations, and existing files unless forced.
+    """Refuse duplicate or directory targets, and existing files unless forced.
 
     Checked across every file of every series before a single one moves, so a
     refusal costs nothing: the destination is exactly as it was. That is half of
@@ -275,6 +276,13 @@ def _refuse_collisions(
             "destination",
             f"imported files would share destinations in {destination}: "
             f"{', '.join(duplicates)}; --force cannot resolve this collision",
+        )
+    directories = sorted(target.name for _, target in planned if target.is_dir())
+    if directories:
+        raise ConversionError(
+            "destination",
+            f"{destination} holds directories at import targets: "
+            f"{', '.join(directories)}; --force cannot replace directories",
         )
     if force:
         return

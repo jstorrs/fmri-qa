@@ -294,6 +294,47 @@ def _listing(directory: Path) -> dict[str, bytes | None]:
     }
 
 
+@pytest.mark.parametrize("force", [False, True])
+@pytest.mark.parametrize("symlink", [False, True])
+@pytest.mark.parametrize("target_name", ["z.nii.gz", "z.json", "z.trace.txt"])
+def test_directory_targets_are_refused_before_any_file_moves(
+    tmp_path, fake_dcm2niix, monkeypatch, force, symlink, target_name
+) -> None:
+    """Even a later series' companion must be checked before replacing a file."""
+    binary = fake_dcm2niix(
+        {"a": None, "z": FULL_SIDECAR}, companions={"z.trace.txt": b"new companion"}
+    )
+    out = tmp_path / "nifti"
+    out.mkdir()
+    (out / "a.nii.gz").write_bytes(b"an earlier scan")
+    target = out / target_name
+    directory = tmp_path / "linked-directory" if symlink else target
+    directory.mkdir()
+    sentinel = directory / "keep.txt"
+    sentinel.write_bytes(b"the caller's own file")
+    if symlink:
+        try:
+            target.symlink_to(directory, target_is_directory=True)
+        except (OSError, NotImplementedError) as exc:
+            pytest.skip(f"cannot create directory symlinks: {exc}")
+    before = _listing(out)
+    asked = _refusing(monkeypatch, lambda _source, _target: False)
+
+    with pytest.raises(q.ConversionError) as excinfo:
+        import_dicom(tmp_path, out, binary=binary, names="dcm2niix", force=force)
+
+    assert excinfo.value.stage == "destination"
+    assert target_name in str(excinfo.value)
+    assert "director" in str(excinfo.value)
+    assert asked == []
+    assert _listing(out) == before
+    assert sentinel.read_bytes() == b"the caller's own file"
+    assert target.is_dir()
+    if symlink:
+        assert target.is_symlink()
+        assert target.readlink() == directory
+
+
 def test_a_move_that_fails_part_way_is_undone(
     tmp_path, fake_dcm2niix, monkeypatch
 ) -> None:
