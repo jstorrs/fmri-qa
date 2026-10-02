@@ -12,8 +12,9 @@ of whether a display is actually available in CI.
 from __future__ import annotations
 
 import contextlib
+import gc
 import tkinter as tk
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from pathlib import Path
 
 import pytest
@@ -48,6 +49,13 @@ def root() -> Iterator[tk.Tk]:
     finally:
         with contextlib.suppress(tk.TclError):  # a test may already have destroyed it
             window.destroy()
+        # The callback retains Panel and its Tk variables after destroy().
+        # Release those cycles on this thread, before worker tests can collect
+        # them and run Variable.__del__ outside Tk's owning thread.
+        window.report_callback_exception = tk.Tk.report_callback_exception.__get__(
+            window
+        )
+        gc.collect()
 
 
 class _FakeBackground:
@@ -328,25 +336,275 @@ def test_a_second_close_destroys_immediately(root: tk.Tk, tmp_path: Path) -> Non
         root.winfo_exists()
 
 
-def test_a_callback_exception_reenables_inputs_and_records_the_failure(
-    root: tk.Tk, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+def _callback_error(panel: Panel, message: str = "a callback blew up") -> None:
+    try:
+        raise RuntimeError(message)
+    except RuntimeError as exc:
+        panel._on_callback_exception(RuntimeError, exc, exc.__traceback__)
+
+
+def _mainloop_until(root: tk.Tk, done: Callable[[], bool]) -> None:
+    """Exercise real callback supervision; a missing recovery cannot hang the suite."""
+    timed_out = False
+
+    def timeout() -> None:
+        nonlocal timed_out
+        timed_out = True
+        root.quit()
+
+    def check() -> None:
+        if done():
+            root.quit()
+        else:
+            root.after(1, check)
+
+    timeout_id = root.after(5000, timeout)
+    root.after(0, check)
+    try:
+        root.mainloop()
+    finally:
+        with contextlib.suppress(tk.TclError):
+            root.after_cancel(timeout_id)
+    assert not timed_out, "callback recovery did not complete"
+    assert done()
+
+
+@pytest.mark.parametrize("crashes", [False, True], ids=["finished", "crashed"])
+def test_callback_failure_retains_worker_until_terminal_and_preserves_error(
+    root: tk.Tk, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, crashes: bool
 ) -> None:
     monkeypatch.setattr(panel_module.messagebox, "showerror", lambda *a, **k: None)
     factory = _Factory()
-    panel = Panel(root, background=factory)
+    opened: list[str] = []
+    panel = Panel(root, background=factory, opener=_recording_opener(opened))
     _set_form(panel, _valid_form(tmp_path))
     panel._on_run()
     assert panel._run_button.instate(["disabled"])
 
-    try:
-        raise RuntimeError("a callback blew up")
-    except RuntimeError as exc:
-        panel._on_callback_exception(RuntimeError, exc, exc.__traceback__)
+    _callback_error(panel)
 
     assert factory.last.cancel_called is True
-    assert not panel._run_button.instate(["disabled"])
+    assert factory.last.running
+    assert panel._run_button.instate(["disabled"])
     assert "a callback blew up" in panel._status_var.get()
     assert "a callback blew up" in panel._log_widget.get("1.0", "end")
+    status = panel._status_var.get()
+    panel._on_run()
+    assert len(factory.made) == 1
+    panel._recovery_tick()
+    assert panel._background is factory.last
+    assert panel._run_button.instate(["disabled"])
+
+    leftover = tmp_path / "leftover"
+    output_dir = factory.last.request.output_dir
+    factory.last.push(Progress(Stage.REPORT, 1, 1, "scan"))
+    factory.last.push(CleanupNotice(leftover, "can be deleted"))
+    factory.last.push(
+        Crashed("worker crashed")
+        if crashes
+        else Finished(RunResult(output_dir, (_published("scan", output_dir),)))
+    )
+    panel._recovery_tick()
+
+    assert panel._background is None
+    assert not panel._run_button.instate(["disabled"])
+    assert panel._status_var.get() == status
+    assert panel.exit_code == 1
+    assert str(leftover) in panel._log_widget.get("1.0", "end")
+    assert opened == []
+    assert panel._open_button.instate(["disabled"])
+    panel._on_run()
+    assert len(factory.made) == 2
+
+
+def test_failure_mid_batch_preserves_cleanup_notice_and_terminal(
+    root: tk.Tk, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(panel_module.messagebox, "showerror", lambda *_a, **_k: None)
+    monkeypatch.setattr(panel_module, "_TICK_MS", 1)
+    factory = _Factory()
+    panel = Panel(root, background=factory)
+    _set_form(panel, _valid_form(tmp_path))
+    panel._on_run()
+
+    def broken_bar(_state: panel_module.BarState) -> None:
+        raise RuntimeError("bar rendering failed")
+
+    monkeypatch.setattr(panel, "_apply_bar_state", broken_bar)
+    leftover = tmp_path / "leftover"
+    factory.last.push(Progress(Stage.ANALYZE, 1, 1, "scan"))
+    factory.last.push(CleanupNotice(leftover, "remove manually"))
+    factory.last.push(Crashed("worker ended"))
+    # Both the progress callback and Tk's exception backstop hit the broken
+    # renderer. The real mainloop must survive and run recovery itself.
+    _mainloop_until(root, lambda: panel._background is None)
+
+    assert panel._background is None
+    assert str(leftover) in panel._log_widget.get("1.0", "end")
+    assert "bar rendering failed" in panel._status_var.get()
+    assert not panel._run_button.instate(["disabled"])
+    assert panel.exit_code == 1
+
+
+def test_superseded_poll_callbacks_cannot_poll_or_schedule_for_a_later_run(
+    root: tk.Tk, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(panel_module.messagebox, "showerror", lambda *_a, **_k: None)
+    callbacks: list[Callable[[], None]] = []
+    after = root.after
+
+    def record_after(delay: int, callback: Callable[[], None]) -> str:
+        callbacks.append(callback)
+        return after(delay, callback)
+
+    monkeypatch.setattr(root, "after", record_after)
+    factory = _Factory()
+    panel = Panel(root, background=factory)
+    _set_form(panel, _valid_form(tmp_path))
+    panel._on_run()
+    normal = callbacks[-1]
+    _callback_error(panel)
+    recovery = callbacks[-1]
+    count = len(callbacks)
+    normal()
+    assert len(callbacks) == count
+
+    factory.last.push(Crashed("ended"))
+    recovery()
+    panel._on_run()
+    factory.last.push(Progress(Stage.ANALYZE, 1, 1, "next scan"))
+    count = len(callbacks)
+    normal()
+    recovery()
+    assert len(callbacks) == count
+    assert panel._status_var.get() == "Starting..."
+    callbacks[-1]()
+    assert "next scan" in panel._status_var.get()
+
+
+@pytest.mark.parametrize("second_close", [False, True])
+def test_close_during_recovery_waits_until_terminal_unless_closed_twice(
+    root: tk.Tk,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    second_close: bool,
+) -> None:
+    monkeypatch.setattr(panel_module.messagebox, "showerror", lambda *_a, **_k: None)
+    factory = _Factory()
+    panel = Panel(root, background=factory)
+    _set_form(panel, _valid_form(tmp_path))
+    panel._on_run()
+    _callback_error(panel)
+    status = panel._status_var.get()
+    panel._on_close()
+    assert root.winfo_exists()
+    assert panel._status_var.get() == status
+    assert factory.last.cancel_called
+    if second_close:
+        panel._on_close()
+        assert factory.last.running
+    else:
+        factory.last.push(Crashed("ended"))
+        panel._recovery_tick()
+    with pytest.raises(tk.TclError):
+        root.winfo_exists()
+    assert panel.exit_code == 1
+
+
+def test_recovery_keeps_closing_after_repeated_log_rendering_errors(
+    root: tk.Tk, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(panel_module, "_TICK_MS", 1)
+    factory = _Factory()
+    panel = Panel(root, background=factory)
+    _set_form(panel, _valid_form(tmp_path))
+    panel._on_run()
+    panel._on_close()
+
+    attempts: list[str] = []
+
+    def broken_log(line: str) -> None:
+        attempts.append(line)
+        raise RuntimeError("log rendering failed")
+
+    monkeypatch.setattr(panel, "_append_log", broken_log)
+    factory.last.push(Progress(Stage.ANALYZE, 1, 1, "scan"))
+    factory.last.push(CleanupNotice(tmp_path / "leftover", "remove manually"))
+    factory.last.push(Crashed("ended"))
+    _mainloop_until(root, lambda: panel._background is None)
+    assert any(
+        "Internal error: RuntimeError: log rendering failed" in s for s in attempts
+    )
+    assert any("remove manually" in s for s in attempts)
+    with pytest.raises(tk.TclError):
+        root.winfo_exists()
+    assert panel.exit_code == 1
+
+
+def test_callback_error_without_worker_returns_to_idle(
+    root: tk.Tk, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(panel_module.messagebox, "showerror", lambda *_a, **_k: None)
+    panel = Panel(root)
+    _callback_error(panel)
+    assert panel._background is None
+    assert not panel._run_button.instate(["disabled"])
+    assert panel.exit_code == 1
+    assert "a callback blew up" in panel._status_var.get()
+
+
+def test_idle_error_finalization_cannot_escape_the_callback_backstop(
+    root: tk.Tk, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(panel_module.messagebox, "showerror", lambda *_a, **_k: None)
+    panel = Panel(root)
+    attempted = False
+
+    def broken_inputs(_enabled: bool) -> None:
+        nonlocal attempted
+        attempted = True
+        raise RuntimeError("input rendering failed")
+
+    def failed_callback() -> None:
+        raise ValueError("original error")
+
+    monkeypatch.setattr(panel, "_set_inputs_enabled", broken_inputs)
+    root.after(0, failed_callback)
+    _mainloop_until(root, lambda: attempted)
+    assert panel._status_var.get() == "Internal error: ValueError: original error"
+    assert panel.exit_code == 1
+
+
+def test_callback_error_after_window_destruction_does_not_raise(root: tk.Tk) -> None:
+    panel = Panel(root)
+    root.destroy()
+    _callback_error(panel)
+    assert panel.exit_code == 1
+
+
+def test_failed_worker_start_does_not_wait_for_a_terminal_event(
+    root: tk.Tk, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(panel_module.messagebox, "showerror", lambda *_a, **_k: None)
+
+    def failed_start(background: _FakeBackground) -> None:
+        # BackgroundRun.running can be true after Thread.start raises: its
+        # thread is assigned, but its target never sets the finished event.
+        background._running = True
+        raise RuntimeError("could not start thread")
+
+    monkeypatch.setattr(_FakeBackground, "start", failed_start)
+    factory = _Factory()
+    panel = Panel(root, background=factory)
+    _set_form(panel, _valid_form(tmp_path))
+    with pytest.raises(RuntimeError, match="could not start thread") as raised:
+        panel._on_run()
+    panel._on_callback_exception(RuntimeError, raised.value, None)
+    panel._recovery_tick()
+    assert panel._background is None
+    assert not panel._run_button.instate(["disabled"])
+    assert "could not start thread" in panel._status_var.get()
+    assert panel.exit_code == 1
 
 
 def test_an_opener_raising_oserror_on_the_close_path_still_destroys(

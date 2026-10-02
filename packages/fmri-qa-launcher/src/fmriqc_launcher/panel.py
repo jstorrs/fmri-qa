@@ -36,6 +36,7 @@ import contextlib
 import tkinter as tk
 import traceback
 import webbrowser
+from collections import deque
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -184,6 +185,10 @@ class Panel:
         self._background_factory = background
         self._opener = opener
         self._background: _BackgroundLike | None = None
+        self._background_started = False
+        self._pending_events: deque[Event] = deque()
+        self._after_id: str | None = None
+        self._recovering = False
         self._closing = False
         self._input_widgets: list[ttk.Widget] = []
         self._wrap_labels: list[ttk.Label] = []
@@ -501,12 +506,15 @@ class Panel:
         )
 
     def _on_run(self) -> None:
+        if self._background is not None or self._closing:
+            return
         try:
             request = parse_form(self.form_values())
         except RequestError as exc:
             messagebox.showerror(_TITLE, "\n".join(exc.problems), parent=self._root)
             return
 
+        self._recovering = False
         self._set_inputs_enabled(False)
         self._clear_log()
         self._open_button.configure(state="disabled")
@@ -517,17 +525,80 @@ class Panel:
 
         self._background = self._background_factory(request)
         self._background.start()
-        self._root.after(_TICK_MS, self._tick)
+        self._background_started = True
+        self._schedule_tick(self._tick)
+
+    def _cancel_tick(self) -> None:
+        if self._after_id is not None:
+            self._root.after_cancel(self._after_id)
+            self._after_id = None
+
+    def _schedule_tick(self, callback: Callable[[], None]) -> None:
+        """Keep one poll scheduled; a superseded callback cannot touch a later run."""
+        self._cancel_tick()
+
+        def scheduled() -> None:
+            if self._after_id != after_id:
+                return
+            self._after_id = None
+            callback()
+
+        after_id = self._root.after(_TICK_MS, scheduled)
+        self._after_id = after_id
 
     def _tick(self) -> None:
+        if self._recovering:
+            return
+        self._cancel_tick()
         background = self._background
         if background is None:
             return
-        for event in background.poll():
-            terminal = self._handle_event(event)
+        self._pending_events.extend(background.poll())
+        while self._pending_events:
+            # Retain the rest of this drained batch if presentation raises.
+            terminal = self._handle_event(self._pending_events.popleft())
             if terminal:
                 return
-        self._root.after(_TICK_MS, self._tick)
+        self._schedule_tick(self._tick)
+
+    def _recovery_tick(self) -> None:
+        """Drain a cancelled run without re-entering its failed presentation path."""
+        self._cancel_tick()
+        background = self._background
+        if background is None:
+            return
+        # Read before polling: once running is false, the terminal event is
+        # already queued. Reading afterwards could race its arrival and lose it.
+        running = self._background_started and background.running
+        try:
+            self._pending_events.extend(background.poll())
+            while self._pending_events:
+                event = self._pending_events.popleft()
+                if isinstance(event, CleanupNotice):
+                    self._append_log(f"WARNING: {event.path}: {event.message}")
+                elif isinstance(event, Finished | Crashed):
+                    self._finish_recovery()
+                    return
+            if not running:
+                self._finish_recovery()
+        finally:
+            # Even another rendering error must leave supervision scheduled.
+            if self._background is not None:
+                self._schedule_tick(self._recovery_tick)
+            elif self._closing:
+                self._destroy()
+
+    def _finish_recovery(self) -> None:
+        self._background = None
+        self._background_started = False
+        self._pending_events.clear()
+        if self._closing:
+            self._destroy()
+        else:
+            # A broken widget must not escape Tk's exception backstop and
+            # terminate mainloop; preserve the original internal error.
+            with contextlib.suppress(Exception):
+                self._set_inputs_enabled(True)
 
     def _handle_event(self, event: Event) -> bool:
         """Apply one `Event`; return True once the run has reached a terminal event."""
@@ -568,10 +639,13 @@ class Panel:
 
         Drops the background run, rests the bar on `bar`, shows `status`,
         logs `log_lines`, re-enables the inputs, and records `code` as the
-        exit code. Callers that may still have a run in flight cancel it
-        first; this only forgets it.
+        exit code. Only terminal-event handlers call this; callback failures
+        retain the worker until the separate recovery pump has drained it.
         """
+        self._cancel_tick()
         self._background = None
+        self._background_started = False
+        self._pending_events.clear()
         self._apply_bar_state(bar)
         self._status_var.set(status)
         for line in log_lines:
@@ -613,25 +687,39 @@ class Panel:
         """Handle an exception `tkinter` caught from a callback (`after`, a button...).
 
         Installed as `root.report_callback_exception` -- see the module
-        docstring for why the default handler is not enough. This does not
-        try to resume the `after` chain (`_tick` is not rescheduled from
-        here): a callback that raised has already left the panel's state
-        uncertain, so the safe thing is to stop polling, not to guess that
-        the next tick would go any better. It must not itself raise if the
-        window is already gone.
+        docstring for why the default handler is not enough. The failed
+        presentation pump is replaced by recovery polling, which retains
+        the cancelled worker until it ends and preserves cleanup notices.
+        Repeated presentation failures cannot replace the original error or
+        stop that supervision. A destroyed window needs no further reporting.
         """
+        self.exit_code = 1
+        if self._recovering:
+            return
+        self._recovering = True
         try:
+            self._cancel_tick()
+            if self._background is not None:
+                self._background.cancel()
+                self._schedule_tick(self._recovery_tick)
             details = "".join(traceback.format_exception(exc_type, exc_value, exc_tb))
             message = f"{exc_type.__name__}: {exc_value}"
-            if self._background is not None:
-                self._background.cancel()  # do not leave the worker running unobserved
             internal = f"Internal error: {message}"
-            self._end_run(
-                bar=CRASHED_BAR, status=internal, log_lines=(internal, details), code=1
-            )
-            messagebox.showerror(_TITLE, message, parent=self._root)
+            # Secondary presentation failures must not escape this backstop:
+            # Tk would terminate mainloop before scheduled recovery can run.
+            with contextlib.suppress(Exception):
+                self._status_var.set(internal)
+                self._append_log(internal)
+                self._append_log(details)
+                self._apply_bar_state(CRASHED_BAR)
+                if not self._closing:
+                    messagebox.showerror(_TITLE, message, parent=self._root)
         except tk.TclError:
             pass  # the window is already gone; nothing left to report to
+        finally:
+            if self._background is None:
+                with contextlib.suppress(tk.TclError):  # window may already be gone
+                    self._finish_recovery()
 
     def _destroy(self) -> None:
         """Destroy the root, tolerating a second call (idempotent by design).
@@ -640,6 +728,7 @@ class Panel:
         window is already gone, must never raise merely for asking twice.
         """
         with contextlib.suppress(tk.TclError):  # already destroyed
+            self._cancel_tick()
             self._root.destroy()
 
     def _on_close(self) -> None:
@@ -653,7 +742,8 @@ class Panel:
         self._closing = True
         if self._background is not None and self._background.running:
             self._background.cancel()
-            self._status_var.set(stopping_message(self._last_progress))
+            if not self._recovering:
+                self._status_var.set(stopping_message(self._last_progress))
             return
         self._destroy()
 
