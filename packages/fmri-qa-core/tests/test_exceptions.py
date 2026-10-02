@@ -15,7 +15,7 @@ from fmriqc.exceptions import (
 from fmriqc.hilo.compatibility import require_compatible_scans
 from fmriqc.prep.detrend import Detrender
 from fmriqc.prep.geometry import resolve_roi
-from fmriqc.prep.imaging import extract_center_slice
+from fmriqc.prep.imaging import select_slice
 
 
 def test_detrender_rejects_unknown_method() -> None:
@@ -23,9 +23,9 @@ def test_detrender_rejects_unknown_method() -> None:
         Detrender.for_series(np.zeros((2, 2, 10)), 2.0, "bogus")  # type: ignore[arg-type]
 
 
-def test_extract_center_slice_rejects_unknown_center() -> None:
+def test_select_slice_rejects_unknown_center() -> None:
     with pytest.raises(InvalidChoiceError, match="center"):
-        extract_center_slice(np.zeros((4, 4, 3, 5)), "middle")  # type: ignore[arg-type]
+        select_slice(np.zeros((4, 4, 3, 5)), "middle")  # type: ignore[arg-type]
 
 
 def test_resolve_roi_rejects_unknown_center() -> None:

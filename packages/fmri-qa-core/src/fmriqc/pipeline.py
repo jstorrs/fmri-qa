@@ -13,7 +13,6 @@ module.
 
 from dataclasses import dataclass, replace
 
-from ._arrays import readonly
 from .load.metadata import ScanMeta
 from .load.scan import QAScan
 from .metrics.artifacts import (
@@ -47,7 +46,7 @@ from .prep.images import QAImages
 from .prep.imaging import select_slice, trim_count, trim_initial
 from .prep.scale import UNKNOWN_VOXEL_SIZE, VoxelSize
 from .settings import AnalysisSettings
-from .types import BoolArray, PeAxis, RoiCenter
+from .types import PeAxis, RoiCenter
 from .validation import validate_qa_run
 from .warn import warn
 
@@ -122,11 +121,11 @@ def preprocess(scan: QAScan, settings: AnalysisSettings | None = None) -> QAImag
     """
     settings = AnalysisSettings() if settings is None else settings
     data = trim_initial(scan.data, tr=scan.tr, trim_sec=settings.trim_sec)
-    z, phantom_mask = select_slice(data, settings.center)
+    z = select_slice(data, settings.center)
     center_slice = data[:, :, z, :]
     detrender = Detrender.for_series(center_slice, scan.tr, settings.detrend)
     fluctuations = detrender(center_slice)
-    images = QAImages(
+    return QAImages(
         center_slice=center_slice,
         fluctuations=fluctuations,
         tr=float(scan.tr),
@@ -143,31 +142,6 @@ def preprocess(scan: QAScan, settings: AnalysisSettings | None = None) -> QAImag
         slice_index=z,
         n_slices=int(data.shape[2]),
     )
-    if phantom_mask is not None:
-        _prime_phantom_mask_cache(images, phantom_mask)
-    return images
-
-
-def _prime_phantom_mask_cache(images: QAImages, mask: BoolArray) -> None:
-    """Seed `images.phantom_mask` with the mask `select_slice` already segmented.
-
-    `QAImages.phantom_mask` is a `cached_property` defined as
-    `segment_phantom(self.mip)` — its one definition, so `detect_phantom` never
-    reads a mask that could disagree with `images.mip`. `select_slice`
-    (`center="phantom"`) has already run that exact watershed, on that exact
-    array — the winning slice's time-MIP, which is what `mip` reduces to for
-    this `QAImages` — to rank slices before this object existed. Writing that
-    value directly into the property's backing `__dict__` entry is not a
-    second definition or injected state, because it is the value the property
-    would compute anyway; it just spares the second, identical watershed that
-    accessing `.phantom_mask` would otherwise trigger. This is exactly what
-    `cached_property.__get__` itself does after computing on first access —
-    `QAImages` is a frozen dataclass without `__slots__` for that reason: an
-    instance `__dict__` exists for `cached_property` to cache into, and normal
-    attribute assignment (blocked by `frozen=True`) is not how it does so
-    either.
-    """
-    images.__dict__["phantom_mask"] = readonly(mask)
 
 
 def run_qa(scan: QAScan, settings: AnalysisSettings | None = None) -> QAResult:

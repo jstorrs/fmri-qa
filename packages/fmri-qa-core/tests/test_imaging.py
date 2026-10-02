@@ -9,7 +9,6 @@ import fmriqc as q
 from fmriqc.prep.imaging import (
     clamp_center,
     edge_valid_mask,
-    extract_center_slice,
     fluctuation_noise,
     image_center,
     odd_even_difference,
@@ -240,7 +239,7 @@ def test_phantom_area_counts_a_real_cross_section() -> None:
     assert phantom_area(image) == disk.sum()
 
 
-def test_extract_center_slice_prefers_the_phantom_over_a_larger_air_mask() -> None:
+def test_select_slice_prefers_the_phantom_over_a_larger_air_mask() -> None:
     """A prescription running off the end of the phantom must not win the argmax.
 
     Slices past the phantom hold only air, which segments to ~45% of the frame
@@ -253,14 +252,7 @@ def test_extract_center_slice_prefers_the_phantom_over_a_larger_air_mask() -> No
     # (X, Y, Z, T) with the phantom in slice 1 and air either side of it
     data = np.stack([air, phantom, air], axis=2)
 
-    chosen = extract_center_slice(data, center="phantom")
-
-    z, mask = select_slice(data, center="phantom")
-    assert z == 1
-    # The mask returned alongside the index is the one that won the ranking --
-    # not a fresh segmentation -- so it should agree with the phantom itself.
-    assert np.array_equal(mask, disk)
-    assert np.array_equal(chosen, data[:, :, 1, :])
+    assert select_slice(data, center="phantom") == 1
 
 
 def test_select_slice_prefers_a_sparse_phantom_over_empty_slices() -> None:
@@ -270,13 +262,12 @@ def test_select_slice_prefers_a_sparse_phantom_over_empty_slices() -> None:
 
     with warnings.catch_warnings():
         warnings.simplefilter("error")
-        z, mask = select_slice(data, center="phantom")
+        z = select_slice(data, center="phantom")
 
     assert z == 0  # the phantom must win over the empty middle slice
-    assert np.array_equal(mask, disk)
 
 
-def test_extract_center_slice_falls_back_when_no_slice_holds_a_phantom() -> None:
+def test_select_slice_falls_back_when_no_slice_holds_a_phantom() -> None:
     """An all-air volume has no cross-section to find, and says so.
 
     Silently returning the largest patch of segmented noise would be the old
@@ -285,5 +276,5 @@ def test_extract_center_slice_falls_back_when_no_slice_holds_a_phantom() -> None
     """
     data = _air((32, 32, 3, 4))
     with pytest.warns(UserWarning, match="no slice holds a recognizable phantom"):
-        chosen = extract_center_slice(data, center="phantom")
-    assert np.array_equal(chosen, data[:, :, 1, :])  # the middle slice
+        z = select_slice(data, center="phantom")
+    assert z == 1  # the middle slice

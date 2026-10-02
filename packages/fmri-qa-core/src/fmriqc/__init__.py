@@ -140,7 +140,6 @@ if TYPE_CHECKING:
     from .prep.images import QAImages
     from .prep.imaging import (
         edge_valid_mask,
-        extract_center_slice,
         find_phantom_center,
         fluctuation_noise,
         image_center,
@@ -240,7 +239,6 @@ __all__ = [
     "estimate_motion",
     "estimate_pe_axis",
     "estimate_smoothness",
-    "extract_center_slice",
     "find_phantom_center",
     "fluctuation_noise",
     "ghost_masks",
@@ -365,7 +363,6 @@ _EXPORTS: dict[str, tuple[str, ...]] = {
     ".prep.images": ("QAImages",),
     ".prep.imaging": (
         "edge_valid_mask",
-        "extract_center_slice",
         "find_phantom_center",
         "fluctuation_noise",
         "image_center",

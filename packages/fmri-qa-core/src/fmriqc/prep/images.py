@@ -22,8 +22,7 @@ from .imaging import (
 
 
 # The one value object here without `slots=True`: the summary images below are
-# `cached_property`, which needs a real instance `__dict__` to cache into, and
-# `pipeline._prime_phantom_mask_cache` writes one entry of that cache directly.
+# `cached_property`, which needs a real instance `__dict__` to cache into.
 @dataclass(frozen=True, eq=False)
 class QAImages(ArrayValue):
     """The center slice and its detrended fluctuations, plus derived FBIRN images.
@@ -86,15 +85,7 @@ class QAImages(ArrayValue):
 
         The one definition `detect_phantom` reads — not a constructor field, so
         no `QAImages` can be built whose mask disagrees with
-        `segment_phantom(self.mip)`. That still leaves the redundant watershed
-        `center="phantom"` would otherwise pay for: `select_slice` segments
-        this exact array (the winning slice's time-MIP, before this `QAImages`
-        even exists) to rank slices, so `preprocess` primes this cache with
-        that value — see `pipeline._prime_phantom_mask_cache` — instead of
-        letting a second, identical segmentation run on first access. Every
-        other caller (`center="image"`, and every test that builds a
-        `QAImages` directly) gets it computed fresh here, same as any other
-        summary image on this class.
+        `segment_phantom(self.mip)`.
         """
         return readonly(segment_phantom(self.mip))
 
