@@ -131,7 +131,7 @@ def save_artifact(artifact: QAArtifact, path: str | Path) -> Path:
 
 
 def _read_container(path: Path) -> tuple[str, dict[str, NDArray[Any]]]:
-    """The JSON text and the arrays, from whichever container the file is.
+    """Read the JSON text and arrays from whichever container the file is.
 
     Decided by the leading bytes rather than the suffix: `--artifact` writes the
     name the user asked for, so the suffix is a convention and not a fact, and

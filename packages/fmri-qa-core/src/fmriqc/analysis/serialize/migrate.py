@@ -32,7 +32,7 @@ from ..artifact import ARTIFACT_SCHEMA_VERSION
 
 
 def _v1_to_v2(document: dict[str, Any]) -> dict[str, Any]:
-    """Schema 1 predates the localization diagnostics: record them as unknown.
+    """Migrate schema 1 to 2, recording the localization diagnostics as unknown.
 
     A v1 artifact was analyzed by a build that never asked whether the phantom
     segmentation or the summary ROI held, so nothing in the file answers it.
@@ -48,7 +48,7 @@ def _v1_to_v2(document: dict[str, Any]) -> dict[str, Any]:
 
 
 def _v2_to_v3(document: dict[str, Any]) -> dict[str, Any]:
-    """Schema 2 has the phantom fraction but not the verdict on it.
+    """Migrate schema 2 to 3, recording the phantom-mask verdict as unknown.
 
     The verdict is not re-derived from the stored fraction even though it could
     be: the bounds belong to the segmentation in `prep`, which this module does
@@ -60,7 +60,7 @@ def _v2_to_v3(document: dict[str, Any]) -> dict[str, Any]:
 
 
 def _v3_to_v4(document: dict[str, Any]) -> dict[str, Any]:
-    """Schema 3 was trimmed but never recorded by how much.
+    """Migrate schema 3 to 4, recording the trim count as not recorded.
 
     The trim is not recomputed from the stored `trim_sec` and `tr` even though
     the arithmetic is one line: `trim_count` belongs to `prep`, and a count this
@@ -74,7 +74,7 @@ def _v3_to_v4(document: dict[str, Any]) -> dict[str, Any]:
 
 
 def _v4_to_v5(document: dict[str, Any]) -> dict[str, Any]:
-    """Schema 4 recorded neither the plane analyzed nor the mask's contrast.
+    """Migrate schema 4 to 5, recording the plane and mask contrast as unknown.
 
     Both are measurements the writing build made and did not write down, so
     they come back unknown: the slice cannot be re-derived (it depends on the
@@ -89,7 +89,7 @@ def _v4_to_v5(document: dict[str, Any]) -> dict[str, Any]:
 
 
 def _v5_to_v6(document: dict[str, Any]) -> dict[str, Any]:
-    """Schema 5 reported `max_translation`/`max_com_displacement` in voxels, always.
+    """Migrate schema 5 to 6, declaring its displacements to be in voxels.
 
     This migration does not follow the "unknown, never reconstructed" pattern
     the others do, because there is nothing to reconstruct: before this build,
@@ -116,7 +116,7 @@ def _v5_to_v6(document: dict[str, Any]) -> dict[str, Any]:
 
 
 def _v6_to_v7(document: dict[str, Any]) -> dict[str, Any]:
-    """Schema 6 always answered the clipping question, so its answers stand.
+    """Migrate schema 6 to 7, carrying its clipping answers forward unchanged.
 
     Schema 7 lets the clipping block be None -- "the series did not arrive as
     integers, so the rail test could not run". No schema 6 document can need

@@ -19,7 +19,7 @@ import fmriqc as q
 
 
 def localization_flag(m: q.Measurements) -> str:
-    """The table's `loc` cell: `ok`, or which localization failed.
+    """Format the table's `loc` cell: `ok`, or which localization failed.
 
     A collapsed phantom mask or an ROI that is not inside the phantom makes every
     mask-based number on the row a measurement of background, while leaving it
@@ -141,7 +141,7 @@ COLUMNS: tuple[Column, ...] = (
 
 
 def header_lines() -> tuple[str, str]:
-    """The fixed-width table header and its rule, as literal strings."""
+    """Return the fixed-width table header and its rule, as literal strings."""
     header = " ".join(c.pad(c.title) for c in COLUMNS)
     return header, "-" * len(header)
 

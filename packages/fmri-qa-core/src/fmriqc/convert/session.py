@@ -86,7 +86,7 @@ class ImportResult:
 
 
 def _read_sidecar(path: Path) -> Sidecar | None:
-    """The BIDS sidecar beside `path`, or None if it is missing or unreadable.
+    """Read the BIDS sidecar beside `path`; None if missing or unreadable.
 
     An unreadable sidecar is not fatal: it costs the series its QA name (the
     dcm2niix one is kept) but not its conversion, and the NIfTI is still
@@ -403,7 +403,7 @@ def _aftermath(
     kept: Sequence[tuple[Path, Path]],
     destination: Path,
 ) -> str:
-    """The second half of the error: what state the move left `destination` in.
+    """Build the error's second half: the state the move left `destination` in.
 
     `ours` are files of this import that could not be withdrawn; `kept` are files
     it had replaced that are still set aside, because they could not be put back

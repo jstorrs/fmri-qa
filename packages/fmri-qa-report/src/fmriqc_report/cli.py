@@ -18,12 +18,12 @@ from .summary import package_version
 
 
 def _title(artifact: QAArtifact, path: str) -> str:
-    """The section title for one artifact: its recorded scan name, else the file."""
+    """Choose the section title for one artifact: its scan name, else the file."""
     return artifact.provenance.scan or Path(path).name
 
 
 def _parser() -> argparse.ArgumentParser:
-    """The command line this command accepts."""
+    """Build the parser for the command line this command accepts."""
     parser = argparse.ArgumentParser(
         prog="fmri-qa-report",
         description="Render an fmri-qa analysis artifact (.qa.nc) into a "

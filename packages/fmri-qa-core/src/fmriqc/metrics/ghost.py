@@ -213,7 +213,7 @@ def ghost_ratio(
     *,
     valid_mask: BoolArray,
 ) -> float:
-    """The fBIRN Nyquist ghost-to-signal ratio for one candidate axis.
+    """Measure the fBIRN Nyquist ghost-to-signal ratio for one candidate axis.
 
     A single axis' worth of `estimate_ghost` — what `ghost_ratios` needs to
     score a candidate, before any axis is settled. A run that has settled its

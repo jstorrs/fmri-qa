@@ -20,7 +20,7 @@ JSON_SCHEMA_VERSION = 6
 
 
 def metric_record(artifact: q.QAArtifact) -> dict[str, object]:
-    """The scalar metrics for one scan as a JSON-serializable record.
+    """Build the scalar metrics for one scan as a JSON-serializable record.
 
     Mirrors the human table's columns, but as raw numbers (not the fixed-width
     formatting), so downstream tools can consume `--json` directly. The table's
@@ -99,7 +99,7 @@ def metric_record(artifact: q.QAArtifact) -> dict[str, object]:
 
 
 def config_record(settings: q.AnalysisSettings) -> dict[str, object]:
-    """The run parameters echoed into the JSON document's header."""
+    """Build the run parameters echoed into the JSON document's header."""
     return {
         "version": q.core_version(),
         "detrend": settings.detrend,

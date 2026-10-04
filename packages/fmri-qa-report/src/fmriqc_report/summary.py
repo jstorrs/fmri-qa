@@ -17,7 +17,7 @@ _SEP = "   ·   "
 
 
 def package_version() -> str:
-    """The installed `fmri-qa-report` version, or "unknown" from a source tree."""
+    """Read the installed `fmri-qa-report` version; "unknown" from a source tree."""
     try:
         return version("fmri-qa-report")
     except PackageNotFoundError:
@@ -25,7 +25,7 @@ def package_version() -> str:
 
 
 def acquisition_line(artifact: QAArtifact) -> str:
-    """The sequence/geometry metadata string. Sidecar-only fields are omitted."""
+    """Build the sequence/geometry metadata string, omitting absent fields."""
     prov, m, settings = artifact.provenance, artifact.measurements, artifact.settings
     parts = [f"TR {prov.tr:.3g}s"]
     if prov.te is not None:
@@ -64,7 +64,7 @@ def acquisition_notes(artifact: QAArtifact) -> str:
 
 
 def _localization_note(artifact: QAArtifact) -> str:
-    """The phantom/ROI localization warning for the notes block; empty if fine.
+    """Build the phantom/ROI localization warning for the notes; empty if fine.
 
     Both failures make every mask-based number on the page meaningless while
     leaving it looking like an ordinary measurement, so they are called out in
@@ -97,7 +97,7 @@ def _localization_note(artifact: QAArtifact) -> str:
 
 
 def _clipping_note(artifact: QAArtifact) -> str:
-    """The ADC-saturation warning for the notes block; empty if none.
+    """Build the ADC-saturation warning for the notes block; empty if none.
 
     Clipping inside the analyzed data biases every metric and is called out in
     capitals; clipping confined to the dropped warm-up volumes is expected on
@@ -125,7 +125,7 @@ def _clipping_note(artifact: QAArtifact) -> str:
 
 
 def provenance_line(prov: Provenance) -> str:
-    """The scanner/coil/software/time string; empty without a sidecar."""
+    """Build the scanner/coil/software/time string; empty without a sidecar."""
     parts = []
     if prov.serial:
         parts.append(f"SN {prov.serial}")

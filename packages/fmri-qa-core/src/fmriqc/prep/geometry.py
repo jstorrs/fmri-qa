@@ -172,7 +172,7 @@ def resolve_roi(
 
 
 def roi_fits(phantom_mask: BoolArray, roi: ROI) -> bool:
-    """True if `roi` is on-image and every voxel of it lies inside the phantom.
+    """Return True if `roi` is on-image and every voxel of it lies in the phantom.
 
     An out-of-bounds ROI (negative/overflowing slice) counts as not fitting —
     `np.all` of the empty selection it would produce is vacuously True otherwise.

@@ -8,7 +8,7 @@ from importlib.metadata import PackageNotFoundError, version
 
 
 def launcher_version() -> str:
-    """The installed `fmri-qa-launcher` version, or "unknown" from a bare tree."""
+    """Read the installed `fmri-qa-launcher` version; "unknown" from a bare tree."""
     try:
         return version("fmri-qa-launcher")
     except PackageNotFoundError:

@@ -241,7 +241,7 @@ _FLAG_VALUES = "flag_values"
 
 
 def _mask_attributes() -> dict[str, _AttributeValue]:
-    """The CF flag markers for one mask, built fresh for each.
+    """Build the CF flag markers for one mask, fresh for each.
 
     A function rather than a module constant because the value is a mutable
     array: one shared instance would be handed to every mask in the file, and a
@@ -557,7 +557,7 @@ def _coordinate(
 def _value_coordinate(
     axis: str, declared: _Values, arrays: Mapping[str, Member]
 ) -> _Variable | None:
-    """An axis carrying the values of the curve that already measures it."""
+    """Build an axis from the values of the curve that already measures it."""
     source = arrays.get(declared.source)
     if source is None:
         return None
@@ -570,7 +570,7 @@ def _value_coordinate(
 def _label_coordinate(
     axis: str, length: int, declared: _Labels, document: dict[str, Any]
 ) -> _Variable:
-    """An axis whose positions are named, as CF flags on the position itself."""
+    """Build an axis of named positions, as CF flags on the position itself."""
     positions = np.arange(length, dtype=np.int32)
     return _Variable(
         positions,
@@ -584,7 +584,7 @@ def _label_coordinate(
 
 
 def _label_meanings(declared: _Labels, document: dict[str, Any]) -> list[str]:
-    """The names of a labelled axis's positions, fixed or from the document."""
+    """Resolve a labelled axis's position names, fixed or from the document."""
     if isinstance(declared.meanings, str):
         return declared.meanings.split()
     labels: Any = document
@@ -594,7 +594,7 @@ def _label_meanings(declared: _Labels, document: dict[str, Any]) -> list[str]:
 
 
 def _index_coordinate(axis: str, length: int, declared: _Index) -> _Variable:
-    """An axis carrying the position along it, 0..n-1."""
+    """Build an axis carrying the position along it, 0..n-1."""
     attributes: dict[str, _AttributeValue] = {"long_name": declared.long_name}
     if declared.comment is not None:
         attributes["comment"] = declared.comment
@@ -602,7 +602,7 @@ def _index_coordinate(axis: str, length: int, declared: _Index) -> _Variable:
 
 
 def _global_attributes(text: str, stored: dict[str, Any]) -> dict[str, _AttributeValue]:
-    """The whole file's attributes: the JSON document, plus what it says.
+    """Build the whole file's attributes: the JSON document, plus what it says.
 
     The document is the artifact's own record, unchanged from the `.npz` layout
     and still the only one `read` consults. Beside it ride two conveniences for
@@ -728,7 +728,7 @@ def _attribute(name: str, value: Any) -> _AttributeValue:
 
 
 def _nc_int(name: str, value: int) -> np.int32:
-    """An integer as NC_INT, refused rather than wrapped around if it does not fit.
+    """Convert an integer to NC_INT, refusing rather than wrapping on overflow.
 
     Validation bounds counts below but not above, so a count past NC_INT is a
     valid artifact this layout cannot publish faithfully.
@@ -787,7 +787,7 @@ def _variable(
 def _labelling(
     name: str, dimensions: tuple[str, ...], auxiliary: dict[str, str]
 ) -> str:
-    """The arrays that label this variable's axes, as CF names it them.
+    """Name the arrays that label this variable's axes, space-separated.
 
     A variable never names itself: `curves.time` *is* the seconds along the
     frame axis, and an array pointing at itself would be a claim about a
@@ -801,7 +801,7 @@ def _labelling(
 
 
 def _stored(name: str, array: Member) -> NDArray[Any]:
-    """The array in the dtype the file holds it as.
+    """Convert an array to the dtype the file holds it as.
 
     Masks become 0/1 `u1`, because netCDF has no boolean type; a measured array
     keeps its own float64. Any other dtype is refused rather than silently
@@ -918,7 +918,7 @@ def _write_variable(dataset: "Dataset", name: str, variable: _Variable) -> None:
 
 
 def read(path: Path) -> tuple[str, dict[str, NDArray[Any]]]:
-    """The JSON document's text and every stored array, from a netCDF artifact.
+    """Read the JSON text and every stored array from a netCDF artifact.
 
     Masks come back as `bool`, so what a caller receives is what was written
     however the bytes were stored. The measurements and provenance fields
@@ -971,7 +971,7 @@ def read(path: Path) -> tuple[str, dict[str, NDArray[Any]]]:
 
 
 def _document_text(dataset: "Dataset", path: Path) -> str:
-    """The JSON document carried by the file's `document` attribute."""
+    """Read the JSON document carried by the file's `document` attribute."""
     if _DOCUMENT not in dataset.ncattrs():
         raise InvalidArtifactError(path, "not an fmriqc artifact archive")
     text = dataset.getncattr(_DOCUMENT)

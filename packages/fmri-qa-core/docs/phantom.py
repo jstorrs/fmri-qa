@@ -66,7 +66,7 @@ def synthetic_series(
     seed: int = 0,
     smoothing: float = SMOOTHING_VOXELS,
 ) -> np.ndarray:
-    """A bright central disk over a noisy background: (n, n, z, t), float64.
+    """Build a bright central disk over a noisy background, (n, n, z, t) float64.
 
     The disk carries seeded temporal noise (the fluctuation the stability
     metrics measure); the background carries a static magnitude floor. Each
@@ -110,13 +110,13 @@ def _written() -> Path:
 
 
 def scan() -> q.QAScan:
-    """The phantom as the loader hands it to the pipeline."""
+    """Return the phantom as the loader hands it to the pipeline."""
     return q.QAScan.from_nifti(_written())
 
 
 @cache
 def artifact() -> q.QAArtifact:
-    """The analyzed phantom, computed once per documentation build.
+    """Return the analyzed phantom, computed once per documentation build.
 
     Cached because every figure reads from the same analysis: the curves a page
     plots and the numbers its table names are then one run's, not several.

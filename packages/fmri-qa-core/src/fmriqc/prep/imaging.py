@@ -35,7 +35,7 @@ MIN_PHANTOM_CONTRAST = 4.0
 
 
 def trim_count(*, tr: float, trim_sec: float) -> int:
-    """Number of initial (non-steady-state) volumes dropped for `trim_sec`."""
+    """Count the initial (non-steady-state) volumes dropped for `trim_sec`."""
     return max(round(trim_sec / tr), 0)
 
 
@@ -126,7 +126,7 @@ def phantom_area(image: FloatArray) -> int:
 
 
 def select_slice(data: FloatArray, center: RoiCenter = "image") -> int:
-    """The index of the QA slice in an (X, Y, Z, T) volume.
+    """Select the index of the QA slice in an (X, Y, Z, T) volume.
 
     "image": the geometric middle slice (Glover/fBIRN convention).
     "phantom": the slice with the largest phantom cross-section, measured by
@@ -156,7 +156,7 @@ def select_slice(data: FloatArray, center: RoiCenter = "image") -> int:
 
 
 def _largest_phantom_slice(data: FloatArray) -> int:
-    """The slice with the largest phantom cross-section.
+    """Find the slice with the largest phantom cross-section.
 
     Falls back to the middle slice, with a warning, when no slice holds a
     recognizable phantom -- `phantom_area` scores those 0, so there is no

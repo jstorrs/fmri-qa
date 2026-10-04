@@ -117,7 +117,7 @@ class Detrender:
     def for_series(
         cls, center_slice: FloatArray, tr: float, method: DetrendMethod = "poly"
     ) -> "Detrender":
-        """The detrender for a series of this length, at this TR.
+        """Build the detrender for a series of this length, at this TR.
 
         Complexity (poly degree / spline nodes) is derived once here from the
         timeseries length and `tr`, so every later application shares it.
@@ -169,7 +169,7 @@ class Detrender:
 
 
 def _poly_detrender(center_slice: FloatArray, tr: float) -> Detrender:
-    """The Legendre detrender for this series length, at its resolved degree."""
+    """Build the Legendre detrender for this series, at its resolved degree."""
     n_frames = center_slice.shape[-1]
     degree = poly_degree(center_slice, tr)
     if degree + 1 >= n_frames:
@@ -186,7 +186,7 @@ def _poly_detrender(center_slice: FloatArray, tr: float) -> Detrender:
 
 
 def _spline_detrender(center_slice: FloatArray, tr: float) -> Detrender:
-    """The B-spline detrender for this series, at its resolved interior-knot count."""
+    """Build the B-spline detrender for this series at its interior-knot count."""
     n_frames = center_slice.shape[-1]
     n_nodes = spline_nodes(center_slice, tr)
     n_coefficients = n_nodes + SPLINE_DEGREE + 1

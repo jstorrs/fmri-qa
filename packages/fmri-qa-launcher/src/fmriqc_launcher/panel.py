@@ -157,7 +157,7 @@ class _Rows:
         self._next = 0
 
     def take(self, span: int = 1) -> int:
-        """The next unused row; `span` reserves that many before the next call."""
+        """Take the next unused row; `span` reserves that many before the next call."""
         row = self._next
         self._next += span
         return row
@@ -425,7 +425,7 @@ class Panel:
     # -- reading the form ---------------------------------------------
 
     def form_values(self) -> FormValues:
-        """The widgets' current values, as a `FormValues` -- unparsed, as held."""
+        """Read the widgets' current values as a `FormValues`, unparsed, as held."""
         return FormValues(
             dicom_dir=self._dicom_var.get(),
             output_dir=self._output_var.get(),
@@ -769,7 +769,7 @@ def run_panel() -> int:
 
 
 def main() -> int:
-    """The `fmri-qa-panel` gui-script entry point.
+    """Run the panel as the `fmri-qa-panel` gui-script entry point.
 
     Under `pythonw` there is no console to explain a missing display to, so
     `PanelUnavailableError` is reported the only way it can be from there: a

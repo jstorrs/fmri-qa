@@ -27,7 +27,7 @@ from .arguments import PrintVersion, attributed_warnings, positive_int
 
 
 def _parser() -> argparse.ArgumentParser:
-    """The command line this command accepts."""
+    """Build the parser for the command line this command accepts."""
     parser = argparse.ArgumentParser(
         prog="fmri-qa-import",
         description="Convert a DICOM directory to QA-ready NIfTI with dcm2niix, "

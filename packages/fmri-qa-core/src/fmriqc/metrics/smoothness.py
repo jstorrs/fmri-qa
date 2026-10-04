@@ -169,7 +169,7 @@ def _fwhm_1dif(image: FloatArray, mask: BoolArray) -> FloatArray:
 
 
 def _acf_1d(image: FloatArray, mask: BoolArray, axis: int, max_lag: int) -> FloatArray:
-    """Normalized spatial autocorrelation of `image` along `axis`, lags 0..max_lag.
+    """Estimate normalized spatial autocorrelation along `axis`, lags 0..max_lag.
 
     Follows AFNI `mri_estimate_ACF`: center by the in-mask mean and normalize by
     the in-mask variance, so `rho[d]` is the correlation of the noise field with

@@ -83,7 +83,7 @@ def _panel_fig(
     roi: RoiBox | None = None,
     log: bool = False,
 ) -> Figure:
-    """A single labelled image panel as a square-ish figure."""
+    """Build a single labelled image panel as a square-ish figure."""
     fig = Figure(figsize=(2.0, 2.0 * _PANEL_ASPECT))
     ax = fig.add_subplot(111)
     data = np.log(np.clip(img, 1e-9, None)) if log else img
@@ -166,7 +166,7 @@ def _ghost_panel_fig(images: ArtifactImages) -> Figure:
 
 
 def panel_figs(artifact: QAArtifact) -> list[Figure]:
-    """The summary image panels, in row order (last is the N/2 ghost overlay)."""
+    """Draw the summary image panels, in row order (last: N/2 ghost overlay)."""
     images = artifact.images
     hull, roi = images.phantom_hull, images.roi
     return [

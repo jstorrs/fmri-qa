@@ -70,9 +70,10 @@ The root config selects a broad rule set — the notable groups:
 | `D` | pydocstyle, with `convention = "numpy"`: docstring structure and numpydoc section layout (see [documentation.md](documentation.md)) |
 
 `D` is enabled with the numpy convention, so the section rules match the numpydoc format the
-docstrings use. Tests (`**/tests/**`), `stubs/**` and `__main__.py` are exempt from `D`:
-test names are their own documentation, a stub's one docstring says why it exists, and
-`__main__.py` is an entry-point shim. `D401` (imperative mood) is not yet enabled. `TC`
+docstrings use. `D401` is on: a function or method summary is imperative ("Compute..."),
+while properties, classes and dataclasses keep noun-phrase summaries. Tests (`**/tests/**`),
+`stubs/**` and `__main__.py` are exempt from `D`: test names are their own documentation, a
+stub's one docstring says why it exists, and `__main__.py` is an entry-point shim. `TC`
 (moving type-only imports under `TYPE_CHECKING`) is deliberately left out for now, and the
 config says so in a comment.
 

@@ -111,7 +111,6 @@ select = [
     "D",             # pydocstyle (numpy convention, see below)
 ]
 ignore = [
-    "D401",     # imperative mood: enabled by the next commit
     "PLC0415",  # allow function-local imports
 ]
 

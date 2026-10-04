@@ -44,7 +44,7 @@ def _positive_seconds(value: object) -> float | None:
 
 
 def _repetition_time(header: Any, sidecar: Sidecar, path: str | Path) -> float:
-    """The TR in seconds, preferring the sidecar over a converted pixdim[4].
+    """Resolve the TR in seconds, preferring the sidecar over pixdim[4].
 
     The sidecar `RepetitionTime` is authoritative when it is a positive, finite
     number; otherwise the header value converted by `xyzt_units` is used. When

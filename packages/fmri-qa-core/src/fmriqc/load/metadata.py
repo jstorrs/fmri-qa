@@ -120,7 +120,7 @@ def _malformed(key: str, value: object, expected: str) -> None:
 
 
 def _optional_number(sidecar: Sidecar, key: str) -> float | None:
-    """A finite number from the sidecar, or None if absent or malformed."""
+    """Read a finite number from the sidecar, or None if absent or malformed."""
     value = sidecar.get(key)
     if value is None:
         return None
@@ -134,7 +134,7 @@ def _optional_number(sidecar: Sidecar, key: str) -> float | None:
 
 
 def _optional_text(sidecar: Sidecar, key: str) -> str | None:
-    """A text field from the sidecar, or None if absent or malformed.
+    """Read a text field from the sidecar, or None if absent or malformed.
 
     A number is kept as its text (a serial number written unquoted is still a
     serial number); anything structured is not a value this field can hold.
@@ -151,7 +151,7 @@ def _optional_text(sidecar: Sidecar, key: str) -> str | None:
 
 
 def _pe_direction(pe_axis: int | None) -> str | None:
-    """The row/col word for the axis the loader resolved, or None if it did not.
+    """Name the row/col word for the resolved axis, or None if unresolved.
 
     Derived from `pe_axis` alone, and deliberately *not* from the sidecar's own
     `InPlanePhaseEncodingDirectionDICOM` wording. Reading that word here made

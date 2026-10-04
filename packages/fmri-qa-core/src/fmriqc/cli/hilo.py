@@ -21,7 +21,7 @@ from .arguments import (
 
 
 def _parser() -> argparse.ArgumentParser:
-    """The command line this command accepts."""
+    """Build the parser for the command line this command accepts."""
     defaults = q.AnalysisSettings()
     parser = argparse.ArgumentParser(
         prog="fmri-qa-hilo",

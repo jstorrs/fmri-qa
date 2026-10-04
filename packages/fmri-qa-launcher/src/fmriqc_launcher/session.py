@@ -77,11 +77,11 @@ class _PlannedSeries:
 
 
 def _silent(_progress: Progress) -> None:
-    """The default progress callback: report nothing."""
+    """Report nothing, as the default progress callback."""
 
 
 def _always() -> bool:
-    """The default continuation check: a run that is never asked to cancel."""
+    """Return True always: the default check for a run never asked to cancel."""
     return True
 
 
@@ -265,7 +265,7 @@ def _move_files(work_dir: Path, files: Sequence[Path]) -> None:
 
 
 def _failed(name: str, exc: Exception, noted: tuple[str, ...] = ()) -> Failed:
-    """A logged `Failed` outcome for `exc`, carrying whatever warnings preceded it."""
+    """Log `exc` and build its `Failed` outcome, with the warnings before it."""
     reason = str(exc) or type(exc).__name__
     _LOG.warning("series %s failed: %s", name, reason)
     return Failed(name, reason=reason, warnings=noted)
@@ -435,5 +435,5 @@ def _copy_durably(source: Path, destination: Path) -> None:
 
 
 def _messages(caught: list[warnings.WarningMessage]) -> tuple[str, ...]:
-    """The text of every warning `warnings.catch_warnings(record=True)` caught."""
+    """Collect the text of every warning recorded by `catch_warnings`."""
     return tuple(str(w.message) for w in caught)

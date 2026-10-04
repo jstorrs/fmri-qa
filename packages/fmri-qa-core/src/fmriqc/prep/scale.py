@@ -56,7 +56,7 @@ class VoxelSize:
 
     @classmethod
     def in_plane(cls, voxel_mm: tuple[float, float, float]) -> Self:
-        """The in-plane size, from a header's (row, col, slice spacing) triple.
+        """Build the in-plane size from a header's (row, col, slice spacing) triple.
 
         The one place the row/col pair is taken off the triple `ScanMeta.voxel_mm`
         carries: a caller that sliced it for itself could as easily take the

@@ -59,16 +59,16 @@ class MetricDoc:
     unit: Unit = ""
 
     def value(self, m: Measurements) -> float:
-        """The raw measured value."""
+        """Return the raw measured value."""
         value: float = getattr(m, self.name)
         return value
 
     def number(self, m: Measurements) -> str:
-        """The value rounded to this metric's decimals, without its unit."""
+        """Round the value to this metric's decimals, without its unit."""
         return f"{self.value(m):.{self.decimals}f}"
 
     def unit_for(self, m: Measurements) -> str:
-        """The unit text for these measurements; empty for a dimensionless metric."""
+        """Return the unit text for these measurements; empty if dimensionless."""
         return self.unit(m) if callable(self.unit) else self.unit
 
 

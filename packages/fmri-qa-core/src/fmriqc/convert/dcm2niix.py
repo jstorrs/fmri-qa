@@ -67,7 +67,7 @@ _VERSION = re.compile(r"version\s+(v[\w.]+)")
 
 
 def find_dcm2niix(explicit: str | Path | None = None) -> Path:
-    """The dcm2niix to run: the one named, else the bundled one, else PATH.
+    """Find the dcm2niix to run: the one named, else bundled, else on PATH.
 
     The `dcm2niix` PyPI package ships the compiled binary and exposes its path,
     and it is a dependency of `fmri-qa-core`, so the bundled branch is the one
@@ -120,7 +120,7 @@ def build_args(
     depth: int = DEFAULT_DEPTH,
     extra: Sequence[str] = (),
 ) -> list[str]:
-    """The dcm2niix argument list for one import, pinned flags first.
+    """Build the dcm2niix argument list for one import, pinned flags first.
 
     `extra` is appended *after* everything this function chooses, so a
     passthrough argument wins — that is what makes it an escape hatch rather
@@ -193,7 +193,7 @@ def run(binary: Path, args: Sequence[str]) -> str:
 
 
 def version(output: str) -> str | None:
-    """The dcm2niix version out of its own banner, or None if it did not say.
+    """Parse the dcm2niix version from its banner, or None if it did not say.
 
     Read from the run's output rather than asked for with a second `--version`
     call: the banner is the first line of every conversion, and the version that

@@ -41,7 +41,7 @@ class Progress:
 
 
 def describe(progress: Progress) -> str:
-    """A one-line, human-readable summary of `progress`.
+    """Describe `progress` as a one-line, human-readable summary.
 
     Import names no series -- there is none to name yet -- so its line reads
     differently from the other three, which all share one "N of M: name" shape.

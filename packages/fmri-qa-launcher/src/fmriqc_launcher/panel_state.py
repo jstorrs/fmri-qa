@@ -169,7 +169,7 @@ def _all_refused(result: RunResult) -> bool:
 
 
 def _headline(result: RunResult) -> str:
-    """The one-line summary of `result` for the status label.
+    """Summarize `result` in one line for the status label.
 
     A cancelled run never shows "N of M": `RunResult.outcomes` only holds the
     series a cancelled run actually reached (`session.run_session` breaks the
@@ -193,7 +193,7 @@ def _headline(result: RunResult) -> str:
 
 
 def summarize(result: RunResult) -> Summary:
-    """The finish summary a panel shows once a run has ended."""
+    """Build the finish summary a panel shows once a run has ended."""
     return Summary(
         headline=_headline(result),
         details=_outcome_lines(result),
@@ -202,7 +202,7 @@ def summarize(result: RunResult) -> Summary:
 
 
 def stopping_message(last: Progress | None) -> str:
-    """What the status line should say once closing has asked the run to stop.
+    """Compose what the status line says once closing asks the run to stop.
 
     `should_continue` (see `session.run_session`) is only polled between
     series, never mid-import and never mid-series, so what "stopping" means
@@ -221,7 +221,7 @@ def stopping_message(last: Progress | None) -> str:
 
 
 def exit_code(event: Finished | Crashed) -> int:
-    """The process exit code for a run's terminal event.
+    """Map a run's terminal event to the process exit code.
 
     0 only for a `Finished` event whose `RunResult.complete` is true (every
     series found was published and nothing was cancelled); 1 for a `Crashed`

@@ -47,7 +47,7 @@ DESCRIPTION_LIMIT = 40
 
 
 def sanitize(text: str, limit: int = DESCRIPTION_LIMIT) -> str:
-    """A description reduced to `[A-Za-z0-9_]`, trimmed to `limit`.
+    """Reduce a description to `[A-Za-z0-9_]`, trimmed to `limit`.
 
     Stripped of underscores at both ends *after* truncation as well as before,
     so a cut that lands on punctuation does not leave a trailing `_`.
@@ -56,7 +56,7 @@ def sanitize(text: str, limit: int = DESCRIPTION_LIMIT) -> str:
 
 
 def _digits(value: object, count: int) -> str | None:
-    """The first `count` digits of `value`, or None if there are fewer.
+    """Extract the first `count` digits of `value`, or None if there are fewer.
 
     The sidecar's times and dates are punctuated (`2026-09-09T14:30:12.500000`)
     and the punctuation varies with the writer, so the digits are taken and the
@@ -88,7 +88,7 @@ def text_field(sidecar: Sidecar, key: str) -> str | None:
 
 
 def acquired(sidecar: Sidecar) -> tuple[str | None, str | None]:
-    """The series' `(YYYYMMDD, HHMMSS)`, either half None if the sidecar is silent.
+    """Return `(YYYYMMDD, HHMMSS)`, with None for a half the sidecar omits.
 
     `AcquisitionDateTime` carries both and is the preferred source.
     `AcquisitionTime` is the fallback and holds the time alone — notably it is
@@ -109,7 +109,7 @@ def _series_number(sidecar: Sidecar) -> str | None:
 
 
 def _description(sidecar: Sidecar) -> str | None:
-    """The sanitized series description, falling back to the protocol name."""
+    """Return the sanitized series description, else the protocol name."""
     for key in ("SeriesDescription", "ProtocolName"):
         value = text_field(sidecar, key)
         if value is not None and (cleaned := sanitize(value)):
@@ -118,7 +118,7 @@ def _description(sidecar: Sidecar) -> str | None:
 
 
 def qa_stem(sidecar: Sidecar) -> str | None:
-    """The QA file stem for a series, or None if its sidecar says nothing usable.
+    """Build the QA file stem for a series; None if its sidecar says nothing.
 
     Each of the four fields is included when present and skipped when absent, so
     a partial sidecar degrades to a shorter name rather than to no name — an

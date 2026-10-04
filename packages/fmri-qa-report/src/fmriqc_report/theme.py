@@ -41,7 +41,7 @@ class Theme:
     panel_font_family: str | None = None  # None keeps the matplotlib default family
 
     def rc_params(self) -> "dict[RcKeyType, object]":
-        """The matplotlib rcParams that style the panels to match the page.
+        """Build the matplotlib rcParams that style the panels to match the page.
 
         A driver activates these with `matplotlib.rc_context` around the figure
         building so the phantom colormap, the primary-series colour, and the

@@ -13,7 +13,7 @@ from importlib.metadata import PackageNotFoundError, version
 
 
 def core_version() -> str:
-    """The installed `fmri-qa-core` version, or "unknown" from a bare source tree."""
+    """Read the installed `fmri-qa-core` version; "unknown" from a source tree."""
     try:
         return version("fmri-qa-core")
     except PackageNotFoundError:

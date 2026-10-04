@@ -66,7 +66,7 @@ class _PrintVersion(argparse.Action):
 
 
 def _build_parser() -> argparse.ArgumentParser:
-    """The command line this command accepts."""
+    """Build the parser for the command line this command accepts."""
     parser = argparse.ArgumentParser(
         prog="fmri-qa-run",
         description="Run fmri-qa end to end: one DICOM directory in, one report "
@@ -173,7 +173,7 @@ def _launch_panel() -> int:
 
 
 def _request_from(args: argparse.Namespace) -> RunRequest:
-    """The run `args` ask for; raises `RequestError` naming every problem."""
+    """Build the run `args` ask for; raises `RequestError` naming every problem."""
     settings = AnalysisSettings(
         trim_sec=args.trim_sec,
         detrend=args.detrend,

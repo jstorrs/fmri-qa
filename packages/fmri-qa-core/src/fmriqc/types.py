@@ -80,7 +80,7 @@ PE_AXES: tuple[PeAxis, ...] = get_args(PeAxis)
 
 
 def readout_axis(pe_axis: PeAxis) -> PeAxis:
-    """The readout axis: the in-plane axis that is not the phase-encode one.
+    """Return the readout axis: the in-plane axis other than phase-encode.
 
     `1 - pe_axis` says this in fewer characters but evaluates to a plain `int`,
     which then has to be re-narrowed at each use. Naming it keeps the pair

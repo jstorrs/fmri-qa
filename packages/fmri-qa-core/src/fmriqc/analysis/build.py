@@ -117,7 +117,7 @@ def _provenance(result: QAResult, *, name: str, source: str) -> Provenance:
 
 
 def _pe_label(result: QAResult) -> PeLabel:
-    """The phase-encode direction to display: "row", "col", or "?".
+    """Resolve the phase-encode direction to display: "row", "col", or "?".
 
     One rule, and the axis is the whole of it: the label names the axis the
     ghost masks were built on, whatever settled it -- the sidecar, the header,
@@ -220,7 +220,7 @@ def _curves(result: QAResult) -> Curves:
 
 
 def _weisskoff_curve(result: QAResult) -> WeisskoffCurve:
-    """The measured CV curve with its ideal reference line resolved."""
+    """Build the measured CV curve together with its ideal reference line."""
     wk = result.metrics.weisskoff
     sizes = np.asarray(wk.roi_sizes, dtype=np.float64)
     return WeisskoffCurve(
@@ -268,7 +268,7 @@ def _psf_curves(s: SmoothnessResult) -> PsfCurves:
 
 
 def _convex_hull(mask: BoolArray) -> FloatArray:
-    """The closed convex outline of a mask as an (N, 2) polygon in (x, y) order.
+    """Compute the closed convex hull of a mask as an (N, 2) (x, y) polygon.
 
     Materialized here so a renderer can stroke the phantom boundary without any
     computational geometry. `imshow` maps column -> x and row -> y, so the mask's
@@ -298,7 +298,7 @@ def _convex_hull(mask: BoolArray) -> FloatArray:
 
 
 def _ghost_regions(result: QAResult) -> GhostRegions | None:
-    """The region-matched signal/ghost masks per in-plane axis, or None.
+    """Copy the region-matched signal/ghost masks per axis, or None.
 
     Copied off the `GhostResult` the run measured on, not rebuilt here: the
     published regions are the ones the percentages were averaged over, by
@@ -317,7 +317,7 @@ def _ghost_regions(result: QAResult) -> GhostRegions | None:
 
 
 def _images(result: QAResult) -> ArtifactImages:
-    """The four fBIRN summary images plus the geometry drawn over them."""
+    """Assemble the four fBIRN summary images plus the geometry drawn over them."""
     images, geom, roi = result.images, result.geom, result.roi
     fluctuation_noise = images.fluctuation_noise
     # Per-voxel SFNR inside the phantom; the epsilon keeps the ratio finite where

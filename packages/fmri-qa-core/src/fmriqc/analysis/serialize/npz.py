@@ -31,7 +31,7 @@ _DOCUMENT = "__document__"
 
 
 def read(path: Path) -> tuple[str, dict[str, NDArray[Any]]]:
-    """The JSON document's text and every stored array, from an `.npz` artifact.
+    """Read the JSON text and every stored array from an `.npz` artifact.
 
     Raises
     ------
@@ -60,7 +60,7 @@ def read(path: Path) -> tuple[str, dict[str, NDArray[Any]]]:
 
 
 def _document_text(member: NDArray[Any]) -> str:
-    """The JSON text of the `__document__` member, in either stored form.
+    """Decode the JSON text of the `__document__` member, in either stored form.
 
     Read before the schema version is known -- the version is *inside* this
     document -- so the two forms are told apart by dtype rather than by version:

@@ -126,7 +126,7 @@ def weisskoff(images: QAImages, roi: ROI) -> WeisskoffResult:
 
 
 def snr(images: QAImages, roi: ROI) -> float:
-    """The fBIRN signal-to-noise ratio over a resolved ROI (Friedman & Glover 2006).
+    """Compute the fBIRN SNR over a resolved ROI (Friedman & Glover 2006).
 
     Signal is the mean of the temporal-mean image over the ROI. Static spatial
     noise is the ROI variance of the (odd-sum minus even-sum) difference image;
@@ -162,7 +162,7 @@ def snr(images: QAImages, roi: ROI) -> float:
 
 
 def sfnr(images: QAImages, roi: ROI) -> float:
-    """The fBIRN signal-to-fluctuation-noise ratio over a resolved ROI.
+    """Compute the fBIRN signal-to-fluctuation-noise ratio over a resolved ROI.
 
     After Friedman & Glover 2006.
 

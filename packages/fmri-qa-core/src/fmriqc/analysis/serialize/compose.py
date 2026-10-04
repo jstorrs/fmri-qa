@@ -32,14 +32,14 @@ _PROVENANCE_TUPLES = ("voxel_mm", "matrix")
 
 
 def _floats(arrays: Mapping[str, NDArray[Any]], key: str) -> FloatArray:
-    """A required float array member."""
+    """Return a required float array member."""
     if arrays[key].dtype.kind not in "fiu":
         raise ValueError(f"{key} must be a real numeric array")
     return np.asarray(arrays[key], dtype=np.float64)
 
 
 def _bools(arrays: Mapping[str, NDArray[Any]], key: str) -> BoolArray:
-    """A required boolean mask member."""
+    """Return a required boolean mask member."""
     if arrays[key].dtype != np.bool_:
         raise ValueError(f"{key} must be a boolean mask")
     return np.asarray(arrays[key], dtype=np.bool_)

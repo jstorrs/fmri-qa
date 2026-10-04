@@ -39,7 +39,7 @@ def decompose(artifact: QAArtifact) -> tuple[dict[str, Any], dict[str, Member]]:
 
 
 def _curves_section(curves: Curves) -> tuple[dict[str, Any], dict[str, Member]]:
-    """The curve scalars, and every trace keyed by its dotted path."""
+    """Split the curve scalars from every trace keyed by its dotted path."""
     psf = curves.psf
     document = {
         "outlier_qthr": curves.outlier_qthr,
@@ -77,7 +77,7 @@ def _curves_section(curves: Curves) -> tuple[dict[str, Any], dict[str, Member]]:
 def _images_section(
     images: ArtifactImages,
 ) -> tuple[dict[str, Any], dict[str, Member]]:
-    """The image-section scalars, and every image/mask keyed by its dotted path."""
+    """Split the image scalars from every image/mask keyed by its dotted path."""
     document = {"roi": asdict(images.roi), "has_ghost": images.ghost is not None}
     arrays: dict[str, Member] = {
         "images.signal": images.signal,

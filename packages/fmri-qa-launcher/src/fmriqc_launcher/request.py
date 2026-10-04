@@ -273,7 +273,7 @@ def _parse_center(text: str, problems: list[str]) -> RoiCenter | None:
 
 
 def _translate_settings_problem(exc: InvalidScanError) -> str:
-    """A plain-language rewording of what `AnalysisSettings` refused.
+    """Reword what `AnalysisSettings` refused in plain language.
 
     `exc.field` names the constructor argument that failed; `trim_sec` and
     `roi_size` are the only two a form built from `FormValues` can ever

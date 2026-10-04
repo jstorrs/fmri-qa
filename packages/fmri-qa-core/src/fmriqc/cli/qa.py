@@ -33,7 +33,7 @@ from .table import format_row, header_lines
 
 
 def _parser() -> argparse.ArgumentParser:
-    """The command line this command accepts."""
+    """Build the parser for the command line this command accepts."""
     parser = argparse.ArgumentParser(
         prog="fmri-qa",
         description="Phantom fMRI QA: SNR, SFNR, RDC (Weisskoff), Nyquist ghost.",

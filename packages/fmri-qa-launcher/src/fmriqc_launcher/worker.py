@@ -74,7 +74,7 @@ def _run_session(
     notice: CleanupNoticeCallback,
     should_continue: Callable[[], bool],
 ) -> RunResult:
-    """The real pipeline, imported only once a run starts. See the module docstring."""
+    """Run the real pipeline, imported once a run starts. See module docstring."""
     from .session import run_session
 
     return run_session(
