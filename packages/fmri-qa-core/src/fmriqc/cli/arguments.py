@@ -26,6 +26,7 @@ class PrintVersion(argparse.Action):
         values: object,
         option_string: str | None = None,
     ) -> None:
+        """Print the program name and core version, then exit."""
         # stdout, and only then exit: `parser.exit(message=...)` would send it
         # to stderr, where argparse's own `action="version"` never put it.
         print(f"{parser.prog} {q.core_version()}")
@@ -33,6 +34,7 @@ class PrintVersion(argparse.Action):
 
 
 def nonnegative_float(value: str) -> float:
+    """Parse a finite number of at least zero."""
     parsed = float(value)
     if not math.isfinite(parsed) or parsed < 0:
         raise argparse.ArgumentTypeError(
@@ -42,6 +44,7 @@ def nonnegative_float(value: str) -> float:
 
 
 def positive_int(value: str) -> int:
+    """Parse a positive integer."""
     parsed = int(value)
     if parsed <= 0:
         raise argparse.ArgumentTypeError("expected a positive integer")
@@ -49,12 +52,14 @@ def positive_int(value: str) -> int:
 
 
 def nonempty(value: str) -> str:
+    """Accept a non-empty path argument."""
     if not value:
         raise argparse.ArgumentTypeError("expected a non-empty path")
     return value
 
 
 def nonnegative_int(value: str) -> int:
+    """Parse an integer of at least zero."""
     parsed = int(value)
     if parsed < 0:
         raise argparse.ArgumentTypeError(

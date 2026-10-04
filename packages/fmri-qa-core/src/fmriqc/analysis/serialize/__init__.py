@@ -1,4 +1,4 @@
-"""Move a `QAArtifact` to and from a single `.qa.nc` file.
+r"""Move a `QAArtifact` to and from a single `.qa.nc` file.
 
 The on-disk form is one netCDF-4 file: every array is a variable under its
 dotted path (`curves.weisskoff.cv`, `images.ghost.pe_ghost`), declared over
@@ -24,7 +24,7 @@ document -- which fields exist and what they mean -- and no field changed; only
 the envelope did, exactly as when the `.npz` document member became `uint8`. So
 every `.qa.npz` an earlier build wrote still loads, and `npz` is kept for
 precisely that: a file's container is decided by sniffing its leading bytes
-(HDF5's `\\x89HDF\\r\\n\\x1a\\n` against a zip's `PK\\x03\\x04`), never by its
+(HDF5's `\x89HDF\r\n\x1a\n` against a zip's `PK\x03\x04`), never by its
 suffix, because the CLI writes whatever name the user asked for and a stored
 schema version cannot be consulted until the container it lives in has been
 opened. Nothing writes an `.npz` any more.
@@ -102,9 +102,11 @@ def save_artifact(artifact: QAArtifact, path: str | Path) -> Path:
     cannot hold is refused on the same terms and just as early, and the only
     file this function writes is the temporary it then renames.
 
-    Raises:
-        InvalidArtifactError: If the artifact would not read back; nothing is
-            written, and an existing file at `path` is left as it was.
+    Raises
+    ------
+    InvalidArtifactError
+        If the artifact would not read back; nothing is written, and an existing
+        file at `path` is left as it was.
     """
     out = Path(path)
     try:
@@ -154,9 +156,11 @@ def load_artifact(path: str | Path) -> QAArtifact:
     this build has no route from -- or one from a newer build, which it cannot
     know the layout of -- is refused.
 
-    Raises:
-        InvalidArtifactError: If the file is not a readable artifact, is
-            malformed, or carries a `schema_version` this build cannot reach.
+    Raises
+    ------
+    InvalidArtifactError
+        If the file is not a readable artifact, is malformed, or carries a
+        `schema_version` this build cannot reach.
     """
     src = Path(path)
     try:

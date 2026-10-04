@@ -57,9 +57,11 @@ def run_hilo(
     identical voxels. `separate_noise` then does the flip-angle algebra. Raises if
     the two geometries differ or their cores do not overlap.
 
-    Raises:
-        IncompatibleScansError: If the two scans differ in geometry, or their
-            phantom cores do not overlap.
+    Raises
+    ------
+    IncompatibleScansError
+        If the two scans differ in geometry, or their phantom cores do not
+        overlap.
     """
     validate_hilo_run(high, low, trim_sec=trim_sec, erode=erode)
     require_compatible_scans(high, low)

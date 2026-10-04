@@ -62,8 +62,10 @@ def _load_sidecar(path: str | Path) -> dict[str, object]:
     is a different matter — the metadata exists and we would be misreading it —
     so it fails loudly.
 
-    Raises:
-        InvalidScanError: If the sidecar is not parseable as a JSON object.
+    Raises
+    ------
+    InvalidScanError
+        If the sidecar is not parseable as a JSON object.
     """
     sidecar = sidecar_path(path)
     if not sidecar.is_file():

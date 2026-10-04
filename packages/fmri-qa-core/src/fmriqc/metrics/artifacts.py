@@ -80,8 +80,8 @@ def outlier_fraction(
     """Per-TR outlier-voxel fraction over `mask`, following AFNI 3dToutcount.
 
     For each masked voxel the robust spread of its detrended residual is
-    `sigma = sqrt(pi/2) * MAD` (MAD = median |residual|); a frame is an outlier
-    for that voxel when `|residual| > alpha * sigma`, with
+    `sigma = sqrt(pi/2) * MAD` (MAD = ``median |residual|``); a frame is an outlier
+    for that voxel when ``|residual| > alpha * sigma``, with
     `alpha = Q^-1(qthr / n_t)` the normal upper-tail quantile. `qthr` tunes
     this length-dependent threshold, not an expected per-frame fraction.
     `fraction[t]` is the share of masked voxels flagged at frame `t`.

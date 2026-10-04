@@ -1,4 +1,4 @@
-"""The netCDF-4 container: the artifact's arrays as a self-describing file.
+r"""The netCDF-4 container: the artifact's arrays as a self-describing file.
 
 The on-disk form of a `QAArtifact`. Every array `decompose` produces becomes a
 netCDF variable under its own dotted path (`curves.weisskoff.cv`,
@@ -126,7 +126,7 @@ are not this package's to constrain -- `scan` and `source` come from file
 names, `coil`, `manufacturer`, `model`, `serial` and `software` from scanner
 headers -- and the one string with no UTF-8 form at all is the lone surrogate a
 Windows file name with an undecodable byte becomes in Python, which rides as its
-`\\udcff` escape. That attribute is lossy where the document beside it is not,
+`\udcff` escape. That attribute is lossy where the document beside it is not,
 which is the trade a convenience copy should make rather than failing the save.
 
 Because these are a convenience for a foreign reader and nothing else, `read`
@@ -487,12 +487,14 @@ def encode(
     `text` is the document's JSON, stored verbatim, and `stored` is that same
     text parsed back: the caller round-trips once and hands over both.
 
-    Raises:
-        ValueError: If an array is not one this layout declares, disagrees with
-            its declared rank, or claims a dimension another array has already
-            fixed at a different length; if an axis has no declared coordinate;
-            or if a measurement or provenance field is of a kind no netCDF
-            attribute can hold.
+    Raises
+    ------
+    ValueError
+        If an array is not one this layout declares, disagrees with its declared
+        rank, or claims a dimension another array has already fixed at a
+        different length; if an axis has no declared coordinate; or if a
+        measurement or provenance field is of a kind no netCDF attribute can
+        hold.
     """
     # Only the auxiliary coordinates this file actually carries: a `coordinates`
     # attribute naming a variable that is not here would send a reader looking
@@ -521,8 +523,10 @@ def _coordinates(
     coordinate rather than an invented one -- `encode` takes whatever arrays it
     is handed, and a made-up abscissa would be worse than none.
 
-    Raises:
-        ValueError: If an axis has no coordinate declared for it.
+    Raises
+    ------
+    ValueError
+        If an axis has no coordinate declared for it.
     """
     coordinates: dict[str, _Variable] = {}
     for axis, length in dimensions.items():
@@ -697,9 +701,11 @@ def _attribute(name: str, value: Any) -> _AttributeValue:
     text, the way CF itself spells `flag_meanings`: `curves.psf.labels` reads
     `PE RO`.
 
-    Raises:
-        ValueError: If an integer is outside NC_INT, or the value is of a kind
-            no attribute can hold.
+    Raises
+    ------
+    ValueError
+        If an integer is outside NC_INT, or the value is of a kind no attribute
+        can hold.
     """
     match value:
         case bool():
@@ -922,9 +928,11 @@ def read(path: Path) -> tuple[str, dict[str, NDArray[Any]]]:
     the document and the dotted arrays are the one record this package reads
     back, and reading a derived copy too would be two answers to one question.
 
-    Raises:
-        InvalidArtifactError: If the file is not readable as netCDF-4, carries
-            no `document` attribute, or carries one that is not text.
+    Raises
+    ------
+    InvalidArtifactError
+        If the file is not readable as netCDF-4, carries no `document`
+        attribute, or carries one that is not text.
     """
     # Deferred for the same reason as in `write`.
     import netCDF4

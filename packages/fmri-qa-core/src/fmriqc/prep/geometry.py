@@ -148,8 +148,10 @@ def resolve_roi(
     is shifted if needed to keep the ROI on-image; whether it also fits inside the
     phantom is a separate check (see `roi_fits`).
 
-    Raises:
-        InvalidChoiceError: If `center` is not one of `ROI_CENTER_MODES`.
+    Raises
+    ------
+    InvalidChoiceError
+        If `center` is not one of `ROI_CENTER_MODES`.
     """
     # Guarded up front so an untyped caller still gets the named error, then
     # matched exhaustively: `assert_never` is unreachable for a `RoiCenter`, so

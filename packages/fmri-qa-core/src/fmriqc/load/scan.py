@@ -76,6 +76,7 @@ class QAScan:
 
     @classmethod
     def from_nifti(cls, path: str | Path) -> "QAScan":
+        """Load a 4-D NIfTI series, with its BIDS sidecar when one exists."""
         img = nib.load(str(path))
         if len(img.shape) != 4:
             raise InvalidScanError(

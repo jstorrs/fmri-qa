@@ -149,12 +149,14 @@ def detect_saturation(
     lone bright voxel that happens to land there, which the reasoning above says
     is not saturation. Judge severity by the counts, not the flag.
 
-    Raises:
-        InvalidScanError: If `slope` is zero, infinite, or NaN. The rail test
-            below divides by `slope` to undo the scaling, so a non-finite or
-            zero value makes it meaningless -- not a series with no clipping,
-            which is what a caller silently getting `suspected=False` back
-            would read this as. Refusing is safer than a wrong "clean" verdict.
+    Raises
+    ------
+    InvalidScanError
+        If `slope` is zero, infinite, or NaN. The rail test below divides by
+        `slope` to undo the scaling, so a non-finite or zero value makes it
+        meaningless -- not a series with no clipping, which is what a caller
+        silently getting `suspected=False` back would read this as. Refusing is
+        safer than a wrong "clean" verdict.
     """
     if not stored_integer:
         return None

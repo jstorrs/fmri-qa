@@ -147,7 +147,7 @@ class GhostResult(ArrayValue):
 
     @property
     def ghost_pct(self) -> float:
-        """fBIRN percent ghost along the phase-encode axis."""
+        """The fBIRN percent ghost along the phase-encode axis."""
         return 100.0 * self.pe_ratio
 
     @property
@@ -213,7 +213,7 @@ def ghost_ratio(
     *,
     valid_mask: BoolArray,
 ) -> float:
-    """fBIRN Nyquist ghost-to-signal ratio for one candidate axis.
+    """The fBIRN Nyquist ghost-to-signal ratio for one candidate axis.
 
     A single axis' worth of `estimate_ghost` — what `ghost_ratios` needs to
     score a candidate, before any axis is settled. A run that has settled its

@@ -105,6 +105,7 @@ def _parser() -> argparse.ArgumentParser:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
+    """Run `fmri-qa`; return the process exit status."""
     args = _parser().parse_args(argv)
     # Before anything counts the scans: on Windows the wildcard is still here.
     args.paths = expand_globs(args.paths)

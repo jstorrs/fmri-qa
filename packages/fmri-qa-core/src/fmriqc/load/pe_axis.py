@@ -83,8 +83,10 @@ def _pe_axis_from_sidecar(sidecar: Sidecar) -> int | None:
     `InPlanePhaseEncodingDirectionDICOM` (ROW/COL) as the DICOM fallback
     (row = i = axis 0, col = j = axis 1). See `_SIDECAR_PE_FIELDS` for the order.
 
-    Raises:
-        InvalidScanError: The first present PE field has an invalid value.
+    Raises
+    ------
+    InvalidScanError
+        The first present PE field has an invalid value.
     """
     for field in _SIDECAR_PE_FIELDS:
         if field not in sidecar:

@@ -1,5 +1,4 @@
-"""`fmri-qa-report`: render a saved analysis artifact into a single-file HTML
-report.
+"""`fmri-qa-report`: render a saved artifact into a one-file HTML report.
 
 The presentation half's entry point. It reads the `.qa.nc` artifacts written by
 `fmri-qa --artifact` — never a NIfTI series — so reporting is a separate step

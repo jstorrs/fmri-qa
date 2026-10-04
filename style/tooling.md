@@ -67,9 +67,14 @@ The root config selects a broad rule set — the notable groups:
 | `A` | shadowing builtins |
 | `T20` | `print` outside a binary (see [logging.md](logging.md)) |
 | `RUF` | ruff's own rules, including ambiguous Unicode |
+| `D` | pydocstyle, with `convention = "numpy"`: docstring structure and numpydoc section layout (see [documentation.md](documentation.md)) |
 
-`TC` (moving type-only imports under `TYPE_CHECKING`) and `D` (docstrings) are deliberately
-left out for now, and the config says so in a comment.
+`D` is enabled with the numpy convention, so the section rules match the numpydoc format the
+docstrings use. Tests (`**/tests/**`), `stubs/**` and `__main__.py` are exempt from `D`:
+test names are their own documentation, a stub's one docstring says why it exists, and
+`__main__.py` is an entry-point shim. `D401` (imperative mood) is not yet enabled. `TC`
+(moving type-only imports under `TYPE_CHECKING`) is deliberately left out for now, and the
+config says so in a comment.
 
 - Run `uv run ruff check` (or `--fix` to auto-apply, `make lint`). A hit fails the build.
 - **Fix, don't suppress.** A ruff hit usually points at a real simplification — the `SIM`,

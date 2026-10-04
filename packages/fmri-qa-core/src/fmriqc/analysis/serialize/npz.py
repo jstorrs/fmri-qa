@@ -33,9 +33,11 @@ _DOCUMENT = "__document__"
 def read(path: Path) -> tuple[str, dict[str, NDArray[Any]]]:
     """The JSON document's text and every stored array, from an `.npz` artifact.
 
-    Raises:
-        InvalidArtifactError: If the file is not a readable NumPy archive, or
-            carries no `__document__` member.
+    Raises
+    ------
+    InvalidArtifactError
+        If the file is not a readable NumPy archive, or carries no
+        `__document__` member.
     """
     try:
         with np.load(path, allow_pickle=False) as archive:

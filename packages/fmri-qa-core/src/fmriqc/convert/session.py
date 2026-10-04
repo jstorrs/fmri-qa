@@ -155,16 +155,18 @@ def import_dicom(
     is filed under the name `convert.naming` builds from its sidecar; with
     `names="dcm2niix"` it keeps whatever `template` produced.
 
-    Raises:
-        InvalidChoiceError: If `names` is not one of `NAME_STYLES` or
-            `anonymize` is not one of `ANONYMIZE_MODES`.
-        ConversionError: If `source` is not a directory, if no dcm2niix can be
-            found or it exits non-zero, if imported files would share a
-            destination, if a target is a directory (including a symlink to
-            one), if the import would overwrite files already in `destination`
-            and `force` is not set, or if a file cannot be moved into
-            `destination`. All destination checks happen before any file moves,
-            and a move that fails is undone.
+    Raises
+    ------
+    InvalidChoiceError
+        If `names` is not one of `NAME_STYLES` or `anonymize` is not one of
+        `ANONYMIZE_MODES`.
+    ConversionError
+        If `source` is not a directory, if no dcm2niix can be found or it exits
+        non-zero, if imported files would share a destination, if a target is a
+        directory (including a symlink to one), if the import would overwrite
+        files already in `destination` and `force` is not set, or if a file
+        cannot be moved into `destination`. All destination checks happen before
+        any file moves, and a move that fails is undone.
     """
     # Guarded up front so an untyped caller still gets the named error, then
     # matched exhaustively: `assert_never` is unreachable for a `NameStyle`, so
@@ -330,9 +332,11 @@ def _file_atomically(planned: Sequence[tuple[Path, Path]], destination: Path) ->
     had replaced still set aside; and a file of an earlier import that this one
     does not collide with, which was never this function's to move.
 
-    Raises:
-        ConversionError: If a file cannot be moved, saying whether the import
-            was undone and, if not completely, exactly what is left.
+    Raises
+    ------
+    ConversionError
+        If a file cannot be moved, saying whether the import was undone and, if
+        not completely, exactly what is left.
     """
     replaced: list[tuple[Path, Path]] = []  # (target, where it was set aside)
     filed: list[tuple[Path, Path]] = []  # (staged, target)

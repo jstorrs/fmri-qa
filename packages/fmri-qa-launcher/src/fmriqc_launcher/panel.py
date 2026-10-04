@@ -751,12 +751,13 @@ class Panel:
 def run_panel() -> int:
     """Build the panel and run its event loop; return 0, or 1 if the last run failed.
 
-    Raises:
-        PanelUnavailableError: If no display is available -- either building
-            the `tk.Tk` root or constructing the panel's widgets raised
-            `tkinter.TclError`. Never a bare `tkinter.TclError`, so
-            `cli._launch_panel` can report this without importing `tkinter`
-            itself.
+    Raises
+    ------
+    PanelUnavailableError
+        If no display is available -- either building the `tk.Tk` root or
+        constructing the panel's widgets raised `tkinter.TclError`. Never a bare
+        `tkinter.TclError`, so `cli._launch_panel` can report this without
+        importing `tkinter` itself.
     """
     try:
         root = tk.Tk()

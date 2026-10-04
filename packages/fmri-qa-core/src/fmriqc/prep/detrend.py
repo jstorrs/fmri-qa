@@ -64,6 +64,7 @@ def spline_residuals(y: FloatArray, n_nodes: int) -> FloatArray:
 
 
 def poly_degree(y: FloatArray, tr: float) -> int:
+    """Return the Legendre detrend degree: the duration in `POLY_CUTOFF_S`, rounded."""
     n = y.shape[-1]
     return int(np.round(n * tr / POLY_CUTOFF_S))
 
@@ -128,11 +129,13 @@ class Detrender:
         then measured on a residual of nothing. Refuse the fit rather than
         return zeros that look like a very stable scanner.
 
-        Raises:
-            InvalidChoiceError: If `method` is not one of `DETREND_METHODS`.
-            InvalidScanError: If the fit has at least as many coefficients as
-                frames, leaving no residual degrees of freedom for noise
-                estimation.
+        Raises
+        ------
+        InvalidChoiceError
+            If `method` is not one of `DETREND_METHODS`.
+        InvalidScanError
+            If the fit has at least as many coefficients as frames, leaving no
+            residual degrees of freedom for noise estimation.
         """
         # Guarded up front so an untyped caller still gets the named error, then
         # matched exhaustively: `assert_never` is unreachable for a

@@ -50,6 +50,7 @@ class VoxelSize:
     mm: tuple[float, float] | None = None
 
     def __post_init__(self) -> None:
+        """Coerce `mm` to a pair of floats."""
         if self.mm is not None:
             object.__setattr__(self, "mm", (float(self.mm[0]), float(self.mm[1])))
 

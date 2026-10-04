@@ -118,14 +118,15 @@ def run_session(
     this best-effort callback are logged and suppressed to preserve the run's
     result or original error. `KeyboardInterrupt` and `SystemExit` propagate.
 
-    Raises:
-        SessionError: If `output_dir` cannot be created or written to, no
-            staging directory can be made, the DICOM import fails outright
-            (no converter, an unreadable source, dcm2niix exiting non-zero,
-            an `OSError` while filing its output), or the import produces no
-            series at all. A failure specific to *one*
-            series never raises -- it becomes a `Failed` outcome and the run
-            continues with the next series.
+    Raises
+    ------
+    SessionError
+        If `output_dir` cannot be created or written to, no staging directory
+        can be made, the DICOM import fails outright (no converter, an
+        unreadable source, dcm2niix exiting non-zero, an `OSError` while filing
+        its output), or the import produces no series at all. A failure specific
+        to *one* series never raises -- it becomes a `Failed` outcome and the
+        run continues with the next series.
     """
     try:
         request.output_dir.mkdir(parents=True, exist_ok=True)

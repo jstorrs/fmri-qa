@@ -56,6 +56,11 @@ def broken_links(site: Path) -> list[str]:
 
 
 def main(argv: list[str]) -> None:
+    """Check the built site at `argv[0]`; exit non-zero on a bad link.
+
+    Also exits non-zero, printing usage, on a wrong argument count, and when the
+    site has no HTML pages.
+    """
     if len(argv) != 1:
         sys.exit(__doc__)
     site = Path(argv[0])

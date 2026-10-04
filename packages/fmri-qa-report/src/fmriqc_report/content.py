@@ -73,12 +73,12 @@ class MetricDoc:
 
 
 def _displacement_unit(m: Measurements) -> str:
-    """mm when the voxel size is known, else voxels."""
+    """Return ``"mm"`` when the voxel size is known, else ``"vox"``."""
     return m.displacement_unit
 
 
 def _fwhm_unit(m: Measurements) -> str:
-    """mm when the voxel size is known, else voxels."""
+    """Return ``"mm"`` when the voxel size is known, else ``"vox"``."""
     return m.fwhm_unit
 
 

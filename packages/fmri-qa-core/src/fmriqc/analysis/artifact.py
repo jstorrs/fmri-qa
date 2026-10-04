@@ -104,6 +104,7 @@ class Provenance:
     series: str | None = None
 
     def __post_init__(self) -> None:
+        """Refuse a provenance record with out-of-range or inconsistent fields."""
         coerce_float_fields(self)
         _require(self.n_frames > 0, "invalid provenance.n_frames")
         _require(
@@ -237,6 +238,7 @@ class Measurements:
     roi_inside_phantom: bool | None  # the ROI lies wholly within the phantom
 
     def __post_init__(self) -> None:
+        """Refuse measurements whose fields disagree or fall out of range."""
         coerce_float_fields(self)
         # `fwhm_pe`/`fwhm_ro` are None exactly when no axis resolved
         # (`SmoothnessResult.fwhm_pe`), in every build since schema 1, and no
@@ -333,6 +335,7 @@ class PsfCurves(ArrayValue):
     xmax: float
 
     def __post_init__(self) -> None:
+        """Copy the arrays read-only, then coerce the float fields."""
         # Zero-argument `super()` cannot find its class in a slots dataclass,
         # which is a new class object built after this body runs.
         ArrayValue.__post_init__(self)
@@ -369,6 +372,7 @@ class Curves(ArrayValue):
     psf: PsfCurves
 
     def __post_init__(self) -> None:
+        """Copy the arrays read-only, then coerce the float fields."""
         # Zero-argument `super()` cannot find its class in a slots dataclass,
         # which is a new class object built after this body runs.
         ArrayValue.__post_init__(self)
@@ -391,6 +395,7 @@ class RoiBox:
     col1: int
 
     def __post_init__(self) -> None:
+        """Refuse a box unless square, with a positive side and non-negative origin."""
         # The same message the image-shape half carries, because a reader of a
         # refused artifact is told which box is wrong, not which of the two
         # places looked at it.

@@ -51,6 +51,7 @@ class AnalysisSettings:
     detrend_order: int | None = None
 
     def __post_init__(self) -> None:
+        """Coerce floats; refuse a bad `trim_sec`, `roi_size` or `detrend_order`."""
         coerce_float_fields(self)
         if not math.isfinite(self.trim_sec) or self.trim_sec < 0:
             raise InvalidScanError(

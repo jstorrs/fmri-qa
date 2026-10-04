@@ -80,10 +80,12 @@ def find_dcm2niix(explicit: str | Path | None = None) -> Path:
     cannot import the bundled binary at all: a platform with no wheel that
     fell back to the sdist and failed to build it, or a pruned environment.
 
-    Raises:
-        ConversionError: If no dcm2niix can be found, or the named one is not
-            an executable file. Naming one that cannot be run is a mistake worth
-            reporting rather than quietly falling back past.
+    Raises
+    ------
+    ConversionError
+        If no dcm2niix can be found, or the named one is not an executable file.
+        Naming one that cannot be run is a mistake worth reporting rather than
+        quietly falling back past.
     """
     if explicit is not None:
         found = shutil.which(str(explicit))
@@ -169,10 +171,11 @@ def run(binary: Path, args: Sequence[str]) -> str:
     converts into a directory it owns and lists that instead, so the answer
     comes from the filesystem rather than from parsing a human-readable line.
 
-    Raises:
-        ConversionError: If dcm2niix exits non-zero. Its own last words are
-            carried through, since they name the DICOM problem far better than
-            an exit status can.
+    Raises
+    ------
+    ConversionError
+        If dcm2niix exits non-zero. Its own last words are carried through,
+        since they name the DICOM problem far better than an exit status can.
     """
     try:
         # Not shell=True, and `binary` is an absolute path resolved by

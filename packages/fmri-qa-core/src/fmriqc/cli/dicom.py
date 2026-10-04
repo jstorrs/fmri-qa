@@ -158,6 +158,7 @@ def _print_listing(result: ImportResult, destination: Path, *, renaming: bool) -
 
 
 def import_main(argv: Sequence[str] | None = None) -> int:
+    """Run `fmri-qa-import`; return the process exit status."""
     args = _parser().parse_args(argv)
     destination = _destination(args.source, args.out)
 

@@ -106,9 +106,11 @@ class BackgroundRun:
     def start(self) -> None:
         """Start the run on a new non-daemon thread.
 
-        Raises:
-            RuntimeError: If called more than once -- a second call would run
-                the pipeline twice concurrently against the same request.
+        Raises
+        ------
+        RuntimeError
+            If called more than once -- a second call would run the pipeline
+            twice concurrently against the same request.
         """
         if self._thread is not None:
             raise RuntimeError("BackgroundRun.start() called more than once")

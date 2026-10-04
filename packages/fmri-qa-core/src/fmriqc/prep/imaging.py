@@ -40,6 +40,7 @@ def trim_count(*, tr: float, trim_sec: float) -> int:
 
 
 def trim_initial(data: FloatArray, *, tr: float, trim_sec: float) -> FloatArray:
+    """Drop the initial volumes that `trim_sec` seconds covers at `tr`."""
     return data[..., trim_count(tr=tr, trim_sec=trim_sec) :]
 
 
@@ -134,8 +135,10 @@ def select_slice(data: FloatArray, center: RoiCenter = "image") -> int:
     of a segmentation of its own air. If no slice holds a recognizable phantom,
     the middle slice is used and a warning says so.
 
-    Raises:
-        InvalidChoiceError: If `center` is not one of `ROI_CENTER_MODES`.
+    Raises
+    ------
+    InvalidChoiceError
+        If `center` is not one of `ROI_CENTER_MODES`.
     """
     # Guarded up front so an untyped caller still gets the named error, then
     # matched exhaustively: `assert_never` is unreachable for a `RoiCenter`, so
@@ -173,12 +176,14 @@ def _largest_phantom_slice(data: FloatArray) -> int:
 
 
 def find_phantom_center(phantom_mask: BoolArray) -> IntArray:
+    """Center (row, col) of the largest inscribed circle of the phantom mask."""
     dist = ndimage.distance_transform_edt(phantom_mask)
     roi_center = np.unravel_index(np.argmax(dist), dist.shape)
     return np.array(roi_center)
 
 
 def roi_indexes(roi_center: IntArray, n: int) -> tuple[slice, slice]:
+    """Index the `n` x `n` ROI around `roi_center` as (rows, cols) slices."""
     # roi_center is (row, col) in array-index order; return (rows, cols) so
     # callers index as mask[roi]. Do NOT swap these — the notebooks' swapped
     # version transposes the ROI and only agrees when roi_center[0] == roi_center[1].
@@ -233,7 +238,7 @@ def edge_valid_mask(image: FloatArray, zero: float = 0.0) -> BoolArray:
 
 
 def odd_even_difference(center_slice: FloatArray) -> FloatArray:
-    """|mean(even frames) - mean(odd frames)| — a temporal-stability image."""
+    """``|mean(even frames) - mean(odd frames)|``, a temporal-stability image."""
     even = center_slice[..., 0::2].mean(axis=-1)
     odd = center_slice[..., 1::2].mean(axis=-1)
     return np.abs(even - odd)

@@ -91,8 +91,8 @@ indent-style = "space"
 
 [tool.ruff.lint]
 # See style/tooling.md for the rationale behind each group. TC (type-only
-# imports under TYPE_CHECKING) and D (docstrings) are deliberately left out for
-# now — the ruleset is a living part of the style, tightened as needs recur.
+# imports under TYPE_CHECKING) is deliberately left out for now — the ruleset
+# is a living part of the style, tightened as needs recur.
 select = [
     "E", "W", "F",   # pycodestyle + Pyflakes
     "I",             # import sorting (isort)
@@ -108,26 +108,34 @@ select = [
     "A",             # shadowing builtins
     "T20",           # flake8-print (keeps print out of libraries)
     "RUF",           # ruff-specific rules
+    "D",             # pydocstyle (numpy convention, see below)
 ]
 ignore = [
+    "D401",     # imperative mood: enabled by the next commit
     "PLC0415",  # allow function-local imports
 ]
 
+[tool.ruff.lint.pydocstyle]
+convention = "numpy"
+
 [tool.ruff.lint.per-file-ignores]
-# Tests: assert is the assertion, magic values and unused fixture args are fine.
-"**/tests/**" = ["S101", "PLR2004", "ARG"]
+# Tests: assert is the assertion, magic values and unused fixture args are fine;
+# test names and bodies are their own documentation.
+"**/tests/**" = ["S101", "PLR2004", "ARG", "D"]
 # Output belongs to the binary (see style/logging.md).
 "**/cli.py" = ["T201"]
 "**/cli/*.py" = ["T201"]
-"**/__main__.py" = ["T201"]
+# `__main__.py` is a bare entry-point shim with nothing to document.
+"**/__main__.py" = ["T201", "D"]
 # The report renders human-facing text with intentional typography (× ° —), and
 # its tests assert on that text.
 "packages/fmri-qa-report/**" = ["RUF001"]
 # Stubs mirror external library signatures verbatim, including names we would
 # not choose: scipy's `input` parameter (A002) and the dcm2niix wrapper's
 # module-level `bin` (A001). Renaming either would make the stub describe a
-# module that does not exist.
-"stubs/**" = ["A001", "A002"]
+# module that does not exist. Their docstrings state why the stub exists, not
+# what each mirrored signature does.
+"stubs/**" = ["A001", "A002", "D"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["fmriqc", "fmriqc_report", "fmriqc_launcher"]

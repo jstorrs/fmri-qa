@@ -1,5 +1,4 @@
-"""The report `Theme`: the visual decisions the matplotlib panels are drawn
-with.
+"""The report `Theme`, the visual decisions the matplotlib panels follow.
 
 A `Theme` carries the colormap, accent colour, and font family a run page's
 figures use, exposed as matplotlib rcParams through `rc_params()`. The default
@@ -42,7 +41,7 @@ class Theme:
     panel_font_family: str | None = None  # None keeps the matplotlib default family
 
     def rc_params(self) -> "dict[RcKeyType, object]":
-        """matplotlib rcParams that style the panels to match the page.
+        """The matplotlib rcParams that style the panels to match the page.
 
         A driver activates these with `matplotlib.rc_context` around the figure
         building so the phantom colormap, the primary-series colour, and the

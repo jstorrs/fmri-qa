@@ -183,6 +183,7 @@ class RunRequest:
     open_report: bool = False
 
     def __post_init__(self) -> None:
+        """Resolve paths, then refuse unusable directories or an unknown `anonymize`."""
         # `resolve()` rather than `absolute()`: both anchor a relative path at
         # the current directory, but only `resolve()` also collapses `.`/`..`
         # and follows symlinks, which is what lets the same-directory check
@@ -321,9 +322,10 @@ def parse_form(values: FormValues) -> RunRequest:
     those checks is returned as-is when nothing else went wrong -- built once,
     not rebuilt identically for the return.
 
-    Raises:
-        RequestError: If anything above was wrong. `problems` lists every
-            reason found.
+    Raises
+    ------
+    RequestError
+        If anything above was wrong. `problems` lists every reason found.
     """
     problems: list[str] = []
     dicom_dir = _require_path(values.dicom_dir, DICOM_DIR_LABEL, problems)

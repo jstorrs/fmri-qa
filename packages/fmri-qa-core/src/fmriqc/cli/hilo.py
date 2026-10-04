@@ -56,6 +56,7 @@ def _parser() -> argparse.ArgumentParser:
 
 
 def hilo_main(argv: Sequence[str] | None = None) -> int:
+    """Run `fmri-qa-hilo`; return the process exit status."""
     args = _parser().parse_args(argv)
 
     hi_name = Path(args.high).name
