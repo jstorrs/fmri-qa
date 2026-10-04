@@ -129,7 +129,7 @@ def _spike_ratio(x: FloatArray) -> float:
 def spike_scores(images: QAImages, roi: ROI) -> SpikeResult:
     """cran-fmriqa MAD-normalized temporal/spectral spike scores over the ROI.
 
-    Both are `_spike_ratio` (peak / robust spread) of the detrended ROI-mean
+    Both are peak over robust (MAD) spread of the detrended ROI-mean
     residual series -- `tc_outlier` in the time domain, `spec_outlier` on its FFT
     magnitude with the DC bin dropped (matching cran, and the report's residual
     spectrum). The residual is the ROI mean of the pipeline's per-voxel

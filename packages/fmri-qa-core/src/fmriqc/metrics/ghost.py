@@ -244,7 +244,7 @@ def ghost_ratios(
     real ghost signal (high mean); along the wrong axis it lands on background
     (low mean) — what `estimate_pe_axis` compares to pick a winner. An axis
     whose ghost region came back empty — the phantom spans the FOV along it, or
-    the segmentation collapsed — scores NaN (see `_mean_ratio`): not a low
+    the segmentation collapsed — scores NaN: not a low
     ratio but no ratio at all, a distinction `estimate_pe_axis` relies on.
     """
     return {

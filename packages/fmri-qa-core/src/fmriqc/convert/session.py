@@ -16,9 +16,9 @@ both are the reason for it:
   destination exactly as it was.
 * **A move that fails part-way is undone.** Filing is a sequence of renames, and
   the fifth of twelve can be refused -- a sync client holding the file, a disk
-  error. `_file_atomically` records the renames it has made and reverses them,
-  so the destination is as it was; see there for where that cannot be promised,
-  and what is said instead.
+  error. The import records the renames it has made and reverses them, so the
+  destination is as it was; where that cannot be promised, the error says what
+  state the destination is left in.
 
 Staging is created inside the destination so the move is a rename within one
 filesystem rather than a copy, and is removed whether or not the import
@@ -164,7 +164,7 @@ def import_dicom(
             one), if the import would overwrite files already in `destination`
             and `force` is not set, or if a file cannot be moved into
             `destination`. All destination checks happen before any file moves,
-            and a move that fails is undone (see `_file_atomically`).
+            and a move that fails is undone.
     """
     # Guarded up front so an untyped caller still gets the named error, then
     # matched exhaustively: `assert_never` is unreachable for a `NameStyle`, so

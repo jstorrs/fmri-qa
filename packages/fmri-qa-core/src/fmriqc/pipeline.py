@@ -145,7 +145,11 @@ def preprocess(scan: QAScan, settings: AnalysisSettings | None = None) -> QAImag
 
 
 def run_qa(scan: QAScan, settings: AnalysisSettings | None = None) -> QAResult:
-    """Full pipeline: scan -> preprocess -> phantom -> Weisskoff/RDC + ghost ratio.
+    """Run the single-slice QA pipeline on a scan.
+
+    Stages, in order: validate, full-series saturation, preprocess, detect
+    phantom, resolve ROI, fBIRN statistics, ghost family, outliers, spikes,
+    motion, centre of mass, smoothness.
 
     `settings` is the request; the result carries it back with the detrend order
     the run resolved. Its fields:
@@ -187,7 +191,7 @@ def run_qa(scan: QAScan, settings: AnalysisSettings | None = None) -> QAResult:
 
     # Directional spatial smoothness (AFNI 3dFWHMx): the Gaussian FWHM of the
     # detrended noise field along PE and RO, plus the point-spread curves -- the
-    # correlation-length confound the guide warns the Weisskoff RDC is measured
+    # correlation-length confound the Weisskoff RDC is measured
     # against. Computed here so `resolved_pe` labels the directions.
     smoothness = estimate_smoothness(
         images.fluctuations, geom.phantom_mask, voxel=voxel, pe_axis=resolved_pe

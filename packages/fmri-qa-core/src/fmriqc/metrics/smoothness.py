@@ -34,7 +34,7 @@ class SmoothnessResult(ArrayValue):
     `FWHM = sqrt(8 ln 2)*sigma`. Estimated on each fluctuation frame over the
     phantom mask, then aggregated across frames by geometric mean (AFNI `-geom`).
     A larger FWHM means a smoother noise field -- the spatial-correlation confound
-    the guide warns the Weisskoff RDC is measured against.
+    the Weisskoff RDC is measured against.
 
     The axes are resolved to physical directions with `pe_axis`: `fwhm_pe` is the
     FWHM along the phase-encode axis, `fwhm_ro` along the readout axis. `acf` is
@@ -93,12 +93,18 @@ class SmoothnessResult(ArrayValue):
 
     @property
     def fwhm_pe(self) -> float | None:
-        """FWHM along the phase-encode axis (mm/voxels); None if `pe_axis` unknown."""
+        """FWHM along the phase-encode axis; None if `pe_axis` unknown.
+
+        In `voxel.unit` (mm when the voxel size is known, else voxels).
+        """
         return None if self.pe_axis is None else self.fwhm_axis(self.pe_axis)
 
     @property
     def fwhm_ro(self) -> float | None:
-        """FWHM along the readout axis (mm/voxels); None if `pe_axis` unknown."""
+        """FWHM along the readout axis; None if `pe_axis` unknown.
+
+        In `voxel.unit` (mm when the voxel size is known, else voxels).
+        """
         a = self.ro_axis
         return None if a is None else self.fwhm_axis(a)
 
@@ -227,13 +233,13 @@ def estimate_smoothness(
     (AFNI's `-unif`, which the `-detrend` path forces on) -- so the estimate
     reflects the noise *correlation length* rather than its spatially varying
     amplitude, and voxels that are constant over time (MAD = 0) are dropped from
-    the mask. Per in-plane axis, the Classic first-difference FWHM (`_fwhm_1dif`)
-    is estimated on each standardized fluctuation frame over the phantom mask and
-    aggregated across frames by geometric mean (AFNI `-geom`); the empirical
-    spatial autocorrelation (`_directional_acf`) is collected over the same lags
-    for the point-spread curves. `pe_axis` labels the axes as phase-encode /
-    readout; `voxel` (in-plane, from the header) lets lengths be reported in
-    mm. `fluctuations` is (X, Y, T) -- `QAImages.fluctuations`, the same
+    the mask. Per in-plane axis, the FWHM (AFNI's Classic first-difference
+    estimator) is estimated on each standardized fluctuation frame over the
+    phantom mask and aggregated across frames by geometric mean (AFNI `-geom`);
+    the empirical directional spatial autocorrelation is collected over
+    the same lags for the point-spread curves. `pe_axis` labels the axes as
+    phase-encode / readout; `voxel` (in-plane, from the header) lets lengths be
+    reported in mm. `fluctuations` is (X, Y, T) -- `QAImages.fluctuations`, the same
     Legendre-detrended residual the noise metrics are measured on.
     """
     centered = fluctuations - np.median(fluctuations, axis=-1, keepdims=True)

@@ -48,14 +48,14 @@ def run_hilo(
 ) -> HiLoResult:
     """Separate thermal from instability noise using a high/low flip-angle scan pair.
 
-    Following `bxh-fmriqa-hilo.md`: `high` and `low` must be the same acquisition
-    except for flip angle (the high-flip run first). Each scan is reduced to a
-    temporal-mean map and a temporal-SD-of-residual map over the whole volume
-    (`hilo_stats`), and the statistics are pooled over the **shared** eroded
-    phantom core — the intersection of the two scans' core masks — so `mean_high`
-    and `mean_low` are averaged over identical voxels. `separate_noise` then does
-    the flip-angle algebra. Raises if the two geometries differ or their cores do
-    not overlap.
+    Following Greve's high/low flip-angle method (bxh `fmriqa` tooling): `high` and
+    `low` must be the same acquisition except for flip angle (the high-flip run
+    first). Each scan is reduced to a temporal-mean map and a
+    temporal-SD-of-residual map over the whole volume (`hilo_stats`), and the
+    statistics are pooled over the **shared** eroded phantom core — the intersection
+    of the two scans' core masks — so `mean_high` and `mean_low` are averaged over
+    identical voxels. `separate_noise` then does the flip-angle algebra. Raises if
+    the two geometries differ or their cores do not overlap.
 
     Raises:
         IncompatibleScansError: If the two scans differ in geometry, or their
@@ -89,7 +89,7 @@ def run_hilo(
     mean_low = float(mean_l[core].mean())
     var_high = (
         float(sd_h[core].mean()) ** 2
-    )  # (core-mean per-voxel SD)**2, per the note
+    )  # (core-mean per-voxel SD)**2, per Greve's method
     var_low = float(sd_l[core].mean()) ** 2
     return separate_noise(
         mean_high=mean_high,

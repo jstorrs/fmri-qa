@@ -14,7 +14,7 @@ import numpy as np
 class HiLoResult:
     """Thermal vs. instability noise separation from a high/low flip-angle pair.
 
-    Greve's high/low flip-angle QA (`bxh-fmriqa-hilo.md`): two phantom runs that
+    Greve's high/low flip-angle QA (bxh `fmriqa` tooling): two phantom runs that
     differ *only* in flip angle let the two noise sources be separated, because
     thermal (additive) noise variance is independent of signal level while
     instability (multiplicative: drift, gradient heating, physiological-like
@@ -31,7 +31,7 @@ class HiLoResult:
 
     All statistics are pooled over the shared eroded phantom core: `mean_*` is the
     core-mean of the per-voxel temporal mean; `var_*` is the *square* of the
-    core-mean per-voxel temporal SD of the detrended residual (the note's
+    core-mean per-voxel temporal SD of the detrended residual (Greve's
     `ROIstats` on the `stddev` image, then squared). `flip_high`/`flip_low` are
     the sidecar flip angles, carried for the report and the ordering check.
     """

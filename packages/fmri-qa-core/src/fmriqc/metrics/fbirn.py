@@ -67,7 +67,7 @@ def _roi_cv(*, fluctuations: FloatArray, mean_image: FloatArray, roi: ROI) -> fl
     timeseries (detrending commutes with the spatial mean), and the temporal
     mean of that timeseries is the ROI mean of `mean_image`.
 
-    NaN on a zero ROI mean signal; see `_relative_to_signal`.
+    NaN when the ROI mean signal is exactly zero.
     """
     roi_fluct = roi.mean(fluctuations)
     roi_signal = roi.mean(mean_image)
@@ -82,7 +82,7 @@ def _roi_cv1(
 ) -> float:
     """Single-voxel CV pooled over an ROI: RMS(noise) / ROI mean signal.
 
-    NaN on a zero ROI mean signal; see `_relative_to_signal`.
+    NaN when the ROI mean signal is exactly zero.
     """
     s = fluctuation_noise[roi.index]
     roi_signal = roi.mean(mean_image)
@@ -126,7 +126,7 @@ def weisskoff(images: QAImages, roi: ROI) -> WeisskoffResult:
 
 
 def snr(images: QAImages, roi: ROI) -> float:
-    """fBIRN signal-to-noise ratio over a resolved ROI (Glover 2006).
+    """fBIRN signal-to-noise ratio over a resolved ROI (Friedman & Glover 2006).
 
     Signal is the mean of the temporal-mean image over the ROI. Static spatial
     noise is the ROI variance of the (odd-sum minus even-sum) difference image;
@@ -137,8 +137,9 @@ def snr(images: QAImages, roi: ROI) -> float:
     an odd count the two subsets differ by one frame, so the difference carries
     a whole frame of signal, and that frame's spatial variation across the ROI —
     not noise — dominates the variance: a phantom shaded 25% across the FOV reads
-    25% low. Frame parity is set by `--trim-sec`, so the same series would score
-    differently for a one-volume change in the warm-up trim. The trailing frame
+    25% low. Frame parity is set by the warm-up trim
+    (`AnalysisSettings.trim_sec`), so the same series would score differently
+    for a one-volume change in the warm-up trim. The trailing frame
     is dropped from the difference only; the signal still averages the full
     series. NaN for a series too short to hold one odd/even pair, and NaN when
     the difference image has no variance across the ROI at all: there is no
@@ -161,7 +162,9 @@ def snr(images: QAImages, roi: ROI) -> float:
 
 
 def sfnr(images: QAImages, roi: ROI) -> float:
-    """fBIRN signal-to-fluctuation-noise ratio over a resolved ROI (Glover 2006).
+    """fBIRN signal-to-fluctuation-noise ratio over a resolved ROI.
+
+    After Friedman & Glover 2006.
 
     Mean over the ROI of the voxelwise SFNR image (temporal-mean signal divided
     by temporal fluctuation noise).
@@ -182,7 +185,7 @@ def sfnr(images: QAImages, roi: ROI) -> float:
 def drift_percent(images: QAImages, roi: ROI) -> float:
     """Peak-to-peak of the ROI-mean fitted trend, as % of the ROI mean signal.
 
-    NaN on a zero ROI mean signal; see `_relative_to_signal`.
+    NaN when the ROI mean signal is exactly zero.
     """
     trend_roi = roi.mean(images.trend)
     signal = roi.mean(images.mean_image)
@@ -194,7 +197,7 @@ def drift_percent(images: QAImages, roi: ROI) -> float:
 def percent_fluctuation(images: QAImages, roi: ROI) -> float:
     """SD of the ROI-mean residual, as % of the ROI mean signal (fBIRN).
 
-    NaN on a zero ROI mean signal; see `_relative_to_signal`.
+    NaN when the ROI mean signal is exactly zero.
     """
     return 100.0 * _roi_cv(
         fluctuations=images.fluctuations, mean_image=images.mean_image, roi=roi

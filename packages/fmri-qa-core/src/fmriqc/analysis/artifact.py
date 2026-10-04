@@ -140,8 +140,9 @@ class Measurements:
     combined FWHM) are resolved here once, at build time.
 
     `pe_label` is the phase-encode direction as it should be *displayed* ("row",
-    "col", or "?"): the sidecar's DICOM direction when the run did not override
-    the axis, otherwise the label of the axis actually used.
+    "col", or "?"): the label of the axis the ghost masks were built on, whichever
+    source settled it (sidecar, header, `pe_axis_override`, or the ghost
+    estimate), and "?" when none did.
 
     The two localization fields say whether the numbers beside them can be
     trusted at all. Every mask-based metric is measured through the phantom

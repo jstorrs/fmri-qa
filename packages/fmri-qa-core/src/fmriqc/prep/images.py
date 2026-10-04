@@ -33,7 +33,7 @@ class QAImages(ArrayValue):
     from here. `fluctuations` is the per-voxel detrended residual, so ROI-averaging
     it equals detrending the ROI mean (detrending is a fixed linear operator that
     commutes with the spatial mean); `trend = center_slice - fluctuations` is the
-    fitted low-frequency drift needed for drift/SFNR summaries. `zero_value` is
+    fitted low-frequency drift that `drift_percent` summarizes. `zero_value` is
     the image value a stored zero maps to — the scan's `scl_inter`, without
     which a nulled image edge is not recognizable as one.
 
@@ -101,7 +101,11 @@ class QAImages(ArrayValue):
 
     @cached_property
     def static_noise(self) -> FloatArray:
-        """(X, Y) odd/even difference (FBIRN static spatial noise)."""
+        """(X, Y) ``|mean(even) - mean(odd)|``, published as `images.static_noise`.
+
+        `snr` does not read it: it builds its own odd/even *sum* difference over
+        an even frame count.
+        """
         return readonly(odd_even_difference(self.center_slice))
 
     @cached_property
