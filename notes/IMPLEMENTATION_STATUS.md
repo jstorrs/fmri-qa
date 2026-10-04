@@ -69,7 +69,7 @@ TR 2.0 s) they reproduce the exact FBIRN choices, and only diverge for
 off-protocol acquisitions, by design.
 
 1. **Detrend order scales with run length.** GSQAP prescribes a fixed
-   `-polort 2`. We compute `degree = round(nt·TR / 200 s)` (`poly_degree`). The
+   `-polort 2`. We compute `degree = round(nt·TR / 200 s)` (`Detrender.for_series`). The
    200 s cutoff is calibrated so the FBIRN run (198 used × TR 2.0 s = 396 s)
    lands on **degree 2** — the FBIRN value. It only scales up for much longer
    acquisitions; the fixed-2 assumption of the standard is honored where the

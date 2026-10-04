@@ -6,13 +6,13 @@ import numpy as np
 import pytest
 
 from fmriqc import ROI, ClipRail, MotionResult, QAImages, SaturationResult
-from fmriqc.prep.imaging import roi_indexes
+from fmriqc.prep.geometry import _roi_indexes
 from fmriqc.prep.scale import VoxelSize
 
 
 def test_roi_index_matches_roi_indexes() -> None:
     roi = ROI(center=np.array([5, 7]), size=3)
-    assert roi.index == roi_indexes(np.array([5, 7]), 3)
+    assert roi.index == _roi_indexes(np.array([5, 7]), 3)
 
 
 def test_saturation_result_derived_flags() -> None:

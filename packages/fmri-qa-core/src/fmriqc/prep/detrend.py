@@ -16,6 +16,15 @@ from scipy.interpolate import make_lsq_spline
 from ..exceptions import InvalidChoiceError, InvalidScanError
 from ..types import DETREND_METHODS, DetrendMethod, FloatArray
 
+__all__ = [
+    "POLY_CUTOFF_S",
+    "SPLINE_CUTOFF_S",
+    "SPLINE_DEGREE",
+    "Detrender",
+    "poly_residuals",
+    "spline_residuals",
+]
+
 # Detrend cutoff period (s). Drift slower than this is removed before noise is
 # measured. `poly` and `spline` historically used 200 vs 256; kept distinct
 # because only `poly` feeds the settled pipeline.
@@ -28,10 +37,10 @@ SPLINE_CUTOFF_S = 256.0
 SPLINE_DEGREE = 2
 
 
-def spline_nodes(y: FloatArray, tr: float) -> int:
+def _spline_nodes(y: FloatArray, tr: float) -> int:
     """Recommended number of interior knots: one spline segment per `SPLINE_CUTOFF_S`.
 
-    The spline analogue of `poly_degree` — the fit-complexity knob for
+    The spline analogue of `_poly_degree` — the fit-complexity knob for
     `spline_residuals`, separated so it can be computed once from the header.
     """
     nt = y.shape[-1]
@@ -41,9 +50,11 @@ def spline_nodes(y: FloatArray, tr: float) -> int:
 def spline_residuals(y: FloatArray, n_nodes: int) -> FloatArray:
     """Detrend along the last axis with a least-squares B-spline (handles N-D).
 
-    A drop-in alternative to `poly_residuals`; `n_nodes` (interior knots, from
-    `spline_nodes`) sets the fit complexity the way `degree` does for the poly,
-    with the spline's own degree fixed at `SPLINE_DEGREE`.
+    A drop-in alternative to `poly_residuals`; `n_nodes` (interior knots, which
+    `Detrender.for_series` sets to one fewer than the run duration in
+    `SPLINE_CUTOFF_S` units, so one spline segment per `SPLINE_CUTOFF_S`) sets
+    the fit complexity the way `degree` does for the poly, with the spline's
+    own degree fixed at `SPLINE_DEGREE`.
     """
     nt = y.shape[-1]
     x = np.arange(nt, dtype=np.float64)
@@ -63,7 +74,7 @@ def spline_residuals(y: FloatArray, n_nodes: int) -> FloatArray:
     return np.asarray((signals - fitted).T.reshape(y.shape), dtype=np.float64)
 
 
-def poly_degree(y: FloatArray, tr: float) -> int:
+def _poly_degree(y: FloatArray, tr: float) -> int:
     """Return the Legendre detrend degree: the duration in `POLY_CUTOFF_S`, rounded."""
     n = y.shape[-1]
     return int(np.round(n * tr / POLY_CUTOFF_S))
@@ -171,7 +182,7 @@ class Detrender:
 def _poly_detrender(center_slice: FloatArray, tr: float) -> Detrender:
     """Build the Legendre detrender for this series, at its resolved degree."""
     n_frames = center_slice.shape[-1]
-    degree = poly_degree(center_slice, tr)
+    degree = _poly_degree(center_slice, tr)
     if degree + 1 >= n_frames:
         raise InvalidScanError(
             "detrend order",
@@ -188,7 +199,7 @@ def _poly_detrender(center_slice: FloatArray, tr: float) -> Detrender:
 def _spline_detrender(center_slice: FloatArray, tr: float) -> Detrender:
     """Build the B-spline detrender for this series at its interior-knot count."""
     n_frames = center_slice.shape[-1]
-    n_nodes = spline_nodes(center_slice, tr)
+    n_nodes = _spline_nodes(center_slice, tr)
     n_coefficients = n_nodes + SPLINE_DEGREE + 1
     if n_coefficients >= n_frames:
         raise InvalidScanError(

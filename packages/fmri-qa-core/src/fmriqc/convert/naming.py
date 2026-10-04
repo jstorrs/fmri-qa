@@ -46,7 +46,7 @@ _UNSAFE = re.compile(r"[^A-Za-z0-9]+")
 DESCRIPTION_LIMIT = 40
 
 
-def sanitize(text: str, limit: int = DESCRIPTION_LIMIT) -> str:
+def _sanitize(text: str, limit: int = DESCRIPTION_LIMIT) -> str:
     """Reduce a description to `[A-Za-z0-9_]`, trimmed to `limit`.
 
     Stripped of underscores at both ends *after* truncation as well as before,
@@ -112,7 +112,7 @@ def _description(sidecar: Sidecar) -> str | None:
     """Return the sanitized series description, else the protocol name."""
     for key in ("SeriesDescription", "ProtocolName"):
         value = text_field(sidecar, key)
-        if value is not None and (cleaned := sanitize(value)):
+        if value is not None and (cleaned := _sanitize(value)):
             return cleaned
     return None
 

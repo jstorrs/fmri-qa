@@ -14,6 +14,11 @@ from .._arrays import ArrayValue
 from ..prep.scale import UNKNOWN_VOXEL_SIZE, VoxelSize
 from ..types import BoolArray, FloatArray
 
+__all__ = [
+    "CenterOfMassResult",
+    "estimate_center_of_mass",
+]
+
 
 def _resolved_angle(
     sine: FloatArray, cosine: FloatArray, total: FloatArray

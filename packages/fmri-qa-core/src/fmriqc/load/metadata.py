@@ -20,6 +20,10 @@ from ..warn import warn
 from .paths import sidecar_path
 from .pe_axis import PE_ROWCOL, in_plane
 
+__all__ = [
+    "ScanMeta",
+]
+
 
 @dataclass(frozen=True, slots=True)
 class ScanMeta:

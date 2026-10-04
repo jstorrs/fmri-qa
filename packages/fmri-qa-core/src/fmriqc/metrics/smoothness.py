@@ -12,9 +12,15 @@ from dataclasses import dataclass
 import numpy as np
 
 from .._arrays import ArrayValue
-from ..prep.imaging import geomean
 from ..prep.scale import UNKNOWN_VOXEL_SIZE, VoxelSize
 from ..types import BoolArray, FloatArray, IntArray, PeAxis, readout_axis
+
+__all__ = [
+    "SIGMA_TO_FWHM",
+    "SMOOTHNESS_MAX_LAG",
+    "SmoothnessResult",
+    "estimate_smoothness",
+]
 
 # Gaussian FWHM per standard deviation: sqrt(8 ln 2) (AFNI 3dFWHMx uses 2.35482).
 SIGMA_TO_FWHM = float(np.sqrt(8.0 * np.log(2.0)))
@@ -122,19 +128,26 @@ class SmoothnessResult(ArrayValue):
     @property
     def fwhm_combined_vox(self) -> float:
         """Geometric mean of the per-axis FWHM over the resolved axes (voxels)."""
-        return geomean(np.asarray(self.fwhm_vox))
+        return _geomean(np.asarray(self.fwhm_vox))
 
     @property
     def fwhm_combined_mm(self) -> float | None:
         """Geometric-mean FWHM in mm (AFNI `ccomb`); None without voxel sizes."""
         mm = self.fwhm_mm
-        return geomean(np.asarray(mm)) if mm is not None else None
+        return _geomean(np.asarray(mm)) if mm is not None else None
 
     @property
     def fwhm(self) -> float:
         """Combined FWHM, in `voxel.unit`."""
         mm = self.fwhm_combined_mm
         return mm if mm is not None else self.fwhm_combined_vox
+
+
+def _geomean(x: FloatArray) -> float:
+    """Geometric mean over the positive, finite entries; NaN if there are none."""
+    x = np.asarray(x, dtype=float)
+    x = x[np.isfinite(x) & (x > 0)]
+    return float(np.exp(np.mean(np.log(x)))) if x.size else float("nan")
 
 
 def _fwhm_1dif(image: FloatArray, mask: BoolArray) -> FloatArray:
@@ -249,7 +262,7 @@ def estimate_smoothness(
 
     nt = scaled.shape[-1]
     per = np.array([_fwhm_1dif(scaled[..., t], work_mask) for t in range(nt)])
-    fwhm_vox = (geomean(per[:, 0]), geomean(per[:, 1]))
+    fwhm_vox = (_geomean(per[:, 0]), _geomean(per[:, 1]))
 
     lag = min(max_lag, *(d - 1 for d in work_mask.shape[:2]))
     lags = np.arange(lag + 1)

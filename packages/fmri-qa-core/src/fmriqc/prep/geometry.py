@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from typing import Any, assert_never
 
 import numpy as np
+from scipy import ndimage
 
 from .._arrays import ArrayValue
 from ..exceptions import InvalidChoiceError
@@ -26,13 +27,17 @@ from .imaging import (
     DEGENERATE_PHANTOM_MAX,
     DEGENERATE_PHANTOM_MIN,
     MIN_PHANTOM_CONTRAST,
-    clamp_center,
-    find_phantom_center,
-    image_center,
     phantom_contrast,
     phantom_plausible,
-    roi_indexes,
 )
+
+__all__ = [
+    "ROI",
+    "PhantomGeometry",
+    "detect_phantom",
+    "resolve_roi",
+    "roi_fits",
+]
 
 
 @dataclass(frozen=True, eq=False, slots=True)
@@ -83,7 +88,7 @@ class ROI(ArrayValue):
     @property
     def index(self) -> tuple[slice, slice]:
         """The (rows, cols) slice pair for indexing an image."""
-        return roi_indexes(self.center, self.size)
+        return _roi_indexes(self.center, self.size)
 
     def mean(self, image: FloatArray) -> Any:
         """Mean of `image` over the ROI's rows and columns.
@@ -110,7 +115,7 @@ def detect_phantom(images: QAImages) -> PhantomGeometry:
     phantom_mask = images.phantom_mask
     geom = PhantomGeometry(
         phantom_mask=phantom_mask,
-        roi_center=find_phantom_center(phantom_mask),
+        roi_center=_find_phantom_center(phantom_mask),
         contrast=phantom_contrast(images.mip, phantom_mask),
     )
     if not geom.plausible:
@@ -163,12 +168,12 @@ def resolve_roi(
     n = min(roi_size, *shape)
     match center:
         case "image":
-            c = image_center(shape)
+            c = _image_center(shape)
         case "phantom":
             c = geom.roi_center
         case _:
             assert_never(center)
-    return ROI(center=clamp_center(c, n, shape), size=n)
+    return ROI(center=_clamp_center(c, n, shape), size=n)
 
 
 def roi_fits(phantom_mask: BoolArray, roi: ROI) -> bool:
@@ -182,3 +187,32 @@ def roi_fits(phantom_mask: BoolArray, roi: ROI) -> bool:
     if r.start < 0 or c.start < 0 or r.stop > h or c.stop > w:
         return False
     return bool(np.all(phantom_mask[index]))
+
+
+def _find_phantom_center(phantom_mask: BoolArray) -> IntArray:
+    """Center (row, col) of the largest inscribed circle of the phantom mask."""
+    dist = ndimage.distance_transform_edt(phantom_mask)
+    roi_center = np.unravel_index(np.argmax(dist), dist.shape)
+    return np.array(roi_center)
+
+
+def _roi_indexes(roi_center: IntArray, n: int) -> tuple[slice, slice]:
+    """Index the `n` x `n` ROI around `roi_center` as (rows, cols) slices."""
+    # roi_center is (row, col) in array-index order; return (rows, cols) so
+    # callers index as mask[roi]. Do NOT swap these — the notebooks' swapped
+    # version transposes the ROI and only agrees when roi_center[0] == roi_center[1].
+    p1 = roi_center - (n - 1) // 2
+    p2 = p1 + n
+    return slice(p1[0], p2[0]), slice(p1[1], p2[1])
+
+
+def _image_center(shape: tuple[int, ...]) -> IntArray:
+    """Geometric center (row, col) of an image, array-index order."""
+    return np.array(shape[:2]) // 2
+
+
+def _clamp_center(center: IntArray, n: int, shape: tuple[int, ...]) -> IntArray:
+    """Shift `center` so an n x n ROI (per `_roi_indexes`) stays within `shape`."""
+    lo = (n - 1) // 2
+    hi = n - lo
+    return np.array([int(np.clip(center[i], lo, shape[i] - hi)) for i in (0, 1)])

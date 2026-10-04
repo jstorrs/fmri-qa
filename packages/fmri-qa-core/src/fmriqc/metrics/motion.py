@@ -16,6 +16,13 @@ from ..prep.scale import UNKNOWN_VOXEL_SIZE, VoxelSize
 from ..types import BoolArray, FloatArray
 from ..warn import warn
 
+__all__ = [
+    "MOTION_MAX_ITER",
+    "MOTION_TOL",
+    "MotionResult",
+    "estimate_motion",
+]
+
 # Per-volume registration budget (in-plane phantom motion). Phantom drift is
 # sub-voxel, so a few Gauss-Newton steps converge; TOL is on the largest
 # per-step parameter update (voxels for translation, fraction for strain).

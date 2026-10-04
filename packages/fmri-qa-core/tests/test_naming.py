@@ -51,7 +51,7 @@ def test_a_description_is_reduced_to_something_a_shell_needs_no_quoting_for() ->
 
 def test_a_long_description_is_truncated_without_a_trailing_underscore() -> None:
     """A cut that lands on punctuation must not leave the separator behind."""
-    assert naming.sanitize("a" * 30 + " " + "b" * 30, limit=31) == "a" * 30
+    assert naming._sanitize("a" * 30 + " " + "b" * 30, limit=31) == "a" * 30
 
 
 def test_a_partial_sidecar_gives_a_shorter_name_rather_than_no_name() -> None:

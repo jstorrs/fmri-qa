@@ -173,7 +173,7 @@ which is Python's JSON dialect and not the standard's, so MATLAB's `jsondecode`
 refuses it where Python and R's `jsonlite` take it -- which is now only a caveat
 for reading the *document*, since every number it carries is also an attribute.
 
-`encode` is pure -- document and arrays in, a `NetcdfContent` value out -- so
+`encode` is pure -- document and arrays in, a `_NetcdfContent` value out -- so
 every way the layout can refuse a set of arrays is settled before a file is
 touched, and `write` performs exactly one write to disk. `read` is the inverse
 of both.
@@ -458,7 +458,7 @@ class _Variable:
 
 
 @dataclass(frozen=True, slots=True)
-class NetcdfContent:
+class _NetcdfContent:
     """A whole netCDF-4 file, as a value: dimensions, variables, attributes.
 
     What `encode` produces and `write` pours into a file. Splitting the two is
@@ -481,7 +481,7 @@ class NetcdfContent:
 
 def encode(
     text: str, stored: dict[str, Any], arrays: Mapping[str, Member]
-) -> NetcdfContent:
+) -> _NetcdfContent:
     """Lay out an artifact's document and arrays as a netCDF-4 file.
 
     `text` is the document's JSON, stored verbatim, and `stored` is that same
@@ -506,7 +506,7 @@ def encode(
     variables: dict[str, _Variable] = {}
     for name, array in arrays.items():
         variables[name] = _variable(name, array, dimensions, auxiliary)
-    return NetcdfContent(
+    return _NetcdfContent(
         dimensions=dimensions,
         variables=variables,
         coordinates=_coordinates(dimensions, arrays, stored),
@@ -827,7 +827,7 @@ def _fix_dimension(
         )
 
 
-def write(content: NetcdfContent, path: Path) -> None:
+def write(content: _NetcdfContent, path: Path) -> None:
     """Write `content` to `path` as a netCDF-4 file, and close it.
 
     Exactly one file is written and the handle is closed before this returns, so

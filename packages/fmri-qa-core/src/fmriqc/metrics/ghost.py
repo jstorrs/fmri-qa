@@ -19,6 +19,16 @@ from skimage.morphology import isotropic_dilation, isotropic_erosion
 from .._arrays import ArrayValue
 from ..types import PE_AXES, BoolArray, FloatArray, PeAxis, readout_axis
 
+__all__ = [
+    "GHOST_RADIUS",
+    "GHOST_TOP_FRACTION",
+    "GhostResult",
+    "estimate_ghost",
+    "estimate_pe_axis",
+    "ghost_masks",
+    "ghost_ratios",
+]
+
 # Fraction of the brightest ghost-region voxels averaged for the localized-ghost
 # statistic (Greve / bxh fmriqa_ghostiness "top-10%"): catches a concentrated
 # bright ghost that the region-mean ghost ratio dilutes.
@@ -205,7 +215,7 @@ def estimate_ghost(
     )
 
 
-def ghost_ratio(
+def _ghost_ratio(
     mean_image: FloatArray,
     phantom_mask: BoolArray,
     pe_axis: PeAxis,
@@ -238,7 +248,7 @@ def ghost_ratios(
     *,
     valid_mask: BoolArray,
 ) -> dict[PeAxis, float]:
-    """`ghost_ratio` for both in-plane axes, keyed by axis index.
+    """Measure the region-mean ghost ratio on both in-plane axes, keyed by axis.
 
     Rolling the phantom along the *true* PE axis lines the ghost region up with
     real ghost signal (high mean); along the wrong axis it lands on background
@@ -248,7 +258,7 @@ def ghost_ratios(
     ratio but no ratio at all, a distinction `estimate_pe_axis` relies on.
     """
     return {
-        axis: ghost_ratio(
+        axis: _ghost_ratio(
             mean_image, phantom_mask, pe_axis=axis, radius=radius, valid_mask=valid_mask
         )
         for axis in PE_AXES
@@ -271,7 +281,7 @@ def estimate_pe_axis(
     is measurable, or both finite ratios are exactly equal, the answer is None.
     A single measurable axis wins even when its ratio is zero.
 
-    NOTE: shares the tuning caveats of `ghost_ratio` — a win by a hair is still
+    NOTE: shares the tuning caveats of `ghost_ratios` — a win by a hair is still
     a guess, so verify against the acquisition's known PE direction before
     trusting it.
     """

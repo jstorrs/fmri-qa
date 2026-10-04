@@ -89,6 +89,7 @@ if TYPE_CHECKING:
         ROI,
         PhantomGeometry,
         detect_phantom,
+        resolve_roi,
     )
     from .prep.images import QAImages
     from .prep.scale import VoxelSize
@@ -179,6 +180,7 @@ __all__ = [
     "outlier_fraction",
     "percent_fluctuation",
     "preprocess",
+    "resolve_roi",
     "run_hilo",
     "run_qa",
     "save_artifact",
@@ -253,6 +255,7 @@ _EXPORTS: dict[str, tuple[str, ...]] = {
         "ROI",
         "PhantomGeometry",
         "detect_phantom",
+        "resolve_roi",
     ),
     ".prep.images": ("QAImages",),
     ".prep.scale": ("VoxelSize",),

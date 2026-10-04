@@ -1,8 +1,8 @@
 """Low-level operations on raw phantom-image arrays.
 
 The leaf layer the value objects and the metric modules both build on: trim,
-slice selection, phantom segmentation, ROI indexing, the FBIRN summary-image
-primitives, and a couple of numeric helpers. Everything here is a pure
+slice selection, phantom segmentation, the valid-data mask, and the FBIRN
+summary-image primitives. Everything here is a pure
 `NDArray -> NDArray` (or scalar) transform with no dependency on the value
 types, so it can be shared without import cycles.
 """
@@ -11,12 +11,26 @@ import math
 from typing import assert_never
 
 import numpy as np
-from scipy import ndimage
 from skimage import filters, segmentation
 
 from ..exceptions import InvalidChoiceError
-from ..types import ROI_CENTER_MODES, BoolArray, FloatArray, IntArray, RoiCenter
+from ..types import ROI_CENTER_MODES, BoolArray, FloatArray, RoiCenter
 from ..warn import warn
+
+__all__ = [
+    "DEGENERATE_PHANTOM_MAX",
+    "DEGENERATE_PHANTOM_MIN",
+    "MIN_PHANTOM_CONTRAST",
+    "edge_valid_mask",
+    "fluctuation_noise",
+    "odd_even_difference",
+    "phantom_contrast",
+    "phantom_plausible",
+    "segment_phantom",
+    "select_slice",
+    "trim_count",
+    "trim_initial",
+]
 
 # Open bounds on the plausible share of a frame a phantom mask covers. Outside
 # them the segmentation has collapsed rather than found an unusual phantom: a
@@ -28,7 +42,7 @@ DEGENERATE_PHANTOM_MIN = 0.0
 DEGENERATE_PHANTOM_MAX = 0.95
 
 # Least in-mask/out-of-mask intensity ratio a mask must show to be a phantom
-# rather than a partition of noise (see `phantom_area`). Measured on synthetic
+# rather than a partition of noise (see `_phantom_area`). Measured on synthetic
 # frames: air segments at ~1.5-1.9, a phantom only 7x above the air floor at
 # ~10, a normal phantom at ~160. Deliberately nearer the noise end.
 MIN_PHANTOM_CONTRAST = 4.0
@@ -110,7 +124,7 @@ def phantom_plausible(*, fraction: float, contrast: float) -> bool:
     )
 
 
-def phantom_area(image: FloatArray) -> int:
+def _phantom_area(image: FloatArray) -> int:
     """Segmented phantom area (voxels), or 0 for an image holding no phantom.
 
     Area alone cannot rank slices — an air slice segments to ~45% of the frame
@@ -130,7 +144,7 @@ def select_slice(data: FloatArray, center: RoiCenter = "image") -> int:
 
     "image": the geometric middle slice (Glover/fBIRN convention).
     "phantom": the slice with the largest phantom cross-section, measured by
-    `phantom_area` — which scores a slice holding no phantom as 0, so a
+    `_phantom_area` — which scores a slice holding no phantom as 0, so a
     prescription that runs off the end of the phantom cannot win on the strength
     of a segmentation of its own air. If no slice holds a recognizable phantom,
     the middle slice is used and a warning says so.
@@ -159,11 +173,11 @@ def _largest_phantom_slice(data: FloatArray) -> int:
     """Find the slice with the largest phantom cross-section.
 
     Falls back to the middle slice, with a warning, when no slice holds a
-    recognizable phantom -- `phantom_area` scores those 0, so there is no
+    recognizable phantom -- `_phantom_area` scores those 0, so there is no
     winner to pick and `center="image"`'s answer is the honest one.
     """
     mip = data.max(axis=-1)
-    areas = [phantom_area(s) for s in np.moveaxis(mip, -1, 0)]
+    areas = [_phantom_area(s) for s in np.moveaxis(mip, -1, 0)]
     if any(areas):
         return int(np.argmax(areas))
     z = int(data.shape[2] // 2)
@@ -173,35 +187,6 @@ def _largest_phantom_slice(data: FloatArray) -> int:
         f"middle slice {z} as center='image' would.",
     )
     return z
-
-
-def find_phantom_center(phantom_mask: BoolArray) -> IntArray:
-    """Center (row, col) of the largest inscribed circle of the phantom mask."""
-    dist = ndimage.distance_transform_edt(phantom_mask)
-    roi_center = np.unravel_index(np.argmax(dist), dist.shape)
-    return np.array(roi_center)
-
-
-def roi_indexes(roi_center: IntArray, n: int) -> tuple[slice, slice]:
-    """Index the `n` x `n` ROI around `roi_center` as (rows, cols) slices."""
-    # roi_center is (row, col) in array-index order; return (rows, cols) so
-    # callers index as mask[roi]. Do NOT swap these — the notebooks' swapped
-    # version transposes the ROI and only agrees when roi_center[0] == roi_center[1].
-    p1 = roi_center - (n - 1) // 2
-    p2 = p1 + n
-    return slice(p1[0], p2[0]), slice(p1[1], p2[1])
-
-
-def image_center(shape: tuple[int, ...]) -> IntArray:
-    """Geometric center (row, col) of an image, array-index order."""
-    return np.array(shape[:2]) // 2
-
-
-def clamp_center(center: IntArray, n: int, shape: tuple[int, ...]) -> IntArray:
-    """Shift `center` so an n x n ROI (per `roi_indexes`) stays within `shape`."""
-    lo = (n - 1) // 2
-    hi = n - lo
-    return np.array([int(np.clip(center[i], lo, shape[i] - hi)) for i in (0, 1)])
 
 
 def edge_valid_mask(image: FloatArray, zero: float = 0.0) -> BoolArray:
@@ -247,10 +232,3 @@ def odd_even_difference(center_slice: FloatArray) -> FloatArray:
 def fluctuation_noise(residuals: FloatArray) -> FloatArray:
     """Temporal RMS of detrended residuals (std about zero) over the last axis."""
     return np.std(residuals, axis=-1, mean=0)
-
-
-def geomean(x: FloatArray) -> float:
-    """Geometric mean over the positive, finite entries; NaN if there are none."""
-    x = np.asarray(x, dtype=float)
-    x = x[np.isfinite(x) & (x > 0)]
-    return float(np.exp(np.mean(np.log(x)))) if x.size else float("nan")

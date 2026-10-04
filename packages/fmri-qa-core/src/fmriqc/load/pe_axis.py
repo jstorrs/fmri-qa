@@ -18,6 +18,8 @@ from typing import Any
 from ..exceptions import InvalidScanError
 from ..types import PE_AXES, PeAxis, PeLabel, Sidecar
 
+__all__: list[str] = []
+
 # DICOM in-plane phase-encode axis -> row/col: NIfTI i (axis 0) is the DICOM
 # row direction, j (axis 1) the column direction (verified against dcm2niix
 # InPlanePhaseEncodingDirectionDICOM on a Siemens acquisition). The single source

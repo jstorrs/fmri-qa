@@ -15,6 +15,15 @@ from ..prep.geometry import ROI
 from ..prep.images import QAImages
 from ..types import BoolArray, FloatArray
 
+__all__ = [
+    "MAD_SCALE",
+    "OUTLIER_QTHR",
+    "OutlierResult",
+    "SpikeResult",
+    "outlier_fraction",
+    "spike_scores",
+]
+
 # R `mad()` default scale constant: 1.4826 makes the MAD a consistent estimator
 # of the SD for normal data. cran-fmriqa's spike scores divide by this MAD.
 MAD_SCALE = 1.4826

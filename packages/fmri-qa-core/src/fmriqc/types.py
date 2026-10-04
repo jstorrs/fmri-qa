@@ -29,6 +29,21 @@ from typing import Literal, get_args
 import numpy as np
 from numpy.typing import NDArray
 
+__all__ = [
+    "ANONYMIZE_MODES",
+    "DETREND_METHODS",
+    "FBIRN_ROI_SIZE",
+    "NAME_STYLES",
+    "PE_AXES",
+    "ROI_CENTER_MODES",
+    "Anonymize",
+    "DetrendMethod",
+    "NameStyle",
+    "PeAxis",
+    "RoiCenter",
+    "readout_axis",
+]
+
 # Array aliases. numpy's generic `NDArray` needs a dtype parameter under strict
 # typing; naming the three element kinds the pipeline actually uses keeps the
 # annotations honest (signal is float64 end to end -- nibabel `get_fdata`

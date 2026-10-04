@@ -17,6 +17,8 @@ from typing import Any
 from ..types import Sidecar
 from ..warn import warn
 
+__all__: list[str] = []
+
 # NIfTI `xyzt_units` time codes, as nibabel spells them, in seconds. An unknown
 # unit is read as seconds: that is what an unlabelled pixdim has always meant in
 # practice, and it leaves a well-formed file untouched.

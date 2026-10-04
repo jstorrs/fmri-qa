@@ -30,6 +30,7 @@ from .stats import hilo_stats
 __all__ = [
     "HILO_ERODE",
     "HiLoResult",
+    "hilo_stats",
     "phantom_core_mask",
     "run_hilo",
     "separate_noise",

@@ -8,6 +8,24 @@ versioning when the first stable public interface is released.
 
 ### Changed
 
+- **`resolve_roi` is exported from `fmriqc`; prep/metrics/load modules declare
+  `__all__`; the helpers listed were made private.** `fmriqc.resolve_roi` is
+  the summary ROI the ROI metrics take, so calling them yourself no longer
+  reaches into `fmriqc.prep.geometry`. Every `fmriqc.prep`, `fmriqc.metrics`
+  and `fmriqc.load` module, and `fmriqc.types`, now lists its building blocks
+  and tuning constants in `__all__`, and `fmriqc.hilo.__all__` gains
+  `hilo_stats`. Helpers used in only one module are private. Moved:
+  `fmriqc.prep.imaging.roi_indexes`, `image_center`, `clamp_center` and
+  `find_phantom_center` become `fmriqc.prep.geometry._roi_indexes`,
+  `_image_center`, `_clamp_center` and `_find_phantom_center` (`ROI.index` is
+  the public form of `roi_indexes`), and `fmriqc.prep.imaging.geomean`
+  becomes `fmriqc.metrics.smoothness._geomean`. Renamed in place with a
+  leading underscore: `fmriqc.prep.imaging.phantom_area`,
+  `fmriqc.prep.detrend.poly_degree` and `spline_nodes`,
+  `fmriqc.metrics.ghost.ghost_ratio`, `fmriqc.validation.validate_scan`,
+  `fmriqc.convert.naming.sanitize` and
+  `fmriqc.analysis.serialize.netcdf.NetcdfContent`. Code importing any of
+  these by their old names must change; no computed value changes.
 - **Clicking a figure in the HTML report enlarges it, and clicking the enlarged
   figure closes it.** The separate Enlarge and Close links are gone, and
   closing returns to the figure rather than to the top of the Figures section.

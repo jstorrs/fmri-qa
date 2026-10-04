@@ -6,16 +6,14 @@ import numpy as np
 import pytest
 
 import fmriqc as q
+from fmriqc.prep.geometry import _clamp_center, _image_center, _roi_indexes
 from fmriqc.prep.imaging import (
-    clamp_center,
+    _phantom_area,
     edge_valid_mask,
     fluctuation_noise,
-    image_center,
     odd_even_difference,
-    phantom_area,
     phantom_contrast,
     phantom_plausible,
-    roi_indexes,
     segment_phantom,
     select_slice,
     trim_initial,
@@ -65,20 +63,20 @@ def test_edge_valid_mask_each_edge_independent() -> None:
 
 
 def test_roi_indexes_are_centered_and_not_swapped() -> None:
-    rows, cols = roi_indexes(np.array([2, 6]), 3)
+    rows, cols = _roi_indexes(np.array([2, 6]), 3)
     # (n-1)//2 = 1 voxel back from the center, width n
     assert (rows.start, rows.stop) == (1, 4)
     assert (cols.start, cols.stop) == (5, 8)
 
 
 def test_image_center_is_array_index_midpoint() -> None:
-    assert tuple(image_center((10, 20))) == (5, 10)
+    assert tuple(_image_center((10, 20))) == (5, 10)
 
 
 def test_clamp_center_keeps_roi_on_image() -> None:
     # a corner center must shift inward so a 3x3 ROI stays in a 10x10 image
-    clamped = clamp_center(np.array([0, 9]), 3, (10, 10))
-    rows, cols = roi_indexes(clamped, 3)
+    clamped = _clamp_center(np.array([0, 9]), 3, (10, 10))
+    rows, cols = _roi_indexes(clamped, 3)
     assert rows.start >= 0 and cols.start >= 0
     assert rows.stop <= 10 and cols.stop <= 10
 
@@ -127,7 +125,7 @@ def test_segment_phantom_recovers_a_sparse_disk_when_quantiles_coincide(
     image = np.where(disk, 1000.0, background)
     assert np.quantile(image, 0.1) == np.quantile(image, 0.9)
     assert np.array_equal(segment_phantom(image), disk)
-    assert phantom_area(image) == disk.sum()
+    assert _phantom_area(image) == disk.sum()
 
 
 @pytest.mark.parametrize("value", [0.0, 5.0])
@@ -230,13 +228,13 @@ def test_phantom_area_scores_a_frame_of_air_as_no_phantom() -> None:
     """
     air = _air((64, 64))
     assert 0.3 < segment_phantom(air).mean() < 0.6  # a mask, and a big one
-    assert phantom_area(air) == 0  # but not a phantom
+    assert _phantom_area(air) == 0  # but not a phantom
 
 
 def test_phantom_area_counts_a_real_cross_section() -> None:
     disk = _disk(64)
     image = np.where(disk, 1000.0, 0.0) + _air((64, 64))
-    assert phantom_area(image) == disk.sum()
+    assert _phantom_area(image) == disk.sum()
 
 
 def test_select_slice_prefers_the_phantom_over_a_larger_air_mask() -> None:

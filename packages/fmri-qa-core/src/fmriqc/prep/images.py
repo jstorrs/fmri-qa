@@ -20,6 +20,10 @@ from .imaging import (
     segment_phantom,
 )
 
+__all__ = [
+    "QAImages",
+]
+
 
 # The one value object here without `slots=True`: the summary images below are
 # `cached_property`, which needs a real instance `__dict__` to cache into.

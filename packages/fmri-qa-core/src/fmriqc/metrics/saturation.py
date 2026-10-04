@@ -23,6 +23,13 @@ import numpy as np
 from ..exceptions import InvalidScanError
 from ..types import FloatArray
 
+__all__ = [
+    "SATURATION_BITS",
+    "ClipRail",
+    "SaturationResult",
+    "detect_saturation",
+]
+
 # Plausible ADC saturation rails. A clipped magnitude image piles up at a
 # hardware 2**n - 1 ceiling; only these n are realistic for MR (12-bit -> 4095).
 SATURATION_BITS = range(8, 17)  # 255 .. 65535

@@ -19,7 +19,7 @@ from .types import PeAxis
 MIN_ANALYSIS_FRAMES = 4
 
 
-def validate_scan(scan: QAScan) -> None:
+def _validate_scan(scan: QAScan) -> None:
     """Validate the structure shared by the main and high/low pipelines."""
     if scan.data.ndim != 4:
         raise InvalidScanError(
@@ -94,7 +94,7 @@ def validate_qa_run(scan: QAScan, settings: AnalysisSettings) -> PeAxis | None:
     precedence is decided; `run_qa` falls back to the Nyquist-ghost estimate only
     when the return here is None.
     """
-    validate_scan(scan)
+    _validate_scan(scan)
     _require_enough_frames(scan, settings.trim_sec, "frames")
 
     override = settings.pe_axis_override
@@ -119,8 +119,8 @@ def validate_hilo_run(
     high: QAScan, low: QAScan, *, trim_sec: float, erode: int
 ) -> None:
     """Validate parameters shared by both sides of a high/low analysis."""
-    validate_scan(high)
-    validate_scan(low)
+    _validate_scan(high)
+    _validate_scan(low)
     _validate_trim_sec(trim_sec)
     if erode < 0:
         raise InvalidScanError(

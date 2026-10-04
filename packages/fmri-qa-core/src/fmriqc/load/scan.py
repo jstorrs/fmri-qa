@@ -21,6 +21,10 @@ from .metadata import ScanMeta, _load_sidecar, _scan_meta
 from .pe_axis import _pe_axis_from_header, _pe_axis_from_sidecar
 from .repetition_time import _repetition_time
 
+__all__ = [
+    "QAScan",
+]
+
 
 def _spatial_scale_mm(unit: str) -> float:
     """Resolve the header's spatial unit once for voxel sizes and the affine."""

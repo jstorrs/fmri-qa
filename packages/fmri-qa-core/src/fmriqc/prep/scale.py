@@ -26,6 +26,11 @@ import numpy as np
 
 from ..types import FloatArray, LengthUnit, PeAxis
 
+__all__ = [
+    "UNKNOWN_VOXEL_SIZE",
+    "VoxelSize",
+]
+
 
 @dataclass(frozen=True, slots=True)
 class VoxelSize:

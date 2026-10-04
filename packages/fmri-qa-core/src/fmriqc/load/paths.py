@@ -8,6 +8,11 @@ stripping `.nii.gz` its own way.
 
 from pathlib import Path
 
+__all__ = [
+    "nifti_stem",
+    "sidecar_path",
+]
+
 # Longest suffix first, so `.nii.gz` is not mistaken for a bare `.gz`.
 NIFTI_SUFFIXES = (".nii.gz", ".nii")
 

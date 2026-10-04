@@ -34,7 +34,7 @@ def _images(center_slice: np.ndarray, fluctuations: np.ndarray) -> QAImages:
 def _full_roi(n: int) -> ROI:
     """An ROI covering the whole n x n image.
 
-    `roi_indexes` places the block at `center - (n - 1) // 2`, so centering on
+    `ROI.index` places the block at `center - (n - 1) // 2`, so centering on
     `(n - 1) // 2` makes it start at 0 and span the full image (0:n, 0:n).
     """
     c = (n - 1) // 2
