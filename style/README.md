@@ -14,7 +14,7 @@ expressions of those principles; read them when you need the specifics.
 |-------|--------|
 | [zen.md](zen.md) | The guiding principles (the Zen of Python), mapped to where each is detailed and enforced. Read first. |
 | [architecture.md](architecture.md) | Functional core / imperative shell, short functions, flat-over-nested control flow, simple public APIs, type-driven design, module layout. |
-| [documentation.md](documentation.md) | Naming, docstrings (contract, not implementation), comments that explain *why*, the coherence test between code and docs. |
+| [documentation.md](documentation.md) | Naming, numpydoc docstrings (contract, not implementation), API tiers, comments that explain *why*, the coherence test between code and docs. |
 | [exceptions.md](exceptions.md) | Per-package exception hierarchies, wrapping foreign errors, structured payloads, when to use stdlib exceptions, when to raise vs. silence. |
 | [logging.md](logging.md) | Libraries stay silent and return values; binaries talk. stdout-vs-stderr discipline, keeping `print` out of libraries, and the `logging` module conventions. |
 | [tooling.md](tooling.md) | `uv`, `ruff` format/lint, the `mypy`/`pyright` type checkers, local stubs for third-party types, `pytest`, supply-chain posture, pre-commit, and the standard `make` loop. |

@@ -139,8 +139,10 @@ Ask yourself: if someone runs `ls` on this directory, will they understand what'
 
 ```
 # Passes the ls test - clear purpose for each file
-$ ls src/dcmdb/src/dcmdb/
-__init__.py  archive.py  exceptions.py  index.py  reader.py  writer.py
+$ ls packages/fmri-qa-core/src/fmriqc/
+__init__.py  analysis/  cli/  convert/  exceptions.py  hilo/  load/  metrics/
+path_arguments.py  pipeline.py  prep/  rename.py  settings.py  types.py
+validation.py  version.py  warn.py
 
 # Fails the ls test - requires reading code to understand
 $ ls src/mypackage/
@@ -165,42 +167,158 @@ Docstrings document the **contract** - what the function does from the caller's 
 - What exceptions it raises
 - Any important constraints or preconditions
 
-Docstrings should **not** explain implementation details.
+Docstrings should **not** explain implementation details. Rationale, history
+and workarounds go in `#` comments next to the code they explain.
+
+### Format: numpydoc
+
+Docstrings use [numpydoc](https://numpydoc.readthedocs.io/) sections. The format is
+the contract, written down in a fixed place: the same sections in the same order
+mean a reader (and the rendered reference) always finds the type of a parameter,
+the units of a result, and the failure modes where they expect them. Sphinx
+renders these docstrings into the API reference, so the format is not optional
+decoration; it is how the reference gets written.
+
+**Sections**, in this order, omitting any that do not apply: Parameters, Returns,
+Yields, Raises, Warns, See Also, Notes, References, Examples.
+
+**Summary line**: one line, at most 75 characters, ending in a period.
+
+- Functions and methods are **imperative**: "Compute...", "Measure...", "Return...",
+  "Plot...". Ruff enforces this (D401). It also suits the functional style: a
+  calculation is a verb applied to data, and the summary reads as the call.
+- Classes, dataclasses and properties are **noun phrases**: "Voxel dimensions of an
+  acquisition."
+
+**Types** are written for the reader, not for the type checker (annotations already
+do that). Name the array shape and dtype: `mean_image : (X, Y) ndarray of float64`,
+`series : (X, Y, T) ndarray of float64`. Use `pe_axis : {0, 1}` for closed sets,
+`radius : int, optional` for optional arguments, and say "Default is ..." in the
+description.
+
+**Units**: every physical quantity names its unit (s, mm, voxels, %, or "in
+`voxel.unit`").
+
+**NaN versus None**: every value that can be NaN or None says when. NaN means the
+estimator ran and could not resolve a value. None means the quantity does not apply
+or was not measured. A reader should never have to guess which absence they hold.
+
+**Notes** carry method and background: the equation, why it is that equation,
+assumptions. Put short equations in `.. math::`. **References** are numbered
+`.. [1]` and cited as `[1]_` in Notes. Include a DOI where one exists, and never
+invent one; a source without a DOI is cited without it.
+
+**Examples** are doctests: self-contained, built from numpy or `fmriqc.data`,
+deterministic and quick. Print floats with format strings, never numpy scalar
+reprs. A plotting example ends with `plt.close(ax.figure)`.
+
+**Markup**: single backticks are cross-references and parameter names (`roi`).
+Double backticks are literals and expressions (``np.nan``). Never a bare `|`; it is
+reST syntax.
+
+**Records**: library-produced records (results the caller receives) document their
+fields under `Attributes`. Records the user constructs (settings, requests, form
+values, exceptions) document them under `Parameters`, because that is how they are
+called. Properties and methods document themselves.
+
+**Constants** get a `#:` comment on the line above, which Sphinx picks up as the
+description.
+
+**Plotting functions** take the data first and a keyword `ax=None`, return the Axes,
+and are styled through `matplotlib.rc_context`, not through style keywords.
+
+### API Tiers
+
+How much a name's docstring must say depends on who calls it. There are four tiers:
+
+- **Public**: in a root or subpackage `__all__`. Full numpydoc, listed in the
+  reference.
+- **Building block**: in its module's `__all__` only. Concise numpydoc (summary,
+  Parameters, Returns), listed on the "Building blocks" reference page, linked from
+  the analysis page and from its caller's See Also.
+- **Internal**: no leading underscore and in no `__all__`; shared across modules or
+  distributions. Not in the reference. A concise docstring.
+- **Private**: a leading underscore. Local to its module; the docstring may be
+  minimal or absent when the name says it all.
+
+Full numpydoc is for names in an `__all__`. Everywhere else, write a concise
+one-to-three-line docstring. A name that needs more than that is either doing too
+much or belongs in a higher tier.
 
 ### When Docstrings Add Value
 
+This example is illustrative, not an existing function. The docstring earns its
+length: the NaN case, the units, the equation and its source are not in the
+signature.
+
 ```python
-def connect(
-    host: str,
-    port: int = 5432,
-    timeout: float = 30.0,
-    retry_count: int = 3,
-) -> Connection:
-    """Connect to the database server.
+def compute_snr(
+    first: NDArray[np.float64],
+    second: NDArray[np.float64],
+    roi: NDArray[np.bool_],
+) -> float:
+    r"""Compute the signal-to-noise ratio from two repeated images.
 
-    Attempts to establish a connection, retrying on transient failures.
-    The connection is not thread-safe; use a connection pool for
-    concurrent access.
+    Parameters
+    ----------
+    first, second : (X, Y) ndarray of float64
+        Consecutive images of a static phantom, in scanner intensity units.
+    roi : (X, Y) ndarray of bool
+        Voxels over which signal and noise are measured.
 
-    Args:
-        host: Database server hostname.
-        port: Server port.
-        timeout: Connection timeout in seconds.
-        retry_count: Number of retry attempts on transient failures.
+    Returns
+    -------
+    snr : float
+        Mean signal in `roi` divided by the noise standard deviation in
+        `roi`. NaN when the difference image is constant over `roi`, so
+        the noise cannot be resolved.
 
-    Returns:
-        An active database connection.
+    Raises
+    ------
+    ValueError
+        If `first`, `second` and `roi` do not share a shape, or `roi`
+        selects no voxels.
 
-    Raises:
-        ConnectionError: If all connection attempts fail.
-        ValueError: If timeout is not positive.
+    See Also
+    --------
+    fmriqc.metrics.fbirn.sfnr : Fluctuation noise over a full time series.
+
+    Notes
+    -----
+    Noise is estimated from the difference of two images, which cancels
+    static structure [1]_:
+
+    .. math::
+
+        \mathrm{SNR} = \frac{\bar{S}}{\sigma_D / \sqrt{2}}
+
+    where :math:`\bar{S}` is the mean of both images over `roi` and
+    :math:`\sigma_D` is the standard deviation of their difference over
+    `roi`. The factor :math:`\sqrt{2}` converts the variance of a
+    difference to the variance of one image.
+
+    References
+    ----------
+    .. [1] Friedman L, Glover GH. Report on a multicenter fMRI quality
+           assurance protocol. J Magn Reson Imaging. 2006;23(6):827-839.
+           doi:10.1002/jmri.20583
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> first = np.full((4, 4), 100.0)
+    >>> second = first.copy()
+    >>> first[0, 0] += 2.0
+    >>> roi = np.ones((4, 4), dtype=bool)
+    >>> print(f"{compute_snr(first, second, roi):.1f}")
+    292.3
     """
 ```
 
 The docstring adds value by explaining:
-- Retry behavior (not obvious from signature)
-- Thread-safety constraint (important context)
-- What "transient failures" means for retries
+- When the result is NaN (the estimator ran and could not resolve)
+- The units and shapes of every input
+- The method, with its source, in Notes where it does not clutter the contract
 
 ### When Docstrings Can Be Minimal
 
@@ -210,7 +328,7 @@ def calculate_mean(values: Sequence[float]) -> float:
     return sum(values) / len(values)
 ```
 
-The function is simple, the name is clear, the types are explicit. A longer docstring would just repeat what's obvious.
+The function is simple, the name is clear, the types are explicit. A longer docstring would just repeat what's obvious. Building-block, internal and private names usually look like this.
 
 ## Comment Guidelines
 
