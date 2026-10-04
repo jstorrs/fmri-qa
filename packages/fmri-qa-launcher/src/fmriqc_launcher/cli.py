@@ -2,10 +2,9 @@
 
 The command-line front end over `session.run_session`. With both directories
 given it runs the pipeline once and reports every outcome; with neither, it
-opens the desktop panel (`.panel`, not built yet -- see `_launch_panel`).
-Giving exactly one directory, or any flag without both directories, is a
-usage error: the panel takes no flags in this commit, so there is no
-"partially configured panel" state to support.
+opens the desktop panel (`.panel`, see `_launch_panel`). Giving exactly one
+directory, or any flag without both directories, is a usage error: the panel
+takes no flags, so there is no "partially configured panel" state to support.
 
 The heavy stack (`fmriqc`'s pipeline, `fmriqc_report`'s renderer) is reached
 only through `.session`, imported inside `main` after argument parsing --

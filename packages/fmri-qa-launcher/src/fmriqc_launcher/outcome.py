@@ -14,7 +14,11 @@ __all__ = ["Failed", "Published", "Refused", "RunResult", "SeriesOutcome"]
 
 @dataclass(frozen=True, slots=True)
 class Published:
-    """One series filed under `output_dir / name`, with all four of its files."""
+    """One series filed under `output_dir / name`.
+
+    Holds its scan, artifact and report, and its sidecar when dcm2niix wrote
+    one.
+    """
 
     name: str
     directory: Path

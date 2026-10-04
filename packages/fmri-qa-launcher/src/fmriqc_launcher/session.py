@@ -94,19 +94,18 @@ def run_session(
 ) -> RunResult:
     """Run one import-analyze-report-publish pass over `request`.
 
-    `output_dir` is created if missing. Work happens inside a staging
-    directory under the system's temporary directory (`fmri-qa-run.<token>`,
-    removed whether or not the run succeeds -- or, where something else holds
-    a file in it open, logged by name as left behind), so a reader of
-    `output_dir` only ever sees series that are completely finished, and a
-    sync client watching it only ever sees finished files. A series whose name
-    already exists in `output_dir` is refused rather than overwritten and
-    costs nothing; `should_continue` is
-    polled between the remaining series (never in the middle of one) so a
-    cancel takes effect at the next safe point rather than tearing a render in
-    half. `index`/`total` on the `Progress` this reports count the series that
-    are actually attempted -- refused series are found for free while
-    checking names and are never counted or reported on.
+    `output_dir` is created if missing. Work happens inside a staging directory
+    under the system's temporary directory (`fmri-qa-run.<token>`, removed whether
+    or not the run succeeds -- or, where something else holds a file in it open,
+    logged by name as left behind), so a reader of `output_dir` only ever sees
+    series that are completely finished, and a sync client watching it only ever
+    sees finished files. A series whose name already exists in `output_dir` is
+    refused rather than overwritten and costs nothing; `should_continue` is polled
+    between the remaining series (never in the middle of one) so a cancel takes
+    effect at the next safe point rather than tearing a render in half.
+    `index`/`total` on the `Progress` this reports count the series that are
+    actually attempted -- refused series are found for free while checking names and
+    are never counted or reported on.
 
     `progress` and `should_continue` are called from inside the per-series
     work but outside the guard that turns a library/IO failure into a
@@ -135,10 +134,9 @@ def run_session(
 
     _require_writable(request.output_dir, notice)
 
-    # `mkdtemp`'s `0700` is wanted here, where it was not when staging was
-    # renamed into `output_dir`: what sits in it is a scan on a machine's shared
-    # temporary directory. Nothing published inherits it -- `_publish` makes
-    # its own directory and its own files, under the umask.
+    # `mkdtemp`'s `0700` is wanted here: what sits in staging is a scan on a
+    # machine's shared temporary directory. Nothing published inherits it --
+    # `_publish` makes its own directory and its own files, under the umask.
     try:
         staging = Path(tempfile.mkdtemp(prefix="fmri-qa-run."))
     except OSError as exc:
@@ -152,11 +150,10 @@ def run_session(
 def _require_writable(output_dir: Path, notice: CleanupNoticeCallback | None) -> None:
     """Refuse an `output_dir` nothing can be published into, before any work.
 
-    Staging used to be made inside `output_dir`, so an unwritable one stopped
-    the run at once. With staging elsewhere the first write into it is the
-    first publish, minutes of analysis later, and every series would fail there
-    in turn. Making an empty directory asks the same question up front, of the
-    same operation publishing will perform.
+    Staging lives outside `output_dir`, so the first write into `output_dir`
+    is the first publish, minutes of analysis later, and an unwritable one
+    would fail every series there in turn. Making an empty directory asks the
+    same question up front, of the same operation publishing will perform.
 
     Only making it decides. Removing it is cleanup, and in a watched directory
     cleanup can be refused for the reason a rename can (see `fmriqc.rename`):
@@ -345,10 +342,10 @@ def _publish_series(
         _publish(work_dir, planned.target, notice)
     except Exception as exc:  # noqa: BLE001 - one series' failure, reported and skipped
         return _failed(name, exc, noted)
-    # Publishing is a copy now, where it was a move, so without this staging
-    # would hold every series the run has finished until the run ended -- on a
-    # temporary directory that is often small, RAM-backed, or under a quota,
-    # while the output directory the user chose has room to spare.
+    # Publishing is a copy, not a move, so without this staging would hold
+    # every series the run has finished until the run ended -- on a temporary
+    # directory that is often small, RAM-backed, or under a quota, while the
+    # output directory the user chose has room to spare.
     _discard(work_dir, notice)
 
     sidecar_name = f"{name}.json"
@@ -423,13 +420,12 @@ def _copy_durably(source: Path, destination: Path) -> None:
     """Copy one file, syncing its contents before returning.
 
     `save_artifact` syncs what it writes before renaming it, so that a crash
-    soon after cannot leave a truncated file under a finished name. That was a
-    promise about staging's filesystem; the rename that matters now is the one
-    in `output_dir`, of these copies, so they are synced the same way. Like
-    `save_artifact`, this syncs the file and not the directory holding it,
-    which is as far as the guarantee goes. Created exclusively and with
-    default permissions, so a published file answers to the umask and not to
-    staging's `0700`.
+    soon after cannot leave a truncated file under a finished name. The rename
+    that matters is the one in `output_dir`, of these copies, so they are
+    synced the same way. Like `save_artifact`, this syncs the file and not the
+    directory holding it, which is as far as the guarantee goes. Created
+    exclusively and with default permissions, so a published file answers to
+    the umask and not to staging's `0700`.
     """
     with source.open("rb") as read, destination.open("xb") as write:
         shutil.copyfileobj(read, write)

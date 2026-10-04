@@ -123,8 +123,8 @@ class _AdvancedField:
 
     Keeping this a list (see `_ADVANCED_FIELDS` below) rather than one
     hand-built row per field is what makes adding a later row -- the
-    high/low flip-angle option the brief leaves room for -- a one-line
-    addition instead of a new block of widget code.
+    high/low flip-angle option, say -- a one-line addition instead of a new
+    block of widget code.
     """
 
     key: Literal["trim_sec", "detrend", "center", "roi_size"]
@@ -219,13 +219,13 @@ class Panel:
         self._output_var = tk.StringVar(value=_DEFAULTS.output_dir)
         self._open_var = tk.BooleanVar(
             value=True
-        )  # panel default: checked (see module docstring)
+        )  # the panel defaults to opening the report
         self._advanced_visible = tk.BooleanVar(value=False)
         self._status_var = tk.StringVar(value="Ready")
         # Only the entries/comboboxes and the Run button itself trigger Run
-        # on <Return> -- not a "Browse..." button, which the root-level
-        # binding this replaces used to fire from too (see the module's
-        # keyboard-scoping fix).
+        # on <Return> -- not a "Browse..." button, so <Return> is bound on
+        # these widgets and not on the root, where it would fire from any
+        # focused widget.
         self._return_widgets: list[tk.Widget] = []
 
         rows = _Rows()

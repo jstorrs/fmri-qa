@@ -45,8 +45,8 @@ class SessionError(LauncherError):
 class PanelUnavailableError(LauncherError):
     """The desktop panel could not open: `tkinter` has no display to attach to.
 
-    `panel.main` raises this in place of letting `tkinter.TclError` escape,
-    so `cli._launch_panel` can report the failure the same way it reports a
-    missing `tkinter` module -- catching `LauncherError`, not a `tkinter`
-    type `cli.py` never otherwise imports.
+    `panel.run_panel` raises this in place of letting `tkinter.TclError`
+    escape. `cli._launch_panel` catches it and reports the failure the same
+    way it reports a missing `tkinter` module, and `panel.main` catches it
+    and returns exit code 2, so neither names a `tkinter` type.
     """

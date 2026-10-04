@@ -9,11 +9,11 @@ function that turns one into the other, collecting every problem it finds
 rather than stopping at the first, so a panel can show a physicist everything
 wrong with a submission at once.
 
-The label/help constants defined alongside each option are read by two things
-that do not exist yet: an `argparse` flag (`help=`) and a `tkinter` widget (its
+The label/help constants defined alongside each option are read by two things:
+an `argparse` flag in `cli` (`help=`) and a `tkinter` widget in `panel` (its
 label). Defining the wording once here, next to the domain it describes, is
-what keeps a future CLI's `--help` and a future panel's field labels saying the
-same thing.
+what keeps the CLI's `--help` and the panel's field labels saying the same
+thing.
 """
 
 import os
@@ -68,9 +68,9 @@ __all__ = [
 DEFAULT_SETTINGS: AnalysisSettings = AnalysisSettings()
 
 # Aliases of `fmriqc`'s closed option sets, under the names this form speaks.
-# `anonymize` has no field on `FormValues` (the panel this run supports has no
-# way to ask for it yet -- see the module docstring), but a later `argparse`
-# flag needs its domain and wording now, in one place, same as the others.
+# `anonymize` has no field on `FormValues` (the panel has no way to ask for
+# it), but the `--anonymize` flag needs its domain and wording, in one place,
+# same as the others.
 DETREND_CHOICES: tuple[DetrendMethod, ...] = DETREND_METHODS
 CENTER_CHOICES: tuple[RoiCenter, ...] = ROI_CENTER_MODES
 ANONYMIZE_CHOICES: tuple[Anonymize, ...] = ANONYMIZE_MODES
@@ -80,9 +80,9 @@ DICOM_DIR_HELP = "Directory of DICOM files (searched recursively)."
 # The panel speaks to a physicist, not a script: "folder" is the word the
 # panel's own widgets and Browse dialogs use, kept here rather than forked
 # inline in `panel.py` so the two front ends' wording for the same concept
-# lives in one place. `DICOM_DIR_LABEL` stays "directory" -- the CLI's
-# positional-argument help and `parse_form`'s problem messages (shown
-# verbatim in the panel's own error dialog) are unchanged by this addition.
+# lives in one place. `DICOM_DIR_LABEL` stays "directory": it is the wording
+# of the CLI's positional-argument help and of `parse_form`'s problem
+# messages, which the panel shows verbatim in its error dialog.
 DICOM_DIR_PANEL_LABEL = "DICOM folder"
 
 OUTPUT_DIR_LABEL = "Output directory"
@@ -226,7 +226,7 @@ def _require_path(text: str, label: str, problems: list[str]) -> Path | None:
     Only the whitespace a form field routinely picks up from a paste or a
     trailing space is stripped here; `~` and relative-path normalization are
     `RunRequest.__post_init__`'s job, so a directly constructed request (the
-    argparse front end will build one that way) gets the same treatment.
+    argparse front end builds one that way) gets the same treatment.
     """
     stripped = text.strip()
     if not stripped:

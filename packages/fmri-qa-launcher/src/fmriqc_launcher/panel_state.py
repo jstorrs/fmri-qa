@@ -111,15 +111,16 @@ def bar_state(progress: Progress) -> BarState:
 def final_bar(result: RunResult) -> BarState:
     """Where the bar should come to rest once a run has finished.
 
-    Full when every series the run attempted was published. Otherwise the
-    proportion of attempted series that were: `value` is how many published,
-    `maximum` is how many were attempted (never 0 -- a run that attempted
-    none at all rests on an empty bar, `Determinate(0, 1)`, rather than a
-    bar with nothing to be a fraction of). This is a deliberate choice among
-    several defensible ones (e.g. leaving the bar wherever the last
-    `Progress` left it) -- proportion-published is what a physicist skimming
-    the bar after stepping away actually wants to know: how much of the work
-    that was attempted came out the other end.
+    Full when every series the run found was published. Otherwise the
+    proportion of found series that were: `value` is how many published,
+    `maximum` is how many series the run found, `Refused` ones included
+    though they are never attempted (never 0 -- a run that found none at all
+    rests on an empty bar, `Determinate(0, 1)`, rather than a bar with
+    nothing to be a fraction of). This is a deliberate choice among several
+    defensible ones (e.g. leaving the bar wherever the last `Progress` left
+    it) -- proportion-published is what a physicist skimming the bar after
+    stepping away actually wants to know: how much of the run's work came out
+    the other end.
     """
     total = len(result.outcomes)
     published = len(result.published)
