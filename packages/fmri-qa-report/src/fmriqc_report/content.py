@@ -83,7 +83,7 @@ def _fwhm_unit(m: Measurements) -> str:
 
 
 # The reported metrics, in display order. The tile label, decimals and unit here
-# are the ones the header tiles use, so the tiles and the physics tables agree.
+# are the ones the metric tiles use, so the tiles and the definitions list agree.
 METRIC_DOCS: tuple[MetricDoc, ...] = (
     MetricDoc(
         "SNR",

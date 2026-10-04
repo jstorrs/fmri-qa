@@ -1,9 +1,11 @@
-"""Stability plots: Weisskoff/RDC, signal, residual, spectrum, outliers, motion.
+"""Stability plots drawn onto matplotlib axes.
 
-Each `plot_*` draws one stability panel onto a matplotlib `Axes` from the
-artifact's `Curves` — every trace arrives precomputed, so these functions only
-choose colors, labels, and limits. `plot_fig` wraps a draw callback into a
-fresh `Figure`. Format-agnostic — a driver embeds the figures.
+Each `plot_*` (`plot_weisskoff`, `plot_rdc`, `plot_signal`, `plot_residual`,
+`plot_outliers`, `plot_motion`, `plot_com`, `plot_spectrum`, `plot_psf`) draws
+one stability panel onto a matplotlib `Axes` from the artifact's `Curves` —
+every trace arrives precomputed, so these functions only choose colors, labels,
+and limits. `plot_fig` wraps a draw callback into a fresh `Figure`.
+Format-agnostic — a driver embeds the figures.
 """
 
 from collections.abc import Callable
@@ -81,6 +83,7 @@ def plot_rdc(ax: Axes, wk: WeisskoffCurve) -> None:
 
 
 def plot_signal(ax: Axes, curves: Curves) -> None:
+    """ROI mean signal over time with its fitted trend."""
     ax.plot(curves.time, curves.roi_signal, lw=0.5, label="ROI signal")
     ax.plot(curves.time, curves.roi_trend, "r", lw=1.2, label="trend")
     ax.set_xlabel("time (s)")

@@ -3,8 +3,8 @@ with.
 
 A `Theme` carries the colormap, accent colour, and font family a run page's
 figures use, exposed as matplotlib rcParams through `rc_params()`. The default
-`Theme()` reproduces the panels' established appearance exactly, so adopting
-it changes no output; a group rebrands by instantiating it.
+`Theme()` draws gray images with matplotlib's tab10 colour cycle and default
+font; a group rebrands by instantiating it.
 """
 
 from dataclasses import dataclass
@@ -46,8 +46,8 @@ class Theme:
 
         A driver activates these with `matplotlib.rc_context` around the figure
         building so the phantom colormap, the primary-series colour, and the
-        font follow the theme. The default theme returns the panels' established
-        look (gray images, matplotlib's tab10 cycle), so panels are unchanged.
+        font follow the theme. The default theme draws gray images with
+        matplotlib's tab10 colour cycle and default font.
         """
         rc: dict[RcKeyType, object] = {
             "image.cmap": self.panel_cmap,

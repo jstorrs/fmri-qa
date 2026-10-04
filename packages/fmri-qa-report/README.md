@@ -15,7 +15,7 @@ an artifact read back from disk renders exactly like one just computed.
 
 Inside, content is split from format: `summary` and `content` build the text,
 `panels` the matplotlib figures, and `formats/` holds one driver per output
-format. Adding a format is a new file in `formats/`.
+format. Adding a format is a new subpackage beside `formats/html`.
 
 `fmri-qa-report ARTIFACT --html FILE` renders one artifact into a single
 self-contained HTML file — stylesheet inlined, every figure embedded as a
