@@ -8,6 +8,17 @@ versioning when the first stable public interface is released.
 
 ### Changed
 
+- **The documentation builds as one Sphinx project, `docs/`.** The landing page
+  and the three packages' pages are one site with one navigation tree, built by
+  one `sphinx-build` into `build/site`; the pages themselves are unchanged. The
+  package pages moved from `packages/*/docs/` to `docs/user-guide/`, and the
+  launcher's and report's were renamed after what they describe:
+  `command-line.md` is `fmri-qa-run.md`, `output.md` is `run-output.md`,
+  `usage.md` is `fmri-qa-report.md`, `page.md` is `report-page.md` and
+  `library.md` is `report-library.md`. The site no longer has the `core/`,
+  `report/` and `launcher/` subdirectories, so a bookmark into one must be
+  updated, and the `make docs-core`, `docs-report` and `docs-launcher`
+  targets are gone; `make docs` builds everything.
 - **`resolve_roi` is exported from `fmriqc`; prep/metrics/load modules declare
   `__all__`; the helpers listed were made private.** `fmriqc.resolve_roi` is
   the summary ROI the ROI metrics take, so calling them yourself no longer

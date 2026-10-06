@@ -43,21 +43,21 @@ synthetic phantom, and the exact netCDF names it contributes to the artifact:
 
 | Analysis | In one line |
 | --- | --- |
-| [fBIRN stability](packages/fmri-qa-core/docs/analyses/stability.md) | SNR, SFNR, drift and fluctuation over a fixed ROI, the Weisskoff RDC, and the trim + detrending every other analysis shares |
-| [Phantom localization](packages/fmri-qa-core/docs/analyses/localization.md) | the slice, the phantom mask and its outline, the summary ROI — and the verdicts that say whether either landed correctly |
-| [Nyquist ghosting](packages/fmri-qa-core/docs/analyses/ghosting.md) | the N/2 ghost against the tissue that produced it: fBIRN percent ghost, its localized top-10% companion, the readout baseline, and the ACR/AAPM difference |
-| [ADC saturation](packages/fmri-qa-core/docs/analyses/saturation.md) | whether the receiver clipped on its `2ⁿ−1` rail, counted separately before and after the warm-up trim — with a third answer for "not determinable" |
-| [Outliers and spikes](packages/fmri-qa-core/docs/analyses/outliers.md) | the per-frame outlier-voxel fraction (AFNI `3dToutcount`) and two MAD-normalized spike scores, in time and in frequency |
-| [Motion and deformation](packages/fmri-qa-core/docs/analyses/motion.md) | a `3dvolreg`-style rotation-free registration for the translation, scale and shear gradient heating produces, plus a mask-free centroid trace |
-| [Smoothness and point spread](packages/fmri-qa-core/docs/analyses/smoothness.md) | the directional FWHM of the noise field (AFNI `3dFWHMx`) and the empirical point-spread curves, the confound the RDC is read against |
-| [Thermal vs. instability noise](packages/fmri-qa-core/docs/analyses/hilo.md) | `fmri-qa-hilo`: a high/low flip-angle pair split into additive and multiplicative noise (Greve) |
+| [fBIRN stability](docs/user-guide/analyses/stability.md) | SNR, SFNR, drift and fluctuation over a fixed ROI, the Weisskoff RDC, and the trim + detrending every other analysis shares |
+| [Phantom localization](docs/user-guide/analyses/localization.md) | the slice, the phantom mask and its outline, the summary ROI — and the verdicts that say whether either landed correctly |
+| [Nyquist ghosting](docs/user-guide/analyses/ghosting.md) | the N/2 ghost against the tissue that produced it: fBIRN percent ghost, its localized top-10% companion, the readout baseline, and the ACR/AAPM difference |
+| [ADC saturation](docs/user-guide/analyses/saturation.md) | whether the receiver clipped on its `2ⁿ−1` rail, counted separately before and after the warm-up trim — with a third answer for "not determinable" |
+| [Outliers and spikes](docs/user-guide/analyses/outliers.md) | the per-frame outlier-voxel fraction (AFNI `3dToutcount`) and two MAD-normalized spike scores, in time and in frequency |
+| [Motion and deformation](docs/user-guide/analyses/motion.md) | a `3dvolreg`-style rotation-free registration for the translation, scale and shear gradient heating produces, plus a mask-free centroid trace |
+| [Smoothness and point spread](docs/user-guide/analyses/smoothness.md) | the directional FWHM of the noise field (AFNI `3dFWHMx`) and the empirical point-spread curves, the confound the RDC is read against |
+| [Thermal vs. instability noise](docs/user-guide/analyses/hilo.md) | `fmri-qa-hilo`: a high/low flip-angle pair split into additive and multiplicative noise (Greve) |
 
-[The analysis artifact](packages/fmri-qa-core/docs/artifact.md) documents the
+[The analysis artifact](docs/user-guide/artifact.md) documents the
 file those numbers are published in — its dimensions and coordinates, the
 global attributes that carry every scalar in it, and how to read one from MATLAB,
-R, Python or `ncdump`. The [documentation index](packages/fmri-qa-core/docs/index.md)
-builds into browsable HTML with `make sync-docs && make docs`, as part of the
-documentation site under `build/site`.
+R, Python or `ncdump`. The [user guide](docs/user-guide/index.md) builds into
+browsable HTML with `make sync-docs && make docs`, as part of the documentation
+site under `build/site`.
 
 ## Install
 
@@ -203,7 +203,7 @@ command line.
 `-l o` is the one that matters most, and the reason this is a command rather
 than a line in this README telling you to run dcm2niix yourself: it is what
 keeps the [ADC-saturation
-check](packages/fmri-qa-core/docs/analyses/saturation.md) able to answer at all.
+check](docs/user-guide/analyses/saturation.md) able to answer at all.
 
 ### The names it builds
 
@@ -306,7 +306,7 @@ written.
 
 A second command takes a *pair* of scans that differ only in flip angle and
 separates thermal from instability noise (see [thermal vs. instability
-noise](packages/fmri-qa-core/docs/analyses/hilo.md)):
+noise](docs/user-guide/analyses/hilo.md)):
 
 ```bash
 uv run fmri-qa-hilo HIGH_flip.nii.gz LOW_flip.nii.gz
@@ -339,7 +339,7 @@ replacing it would destroy the data the output describes.
 **Reading an artifact elsewhere** — MATLAB, R, Python/xarray and `ncdump` all
 open one without a package they have to go looking for, and an artifact from an
 older build (including the `.qa.npz` archives earlier versions wrote) still
-loads. [The analysis artifact](packages/fmri-qa-core/docs/artifact.md) has the
+loads. [The analysis artifact](docs/user-guide/artifact.md) has the
 layout, the recipes, and the version rules.
 
 ### JSON on stdout

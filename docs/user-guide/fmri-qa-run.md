@@ -7,7 +7,7 @@ $ fmri-qa-run DICOM_DIR OUTPUT_DIR [options]
 `DICOM_DIR` is searched for DICOM files, down to five levels of
 sub-directories, and every series found there is converted and, unless its
 folder already exists, analyzed and published as its own folder under
-`OUTPUT_DIR` — see {doc}`output` for what each folder holds. `OUTPUT_DIR` is
+`OUTPUT_DIR` — see {doc}`run-output` for what each folder holds. `OUTPUT_DIR` is
 created if it does not exist, and must not be `DICOM_DIR` itself.
 
 ## Options
@@ -27,12 +27,12 @@ The four analysis settings are the ones `fmri-qa` takes, with the same
 defaults, and each is recorded in the artifact and shown in the report. Each
 is explained where it is used:
 
-- `--trim-sec` — {external+core:doc}`analyses/stability`, which describes the
-  trim every analysis shares; {external+core:doc}`analyses/saturation` counts
+- `--trim-sec` — {doc}`/user-guide/analyses/stability`, which describes the
+  trim every analysis shares; {doc}`/user-guide/analyses/saturation` counts
   clipping on either side of it.
-- `--detrend` — {external+core:doc}`analyses/stability`, with the polynomial
+- `--detrend` — {doc}`/user-guide/analyses/stability`, with the polynomial
   and spline fits.
-- `--center` and `--roi-size` — {external+core:doc}`analyses/localization`,
+- `--center` and `--roi-size` — {doc}`/user-guide/analyses/localization`,
   under choosing the slice and placing the ROI.
 
 `fmri-qa-run --help` lists them too, in the wording the panel shows under

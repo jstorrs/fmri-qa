@@ -5,7 +5,7 @@ $ fmri-qa-report ARTIFACT --html FILE
 ```
 
 `ARTIFACT` is the `.qa.nc` file `fmri-qa --artifact` writes — the
-{external+core:doc}`analysis artifact <artifact>`. An artifact from an earlier
+{doc}`analysis artifact </user-guide/artifact>`. An artifact from an earlier
 build still renders: the loader also reads the retired `.qa.npz` container,
 and migrates a file written under an older schema forward, with a warning.
 `FILE` is the HTML page to write; `--html` is required.

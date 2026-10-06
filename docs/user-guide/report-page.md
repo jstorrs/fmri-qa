@@ -15,8 +15,8 @@ In the order they appear:
    whose estimator could not be resolved shows a dash and says so instead of a
    number. The values are descriptive: the report
    applies no acceptance thresholds. Beneath the tiles, a note carries any
-   {external+core:doc}`localization <analyses/localization>` or
-   {external+core:doc}`clipping <analyses/saturation>` warning the artifact
+   {doc}`localization </user-guide/analyses/localization>` or
+   {doc}`clipping </user-guide/analyses/saturation>` warning the artifact
    recorded, or says that none was.
 2. **Acquisition and analysis settings** — what was acquired (series, times,
    trimmed frames, recorded phase-encode direction) and how the analysis was
@@ -34,33 +34,33 @@ In the order they appear:
 Every figure is drawn from values stored in the artifact. Each is listed with
 the analysis that computes what it plots. The phantom outline and summary ROI
 drawn over the image figures, and the invalid image edge marked on the ghost
-figure when there is one, come from {external+core:doc}`analyses/localization`.
+figure when there is one, come from {doc}`/user-guide/analyses/localization`.
 
 **Image diagnostics** — per-frame and static spatial views of the phantom,
 noise and ghost regions:
 
 | Figure | What it draws | Computed by |
 | --- | --- | --- |
-| Signal | mean phantom signal, with the phantom outline and the summary ROI | {external+core:doc}`analyses/stability` |
-| SFNR | voxelwise signal-to-fluctuation-noise ratio, with the ROI | {external+core:doc}`analyses/stability` |
-| Fluctuation noise | temporal fluctuation-noise image, log-scaled, with outline and ROI | {external+core:doc}`analyses/stability` |
-| Static noise | odd–even static-noise image, with outline and ROI | {external+core:doc}`analyses/stability` |
-| N/2 ghost regions | mean image with the phase-encode and readout ghost sampling regions | {external+core:doc}`analyses/ghosting` |
+| Signal | mean phantom signal, with the phantom outline and the summary ROI | {doc}`/user-guide/analyses/stability` |
+| SFNR | voxelwise signal-to-fluctuation-noise ratio, with the ROI | {doc}`/user-guide/analyses/stability` |
+| Fluctuation noise | temporal fluctuation-noise image, log-scaled, with outline and ROI | {doc}`/user-guide/analyses/stability` |
+| Static noise | odd–even static-noise image, with outline and ROI | {doc}`/user-guide/analyses/stability` |
+| N/2 ghost regions | mean image with the phase-encode and readout ghost sampling regions | {doc}`/user-guide/analyses/ghosting` |
 
 **Temporal and spatial diagnostics** — time-series stability, motion and
 spatial resolution across the run:
 
 | Figure | What it draws | Computed by |
 | --- | --- | --- |
-| Weisskoff curve | coefficient of variation by ROI width, against the ideal | {external+core:doc}`analyses/stability` |
-| Decorrelation factor by ROI width | the RDC by ROI width, against the ideal | {external+core:doc}`analyses/stability` |
-| ROI mean signal | ROI mean over time, with its fitted trend | {external+core:doc}`analyses/stability` |
-| ROI residual | the detrended ROI mean, titled with its spike score | {external+core:doc}`analyses/stability`; the score from {external+core:doc}`analyses/outliers` |
-| Residual spectrum | magnitude spectrum of the residual, titled with its spike score | {external+core:doc}`analyses/stability`; the score from {external+core:doc}`analyses/outliers` |
-| Outlier fraction | per-volume fraction of outlier voxels | {external+core:doc}`analyses/outliers` |
-| In-plane motion | registration translation, scale and shear over time | {external+core:doc}`analyses/motion` |
-| Whole-slice center of mass | the centroid's deviation over time | {external+core:doc}`analyses/motion` |
-| Directional point-spread function | empirical and Gaussian point-spread profiles per direction | {external+core:doc}`analyses/smoothness` |
+| Weisskoff curve | coefficient of variation by ROI width, against the ideal | {doc}`/user-guide/analyses/stability` |
+| Decorrelation factor by ROI width | the RDC by ROI width, against the ideal | {doc}`/user-guide/analyses/stability` |
+| ROI mean signal | ROI mean over time, with its fitted trend | {doc}`/user-guide/analyses/stability` |
+| ROI residual | the detrended ROI mean, titled with its spike score | {doc}`/user-guide/analyses/stability`; the score from {doc}`/user-guide/analyses/outliers` |
+| Residual spectrum | magnitude spectrum of the residual, titled with its spike score | {doc}`/user-guide/analyses/stability`; the score from {doc}`/user-guide/analyses/outliers` |
+| Outlier fraction | per-volume fraction of outlier voxels | {doc}`/user-guide/analyses/outliers` |
+| In-plane motion | registration translation, scale and shear over time | {doc}`/user-guide/analyses/motion` |
+| Whole-slice center of mass | the centroid's deviation over time | {doc}`/user-guide/analyses/motion` |
+| Directional point-spread function | empirical and Gaussian point-spread profiles per direction | {doc}`/user-guide/analyses/smoothness` |
 
 ## The page as a file
 

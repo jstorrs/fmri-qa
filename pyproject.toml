@@ -47,12 +47,12 @@ notebooks = [
     "pydicom>=3.0.1",
     "scikit-fem>=12.0.2",
 ]
-# The analysis documentation (packages/fmri-qa-core/docs) is built with Sphinx,
-# and its figures are rendered at build time by running the real pipeline over
-# the synthetic phantom — so the stack is Sphinx plus matplotlib, and nothing in
-# the gate needs it either. Same reasoning as `notebooks`: it is development
-# tooling, so it is a workspace group rather than a published extra, and it is
-# out of the default sync. Take it with `make sync-docs`.
+# The documentation (docs/) is built with Sphinx, and its figures are rendered
+# at build time by running the real pipeline over the synthetic phantom — so
+# the stack is Sphinx plus matplotlib, and nothing in the gate needs it either.
+# Same reasoning as `notebooks`: it is development tooling, so it is a workspace
+# group rather than a published extra, and it is out of the default sync. Take
+# it with `make sync-docs`.
 docs = [
     "sphinx>=8",
     "myst-parser>=4",

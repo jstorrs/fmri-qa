@@ -1,17 +1,18 @@
 """The synthetic phantom every figure on these pages is drawn from.
 
-Each `plot` block in `analyses/` runs against this module while Sphinx builds,
-so a figure is output of the installed package rather than a picture of what it
-once produced: change a metric and the curve on its page changes with it, or the
-build fails (`make docs` passes `-W`).
+Each `plot` block in `user-guide/analyses/` runs against this module while
+Sphinx builds, so a figure is output of the installed package rather than a
+picture of what it once produced: change a metric and the curve on its page
+changes with it, or the build fails (`make docs` passes `-W`).
 
 The series is the one the test suite measures against -- a bright disk over a
 Rician-like background floor, seeded, 3 mm isotropic voxels, TR 2 s, stored as
-`uint16`. It is rebuilt here rather than imported because `tests/` is a pytest
-directory and not an importable package, and because the documentation should
-not break when a fixture is rearranged; `synthetic_series` below is the same
-construction as `tests/conftest.py::synthetic_series`, plus the one-parameter
-blur `SMOOTHING_VOXELS` documents, and the two are expected to read alike.
+`uint16`. It is rebuilt here rather than imported because core's `tests/` is a
+pytest directory and not an importable package, and because the documentation
+should not break when a fixture is rearranged; `synthetic_series` below is the
+same construction as `packages/fmri-qa-core/tests/conftest.py::synthetic_series`,
+plus the one-parameter blur `SMOOTHING_VOXELS` documents, and the two are
+expected to read alike.
 
 `scan()` writes that series to a NIfTI + BIDS sidecar in a temporary directory
 and loads it back, so the figures come off the same path a real run takes:

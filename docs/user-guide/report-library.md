@@ -3,7 +3,7 @@
 The command is a thin shell over `write_run_page`; it and `render_run_page` are
 importable from `fmriqc_report`. Both take a loaded `QAArtifact`; reading one from disk is
 core's job, through `fmriqc.analysis.load_artifact`, which reads any file the
-command would (see {external+core:doc}`artifact`).
+command would (see {doc}`/user-guide/artifact`).
 
 ```python
 from fmriqc.analysis import load_artifact
@@ -27,7 +27,7 @@ returns the complete page as a string. Nothing is written.
 renders the same page and writes it to `path`, returning the path. The write
 is the command's: rendered fully in memory first, then moved into place
 atomically, with missing parent directories created (see
-{doc}`usage`).
+{doc}`fmri-qa-report`).
 
 The keyword arguments are the same for both:
 

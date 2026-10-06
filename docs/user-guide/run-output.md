@@ -20,13 +20,13 @@ OUTPUT_DIR/
 - **`<series>.json`** is the BIDS sidecar dcm2niix wrote beside it, anonymized
   as `--anonymize` says. It is there when dcm2niix wrote one; any other file
   the import filed under the series' name travels with the scan the same way.
-- **`<series>.qa.nc`** is the {external+core:doc}`analysis artifact <artifact>`:
+- **`<series>.qa.nc`** is the {doc}`analysis artifact </user-guide/artifact>`:
   every number, curve and image the analysis produced, and the settings it
   used. Its recorded source is the scan's path in this folder, not the
   temporary one it was analyzed from.
 - **`<series>.html`** is the report rendered from that artifact, titled with
   the series name — a single self-contained file, described in
-  {external+report:doc}`the report page <page>`. It opens by double-click.
+  {doc}`the report page </user-guide/report-page>`. It opens by double-click.
 
 ## Existing results are refused, not replaced
 

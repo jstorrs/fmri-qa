@@ -1,10 +1,9 @@
 """Check that every relative link in a built documentation site resolves.
 
-`sphinx-build -W` fails on a reference it cannot resolve, but it only sees one
-project at a time: it cannot see a link into a sibling project written with the
-wrong relative prefix, a sibling that was never built, or a broken link back up
-to the landing page. This walks the finished site and follows every local link,
-which must land on a file inside the site.
+`sphinx-build -W` fails on a reference it cannot resolve, but it only sees the
+references written in the sources: not the links the theme, its templates and
+the extensions write into the HTML around them. This walks the finished site
+and follows every local link, which must land on a file inside the site.
 
 Usage: python scripts/check_site_links.py SITE_ROOT
 """

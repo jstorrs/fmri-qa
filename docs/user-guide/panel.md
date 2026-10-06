@@ -1,6 +1,6 @@
 # The desktop panel
 
-The panel runs the same pipeline as the {doc}`command line <command-line>`,
+The panel runs the same pipeline as the {doc}`command line <fmri-qa-run>`,
 from one window titled "fMRI QA". Open it with `fmri-qa-panel`, or with
 `fmri-qa-run` and no arguments. It needs `tkinter` and a graphical display;
 `fmri-qa-run` explains on stderr when either is missing. `fmri-qa-panel`,

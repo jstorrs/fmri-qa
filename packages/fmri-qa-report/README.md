@@ -29,6 +29,6 @@ follows the reader's OS setting (figures stay on a white plate so plotted data
 keeps its colors); and the page is print-ready. `--html` takes exactly one
 artifact; a wildcard pattern that matches several is a usage error.
 
-The pages in [`docs/`](docs/index.md) cover the command, the page, and the
-Python API. Build them from the workspace root with `make sync-docs && make
-docs`; they land under `build/site/report`.
+The workspace's [user guide](../../docs/user-guide/index.md) covers the
+command, the page, and the Python API. Build it from the workspace root with
+`make sync-docs && make docs`; it lands under `build/site`.

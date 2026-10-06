@@ -1,12 +1,13 @@
 """The analysis pages and the netCDF layout, checked against each other.
 
-`docs/analyses/` documents what each analysis contributes to the artifact, under
-the exact names a reader sees in the file. That is a claim about the serializer,
-and a claim in prose rots silently: a variable added to `_LAYOUT` with no page to
-name it is undocumented, a page naming a variable that was renamed sends a reader
-looking for something that is not there, and the same name on two pages means
-neither owns it. `test_layering.py` makes the same argument for the import
-stack -- a rule that erodes one edit at a time has to be checked mechanically.
+`docs/user-guide/analyses/` documents what each analysis contributes to the
+artifact, under the exact names a reader sees in the file. That is a claim about
+the serializer, and a claim in prose rots silently: a variable added to
+`_LAYOUT` with no page to name it is undocumented, a page naming a variable that
+was renamed sends a reader looking for something that is not there, and the same
+name on two pages means neither owns it. `test_layering.py` makes the same
+argument for the import stack -- a rule that erodes one edit at a time has to be
+checked mechanically.
 
 So every variable in the serializer's `_LAYOUT`, every coordinate in
 `_COORDINATES`, and every `Measurements` field must appear in exactly one
@@ -44,7 +45,7 @@ from fmriqc.analysis.artifact import AnalysisSettings, Measurements, Provenance
 from fmriqc.analysis.serialize.decompose import decompose
 from fmriqc.analysis.serialize.netcdf import _COORDINATES, _LAYOUT, _leaves
 
-DOCS = Path(fmriqc.__file__).parents[2] / "docs"
+DOCS = Path(fmriqc.__file__).parents[4] / "docs" / "user-guide"
 ANALYSES = DOCS / "analyses"
 
 # The heading whose table is the page's ownership claim.
