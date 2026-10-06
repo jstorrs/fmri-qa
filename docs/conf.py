@@ -28,7 +28,7 @@ extensions = [
     "matplotlib.sphinxext.plot_directive",
 ]
 
-exclude_patterns = ["_build", "_templates"]
+exclude_patterns = ["_build"]
 
 # `dollarmath` for the inline and `$$` display math the method sections are
 # written in, `amsmath` for the aligned environments a multi-line derivation
