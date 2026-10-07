@@ -168,10 +168,10 @@ def import_dicom(
         cannot be moved into `destination`. All destination checks happen before
         any file moves, and a move that fails is undone.
     """
-    # Guarded up front so an untyped caller still gets the named error, then
-    # matched exhaustively: `assert_never` is unreachable for a `NameStyle`, so
-    # adding a style to that Literal makes this a type error rather than a
-    # silent fall-through at runtime.
+    # Guarded up front so an untyped caller still gets the named error.
+    # `_file_series` then matches it exhaustively: its `assert_never` is
+    # unreachable for a `NameStyle`, so adding a style to that Literal makes the
+    # match a type error rather than a silent fall-through at runtime.
     if names not in NAME_STYLES:
         raise InvalidChoiceError("names", names, NAME_STYLES)
     # `anonymize` is only ever looked up in `dcm2niix._BA`, a `dict[Anonymize,
