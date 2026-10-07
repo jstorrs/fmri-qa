@@ -460,7 +460,6 @@ def test_json_record_carries_the_displacement_unit(artifact) -> None:
     )
     assert record["com"] == m.max_com_displacement
     assert record["displacement_unit"] == "mm"  # the fixture's voxel size is known
-    assert record["displacement_unit"] == "mm"  # the fixture's voxel size is known
 
 
 def test_table_marks_an_unnamed_direction_unknown(artifact) -> None:
