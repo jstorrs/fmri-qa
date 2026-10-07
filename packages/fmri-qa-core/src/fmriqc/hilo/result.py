@@ -19,10 +19,11 @@ class HiLoResult:
     thermal (additive) noise variance is independent of signal level while
     instability (multiplicative: drift, gradient heating, physiological-like
     fluctuation) noise variance scales with signal squared. With the squared
-    signal ratio `M = (mean_high / mean_low)**2`,
+    signal ratio `M = (mean_high / mean_low)**2` and `instability_var` the
+    instability variance at the high flip angle,
 
-        var_high = thermal_var + M * instability_var0
-        var_low  = thermal_var +     instability_var0
+        var_high = thermal_var + instability_var
+        var_low  = thermal_var + instability_var / M
 
     which solve to `thermal_var = (M*var_low - var_high)/(M - 1)` and
     `instability_var = var_high - thermal_var`. If measurement noise drives
