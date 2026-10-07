@@ -88,14 +88,14 @@ METRIC_DOCS: tuple[MetricDoc, ...] = (
     MetricDoc(
         "SNR",
         "Image signal-to-noise: ROI mean signal over the static spatial noise.",
-        "fBIRN: static noise from the odd/even difference image over the ROI.",
+        "FBIRN: static noise from the odd/even difference image over the ROI.",
         name="snr",
         decimals=1,
     ),
     MetricDoc(
         "SFNR",
         "Signal-to-fluctuation-noise: ROI average of the voxelwise temporal SNR.",
-        "fBIRN/Glover: per voxel, temporal mean / detrended temporal SD; then the "
+        "FBIRN/Glover: per voxel, temporal mean / detrended temporal SD; then the "
         "ROI mean of those ratios (not the ratio of the ROI-mean series).",
         name="sfnr",
         decimals=1,
@@ -145,7 +145,7 @@ METRIC_DOCS: tuple[MetricDoc, ...] = (
     MetricDoc(
         "drift",
         "Slow signal drift across the run.",
-        "fBIRN: peak-to-trough of the fitted trend over the mean signal.",
+        "FBIRN: peak-to-trough of the fitted trend over the mean signal.",
         name="drift_pct",
         decimals=3,
         unit="%",
@@ -153,7 +153,7 @@ METRIC_DOCS: tuple[MetricDoc, ...] = (
     MetricDoc(
         "fluct",
         "Percent temporal fluctuation of the ROI-mean time course.",
-        "fBIRN/Glover: SD of the detrended ROI-mean series over the ROI mean "
+        "FBIRN/Glover: SD of the detrended ROI-mean series over the ROI mean "
         "signal (the ROI-mean form SFNR does not use).",
         name="percent_fluctuation",
         decimals=3,

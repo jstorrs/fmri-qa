@@ -11,7 +11,7 @@ calibration on a scanner.
 
 The package reports four numbers rather than one, because a single region-mean
 ratio hides two different things: a ghost that is bright but small, and a
-"ghost" that is really just background. The four are the fBIRN region-mean
+"ghost" that is really just background. The four are the FBIRN region-mean
 percent ghost, its localized top-10% companion, the same measurement taken
 along the readout axis as a background baseline, and the ACR/AAPM-style
 difference of the two directions.
@@ -87,7 +87,7 @@ $$\text{ghT \%} = 100\,
 \frac{\operatorname{mean}\big(\text{top } 10\% \text{ of } \bar S|_{G_p}\big)}
 {\langle \bar S \rangle_{\Sigma_p}}$$
 
-**ghost %** is the fBIRN percent ghost. **ghT %** is its localized companion
+**ghost %** is the FBIRN percent ghost. **ghT %** is its localized companion
 (Greve's `fmriqa_ghostiness` in bxh), narrowing the numerator to the brightest
 tenth of the ghost voxels — at least one voxel is always averaged, so it can
 only be greater than or equal to the region mean, and a bright concentrated
@@ -157,7 +157,7 @@ well-calibrated acquisition looks like.
 
 | Name | Where it lives | Meaning |
 | --- | --- | --- |
-| `measurements.ghost_pct` | attribute, double | fBIRN region-mean percent ghost along the phase-encode axis |
+| `measurements.ghost_pct` | attribute, double | FBIRN region-mean percent ghost along the phase-encode axis |
 | `measurements.ghost_top_pct` | attribute, double | localized percent ghost over the brightest 10% of ghost voxels |
 | `measurements.ro_ghost_pct` | attribute, double | the same region-matched percent ghost along the readout axis |
 | `measurements.acr_ghost_pct` | attribute, double | ACR/AAPM percent-signal-ghosting: the absolute difference between the phase-encode and readout percent ghosts |

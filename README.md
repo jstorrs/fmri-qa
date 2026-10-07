@@ -1,9 +1,9 @@
 # fmri-qa
 
-Phantom fMRI quality-assurance metrics, following the Glover/fBIRN stability
+Phantom fMRI quality-assurance metrics, following the Glover/FBIRN stability
 protocol (Friedman & Glover, 2006). Given a 4-D phantom time series it reports
 SNR, SFNR, the Weisskoff radius of decorrelation (RDC), drift, temporal
-fluctuation, and two Nyquist-ghost measures (fBIRN percent ghost and the
+fluctuation, and two Nyquist-ghost measures (FBIRN percent ghost and the
 ACR/AAPM ghosting ratio), and renders a self-contained offline HTML report
 per scan.
 
@@ -21,7 +21,7 @@ and the third is an application shell built on both of them:
 
 Between the first two, a `QAArtifact` is the only thing that crosses: the
 run's settings, provenance, scalar measurements, stability curves, and the
-four fBIRN summary images — everything a report needs, and none of the heavy
+four FBIRN summary images — everything a report needs, and none of the heavy
 inputs. It saves to a single netCDF-4 file, so calculation and reporting stay
 two separate steps even when `fmri-qa-launcher` runs them back to back:
 
@@ -43,9 +43,9 @@ synthetic phantom, and the exact netCDF names it contributes to the artifact:
 
 | Analysis | In one line |
 | --- | --- |
-| [fBIRN stability](docs/user-guide/analyses/stability.md) | SNR, SFNR, drift and fluctuation over a fixed ROI, the Weisskoff RDC, and the trim + detrending every other analysis shares |
+| [FBIRN stability](docs/user-guide/analyses/stability.md) | SNR, SFNR, drift and fluctuation over a fixed ROI, the Weisskoff RDC, and the trim + detrending every other analysis shares |
 | [Phantom localization](docs/user-guide/analyses/localization.md) | the slice, the phantom mask and its outline, the summary ROI — and the verdicts that say whether either landed correctly |
-| [Nyquist ghosting](docs/user-guide/analyses/ghosting.md) | the N/2 ghost against the tissue that produced it: fBIRN percent ghost, its localized top-10% companion, the readout baseline, and the ACR/AAPM difference |
+| [Nyquist ghosting](docs/user-guide/analyses/ghosting.md) | the N/2 ghost against the tissue that produced it: FBIRN percent ghost, its localized top-10% companion, the readout baseline, and the ACR/AAPM difference |
 | [ADC saturation](docs/user-guide/analyses/saturation.md) | whether the receiver clipped on its `2ⁿ−1` rail, counted separately before and after the warm-up trim — with a third answer for "not determinable" |
 | [Outliers and spikes](docs/user-guide/analyses/outliers.md) | the per-frame outlier-voxel fraction (AFNI `3dToutcount`) and two MAD-normalized spike scores, in time and in frequency |
 | [Motion and deformation](docs/user-guide/analyses/motion.md) | a `3dvolreg`-style rotation-free registration for the translation, scale and shear gradient heating produces, plus a mask-free centroid trace |

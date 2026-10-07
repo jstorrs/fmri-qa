@@ -54,7 +54,7 @@ Two deliberate **refinements** over the literal spec (both documented in-code):
   raw `CV(1)/CV(Nmax)` — more robust to intensity non-uniformity than a
   single-voxel anchor.
 - **ACR-equivalent ghost** (`acr_ghost_pct = |PE% − RO%|`) is a region-matched
-  synthesis of the fBIRN and ACR/AAPM definitions; not literal in any note but
+  synthesis of the FBIRN and ACR/AAPM definitions; not literal in any note but
   principled (readout axis gives a background-relative baseline). The whole
   family — PE, RO, top-10%, ACR — comes off one build of the region-matched
   masks (`estimate_ghost` → `GhostResult`), which the artifact publishes, so the

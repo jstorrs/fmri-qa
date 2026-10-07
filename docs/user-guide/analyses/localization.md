@@ -97,7 +97,7 @@ record the phantom it segmented anyway as good.
 ### Placing the ROI
 
 The summary ROI is a square of side `--roi-size` (21 voxels by default, the
-fBIRN size). Its center is the image-matrix center under `--center image`, and
+FBIRN size). Its center is the image-matrix center under `--center image`, and
 the phantom's own center under `--center phantom` — the latter taken as the
 mask voxel furthest from any background, i.e. the maximum of the Euclidean
 distance transform of the mask, which is the most interior point rather than

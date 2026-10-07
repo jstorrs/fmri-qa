@@ -161,7 +161,7 @@ def run_qa(scan: QAScan, settings: AnalysisSettings | None = None) -> QAResult:
     `detrend` selects the detrending method ("poly" or "spline").
     `center` localizes both the QA slice and the ROI: "image" (middle slice +
     image-center ROI, Glover) or "phantom" (largest slice + detected center).
-    `roi_size` is the fixed summary/Weisskoff ROI side (fBIRN's
+    `roi_size` is the fixed summary/Weisskoff ROI side (FBIRN's
     `FBIRN_ROI_SIZE` unless asked otherwise).
     """
     settings = AnalysisSettings() if settings is None else settings

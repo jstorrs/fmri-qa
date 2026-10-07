@@ -79,7 +79,7 @@ def _mean_ratio(
 ) -> float:
     """Compute the region-mean ghost-to-signal ratio for one mask pair.
 
-    The single definition of the fBIRN ghost ratio. NaN when either region came
+    The single definition of the FBIRN ghost ratio. NaN when either region came
     back empty -- no measurement at all, which is not the same as a low one.
     """
     if not ghost_mask.any() or not signal_mask.any():
@@ -119,7 +119,7 @@ class GhostResult(ArrayValue):
     Every ratio below was averaged over exactly these masks, so a report drawing
     them is drawing what was measured.
 
-    `pe_ratio` is the fBIRN ghost-to-signal ratio, `pe_top_ratio` its localized
+    `pe_ratio` is the FBIRN ghost-to-signal ratio, `pe_top_ratio` its localized
     (Greve / bxh `fmriqa_ghostiness`) companion over the brightest `top` fraction
     of ghost voxels, and `ro_ratio` the readout baseline. A NaN ratio means the
     region it needed came back empty -- the phantom spans the FOV along that
@@ -143,7 +143,7 @@ class GhostResult(ArrayValue):
         The classic ACR/AAPM "percent-signal-ghosting" subtracts a background
         estimate (the frequency axis, which carries no N/2 ghost) from the
         phase-encode ghost, normalized by the central signal:
-        `|ghost_pe - ghost_freq| / signal`. This is that same contrast in fBIRN
+        `|ghost_pe - ghost_freq| / signal`. This is that same contrast in FBIRN
         region-matched space -- each ghost patch normalized by the exact tissue
         that produced it, with the phantom/ghost overlap zone excluded from both.
 
@@ -157,7 +157,7 @@ class GhostResult(ArrayValue):
 
     @property
     def ghost_pct(self) -> float:
-        """The fBIRN percent ghost along the phase-encode axis."""
+        """The FBIRN percent ghost along the phase-encode axis."""
         return 100.0 * self.pe_ratio
 
     @property
@@ -223,7 +223,7 @@ def _ghost_ratio(
     *,
     valid_mask: BoolArray,
 ) -> float:
-    """Measure the fBIRN Nyquist ghost-to-signal ratio for one candidate axis.
+    """Measure the FBIRN Nyquist ghost-to-signal ratio for one candidate axis.
 
     A single axis' worth of `estimate_ghost` — what `ghost_ratios` needs to
     score a candidate, before any axis is settled. A run that has settled its

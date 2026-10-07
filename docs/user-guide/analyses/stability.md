@@ -1,8 +1,8 @@
-# fBIRN stability
+# FBIRN stability
 
 ## What it is for
 
-This is the core of the Glover/fBIRN phantom protocol (Friedman & Glover, 2006)
+This is the core of the Glover/FBIRN phantom protocol (Friedman & Glover, 2006)
 and the reason the rest of the package exists: a stationary phantom emits a
 constant signal, so everything that moves in the measured time course is the
 scanner. Four scalars summarize how much moves and on what time scale — SNR
@@ -64,7 +64,7 @@ per-voxel images agree by construction rather than by coincidence.
 
 ### SNR
 
-The fBIRN SNR measures the signal against the *static spatial* noise, estimated
+The FBIRN SNR measures the signal against the *static spatial* noise, estimated
 from a difference image that cancels the phantom: the sum of the odd frames
 minus the sum of the even frames.
 
@@ -205,7 +205,7 @@ SFNR, the fluctuation noise, and the static (odd/even difference) noise.
 
 ```{eval-rst}
 .. plot::
-   :caption: The four fBIRN summary images of the synthetic phantom.
+   :caption: The four FBIRN summary images of the synthetic phantom.
    :filename-prefix: stability-images
 
    import matplotlib.pyplot as plt
@@ -235,8 +235,8 @@ SFNR, the fluctuation noise, and the static (odd/even difference) noise.
 
 | Name | Where it lives | Meaning |
 | --- | --- | --- |
-| `measurements.snr` | attribute, double | fBIRN SNR over the summary ROI; NaN if it could not be resolved |
-| `measurements.sfnr` | attribute, double | fBIRN SFNR over the summary ROI; NaN if any ROI voxel has no temporal noise |
+| `measurements.snr` | attribute, double | FBIRN SNR over the summary ROI; NaN if it could not be resolved |
+| `measurements.sfnr` | attribute, double | FBIRN SFNR over the summary ROI; NaN if any ROI voxel has no temporal noise |
 | `measurements.rdc` | attribute, double | Weisskoff radius of decorrelation at the full ROI, in voxels |
 | `measurements.drift_pct` | attribute, double | peak-to-peak of the ROI-mean trend, as a percentage of the ROI mean signal |
 | `measurements.percent_fluctuation` | attribute, double | RMS of the ROI-mean residual, as a percentage of the ROI mean signal |
@@ -270,7 +270,7 @@ ride in the JSON document's `settings` section; see
 ## References
 
 - Friedman L, Glover GH. *Report on a multicenter fMRI quality assurance
-  protocol.* J Magn Reson Imaging 2006;23:827–839. (the fBIRN protocol: SNR,
+  protocol.* J Magn Reson Imaging 2006;23:827–839. (the FBIRN protocol: SNR,
   SFNR, drift, fluctuation, the four summary images)
 - Weisskoff RM. *Simple measurement of scanner stability for fMRI of BOLD
   contrast at 1.5 T.* Magn Reson Med 1996;36:643–645. (the ROI-size curve and

@@ -317,7 +317,7 @@ def _ghost_regions(result: QAResult) -> GhostRegions | None:
 
 
 def _images(result: QAResult) -> ArtifactImages:
-    """Assemble the four fBIRN summary images plus the geometry drawn over them."""
+    """Assemble the four FBIRN summary images plus the geometry drawn over them."""
     images, geom, roi = result.images, result.geom, result.roi
     fluctuation_noise = images.fluctuation_noise
     # Per-voxel SFNR inside the phantom; the epsilon keeps the ratio finite where

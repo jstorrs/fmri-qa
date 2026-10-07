@@ -2,7 +2,7 @@
 
 ## What it is for
 
-The fBIRN summaries on the [stability](stability.md) page are averages, and an
+The FBIRN summaries on the [stability](stability.md) page are averages, and an
 average is exactly the wrong instrument for a transient: one badly corrupted
 volume in a three-hundred-volume run barely moves the SD it is folded into.
 This analysis is the complementary one — three unitless indicators that stand

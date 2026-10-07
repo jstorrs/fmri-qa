@@ -2,7 +2,7 @@
 
 This is the *presentation* half of fmri-qa. Its only input is the artifact the
 calculation half publishes — settings, provenance, measurements, curves and the
-fBIRN images, all precomputed — so nothing here recomputes a metric or reaches
+FBIRN images, all precomputed — so nothing here recomputes a metric or reaches
 into the `load`/`prep`/`metrics`/`pipeline` layers. An artifact read back from
 disk renders exactly like one just computed.
 

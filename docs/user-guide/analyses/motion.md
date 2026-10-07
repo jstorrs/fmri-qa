@@ -17,7 +17,7 @@ between them is reassuring; disagreement usually means the registration is
 looking at something the centroid is not.
 
 Both are **diagnostics only**. The analyzed series is never resampled from the
-fit, so the fBIRN metrics stay measured on the acquired data.
+fit, so the FBIRN metrics stay measured on the acquired data.
 
 ## Method
 

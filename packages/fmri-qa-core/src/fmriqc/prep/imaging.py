@@ -142,7 +142,7 @@ def _phantom_area(image: FloatArray) -> int:
 def select_slice(data: FloatArray, center: RoiCenter = "image") -> int:
     """Select the index of the QA slice in an (X, Y, Z, T) volume.
 
-    "image": the geometric middle slice (Glover/fBIRN convention).
+    "image": the geometric middle slice (Glover/FBIRN convention).
     "phantom": the slice with the largest phantom cross-section, measured by
     `_phantom_area` — which scores a slice holding no phantom as 0, so a
     prescription that runs off the end of the phantom cannot win on the strength

@@ -1,6 +1,6 @@
 # fmri-qa
 
-Phantom fMRI quality-assurance metrics, following the Glover/fBIRN stability
+Phantom fMRI quality-assurance metrics, following the Glover/FBIRN stability
 protocol (Friedman & Glover, 2006). Given a 4-D phantom time series, `fmri-qa`
 measures how stable the scanner was while it acquired it — SNR, SFNR, the
 Weisskoff radius of decorrelation, drift, temporal fluctuation and Nyquist

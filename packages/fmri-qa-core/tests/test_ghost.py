@@ -43,7 +43,7 @@ def _ghost_on_axis0(ghost: np.ndarray) -> GhostResult:
 
 
 def test_ghost_ratio_recovers_the_injected_ratio() -> None:
-    # mean ghost 5 / mean signal 100 = 0.05 (the fBIRN 5% ghost).
+    # mean ghost 5 / mean signal 100 = 0.05 (the FBIRN 5% ghost).
     result = _ghost_on_axis0(np.full((2, 2), 5.0))
     assert np.isclose(result.pe_ratio, 0.05)
     assert np.isclose(result.ghost_pct, 5.0)

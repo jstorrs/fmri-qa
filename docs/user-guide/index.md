@@ -2,7 +2,7 @@
 
 ## What is calculated, and how
 
-Phantom fMRI quality-assurance metrics, following the Glover/fBIRN stability
+Phantom fMRI quality-assurance metrics, following the Glover/FBIRN stability
 protocol. Given a 4-D phantom time series, `fmri-qa` measures how stable the
 scanner was while it acquired it, and publishes the result as a single netCDF-4
 file that a report, a spreadsheet, or a trend database reads.

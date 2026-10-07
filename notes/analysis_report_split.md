@@ -41,7 +41,7 @@ half accepts.
 | `Provenance` | scan name, source, timestamp, computing version, TR, the frame count and the warm-up volumes dropped before it, the plane of the volume analyzed, and the sidecar acquisition metadata |
 | `Measurements` | every reported scalar, flat — no metric result object survives |
 | `Curves` | the 1-D traces: ROI signal/trend/residual, outliers, spectrum, motion, COM, Weisskoff, PSF |
-| `ArtifactImages` | the four fBIRN images (signal, SFNR, fluctuation noise, static noise) plus phantom mask, convex hull, invalid edge, ROI box, ghost regions |
+| `ArtifactImages` | the four FBIRN images (signal, SFNR, fluctuation noise, static noise) plus phantom mask, convex hull, invalid edge, ROI box, ghost regions |
 
 Two rules decide what belongs in it:
 

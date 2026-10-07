@@ -11,7 +11,7 @@ artifact under the netCDF names a reader will see.
 
 | Analysis | What it measures | Publishes |
 | --- | --- | --- |
-| [fBIRN stability](stability.md) | signal against static and temporal noise, the drift removed, and how far the noise is from independent voxel to voxel | `snr`, `sfnr`, `rdc`, `drift_pct`, `percent_fluctuation` |
+| [FBIRN stability](stability.md) | signal against static and temporal noise, the drift removed, and how far the noise is from independent voxel to voxel | `snr`, `sfnr`, `rdc`, `drift_pct`, `percent_fluctuation` |
 | [Phantom localization](localization.md) | where the phantom and the summary ROI are, and whether either landed correctly | `phantom_fraction`, `phantom_contrast`, `phantom_mask_ok`, `roi_inside_phantom` |
 | [Nyquist ghosting](ghosting.md) | the N/2 ghost against the tissue that produced it, four ways, plus the axis it was measured on | `ghost_pct`, `ghost_top_pct`, `ro_ghost_pct`, `acr_ghost_pct`, `pe_axis`, `pe_label` |
 | [ADC saturation](saturation.md) | whether the receiver clipped, split at the warm-up trim — with a third answer for "not determinable" | `clipped_any`, `clipped_kept`, `n_clipped_kept`, `n_clipped_pre`, `clip_ceiling`, `clip_bits` |

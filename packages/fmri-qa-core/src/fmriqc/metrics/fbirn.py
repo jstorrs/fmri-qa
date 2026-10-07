@@ -109,7 +109,7 @@ def weisskoff(images: QAImages, roi: ROI) -> WeisskoffResult:
     # derived images are properties; read each once rather than per ROI size
     fluctuations, mean_image = images.fluctuations, images.mean_image
     noise = images.fluctuation_noise
-    # every integer width 1..roi.size, per the fBIRN/Glover Weisskoff protocol
+    # every integer width 1..roi.size, per the FBIRN/Glover Weisskoff protocol
     # (Friedman & Glover 2006); cv[-1] is at the full ROI the pooled cv1 spans
     roi_sizes = np.arange(1, roi.size + 1)
     cv = np.array(
@@ -136,12 +136,12 @@ def weisskoff(images: QAImages, roi: ROI) -> WeisskoffResult:
 
 
 def snr(images: QAImages, roi: ROI) -> float:
-    """Compute the fBIRN SNR over a resolved ROI (Friedman & Glover 2006).
+    """Compute the FBIRN SNR over a resolved ROI (Friedman & Glover 2006).
 
     Signal is the mean of the temporal-mean image over the ROI. Static spatial
     noise is the ROI variance of the (odd-sum minus even-sum) difference image;
     SNR = signal / sqrt(variance / n_frames). The difference uses frame *sums*,
-    not means, so the normalization matches the fBIRN definition.
+    not means, so the normalization matches the FBIRN definition.
 
     The difference is formed over an *even* number of frames. With an odd count
     the two subsets differ by one frame, so the difference carries a whole frame
@@ -171,7 +171,7 @@ def snr(images: QAImages, roi: ROI) -> float:
 
 
 def sfnr(images: QAImages, roi: ROI) -> float:
-    """Compute the fBIRN signal-to-fluctuation-noise ratio over a resolved ROI.
+    """Compute the FBIRN signal-to-fluctuation-noise ratio over a resolved ROI.
 
     After Friedman & Glover 2006.
 

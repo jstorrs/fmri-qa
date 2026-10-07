@@ -14,7 +14,7 @@ Five sections, in the order a reader consumes them:
 * `Provenance`       -- where the data came from and what produced this artifact
 * `Measurements`     -- the settled scalars (the numbers a table or a threshold reads)
 * `Curves`           -- the 1-D traces a stability plot draws
-* `ArtifactImages`   -- the four fBIRN summary images plus the overlays drawn on them
+* `ArtifactImages`   -- the four FBIRN summary images plus the overlays drawn on them
 
 Nothing here imports the metric, prep or load layers: an artifact is inert data.
 `build` projects a `QAResult` into one; `serialize` moves it to and from disk.
@@ -195,7 +195,7 @@ class Measurements:
     consumer never has to wonder which half of a pair it is looking at.
     """
 
-    # fBIRN ROI stability
+    # FBIRN ROI stability
     snr: float
     sfnr: float
     rdc: float
@@ -429,9 +429,9 @@ class GhostRegions(ArrayValue):
 
 @dataclass(frozen=True, eq=False, slots=True)
 class ArtifactImages(ArrayValue):
-    """The four fBIRN summary images plus the geometry drawn on top of them.
+    """The four FBIRN summary images plus the geometry drawn on top of them.
 
-    `signal`, `sfnr`, `fluctuation_noise` and `static_noise` are the fBIRN
+    `signal`, `sfnr`, `fluctuation_noise` and `static_noise` are the FBIRN
     quartet — temporal mean, per-voxel SFNR, temporal noise RMS, and the odd/even
     difference. The rest is annotation: the phantom segmentation and its convex
     outline (`phantom_hull`, a closed polygon in plot (x=col, y=row) order, so a

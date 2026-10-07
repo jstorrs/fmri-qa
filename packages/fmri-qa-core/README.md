@@ -13,7 +13,7 @@ q.save_artifact(artifact, "qa.nc")
 ```
 
 A `QAArtifact` carries the run's settings, provenance, scalar measurements,
-stability curves, and the four fBIRN summary images — everything a report or a
+stability curves, and the four FBIRN summary images — everything a report or a
 trend database needs, and nothing that only the pipeline needs. It saves as a
 netCDF-4 file: MATLAB's `ncread`/`ncinfo`/`ncdisp`/`ncreadatt` are built in and
 need no toolbox, R reads one through `ncdf4` on CRAN, Python through
