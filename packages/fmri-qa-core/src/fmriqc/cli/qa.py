@@ -133,7 +133,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         pe_axis_override=args.pe_axis,
     )
     # In --json mode stdout carries only the JSON document; the config banner,
-    # table, and save notices go to stderr so a consumer can pipe stdout cleanly.
+    # table and save notices go to stderr so a consumer can pipe stdout cleanly.
     info = sys.stderr if args.json else sys.stdout
     print(
         f"# detrend={settings.detrend}  trim_sec={settings.trim_sec}  "

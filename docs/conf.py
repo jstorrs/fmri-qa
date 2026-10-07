@@ -41,7 +41,7 @@ html_theme = "furo"
 html_title = "fmri-qa"
 
 # Figures are results, not examples: the reader wants the curve, and the code
-# that drew it is on the page's subject matter only incidentally. PNG at 150 dpi
+# that drew it bears on the page's subject only incidentally. PNG at 150 dpi
 # is what a browser and a printed page both want from a plot this size.
 plot_include_source = False
 plot_html_show_source_link = False

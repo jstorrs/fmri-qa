@@ -34,7 +34,7 @@ class _Page(HTMLParser):
 
 
 def _tiny_rendered_figures() -> tuple[RenderedFigure, ...]:
-    """A cheap stand-in inventory for tests that are not about figure content."""
+    """Return a cheap stand-in inventory for tests not about figure content."""
     return tuple(
         RenderedFigure(asset, f"<?xml version='1.0'?><svg>{asset.name}</svg>".encode())
         for asset in FIGURE_ASSETS
@@ -78,8 +78,10 @@ def test_run_page_contains_complete_offline_report_content(standalone_page) -> N
 def test_figure_alt_text_is_the_title_not_the_visible_caption_sentence(
     standalone_page,
 ) -> None:
-    """A screen reader must not read the description twice: once as `alt`,
-    once as the figcaption text right beside it."""
+    """A screen reader must not read the description twice.
+
+    It must not appear both as `alt` and as the figcaption text right beside it.
+    """
     page = standalone_page
     parsed = _Page()
     parsed.feed(page)

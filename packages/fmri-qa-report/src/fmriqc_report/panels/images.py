@@ -1,8 +1,8 @@
-"""Phantom-image panels: signal, SFNR, noise, and the N/2 ghost overlay.
+"""Phantom-image panels: signal, SFNR, noise and the N/2 ghost overlay.
 
 Each builder returns a labelled matplotlib `Figure` (a square-ish `imshow` panel
 with the phantom outline and ROI drawn on top); `panel_figs` assembles the row a
-report shows. Every image, mask, and outline comes ready-made from the artifact,
+report shows. Every image, mask and outline comes ready-made from the artifact,
 so this module only draws. Format-agnostic — a driver embeds the returned figures.
 """
 
@@ -27,7 +27,7 @@ _HULL_COLOR = "tab:cyan"  # phantom hull outline color
 
 
 def _data_per_point(ax: Axes) -> float:
-    """Length of one typographic point (1/72 in) in axes data units.
+    """Return the length of one typographic point (1/72 in) in axes data units.
 
     `imshow` uses equal aspect, so x and y share a scale; `apply_aspect` finalizes
     that scaling first so the measured transform is the one that will render. The
@@ -63,7 +63,7 @@ def _draw_roi(ax: Axes, roi: RoiBox) -> None:
 
 
 def _draw_hull(ax: Axes, hull: FloatArray) -> None:
-    """Stroke the phantom's convex outline, a closed (x, y) polygon from the artifact.
+    """Stroke the phantom's convex outline, a closed polygon from the artifact.
 
     The hull smooths the ragged phantom-mask boundary into a clean convex
     outline. It arrives already closed and already in plot order (`imshow` maps
@@ -114,7 +114,7 @@ def _overlay(
 
 
 def _ghost_panel_fig(images: ArtifactImages) -> Figure:
-    """Mean image with the region-matched ghost/signal masks for both axes.
+    """Build the mean image with region-matched ghost/signal masks for both axes.
 
     Draws the exact masks the ghost metrics averaged: for each in-plane axis, the
     ghost patch (where the phantom rolled half the FOV lands clear of the phantom)

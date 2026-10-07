@@ -327,7 +327,7 @@ def test_an_artifact_without_ghost_regions_still_carries_every_axis(
     four masks lie along `row`/`col` like every other image -- so a ghost-less
     artifact declares the same eleven axes and resolves all eleven. The rest of
     the `replace` is what "no PE axis resolved" means elsewhere in the artifact:
-    the ghost regions, `pe_axis`, `pe_label`, `fwhm_pe`/`fwhm_ro`, and the PSF
+    the ghost regions, `pe_axis`, `pe_label`, `fwhm_pe`/`fwhm_ro` and the PSF
     labels go together.
     """
     without = replace(
@@ -430,7 +430,7 @@ def test_masks_are_stored_as_cf_flagged_bytes(tmp_path, artifact) -> None:
 def test_the_units_a_reader_is_told_are_the_ones_that_are_certain(
     tmp_path, artifact
 ) -> None:
-    """Seconds, hertz and percent are labelled; a unit the file cannot know is not.
+    """Seconds, hertz and percent are labeled; a unit the file cannot know is not.
 
     The PSF abscissas are mm or voxels depending on what the header gave, so
     they carry a long name and no `units` rather than a guess.

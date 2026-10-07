@@ -47,7 +47,7 @@ def ghost_masks(
     *,
     valid_mask: BoolArray,
 ) -> tuple[BoolArray, BoolArray]:
-    """Region-matched (signal, ghost) masks for a candidate PE axis.
+    """Build region-matched (signal, ghost) masks for a candidate PE axis.
 
     The ghost is the phantom rolled half the FOV along `pe_axis`; the ghost mask
     keeps the part of it that lands clear of the phantom (eroded, with the dilated
@@ -77,7 +77,7 @@ def ghost_masks(
 def _mean_ratio(
     mean_image: FloatArray, signal_mask: BoolArray, ghost_mask: BoolArray
 ) -> float:
-    """Region-mean ghost-to-signal ratio over one matched mask pair.
+    """Compute the region-mean ghost-to-signal ratio for one mask pair.
 
     The single definition of the fBIRN ghost ratio. NaN when either region came
     back empty -- no measurement at all, which is not the same as a low one.
@@ -93,7 +93,7 @@ def _top_ratio(
     ghost_mask: BoolArray,
     top: float = GHOST_TOP_FRACTION,
 ) -> float:
-    """Top-fraction ghost-to-signal ratio over one matched mask pair.
+    """Compute the top-fraction ghost-to-signal ratio for one mask pair.
 
     The single definition of the localized ghost ratio: `_mean_ratio` with the
     numerator narrowed to the brightest `top` fraction of ghost voxels, so a
@@ -187,7 +187,7 @@ def estimate_ghost(
 ) -> GhostResult:
     """Measure every Nyquist-ghost statistic for a known phase-encode axis.
 
-    Builds the region-matched masks once per in-plane axis and takes all three
+    It builds the region-matched masks once per in-plane axis and takes all three
     ratios from them, so no two of the family can disagree and the caller keeps
     the masks that were sampled. `pe_axis` is the resolved phase-encode axis (0
     or 1); the readout axis is the other one. `radius` sets the erosion/dilation
@@ -254,8 +254,8 @@ def ghost_ratios(
     real ghost signal (high mean); along the wrong axis it lands on background
     (low mean) — what `estimate_pe_axis` compares to pick a winner. An axis
     whose ghost region came back empty — the phantom spans the FOV along it, or
-    the segmentation collapsed — scores NaN: not a low
-    ratio but no ratio at all, a distinction `estimate_pe_axis` relies on.
+    the segmentation collapsed — scores NaN: not a low ratio but no ratio at
+    all, a distinction `estimate_pe_axis` relies on.
     """
     return {
         axis: _ghost_ratio(

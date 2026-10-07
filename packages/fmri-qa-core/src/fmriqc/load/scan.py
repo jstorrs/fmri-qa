@@ -44,10 +44,10 @@ class QAScan:
     single-slice QA pipeline supports the in-plane axes 0/1 and rejects axis 2.
     The value comes from the sidecar (authoritative -- see `pe_axis` for the
     order it reads its three fields in), falling back to the header `dim_info`
-    phase field; it is `None` when the
-    metadata names no axis, and `run_qa` then estimates one from the Nyquist
-    ghost. Polarity is dropped (unneeded here). `tr` is in seconds, from the sidecar
-    `RepetitionTime` or the header pixdim converted by its declared time unit.
+    phase field; it is `None` when the metadata names no axis, and `run_qa` then
+    estimates one from the Nyquist ghost. Polarity is dropped (unneeded here).
+    `tr` is in seconds, from the sidecar `RepetitionTime` or the header pixdim
+    converted by its declared time unit.
     `meta` holds the human-readable acquisition metadata for the report; the
     BIDS JSON sidecar it comes from is optional, and its fields are `None` when
     no sidecar sits beside the NIfTI.

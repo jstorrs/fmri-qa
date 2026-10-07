@@ -102,7 +102,7 @@ def separate_noise(
     flip_high: float | None = None,
     flip_low: float | None = None,
 ) -> HiLoResult:
-    """Thermal/instability variance split from pooled hi/lo statistics (pure algebra).
+    """Split thermal from instability variance in pooled hi/lo statistics.
 
     The flip-angle noise-separation math of `HiLoResult`; `run_hilo` computes the
     pooled `mean_*`/`var_*` from a scan pair and calls this. Kept separate so the

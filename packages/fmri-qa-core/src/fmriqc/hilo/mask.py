@@ -16,7 +16,7 @@ HILO_ERODE = 5
 
 
 def phantom_core_mask(volume: FloatArray, erode: int = HILO_ERODE) -> BoolArray:
-    """Eroded phantom-core mask of a 3-D image (AFNI `3dAutomask -q -erode` analogue).
+    """Build a 3-D eroded phantom-core mask (AFNI `3dAutomask` analogue).
 
     Segments the phantom from the temporal-mean `volume` with the same watershed
     used in-plane (`segment_phantom`, applied to the whole volume — its Sobel /

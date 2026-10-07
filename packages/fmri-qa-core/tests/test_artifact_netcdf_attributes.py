@@ -153,9 +153,8 @@ def test_encode_refuses_a_value_no_attribute_can_hold(artifact, encode) -> None:
 
     A nested object flattens into the name, and a list of ints, floats or
     strings becomes a vector or a line of words. An object *inside* a list has
-    nowhere to go;
-    `validate_document` refuses it before `save_artifact` reaches this, so the
-    fallthrough answers for `encode` called directly.
+    nowhere to go; `validate_document` refuses it before `save_artifact`
+    reaches this, so the fallthrough answers for `encode` called directly.
     """
     document, arrays = decompose(artifact)
     document["measurements"]["snr"] = [{"value": 1.0}]

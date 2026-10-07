@@ -1,7 +1,7 @@
 """End-to-end smoke tests for the calculation command-line entry points.
 
 These exercise the layers unit tests skip: argument wiring, the batch loop and
-its error handling, the JSON document, and saving artifacts to disk. A tiny
+its error handling, the JSON document and saving artifacts to disk. A tiny
 synthetic phantom is written as a NIfTI + BIDS sidecar (see `conftest`) so
 `QAScan.from_nifti` runs its real file-I/O path. Rendering those artifacts into
 a report is `fmri-qa-report`'s job and is tested there.

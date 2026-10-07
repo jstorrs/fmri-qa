@@ -9,7 +9,7 @@ kept because an artifact outlives the build that wrote it, which is the whole
 point of saving one: a trend database filled over months is a directory of
 these files, and they must keep opening.
 
-Which container a file is is decided by its leading bytes, not its name (see
+A file's container is decided by its leading bytes, not its name (see
 `serialize`), so a `.qa.npz` renamed by a user still reads here and one written
 under any name still reads as what it is.
 """

@@ -4,7 +4,7 @@ An artifact is everything a reader — a report, a plot, a spreadsheet, a trend
 database — needs about one analyzed series, and *nothing* that only the
 calculation needs. The heavy inputs (the 4-D series, the trimmed center slice,
 the per-voxel fluctuations) stay behind in `pipeline.QAResult`; what crosses the
-seam is small, self-describing, and serializable (see `serialize`).
+seam is small, self-describing and serializable (see `serialize`).
 
 Five sections, in the order a reader consumes them:
 
@@ -16,7 +16,7 @@ Five sections, in the order a reader consumes them:
 * `Curves`           -- the 1-D traces a stability plot draws
 * `ArtifactImages`   -- the four fBIRN summary images plus the overlays drawn on them
 
-Nothing here imports the metric, prep, or load layers: an artifact is inert data.
+Nothing here imports the metric, prep or load layers: an artifact is inert data.
 `build` projects a `QAResult` into one; `serialize` moves it to and from disk.
 """
 
@@ -68,7 +68,7 @@ class Provenance:
     told apart. `None` on any of these means *not recorded* — an artifact
     migrated from a schema that predates the field, where the trim or the slice
     choice happened but nothing wrote it down. `scan`, `source`, `created`,
-    `core_version`, `tr`, and `n_frames` identify the run and are required — a
+    `core_version`, `tr` and `n_frames` identify the run and are required — a
     validated artifact cannot exist without them. The rest is acquisition
     metadata copied from the BIDS sidecar and NIfTI header, every field of it
     optional because a scan without a sidecar still analyzes.
@@ -134,15 +134,15 @@ class Provenance:
 class Measurements:
     """The settled scalar results for one scan.
 
-    Flat by design: every value is a number, a bool, or a short string, so a
+    Flat by design: every value is a number, a bool or a short string, so a
     table, a JSON record, and an acceptance threshold all read the same fields
     without walking into per-metric result objects. The derived quantities the
     metric layer exposes as properties (peak motion, worst outlier frame, the
     combined FWHM) are resolved here once, at build time.
 
     `pe_label` is the phase-encode direction as it should be *displayed* ("row",
-    "col", or "?"): the label of the axis the ghost masks were built on, whichever
-    source settled it (sidecar, header, `pe_axis_override`, or the ghost
+    "col" or "?"): the label of the axis the ghost masks were built on, whichever
+    source settled it (sidecar, header, `pe_axis_override` or the ghost
     estimate), and "?" when none did.
 
     The two localization fields say whether the numbers beside them can be
@@ -347,11 +347,11 @@ class Curves(ArrayValue):
     """The 1-D traces: everything a stability plot draws, per analyzed frame.
 
     `time` is the shared abscissa in seconds; the ROI series, outlier fraction,
-    motion, and centroid traces are all indexed by it. The residual spectrum is
+    motion and centroid traces are all indexed by it. The residual spectrum is
     stored already DC-dropped (`spectrum_hz` starts at the first nonzero bin) so
     a plot needs no windowing knowledge. The Weisskoff and PSF curves have their
     own abscissas and sit in their own objects. A failed or unconverged motion
-    fit is an all-NaN frame in translation, scale, and shear; any failed frame
+    fit is an all-NaN frame in translation, scale and shear; any failed frame
     makes the run's peak motion measurements NaN. This status survives storage
     without changing the archive layout.
     """
@@ -431,7 +431,7 @@ class GhostRegions(ArrayValue):
 class ArtifactImages(ArrayValue):
     """The four fBIRN summary images plus the geometry drawn on top of them.
 
-    `signal`, `sfnr`, `fluctuation_noise`, and `static_noise` are the fBIRN
+    `signal`, `sfnr`, `fluctuation_noise` and `static_noise` are the fBIRN
     quartet — temporal mean, per-voxel SFNR, temporal noise RMS, and the odd/even
     difference. The rest is annotation: the phantom segmentation and its convex
     outline (`phantom_hull`, a closed polygon in plot (x=col, y=row) order, so a
@@ -455,7 +455,7 @@ class QAArtifact:
     """One analyzed series, as everything downstream needs and nothing more.
 
     The output of the calculation half (`analyze`) and the only input the report
-    half accepts. Immutable, self-describing, and round-trippable through
+    half accepts. Immutable, self-describing and round-trippable through
     `save_artifact`/`load_artifact`; the class constant `schema_version` is the
     layout those two agree on (loading migrates every file up to it).
     """

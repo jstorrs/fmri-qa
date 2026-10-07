@@ -1,4 +1,4 @@
-"""Local stub for the `dcm2niix` wrapper package — the one attribute we use.
+"""Local stub for the `dcm2niix` wrapper package: the one attribute we use.
 
 The package is a thin wrapper around a bundled dcm2niix binary and ships no type
 information, so `convert.dcm2niix` could not import it under strict typing. That

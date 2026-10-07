@@ -18,7 +18,7 @@ ConversionStage = Literal["dcm2niix", "source", "destination"]
 
 
 class FmriqcError(Exception):
-    """Base exception for fmriqc; catch this to catch any error the package raises."""
+    """Base exception for fmriqc; catch it to catch any error the package raises."""
 
 
 class InvalidChoiceError(FmriqcError, ValueError):

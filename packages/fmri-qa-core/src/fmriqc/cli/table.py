@@ -38,7 +38,7 @@ def localization_flag(m: q.Measurements) -> str:
 
 
 def fwhm_cell(value: float | None) -> str:
-    """One directional FWHM as a table cell: the number, or `?` if unmeasured.
+    """Format a directional FWHM cell: the number, or `?` if unmeasured.
 
     `fwhm_pe`/`fwhm_ro` are None when no phase-encode axis resolved, so neither
     direction has a name. The combined FWHM is *not* shown in their place: it is
@@ -49,7 +49,7 @@ def fwhm_cell(value: float | None) -> str:
 
 
 def clip_cell(count: int | None, *, flag: bool = False) -> str:
-    """One clipping count as a table cell: the number, or `?` if undeterminable.
+    """Format a clipping count cell: the number, or `?` if undeterminable.
 
     None means the rail test never ran, because the series did not reach the
     analysis as integer samples. Printing 0 there would report a clean scanner
@@ -60,7 +60,7 @@ def clip_cell(count: int | None, *, flag: bool = False) -> str:
 
 @dataclass(frozen=True)
 class Column:
-    """One table column: its header title, field width, and how a row fills it.
+    """One table column: its header title, field width and how a row fills it.
 
     `cell` returns the unpadded text; the width and alignment are applied by
     `Column.pad`, so the header and every row share them.
@@ -72,7 +72,7 @@ class Column:
     left: bool = False
 
     def pad(self, text: str) -> str:
-        """`text` padded to this column's width (right-aligned unless `left`)."""
+        """Pad `text` to this column's width (right-aligned unless `left`)."""
         return f"{text:<{self.width}s}" if self.left else f"{text:>{self.width}s}"
 
 

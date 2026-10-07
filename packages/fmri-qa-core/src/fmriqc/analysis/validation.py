@@ -8,7 +8,7 @@ module: a new single-record invariant added here would go unchecked for every
 consumer but the archive. What is left here is what a constructor cannot see —
 facts that span two records (`displacement_unit` against `provenance.voxel_mm`,
 `outlier_worst_frame` against `provenance.n_frames`, the ROI box against the
-image it sits on), and everything about arrays: their dimensions, shapes, and
+image it sits on), and everything about arrays: their dimensions, shapes and
 coordinates.
 
 Scalar types follow the value objects; dimensional relationships and numeric
@@ -89,7 +89,7 @@ def validate_document(document: dict[str, Any]) -> None:
 
 
 def validate_artifact(artifact: QAArtifact) -> None:
-    """Require coherent settings, dimensions, and coordinates after composition."""
+    """Require coherent settings, dimensions and coordinates after composition."""
     _validate_parameters(artifact)
     _validate_timeseries(artifact)
     _validate_images(artifact)

@@ -23,7 +23,7 @@ __all__ = [
 def _resolved_angle(
     sine: FloatArray, cosine: FloatArray, total: FloatArray
 ) -> FloatArray:
-    """Angles whose resultant exceeds 1e-12 of the total positive weight.
+    """Compute angles whose resultant exceeds 1e-12 of the total weight.
 
     This relative numerical tolerance rejects cancellation roundoff without
     depending on image brightness or the number of temporal samples.
@@ -36,7 +36,7 @@ def _resolved_angle(
 
 @dataclass(frozen=True, eq=False, slots=True)
 class CenterOfMassResult(ArrayValue):
-    """Per-volume intensity-weighted center of mass of the phantom (bxh volmeasures).
+    """Per-volume intensity-weighted center of mass of the phantom.
 
     `com` is (n_t, 2): each frame's intensity centroid along in-plane axes 0/1, in
     voxels within `[0, N)`, computed with a *circular* mean so a phantom sitting
@@ -113,7 +113,7 @@ def estimate_center_of_mass(
     valid_mask: BoolArray,
     voxel: VoxelSize = UNKNOWN_VOXEL_SIZE,
 ) -> CenterOfMassResult:
-    """Per-volume intensity-weighted center of mass of the phantom (circular).
+    """Estimate the per-volume intensity-weighted center of mass (circular).
 
     bxh `fmriqa_volmeasures`' center-of-mass trace, specialized to the QA center
     slice: for each frame, the intensity centroid along each in-plane axis via a

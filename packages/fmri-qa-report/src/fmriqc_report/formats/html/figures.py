@@ -47,7 +47,7 @@ _SVG_HASHSALT = "fmriqc-report"
 
 @dataclass(frozen=True, slots=True)
 class FigureAsset:
-    """One fixed figure's identity, caption text, and the report section it fills."""
+    """One fixed figure's identity, caption text and the report section it fills."""
 
     name: str
     title: str

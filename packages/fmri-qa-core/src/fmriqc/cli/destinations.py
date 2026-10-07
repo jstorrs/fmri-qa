@@ -25,7 +25,7 @@ ARTIFACT_SUFFIX = ".qa.nc"
 
 
 def artifact_destinations(base: str, paths: Sequence[str]) -> list[tuple[str, Path]]:
-    """`(input, destination)` pairs for every requested scan, in order.
+    """Return `(input, destination)` pairs for every requested scan, in order.
 
     A batch cannot share one file, so `BASE` is a directory and each scan gets
     `<scan stem>.qa.nc` inside it. A single-scan run writes exactly `BASE` --
@@ -56,7 +56,7 @@ def artifact_destinations(base: str, paths: Sequence[str]) -> list[tuple[str, Pa
 def overwritten_inputs(
     destinations: Sequence[tuple[str, Path]],
 ) -> list[tuple[Path, str]]:
-    """`(destination, input)` pairs where an artifact would replace an input.
+    """Return `(destination, input)` pairs where an artifact overwrites an input.
 
     An artifact is written by moving a finished file over its destination, and
     the scans (and their sidecars) are read before any is written — so an
@@ -72,7 +72,7 @@ def overwritten_inputs(
 def artifact_collisions(
     destinations: Sequence[tuple[str, Path]],
 ) -> dict[Path, list[str]]:
-    """Destinations that more than one input scan would be written to.
+    """Return destinations that more than one input scan would be written to.
 
     A batch names each artifact by the scan's stem, so inputs from different
     directories with the same file name (`sub-01/qa.nii.gz`, `sub-02/qa.nii.gz`)
@@ -88,7 +88,7 @@ def artifact_collisions(
 
 
 def report_destination_problems(destinations: Sequence[tuple[str, Path]]) -> bool:
-    """Print every `--artifact` destination problem; True if the run must stop.
+    """Print every `--artifact` destination problem; return True to stop the run.
 
     Both checks are made against the paths alone, before a single scan is read,
     because either one costs work that cannot be recovered: an artifact written
@@ -121,7 +121,7 @@ def report_destination_problems(destinations: Sequence[tuple[str, Path]]) -> boo
 
 
 def write_artifact(artifact: q.QAArtifact, out: Path, info: TextIO) -> str | None:
-    """Write one artifact. Returns None if written, else the error as reported."""
+    """Write one artifact; return None if written, else the error as reported."""
     try:
         q.save_artifact(artifact, out)
     except (OSError, q.InvalidArtifactError) as exc:

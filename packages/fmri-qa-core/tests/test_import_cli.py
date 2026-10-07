@@ -2,7 +2,7 @@
 
 Drives `cli.import_main` over the stub dcm2niix (the `fake_dcm2niix` fixture),
 checking the report it gives, its refusals without a traceback, its default
-output directory, and its warnings.
+output directory and its warnings.
 """
 
 import pytest

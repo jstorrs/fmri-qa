@@ -1,7 +1,7 @@
 """`AnalysisSettings`: the record of what a run was asked for.
 
 A leaf of its own, below every layer, because of who speaks it: the request is
-common to the pipeline that honours it (`pipeline.run_qa`) and the artifact that
+common to the pipeline that honors it (`pipeline.run_qa`) and the artifact that
 publishes it (`analysis.artifact.QAArtifact`), and reading an artifact must not
 load the pipeline to name a type. Here it costs nothing but the shared
 vocabulary.
@@ -17,7 +17,7 @@ from .types import FBIRN_ROI_SIZE, DetrendMethod, PeAxis, RoiCenter
 
 @dataclass(frozen=True, slots=True)
 class AnalysisSettings:
-    """The analysis knobs: what the run was asked for, and what that resolved to.
+    """The analysis knobs: what a run was asked for and what that resolved to.
 
     The first five fields are the request — this record is what `run_qa`,
     `preprocess` and `analyze` take, so re-running with it reproduces the result.
@@ -38,7 +38,7 @@ class AnalysisSettings:
     that names a real duration, a positive ROI side, and a detrend order that is
     absent or non-negative are an `InvalidScanError` when they are not, so
     holding an `AnalysisSettings` means the run it asks for is one that could be
-    honoured. `run_qa`'s `replace(settings, detrend_order=...)` passes through
+    honored. `run_qa`'s `replace(settings, detrend_order=...)` passes through
     the same door, so the order a run resolves is held to the same domain as one
     a caller hands in.
     """

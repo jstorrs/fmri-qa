@@ -265,7 +265,7 @@ def _move_files(work_dir: Path, files: Sequence[Path]) -> None:
 
 
 def _failed(name: str, exc: Exception, noted: tuple[str, ...] = ()) -> Failed:
-    """Log `exc` and build its `Failed` outcome, with the warnings before it."""
+    """Log `exc` and build its `Failed` outcome, with the warnings noted so far."""
     reason = str(exc) or type(exc).__name__
     _LOG.warning("series %s failed: %s", name, reason)
     return Failed(name, reason=reason, warnings=noted)
@@ -278,7 +278,7 @@ def _publish_series(
     progress: ProgressCallback,
     notice: CleanupNoticeCallback | None,
 ) -> SeriesOutcome:
-    """Analyze, report, and publish one planned series; `Failed` on any error.
+    """Analyze, report and publish one planned series; `Failed` on any error.
 
     Every warning the analysis raises about the scan (a missing spatial unit,
     an unreadable sidecar, a motion fit that did not converge) is captured
@@ -371,7 +371,7 @@ def _publish(
     atomic one: the files are copied into a hidden sibling of `target`, and the
     sibling is renamed. Copying straight into `target` would be one step and
     could not be refused by a sync client -- and would leave, for as long as a
-    30 MB scan takes to copy and for ever after a crash, a series directory
+    30 MB scan takes to copy and forever after a crash, a series directory
     that looks published and is not. That one is the worse failure: the next
     run finds the name taken and refuses it, so a half-copied series blocks its
     own repair. A refused rename only fails the series, loudly, and the

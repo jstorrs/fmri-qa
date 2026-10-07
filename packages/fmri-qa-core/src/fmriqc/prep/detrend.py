@@ -32,13 +32,13 @@ POLY_CUTOFF_S = 200.0
 SPLINE_CUTOFF_S = 256.0
 
 # B-spline degree of the `spline` detrender. Named because the fit's coefficient
-# count -- `n_nodes + SPLINE_DEGREE + 1`, what `Detrender.for_series` weighs against the
-# frame count -- depends on it.
+# count -- `n_nodes + SPLINE_DEGREE + 1`, what `Detrender.for_series` weighs
+# against the frame count -- depends on it.
 SPLINE_DEGREE = 2
 
 
 def _spline_nodes(y: FloatArray, tr: float) -> int:
-    """Recommended number of interior knots: one spline segment per `SPLINE_CUTOFF_S`.
+    """Return the interior-knot count: one spline segment per `SPLINE_CUTOFF_S`.
 
     The spline analogue of `_poly_degree` — the fit-complexity knob for
     `spline_residuals`, separated so it can be computed once from the header.
@@ -75,7 +75,7 @@ def spline_residuals(y: FloatArray, n_nodes: int) -> FloatArray:
 
 
 def _poly_degree(y: FloatArray, tr: float) -> int:
-    """Return the Legendre detrend degree: the duration in `POLY_CUTOFF_S`, rounded."""
+    """Return the Legendre degree: run duration in `POLY_CUTOFF_S` units, rounded."""
     n = y.shape[-1]
     return int(np.round(n * tr / POLY_CUTOFF_S))
 
@@ -100,7 +100,7 @@ def poly_residuals(y: FloatArray, degree: int) -> FloatArray:
 
 @dataclass(frozen=True, slots=True)
 class Detrender:
-    """A settled detrending operator: the method, its fit order, and the fit itself.
+    """A settled detrender: its method, its fit order and the fit itself.
 
     `Detrender.for_series` derives the fit complexity from a series' length and
     TR; the result is callable, so `detrender(y)` returns the residuals of `y`

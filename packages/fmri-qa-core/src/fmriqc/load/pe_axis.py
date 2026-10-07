@@ -23,7 +23,7 @@ __all__: list[str] = []
 # DICOM in-plane phase-encode axis -> row/col: NIfTI i (axis 0) is the DICOM
 # row direction, j (axis 1) the column direction (verified against dcm2niix
 # InPlanePhaseEncodingDirectionDICOM on a Siemens acquisition). The single source
-# of truth for the row/col label the metadata, report, and CLI all show.
+# of truth for the row/col label the metadata, report and CLI all show.
 #
 # Keyed by `PeAxis`, so it is *total*: every in-plane axis has a word, and a
 # caller holding one indexes straight into it. That is what lets the artifact
@@ -33,7 +33,7 @@ PE_ROWCOL: dict[PeAxis, PeLabel] = {0: "row", 1: "col"}
 
 
 def in_plane(axis: int | None) -> PeAxis | None:
-    """`axis` as an in-plane `PeAxis`, or None if it is not one.
+    """Narrow `axis` to an in-plane `PeAxis`, or None if it is not one.
 
     The single narrowing point between what a header can *say* and what the
     single-slice pipeline can *measure*. A BIDS sidecar may name the
@@ -79,7 +79,7 @@ _SIDECAR_PE_FIELDS = ("PhaseEncodingDirection", "PhaseEncodingAxis")
 
 
 def _pe_axis_from_sidecar(sidecar: Sidecar) -> int | None:
-    """PE axis (0/1/2) from the sidecar, or None if it carries no PE field.
+    """Read the PE axis (0/1/2) from the sidecar, or None if it has no PE field.
 
     dcm2niix's two BIDS answers are tried in turn, then
     `InPlanePhaseEncodingDirectionDICOM` (ROW/COL) as the DICOM fallback
@@ -116,7 +116,7 @@ def _pe_axis_from_sidecar(sidecar: Sidecar) -> int | None:
 
 
 def _pe_axis_from_header(header: Any) -> int | None:
-    """PE axis from the NIfTI `dim_info` phase field, or None if unset/invalid.
+    """Read the PE axis from NIfTI `dim_info`, or None if unset or invalid.
 
     `dim_info` carries no polarity, which we don't need for ghost placement.
     """

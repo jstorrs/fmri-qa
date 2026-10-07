@@ -1,5 +1,7 @@
-"""`bar_state`/`final_bar`/`summarize`/`stopping_message`/`exit_code`: the panel's
-pure presentation decisions."""
+"""The panel's pure presentation decisions.
+
+Covers `bar_state`, `final_bar`, `summarize`, `stopping_message` and `exit_code`.
+"""
 
 from pathlib import Path
 

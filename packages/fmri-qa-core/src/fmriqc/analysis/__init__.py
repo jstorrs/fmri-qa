@@ -3,7 +3,7 @@
 `artifact` defines the value objects, `build` projects a computed `QAResult`
 into one (`analyze` runs the whole thing from a scan), `validation` holds them
 to the published contract, and `serialize` moves an artifact to and from a
-single netCDF-4 file. Everything a report, a plot, or a trend database needs
+single netCDF-4 file. Everything a report, a plot or a trend database needs
 sits in here; nothing in this subpackage reaches back into the metric, prep, or
 load layers at read time.
 
@@ -12,7 +12,7 @@ validator and its serializer are cheap leaves, so they load eagerly. So does
 `InvalidArtifactError`, the one error `load_artifact` raises: `fmriqc.exceptions`
 imports nothing, and a reader that may cross only this seam has to be able to
 catch it by name. `build` is not: projecting a `QAResult` means importing the
-pipeline, and behind it the whole metric, prep, and load stack -- scikit-image,
+pipeline, and behind it the whole metric, prep and load stack -- scikit-image,
 scipy and nibabel included.
 Eagerly re-exporting `analyze` and `build_artifact` from here would charge that
 cost to every reader of a finished artifact, which is exactly the dependency

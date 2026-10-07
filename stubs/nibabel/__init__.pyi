@@ -2,7 +2,7 @@
 
 nibabel ships type information, but `load` is annotated to return the
 `FileBasedImage` base class, which lacks the NIfTI accessors (`get_fdata`,
-`affine`, the scaled array proxy, and the spatial header) the loader actually
+`affine`, the scaled array proxy and the spatial header) the loader actually
 uses, and its `get_zooms` is mistyped. This stub narrows `load` to a NIfTI image
 with just those accessors, typed as the pipeline expects them.
 """

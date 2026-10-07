@@ -13,7 +13,7 @@ import fmriqc as q
 
 
 def _phantom(n: int = 32, z: int = 3, t: int = 40, seed: int = 0) -> q.QAScan:
-    """A synthetic bright-disk phantom series with seeded temporal noise.
+    """Build a synthetic bright-disk phantom series with seeded temporal noise.
 
     The background gets a magnitude noise floor, mirroring the calculation half's
     fixture: an exactly-constant background degenerates the intensity quantiles

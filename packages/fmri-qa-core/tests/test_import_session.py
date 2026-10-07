@@ -1,9 +1,9 @@
-"""`convert.session`: staging, naming, filing, and refusing.
+"""`convert.session`: staging, naming, filing and refusing.
 
 Runs against a *stub* dcm2niix -- the `fake_dcm2niix` fixture, a script that
 writes the files a real conversion would, named on demand. What the session has
 to get right is everything around the converter: staging, naming, refusing a
-destination it would damage, cleaning up after a failure, and -- when a move
+destination it would damage, cleaning up after a failure and -- when a move
 starts and cannot finish -- undoing it or saying exactly what is left. Driving
 those cases through real DICOM would mean synthesizing a study per case.
 """
@@ -338,7 +338,7 @@ def test_directory_targets_are_refused_before_any_file_moves(
 def test_a_move_that_fails_part_way_is_undone(
     tmp_path, fake_dcm2niix, monkeypatch
 ) -> None:
-    """Files move in name order: the sidecar lands, the NIfTI is refused, and
+    """Files move in name order: the sidecar lands, the NIfTI is refused and
     the sidecar goes back."""
     binary = fake_dcm2niix({"2_QA": FULL_SIDECAR})
     out = tmp_path / "nifti"

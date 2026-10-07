@@ -10,7 +10,7 @@ from fmriqc_report import summary
 
 
 def _clipped(artifact: q.QAArtifact, **changes) -> q.QAArtifact:
-    """The artifact with its saturation measurements overridden."""
+    """Return the artifact with some of its measurements overridden."""
     return replace(artifact, measurements=replace(artifact.measurements, **changes))
 
 
@@ -87,7 +87,7 @@ def test_a_collapsed_phantom_mask_is_called_out(artifact) -> None:
 
     It has to say so in the notes block: the metrics themselves still look
     like ordinary measurements, so a reader has nothing else to go on. The
-    verdict is the artifact's -- the bounds it was reached by live with the
+    verdict is the artifact's -- the bounds it was judged by live with the
     segmentation, in a package this one cannot import -- and the fraction beside
     it is what the reader is shown.
     """
@@ -96,9 +96,12 @@ def test_a_collapsed_phantom_mask_is_called_out(artifact) -> None:
 
 
 def test_a_bad_mask_note_shows_the_contrast_when_the_artifact_has_it(artifact) -> None:
-    """Which test the mask failed is visible: a collapse in the share, noise in
-    the contrast. An artifact migrated from before the contrast was recorded
-    shows the share alone rather than a NaN."""
+    """The note shows which test the mask failed.
+
+    A collapse shows in the share, noise in the contrast. An artifact migrated
+    from before the contrast was recorded shows the share alone rather than a
+    NaN.
+    """
     noisy = _clipped(
         artifact, phantom_fraction=0.54, phantom_contrast=1.7, phantom_mask_ok=False
     )
@@ -108,7 +111,7 @@ def test_a_bad_mask_note_shows_the_contrast_when_the_artifact_has_it(artifact) -
 
 
 def test_acquisition_notes_flag_an_analysis_of_background() -> None:
-    """A noise-only scan's failed verdict reaches the page as the analysis made it.
+    """A noise-only scan's failed verdict reaches the page unchanged.
 
     End to end rather than by overriding the field: the calculation half once
     warned that no slice held a phantom and then recorded the mask as good, and

@@ -159,7 +159,7 @@ def detect_saturation(
     Raises
     ------
     InvalidScanError
-        If `slope` is zero, infinite, or NaN. The rail test below divides by
+        If `slope` is zero, infinite or NaN. The rail test below divides by
         `slope` to undo the scaling, so a non-finite or zero value makes it
         meaningless -- not a series with no clipping, which is what a caller
         silently getting `suspected=False` back would read this as. Refusing is

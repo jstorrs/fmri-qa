@@ -2,14 +2,14 @@
 
 Three metrics report a length: `motion` a translation, `center_of_mass` a
 centroid displacement, `smoothness` a FWHM. Each measures in voxels and each
-reports millimetres *when the header said how big a voxel is*, which is a
+reports millimeters *when the header said how big a voxel is*, which is a
 question with three parts -- is the size known, what is it along this axis, and
 what unit does that make the answer -- that every one of them used to answer for
 itself. `VoxelSize` is that one answer.
 
 The unit is the part worth centralizing. `Measurements.displacement_unit` exists
-because a build once published these peaks in voxels while labelling them
-millimetres (see `analysis.serialize.migrate._v5_to_v6`, and the schema bump it
+because a build once published these peaks in voxels while labeling them
+millimeters (see `analysis.serialize.migrate._v5_to_v6`, and the schema bump it
 came with): the rule was written down in several places and one of them was
 wrong. Here it is a property of the thing that decides it, so a caller cannot
 hold the length and reach the wrong unit.
@@ -34,7 +34,7 @@ __all__ = [
 
 @dataclass(frozen=True, slots=True)
 class VoxelSize:
-    """In-plane millimetres per voxel, or None when the header did not say.
+    """In-plane millimeters per voxel, or None when the header did not say.
 
     Constructing one coerces the pair to plain floats: the header hands these
     over as numpy scalars, and a result object that stores them raw publishes a
@@ -80,7 +80,7 @@ class VoxelSize:
         return "vox" if self.mm is None else "mm"
 
     def per_axis(self, axis: PeAxis) -> float:
-        """Millimetres per voxel along `axis`, or 1.0 when the size is unknown.
+        """Return the millimeters per voxel along `axis`, or 1.0 if unknown.
 
         The 1.0 is not a guess at the voxel size: it is the scale factor that
         leaves a length in voxels, which `unit` then reports it as.
@@ -88,9 +88,9 @@ class VoxelSize:
         return 1.0 if self.mm is None else self.mm[axis]
 
     def magnitude(self, deviations: FloatArray) -> FloatArray:
-        """(n, 2) per-axis displacements -> (n,) magnitudes, in `unit`.
+        """Combine (n, 2) per-axis displacements into (n,) magnitudes, in `unit`.
 
-        Scales each axis by its own millimetres-per-voxel before combining, so
+        Scales each axis by its own millimeters-per-voxel before combining, so
         an anisotropic in-plane voxel gives a true length rather than a
         hypotenuse of two differently-sized voxel counts. NaN rows stay NaN,
         which is how a failed motion fit keeps its frame undefined.

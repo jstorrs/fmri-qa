@@ -48,11 +48,12 @@ def _parser() -> argparse.ArgumentParser:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    """Render one artifact to a self-contained HTML report; return the exit status."""
+    """Render one artifact to a self-contained HTML report; return the status."""
     parser = _parser()
     args = parser.parse_args(argv)
 
-    # Before the overwrite check counts them: on Windows the wildcard is here.
+    # Expand patterns before the overwrite check counts them: on Windows the shell
+    # does not.
     artifacts = expand_globs(args.artifacts)
     if len(artifacts) != 1:
         parser.error("--html renders one artifact to one file")

@@ -15,10 +15,10 @@ is `session._publish`'s, which removes the hidden `.partial` sibling a series
 is copied into before it is renamed into place; cut short, that is a partial
 scan left in the user's output directory, and uploaded if it is a synced one.
 (Staging itself is in the system's temporary directory, and losing the race to
-remove that would cost `output_dir` nothing.) A `Crashed` event is how *any* exception,
-expected or not, still reaches a caller that has no stderr of its own -- a
-windowed executable's `sys.stderr` is `None`, so an error that only ever
-reached a thread's default excepthook would be lost silently.
+remove that would cost `output_dir` nothing.) A `Crashed` event is how *any*
+exception, expected or not, still reaches a caller that has no stderr of its
+own -- a windowed executable's `sys.stderr` is `None`, so an error that only
+ever reached a thread's default excepthook would be lost silently.
 """
 
 import logging
@@ -88,11 +88,10 @@ class BackgroundRun:
     `start()` launches a non-daemon thread that calls `run` (by default the
     real pipeline) with `progress=queue.put`, `notice=queue.put`, and a
     `should_continue` this object controls via `cancel()`. `poll()` drains
-    whatever events have
-    arrived since the last call without blocking; the thread always ends by
-    putting exactly one terminal event, `Finished` or `Crashed`, so a caller
-    that keeps draining until it sees one has seen the whole run, including
-    cleanup notices produced during exception unwinding.
+    whatever events have arrived since the last call without blocking; the
+    thread always ends by putting exactly one terminal event, `Finished` or
+    `Crashed`, so a caller that keeps draining until it sees one has seen the
+    whole run, including cleanup notices produced during exception unwinding.
     """
 
     def __init__(self, request: RunRequest, *, run: _Runner | None = None) -> None:
@@ -153,7 +152,7 @@ class BackgroundRun:
                 return tuple(events)
 
     def cancel(self) -> None:
-        """Ask the run to stop at the next between-series check point."""
+        """Ask the run to stop at the next between-series checkpoint."""
         self._cancelled.set()
 
     def join(self, timeout: float | None = None) -> None:

@@ -47,7 +47,7 @@ def run_hilo(
     detrend: DetrendMethod = _DEFAULTS.detrend,
     erode: int = HILO_ERODE,
 ) -> HiLoResult:
-    """Separate thermal from instability noise using a high/low flip-angle scan pair.
+    """Separate thermal from instability noise in a high/low flip-angle pair.
 
     Following Greve's high/low flip-angle method (bxh `fmriqa` tooling): `high` and
     `low` must be the same acquisition except for flip angle (the high-flip run

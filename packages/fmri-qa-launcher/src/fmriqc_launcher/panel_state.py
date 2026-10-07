@@ -83,7 +83,7 @@ CRASHED_BAR: BarState = Determinate(value=0, maximum=1)
 
 
 def bar_state(progress: Progress) -> BarState:
-    """Where the progress bar should sit for `progress`.
+    """Choose where the progress bar should sit for `progress`.
 
     Indeterminate for `Stage.IMPORT` -- dcm2niix has not yet said how many
     series there are, so there is nothing to be a fraction of. Otherwise
@@ -109,7 +109,7 @@ def bar_state(progress: Progress) -> BarState:
 
 
 def final_bar(result: RunResult) -> BarState:
-    """Where the bar should come to rest once a run has finished.
+    """Choose where the bar should come to rest once a run has finished.
 
     Full when every series the run found was published. Otherwise the
     proportion of found series that were: `value` is how many published,
@@ -133,7 +133,7 @@ class Summary:
 
     `headline` is one line for the status label; `details` is one line per
     outcome (and per warning) for the log, in the order `RunResult.outcomes`
-    found them; `offer_open` says whether an "open results" action makes
+    lists them; `offer_open` says whether an "open results" action makes
     sense at all.
     """
 
@@ -143,7 +143,7 @@ class Summary:
 
 
 def _outcome_lines(result: RunResult) -> tuple[str, ...]:
-    """One line per outcome, and per warning it carries, in outcome order."""
+    """List one line per outcome, and per warning it carries, in outcome order."""
     lines: list[str] = []
     for outcome in result.outcomes:
         if isinstance(outcome, Published):
@@ -162,7 +162,7 @@ def _outcome_lines(result: RunResult) -> tuple[str, ...]:
 
 
 def _all_refused(result: RunResult) -> bool:
-    """Whether `result` found series at all, and every one was refused."""
+    """Return True if `result` found series and every one was refused."""
     return bool(result.outcomes) and all(
         isinstance(o, Refused) for o in result.outcomes
     )
@@ -212,7 +212,7 @@ def stopping_message(last: Progress | None) -> str:
     is that closing takes effect once import itself finishes. Once at least
     one series is under way, the ordinary "stops between series" wording
     applies. Either way, a second close request destroys the window
-    immediately (see `panel.Panel._on_close`), which is worth saying so a
+    immediately (see `panel.Panel._on_close`), which is worth saying so that a
     physicist who does not want to wait is not left guessing.
     """
     if last is None or last.stage is Stage.IMPORT:

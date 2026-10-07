@@ -4,8 +4,8 @@ Only `test_the_published_run_matches_a_direct_analyze` (the equivalence claim
 that matters) pays for a real analysis; the other end-to-end tests
 monkeypatch `fmriqc_launcher.session.write_run_page` with the `fast_render`
 fixture, the same stand-in `tests/test_session.py` uses. What the command
-prints for each kind of outcome is pinned by calling `_print_outcomes` on a hand-built
-`RunResult`, with no run at all.
+prints for each kind of outcome is pinned by calling `_print_outcomes` on a
+hand-built `RunResult`, with no run at all.
 """
 
 import stat

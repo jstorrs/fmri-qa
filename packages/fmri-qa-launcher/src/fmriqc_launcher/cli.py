@@ -121,7 +121,7 @@ def _build_parser() -> argparse.ArgumentParser:
 
 
 def _is_missing_tkinter(exc: ImportError) -> bool:
-    """Whether `exc` is `tkinter` (or its C extension `_tkinter`) missing outright.
+    """Check whether `exc` means `tkinter` (or `_tkinter`) is missing outright.
 
     `exc.name` is the dotted module the failed import was looking for --
     `tkinter` itself, one of its submodules (`tkinter.ttk`, `tkinter.font`,
@@ -252,7 +252,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 1
 
     # Deferred past every usage error and every bad request: this is the
-    # import that pulls in scipy, scikit-image, and matplotlib behind
+    # import that pulls in scipy, scikit-image and matplotlib behind
     # `fmriqc`'s pipeline and `fmriqc_report`'s renderer -- see the module
     # docstring.
     from .session import run_session

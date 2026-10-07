@@ -71,7 +71,7 @@ def test_non_integer_storage_is_not_determinable_rather_than_clean() -> None:
 
 @pytest.mark.parametrize("slope", [0.0, float("nan"), float("inf")])
 def test_detect_saturation_refuses_an_unusable_slope(slope) -> None:
-    """A zero or non-finite slope can't recover stored units, so the rail test
+    """A zero or non-finite slope cannot recover stored units, so the rail test
     is meaningless -- reporting a clean series would be a wrong answer, not a
     safe default, so this must raise rather than silently return `suspected=False`.
     """

@@ -79,7 +79,7 @@ def test_analysis_reexports_the_one_error_load_artifact_raises() -> None:
 
 
 def test_save_uses_the_exact_path_given(tmp_path, artifact) -> None:
-    """A caller's name is honoured exactly, suffix or no suffix."""
+    """A caller's name is honored exactly, suffix or no suffix."""
     path = q.save_artifact(artifact, tmp_path / "nested" / "run1.artifact")
     assert path.is_file() and path.name == "run1.artifact"
     assert q.load_artifact(path).measurements.snr == artifact.measurements.snr
@@ -567,7 +567,7 @@ def test_load_migrating_a_schema_6_artifact_keeps_its_clipping_answers(
 
 # Fields each schema version introduced, per document section, so a current
 # document can be rewritten as the older one it grew out of (the reverse of
-# `serialize.migrate._MIGRATIONS`). Division of labour with
+# `serialize.migrate._MIGRATIONS`). Division of labor with
 # `test_artifact_fixtures.py`: this file's migration tests check each step in
 # isolation against this hand-maintained description of the schema history;
 # that file loads real `.npz` archives an old build actually wrote, which

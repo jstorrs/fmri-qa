@@ -39,7 +39,7 @@ rather than flattened.
 * `decompose` -- artifact -> (JSON document, named arrays)
 * `compose`   -- (JSON document, named arrays) -> artifact
 * `netcdf`    -- the netCDF-4 file those two travel in: dimensions, variables,
-                 attributes, and the units a reader is told
+                 attributes and the units a reader is told
 * `npz`       -- the retired NumPy-archive container, read-only
 * `migrate`   -- an older document's layout, brought forward on read
 """
@@ -82,7 +82,7 @@ _MALFORMED = (
 
 
 def save_artifact(artifact: QAArtifact, path: str | Path) -> Path:
-    """Write `artifact` to `path` as a netCDF-4 file. Returns the path.
+    """Write `artifact` to `path` as a netCDF-4 file and return the path.
 
     Missing parent directories are created. The file name is used exactly as
     given, including a name that carries no suffix at all.

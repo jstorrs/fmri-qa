@@ -139,7 +139,7 @@ def provenance_line(prov: Provenance) -> str:
 
 
 def device_line(prov: Provenance) -> str:
-    """Manufacturer/model/field-strength for the title row; empty if unknown."""
+    """Build the manufacturer, model and field-strength title text; empty if none."""
     dev = " ".join(x for x in (prov.manufacturer, prov.model) if x)
     if prov.field_strength is not None:
         dev = f"{dev}{_SEP}{prov.field_strength:g}T".strip(" ·")

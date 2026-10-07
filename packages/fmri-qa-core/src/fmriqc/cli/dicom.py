@@ -118,7 +118,7 @@ def _parser() -> argparse.ArgumentParser:
 
 
 def _destination(source: str, out: str | None) -> Path:
-    """Where the NIfTI goes: `--out`, else `<source name>_nifti` here.
+    """Resolve where the NIfTI goes: `--out`, else `<source name>_nifti` here.
 
     Derived from the source rather than defaulting to the working directory, so
     the common one-argument call puts a session's series together in a directory
@@ -130,7 +130,7 @@ def _destination(source: str, out: str | None) -> Path:
 
 
 def _print_listing(result: ImportResult, destination: Path, *, renaming: bool) -> None:
-    """One row per series: number, when it ran, and the file it is now in."""
+    """Print one row per series: number, when it ran and the file it is now in."""
     print(f"{'series':>6}  {'acquired':<19}  file")
     for entry in result.series:
         acquired = (entry.acquired or "").replace("T", " ")[:19]

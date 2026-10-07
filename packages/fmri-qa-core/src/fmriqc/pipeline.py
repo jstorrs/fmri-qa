@@ -1,8 +1,8 @@
-"""Preprocessing and the full single-scan QA pipeline, plus its result objects.
+"""Preprocessing and the single-scan QA pipeline, with its result objects.
 
 `preprocess` turns a raw `QAScan` into the `QAImages` every metric reads from;
 `run_qa` orchestrates the whole analysis — saturation, phantom detection,
-motion/centroid, the FBIRN ROI metrics, ghost ratios, and smoothness — into one
+motion/centroid, the FBIRN ROI metrics, ghost ratios and smoothness — into one
 `QAResult`. The heavy lifting lives in the operation modules; this is the glue,
 so it is also the natural home for the aggregate `QAMetrics`/`QAResult` value
 objects that gather every metric's output. `run_qa` writes the `AnalysisSettings`
@@ -93,7 +93,7 @@ class QAResult:
     """Full QA output: the intermediate objects plus the scalar metrics.
 
     Returned by `run_qa`. `metrics` holds the scalars; `images`/`geom`/`roi` are
-    retained so a report can render the images, curves, and time series;
+    retained so a report can render the images, curves and time series;
     `settings` is the request the run answered, with the detrend order it
     resolved; `meta` carries the acquisition metadata (from the scan) for the
     report header.
@@ -110,7 +110,7 @@ class QAResult:
 def preprocess(scan: QAScan, settings: AnalysisSettings | None = None) -> QAImages:
     """Trim, select the QA slice, and compute the FBIRN summary images.
 
-    Returns `QAImages` (center slice, detrended fluctuations, and derived summary
+    Returns `QAImages` (center slice, detrended fluctuations and derived summary
     images); the caller can discard `scan.data` afterwards. It reads three fields
     of the request: `trim_sec`, `detrend` (the detrending method,
     "poly"/"spline") and `center`, which selects the slice — "image" for the
@@ -148,8 +148,8 @@ def run_qa(scan: QAScan, settings: AnalysisSettings | None = None) -> QAResult:
     """Run the single-slice QA pipeline on a scan.
 
     Stages, in order: validate, full-series saturation, preprocess, detect
-    phantom, resolve ROI, fBIRN statistics, ghost family, outliers, spikes,
-    motion, centre of mass, smoothness.
+    phantom, resolve ROI, FBIRN statistics, ghost family, outliers, spikes,
+    motion, center of mass, smoothness.
 
     `settings` is the request; the result carries it back with the detrend order
     the run resolved. Its fields:

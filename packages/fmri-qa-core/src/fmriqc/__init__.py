@@ -1,4 +1,4 @@
-"""Phantom fMRI quality-assurance metrics (SNR, SFNR, RDC, ghost, and more).
+"""Phantom fMRI quality-assurance metrics (SNR, SFNR, RDC, ghost and more).
 
 The root exports the analysis chain (`import_dicom`, `QAScan`, `analyze`,
 `run_qa`, the metric estimators), its result and value types, the exceptions,

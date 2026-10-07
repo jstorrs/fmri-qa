@@ -1,7 +1,7 @@
-"""Per-metric vocabulary: the label, definition, method, and display recipe.
+"""Per-metric vocabulary: the label, definition, method and display recipe.
 
 One `MetricDoc` per reported metric is the single source for what a metric is
-called, how its value is shown, what it means, and how it is computed. Values
+called, how its value is shown, what it means and how it is computed. Values
 are read off the artifact's flat `Measurements`, so a report needs nothing
 but the artifact to render a metric. The run page's metric tiles and its
 definitions list both read this catalog, so a metric's name and formatting

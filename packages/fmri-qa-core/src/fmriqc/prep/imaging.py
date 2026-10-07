@@ -2,9 +2,9 @@
 
 The leaf layer the value objects and the metric modules both build on: trim,
 slice selection, phantom segmentation, the valid-data mask, and the FBIRN
-summary-image primitives. Everything here is a pure
-`NDArray -> NDArray` (or scalar) transform with no dependency on the value
-types, so it can be shared without import cycles.
+summary-image primitives. Everything here is a pure `NDArray -> NDArray` (or
+scalar) transform with no dependency on the value types, so it can be shared
+without import cycles.
 """
 
 import math
@@ -89,7 +89,7 @@ def segment_phantom(image: FloatArray) -> BoolArray:
 
 
 def phantom_contrast(image: FloatArray, mask: BoolArray) -> float:
-    """How far the mask's interior stands above the background it was cut from.
+    """Measure how far the mask's interior stands above its background.
 
     The ratio of the mean intensity inside `mask` to the mean outside it. An
     exactly-zero background (a background-suppressed reconstruction) makes the
@@ -107,7 +107,7 @@ def phantom_contrast(image: FloatArray, mask: BoolArray) -> float:
 
 
 def phantom_plausible(*, fraction: float, contrast: float) -> bool:
-    """Whether a segmentation with this frame share and contrast is a phantom.
+    """Return True if a segmentation with this share and contrast is a phantom.
 
     `segment_phantom` always returns *some* mask: given a frame of pure air it
     seeds one quantile of the noise against the other and labels about half of
@@ -125,7 +125,7 @@ def phantom_plausible(*, fraction: float, contrast: float) -> bool:
 
 
 def _phantom_area(image: FloatArray) -> int:
-    """Segmented phantom area (voxels), or 0 for an image holding no phantom.
+    """Return the segmented phantom area (voxels), or 0 if there is no phantom.
 
     Area alone cannot rank slices — an air slice segments to ~45% of the frame
     and out-votes a real cross-section at ~20% — so a mask that is not
@@ -190,7 +190,7 @@ def _largest_phantom_slice(data: FloatArray) -> int:
 
 
 def edge_valid_mask(image: FloatArray, zero: float = 0.0) -> BoolArray:
-    """(X, Y) bool mask of real data, clearing only entirely-nulled image edges.
+    """Build an (X, Y) mask of real data, clearing only entirely-nulled edges.
 
     Some vendors (e.g. Siemens) null one outer image row/column to encode the
     phase-encode direction. A nulled border carries no signal and must not enter
@@ -223,12 +223,12 @@ def edge_valid_mask(image: FloatArray, zero: float = 0.0) -> BoolArray:
 
 
 def odd_even_difference(center_slice: FloatArray) -> FloatArray:
-    """``|mean(even frames) - mean(odd frames)|``, a temporal-stability image."""
+    """Compute ``|mean(even frames) - mean(odd frames)|``, a stability image."""
     even = center_slice[..., 0::2].mean(axis=-1)
     odd = center_slice[..., 1::2].mean(axis=-1)
     return np.abs(even - odd)
 
 
 def fluctuation_noise(residuals: FloatArray) -> FloatArray:
-    """Temporal RMS of detrended residuals (std about zero) over the last axis."""
+    """Compute the temporal RMS of detrended residuals over the last axis."""
     return np.std(residuals, axis=-1, mean=0)

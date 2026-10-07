@@ -6,7 +6,7 @@ predates, and check that the matching `_vN_to_vN1` puts them back as unknown.
 That proves each migration step does what `_ADDED_IN` claims -- but `_ADDED_IN`
 is, by its own comment, the reverse of `serialize.migrate._MIGRATIONS`, so
 those tests check one hand-maintained description of the schema history
-against another. They cannot catch an array renamed, resized, or changed
+against another. They cannot catch an array renamed, resized or changed
 dtype between versions; a field whose *meaning* changed rather than its
 presence; a document layout the current writer could no longer produce at
 all; or a key-ordering/encoding difference that only shows up in bytes an old

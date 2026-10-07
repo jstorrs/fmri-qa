@@ -1,4 +1,4 @@
-"""The `fmri-qa-report` command line: an artifact on disk in, one HTML page out."""
+"""The `fmri-qa-report` command line: a saved artifact in, one HTML page out."""
 
 from pathlib import Path
 

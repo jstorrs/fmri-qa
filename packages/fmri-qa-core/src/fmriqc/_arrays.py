@@ -14,15 +14,15 @@ def readonly[T: np.generic](array: NDArray[T]) -> NDArray[T]:
 
 @dataclass(frozen=True, slots=True, eq=False)
 class ArrayValue:
-    """Own read-only copies of immediate array fields, detached from inputs.
+    """Owner of read-only copies of immediate array fields, detached from inputs.
 
     Frozen dataclasses protect attributes, but not array contents. Copying at
     construction also prevents a caller's writable alias from changing a value
     or keeping a much larger input allocation alive through a slice view.
 
     Every frozen dataclass in this package that holds an `ndarray` field
-    inherits this — the calculation layer's every metric result, geometry
-    object, and published artifact value alike, not only the ones that cross
+    inherits this: every metric result, geometry object and published artifact
+    value of the calculation layer alike, not only the ones that cross
     the `analysis` package's seam. The uniform rule exists because scoping it
     ever looked cheaper than it is: the temptation is "only protect what a
     report or a caller outside this package can reach", but every one of

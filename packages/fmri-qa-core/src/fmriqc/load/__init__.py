@@ -4,6 +4,5 @@
 objects the pure pipeline consumes; `metadata` parses the sidecar into
 `ScanMeta`; `paths` holds the NIfTI/sidecar naming rules; `pe_axis` resolves
 the phase-encode axis and `repetition_time` the TR, both from the sidecar and
-header. The public surface is re-exported from
-the top-level `fmriqc` package.
+header. The public surface is re-exported from the top-level `fmriqc` package.
 """

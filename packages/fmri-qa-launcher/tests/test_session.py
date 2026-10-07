@@ -119,7 +119,7 @@ def test_one_series_is_imported_analyzed_and_published(
     assert published.artifact == series_dir / f"{name}.qa.nc"
     assert published.report == series_dir / f"{name}.html"
 
-    # What is published honours the umask -- 0o755 and 0o644 -- and not the
+    # What is published honors the umask -- 0o755 and 0o644 -- and not the
     # 0o700 of the `tempfile.mkdtemp` staging directory it was copied out of.
     assert stat.S_IMODE(series_dir.stat().st_mode) == 0o755
     for published_file in series_dir.iterdir():
@@ -664,8 +664,9 @@ def test_a_failure_saving_the_artifact_is_a_failed_outcome_with_its_warnings(
     stub_series: StubSeries,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """`save_artifact` failing is `Failed`, carrying the analysis warnings, nothing
-    staged left over.
+    """A `save_artifact` failure is `Failed`, with the analysis warnings kept.
+
+    Nothing is left over in staging.
     """
 
     def _failing_save(*_args: object, **_kwargs: object) -> None:

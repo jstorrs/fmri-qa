@@ -65,15 +65,15 @@ class SmoothnessResult(ArrayValue):
 
     # -- per-axis helpers ---------------------------------------------------- #
     def fwhm_axis(self, axis: PeAxis) -> float:
-        """FWHM along an array `axis`, in `voxel.unit`."""
+        """Return the FWHM along array `axis`, in `voxel.unit`."""
         return self.fwhm_vox[axis] * self.voxel.per_axis(axis)
 
     def displacement(self, axis: PeAxis) -> FloatArray:
-        """Lag axis for `axis` as a length, in `voxel.unit`."""
+        """Return the lag axis for `axis` as a length, in `voxel.unit`."""
         return np.asarray(self.lags * self.voxel.per_axis(axis), dtype=np.float64)
 
     def psf_empirical(self, axis: PeAxis) -> FloatArray:
-        """Empirical PSF profile along `axis`: the squared noise autocorrelation.
+        """Return the empirical PSF profile along `axis`, the squared `acf`.
 
         For white noise convolved with a PSF, the normalized spatial
         autocorrelation is the autocorrelation of the PSF; for a Gaussian PSF that
@@ -83,7 +83,7 @@ class SmoothnessResult(ArrayValue):
         return np.asarray(self.acf[axis] ** 2, dtype=np.float64)
 
     def psf_model(self, x: FloatArray, axis: PeAxis) -> FloatArray:
-        """Gaussian PSF profile along `axis` at displacement `x` (same units as `x`).
+        """Evaluate the Gaussian PSF profile along `axis` at displacement `x`.
 
         The Gaussian whose FWHM is `fwhm_axis(axis)`; pass `x` from `displacement`
         so the model shares the empirical PSF's units.
@@ -120,7 +120,7 @@ class SmoothnessResult(ArrayValue):
         """(axis 0, axis 1) FWHM in mm, or None if voxel sizes are unknown.
 
         Unlike `fwhm_axis`, this one answers None rather than falling back to
-        voxels: it promises millimetres in its name, so an unknown voxel size
+        voxels: it promises millimeters in its name, so an unknown voxel size
         has no answer to give.
         """
         return None if self.voxel.mm is None else (self.fwhm_axis(0), self.fwhm_axis(1))
@@ -144,14 +144,14 @@ class SmoothnessResult(ArrayValue):
 
 
 def _geomean(x: FloatArray) -> float:
-    """Geometric mean over the positive, finite entries; NaN if there are none."""
+    """Compute the geometric mean of the positive, finite entries; NaN if none."""
     x = np.asarray(x, dtype=float)
     x = x[np.isfinite(x) & (x > 0)]
     return float(np.exp(np.mean(np.log(x)))) if x.size else float("nan")
 
 
 def _fwhm_1dif(image: FloatArray, mask: BoolArray) -> FloatArray:
-    """Classic first-difference Gaussian FWHM (voxels) along each in-plane axis.
+    """Estimate the Gaussian FWHM (voxels) per in-plane axis (AFNI Classic).
 
     AFNI `mri_estimate_FWHM_1dif`: for each axis, the sample variance of forward
     first differences over neighbor pairs that are *both* in `mask` relates to
@@ -215,7 +215,7 @@ def _acf_1d(image: FloatArray, mask: BoolArray, axis: int, max_lag: int) -> Floa
 
 
 def _directional_acf(scaled: FloatArray, mask: BoolArray, max_lag: int) -> FloatArray:
-    """Per-axis empirical noise autocorrelation, averaged over frames (AFNI ACF).
+    """Average the per-axis empirical noise autocorrelation over frames.
 
     `_acf_1d` per frame and axis, then the per-lag mean across frames (AFNI
     averages the per-subbrick ACF). Returns (2, max_lag + 1) for axes 0 and 1.
@@ -239,7 +239,7 @@ def estimate_smoothness(
     pe_axis: PeAxis | None = None,
     max_lag: int = SMOOTHNESS_MAX_LAG,
 ) -> SmoothnessResult:
-    """Directional spatial smoothness of the detrended noise field (AFNI 3dFWHMx).
+    """Estimate directional spatial smoothness of the detrended noise field.
 
     Follows `3dFWHMx` run on detrended residuals: each voxel time series is first
     robustly standardized -- subtract its temporal median, divide by its MAD

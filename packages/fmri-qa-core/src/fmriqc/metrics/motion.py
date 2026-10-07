@@ -2,7 +2,7 @@
 
 3dvolreg-style estimation specialized for a rigid phantom — a 2-D affine with
 the rotation dropped (translation + symmetric strain), because a stationary
-phantom cannot rotate while gradient heating translates, scales, and shears the
+phantom cannot rotate while gradient heating translates, scales and shears the
 image. The analyzed series is not resampled from this fit; it is a diagnostic.
 """
 
@@ -82,7 +82,7 @@ class MotionResult(ArrayValue):
     def displacement(self) -> FloatArray:
         """(n_t,) translation magnitude per volume, in `voxel.unit`.
 
-        Millimetres when the in-plane voxel size is known, voxels when it is
+        Millimeters when the in-plane voxel size is known, voxels when it is
         not; `VoxelSize.magnitude` is the one place that choice is made.
         """
         return self.voxel.magnitude(self.params[:, 0:2])
@@ -130,7 +130,7 @@ def _register_norotate(
     is linear in the centered coordinates `rr`/`cc` and independent of the
     parameters, so the additive scheme is exact up to the image interpolation. Returns
     `[dr, dc, sr, sc, h]`, the frame's pose relative to the reference, or all
-    NaNs if the fit is rank-deficient, non-finite, or exhausts its iterations.
+    NaNs if the fit is rank-deficient, non-finite or exhausts its iterations.
     """
     m = mask.ravel()
     ref = reference.ravel()[m]
@@ -168,12 +168,12 @@ def estimate_motion(
     max_iter: int = MOTION_MAX_ITER,
     tol: float = MOTION_TOL,
 ) -> MotionResult:
-    """Per-volume in-plane registration of the phantom to its temporal mean.
+    """Register each volume in-plane to the phantom's temporal mean.
 
     3dvolreg-style motion estimation specialized for a rigid phantom: the model
     is a 2-D affine with the rotation dropped -- translation + symmetric strain
     (anisotropic scale + shear) -- because a stationary phantom cannot rotate,
-    while gradient heating translates, scales, and shears the image. Each frame
+    while gradient heating translates, scales and shears the image. Each frame
     of `center_slice` (X, Y, T) is aligned to the temporal-mean image by
     forward-additive Lucas-Kanade over `mask` (the phantom), pivoting the strain
     at the phantom centroid so translation and deformation stay separable.

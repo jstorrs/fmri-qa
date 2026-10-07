@@ -20,7 +20,7 @@ from ..warn import warn
 __all__: list[str] = []
 
 # NIfTI `xyzt_units` time codes, as nibabel spells them, in seconds. An unknown
-# unit is read as seconds: that is what an unlabelled pixdim has always meant in
+# unit is read as seconds: that is what an unlabeled pixdim has always meant in
 # practice, and it leaves a well-formed file untouched.
 TIME_UNIT_SECONDS: dict[str, float] = {"sec": 1.0, "msec": 1e-3, "usec": 1e-6}
 
@@ -31,13 +31,13 @@ TR_RTOL = 1e-3
 
 
 def _tr_from_header(header: Any) -> float:
-    """pixdim[4] in seconds, converted by the header's declared time unit."""
+    """Read pixdim[4] in seconds, converted by the header's declared time unit."""
     unit = str(header.get_xyzt_units()[1])
     return float(header.get_zooms()[3]) * TIME_UNIT_SECONDS.get(unit, 1.0)
 
 
 def _positive_seconds(value: object) -> float | None:
-    """`value` as a positive, finite number of seconds; None if it is neither."""
+    """Return `value` as positive, finite seconds, or None if it is neither."""
     # `isinstance(True, int)` is true, so a JSON boolean is excluded explicitly
     # rather than loaded as a 1 s TR.
     if isinstance(value, bool) or not isinstance(value, int | float):

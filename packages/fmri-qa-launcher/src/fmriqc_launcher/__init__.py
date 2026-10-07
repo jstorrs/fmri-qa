@@ -26,14 +26,14 @@ wire the two libraries together itself.
 * `cli`         -- `main`: the `fmri-qa-run` command line
 * `version`     -- the installed distribution's version
 
-`exceptions`, `outcome`, `progress`, and `version` are cheap leaves -- none of them
+`exceptions`, `outcome`, `progress` and `version` are cheap leaves -- none of them
 imports `fmriqc` or `fmriqc_report` at all -- so they stay eager. `request`
 imports `fmriqc.settings`/`fmriqc.types` for `AnalysisSettings` and its option
 Literals, which pulls in numpy -- so anything that reaches far enough to build
 a command line's `--help` already pays for numpy, as `fmri-qa --help` does
 today. What stays lazy is `session`'s much heavier stack: the rest of
 `fmriqc`'s analysis pipeline and `fmriqc_report`'s HTML renderer bring in
-scipy, scikit-image, and matplotlib too (roughly 1.8 s against `request`'s
+scipy, scikit-image and matplotlib too (roughly 1.8 s against `request`'s
 0.15 s). `run_session` sits behind `__getattr__` below (PEP 562), so reaching
 only as far as `parse_form` never pays for it. The label/help constants and
 `DEFAULT_SETTINGS` are not re-exported here at all -- see `__all__` below.

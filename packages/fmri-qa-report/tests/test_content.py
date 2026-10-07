@@ -122,7 +122,7 @@ def test_motn_and_com_tiles_carry_the_displacement_unit(
 
     `artifact` has a known voxel size and reports mm; `bare_artifact` has no
     sidecar metadata at all and falls back to voxels -- the same "mm when known,
-    else voxels" rule `_fwhm_label` applies, read off `displacement_unit`.
+    else voxels" rule `_fwhm_unit` applies, read off `displacement_unit`.
     """
     by_label = {doc.label: doc for doc in content.METRIC_DOCS}
     m = artifact.measurements

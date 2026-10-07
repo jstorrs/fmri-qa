@@ -86,7 +86,7 @@ class SpikeResult:
 def outlier_fraction(
     fluctuations: FloatArray, mask: BoolArray, qthr: float = OUTLIER_QTHR
 ) -> OutlierResult:
-    """Per-TR outlier-voxel fraction over `mask`, following AFNI 3dToutcount.
+    """Compute the per-TR outlier-voxel fraction over `mask` (3dToutcount).
 
     For each masked voxel the robust spread of its detrended residual is
     `sigma = sqrt(pi/2) * MAD` (MAD = ``median |residual|``); a frame is an outlier
@@ -123,7 +123,7 @@ def outlier_fraction(
 
 
 def _spike_ratio(x: FloatArray) -> float:
-    """Peak-over-spread ratio `max|x| / mad(x)`, R's `mad` (see `MAD_SCALE`).
+    """Compute the peak-over-spread ratio `max|x| / mad(x)` (see `MAD_SCALE`).
 
     The kernel of both cran-fmriqa spike scores: the largest absolute value
     against the robust spread of the whole series. NaN if `x` is empty or has zero
@@ -136,7 +136,7 @@ def _spike_ratio(x: FloatArray) -> float:
 
 
 def spike_scores(images: QAImages, roi: ROI) -> SpikeResult:
-    """cran-fmriqa MAD-normalized temporal/spectral spike scores over the ROI.
+    """Compute cran-fmriqa MAD-normalized spike scores over the ROI.
 
     Both are peak over robust (MAD) spread of the detrended ROI-mean
     residual series -- `tc_outlier` in the time domain, `spec_outlier` on its FFT

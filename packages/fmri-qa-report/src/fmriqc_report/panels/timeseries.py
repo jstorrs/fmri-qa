@@ -3,7 +3,7 @@
 Each `plot_*` (`plot_weisskoff`, `plot_rdc`, `plot_signal`, `plot_residual`,
 `plot_outliers`, `plot_motion`, `plot_com`, `plot_spectrum`, `plot_psf`) draws
 one stability panel onto a matplotlib `Axes` from the artifact's `Curves` —
-every trace arrives precomputed, so these functions only choose colors, labels,
+every trace arrives precomputed, so these functions only choose colors, labels
 and limits. `plot_fig` wraps a draw callback into a fresh `Figure`.
 Format-agnostic — a driver embeds the figures.
 """
@@ -29,7 +29,7 @@ def plot_fig(draw: Callable[[Axes], object], figsize: tuple[float, float]) -> Fi
 
 
 def plot_weisskoff(ax: Axes, wk: WeisskoffCurve, rdc: float) -> None:
-    """Measured CV vs the ideal slope=-1 line, anchored at the pooled cv1.
+    """Plot measured CV against the ideal slope=-1 line anchored at pooled cv1.
 
     The ideal line is anchored at `cv1_pooled` (the single-voxel CV pooled over
     the whole ROI) rather than at the single-voxel `cv[0]`, which makes the
@@ -54,7 +54,7 @@ def plot_weisskoff(ax: Axes, wk: WeisskoffCurve, rdc: float) -> None:
 
 
 def plot_rdc(ax: Axes, wk: WeisskoffCurve) -> None:
-    """RDC vs ROI size: pooled single-voxel CV / ROI-averaged CV, vs identity."""
+    """Plot RDC (pooled single-voxel CV / ROI CV) vs ROI size, with identity."""
     r, rdc = wk.roi_sizes, wk.rdc
     # Match the Weisskoff plot: measured is C0/"o-" on top and first in the
     # legend; the ideal reference is a gray dashed line beneath it.
@@ -83,7 +83,7 @@ def plot_rdc(ax: Axes, wk: WeisskoffCurve) -> None:
 
 
 def plot_signal(ax: Axes, curves: Curves) -> None:
-    """ROI mean signal over time with its fitted trend."""
+    """Plot the ROI mean signal over time with its fitted trend."""
     ax.plot(curves.time, curves.roi_signal, lw=0.5, label="ROI signal")
     ax.plot(curves.time, curves.roi_trend, "r", lw=1.2, label="trend")
     ax.set_xlabel("time (s)")
@@ -93,7 +93,7 @@ def plot_signal(ax: Axes, curves: Curves) -> None:
 
 
 def plot_residual(ax: Axes, curves: Curves, tc_outlier: float) -> None:
-    """ROI-mean detrended residual; the title carries the cran `tc_outlier` score.
+    """Plot the ROI-mean detrended residual with its cran `tc_outlier` score.
 
     `tc_outlier` (max|residual| / MAD) is the peak-to-spread ratio of exactly this
     series, so a lone volume standing far off the baseline is both visible here and
@@ -107,7 +107,7 @@ def plot_residual(ax: Axes, curves: Curves, tc_outlier: float) -> None:
 
 
 def plot_outliers(ax: Axes, curves: Curves) -> None:
-    """Per-TR outlier-voxel fraction (3dToutcount), displayed as a percentage."""
+    """Plot the per-TR outlier-voxel fraction (3dToutcount) as a percentage."""
     ax.plot(curves.time, 100.0 * curves.outlier_fraction, lw=0.7)
     ax.set_xlabel("time (s)")
     ax.set_ylabel("outliers (%)")
@@ -115,7 +115,7 @@ def plot_outliers(ax: Axes, curves: Curves) -> None:
 
 
 def plot_motion(ax: Axes, curves: Curves) -> None:
-    """Per-volume in-plane phantom motion: translation (voxels) + strain (%).
+    """Plot per-volume in-plane phantom motion: translation and strain.
 
     3dvolreg-style registration to the temporal mean with the rotation dropped
     (a rigid phantom cannot rotate). Translation drifts on the left axis; the
@@ -155,7 +155,7 @@ def plot_motion(ax: Axes, curves: Curves) -> None:
 
 
 def plot_com(ax: Axes, curves: Curves) -> None:
-    """Per-volume phantom center-of-mass shift from the temporal mean (voxels).
+    """Plot the per-volume phantom center-of-mass shift (voxels).
 
     Circular intensity centroid (bxh volmeasures) along each in-plane axis,
     plotted as its signed deviation from the run's mean centroid. A rigid, stable
@@ -174,7 +174,7 @@ def plot_com(ax: Axes, curves: Curves) -> None:
 
 
 def plot_spectrum(ax: Axes, curves: Curves, spec_outlier: float) -> None:
-    """Residual FFT magnitude (DC dropped); title carries cran `spec_outlier`.
+    """Plot the residual FFT magnitude (DC dropped) with cran `spec_outlier`.
 
     `spec_outlier` (max magnitude / MAD) is the peak-to-spread ratio of exactly
     this DC-dropped spectrum, so a dominant periodic artifact shows as a spike here
@@ -187,7 +187,7 @@ def plot_spectrum(ax: Axes, curves: Curves, spec_outlier: float) -> None:
 
 
 def plot_psf(ax: Axes, psf: PsfCurves) -> None:
-    """Directional point-spread profiles (PE, RO) of the noise field (3dFWHMx).
+    """Plot PE and RO point-spread profiles of the noise field (3dFWHMx).
 
     Markers are the empirical PSF (the squared spatial autocorrelation of the
     detrended noise field at each lag -- the point spread implied by the data

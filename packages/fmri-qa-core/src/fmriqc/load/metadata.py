@@ -36,7 +36,7 @@ class ScanMeta:
     no sidecar is found. `voxel_mm` is (row, col, slice-spacing) from the header
     zooms; `slice_thickness` is the excited slab from the sidecar (the zoom is
     spacing, which includes any gap). `pe_dir` is the row/col word for the
-    phase-encode axis this scan resolved, and is None when it resolved none.
+    phase-encode axis this scan resolved, and is `None` when it resolved none.
     """
 
     voxel_mm: tuple[float, float, float]
@@ -97,9 +97,10 @@ def _load_sidecar(path: str | Path) -> dict[str, object]:
 
 
 def _acq_datetime(sidecar: Sidecar) -> str | None:
-    """Acquisition date/time from the sidecar, seconds-precision; None if absent.
+    """Read the acquisition date/time from the sidecar, or None if absent.
 
-    Siemens often anonymizes the date away, leaving only `AcquisitionTime`.
+    The time is truncated to whole seconds. Siemens often anonymizes the date
+    away, leaving only `AcquisitionTime`.
     """
     if dt := sidecar.get("AcquisitionDateTime"):
         return str(dt).split(".")[0].replace("T", " ")
@@ -187,10 +188,10 @@ def _scan_meta(
 
     `tr` is handed in already resolved rather than re-read from pixdim[4], so
     the TR the report shows is the one the pipeline ran on. `spatial_scale_mm`
-    is the same resolved unit conversion used for the scan's affine. The sidecar's
-    optional fields are held to the type each one promises here, at the
-    boundary, so that a malformed value is diagnosed against the file it came
-    from rather than surfacing as an unreadable artifact months later; one
+    is the same resolved unit conversion used for the scan's affine. The
+    sidecar's optional fields are held to the type each one promises here, at
+    the boundary, so that a malformed value is diagnosed against the file it
+    came from rather than surfacing as an unreadable artifact months later; one
     that fails is recorded as unknown, with a warning.
     """
     zooms = img.header.get_zooms()

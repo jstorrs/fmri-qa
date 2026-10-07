@@ -2,7 +2,7 @@
 
 The parameter domains are not here. `AnalysisSettings` holds its own knobs to
 theirs, so a request that reaches this module is already one that could be
-honoured by some scan; what is left is everything that is only true relative to
+honored by some scan; what is left is everything that is only true relative to
 *this* scan -- its shape and samples, how many frames the trim leaves it, and
 which axis the request and the header settle on between them.
 """

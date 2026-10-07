@@ -42,7 +42,7 @@ BACKGROUND_SCALE = 8.0
 PHANTOM_SIGNAL = 1000.0
 
 # The size the figures are drawn at. Larger than the unit tests' default so a
-# curve has enough samples to read as a curve -- the construction, the seed, and
+# curve has enough samples to read as a curve -- the construction, the seed and
 # the acquisition parameters are the fixture's.
 FRAME_SIZE = 64
 N_SLICES = 3

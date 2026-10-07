@@ -36,8 +36,8 @@ def test_build_artifact_publishes_the_settings_the_result_was_computed_with(
     """A result built from `run_qa` carries its own request; nothing is filled in.
 
     `build_artifact` used to accept settings separately and default them when
-    omitted, so a result computed with no trim, phantom centering, and a forced
-    PE axis was published as a 5 s trim, image centering, and no override --
+    omitted, so a result computed with no trim, phantom centering and a forced
+    PE axis was published as a 5 s trim, image centering and no override --
     while `n_trimmed` in the same file said 0.
     """
     result = q.run_qa(
@@ -273,7 +273,7 @@ def test_a_collinear_mask_has_no_hull_rather_than_no_artifact() -> None:
     """A one-row mask has pixels but no area, and Qhull refuses to hull it.
 
     The outline is built after the whole analysis has run, so letting the
-    geometry library's error out would throw away a completed scan over an
+    geometry library error out would throw away a completed scan over an
     annotation nothing can draw anyway. The empty polygon the docstring promises
     for a mask too small to have a hull covers this case too.
     """

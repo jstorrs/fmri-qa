@@ -119,7 +119,7 @@ type _BackgroundFactory = Callable[[RunRequest], _BackgroundLike]
 
 @dataclass(frozen=True, slots=True)
 class _AdvancedField:
-    """One row of the Advanced frame, described data rather than written out by hand.
+    """One row of the Advanced frame, described as data, not hand-written.
 
     Keeping this a list (see `_ADVANCED_FIELDS` below) rather than one
     hand-built row per field is what makes adding a later row -- the
@@ -145,7 +145,7 @@ _DEFAULTS = FormValues()
 
 
 class _Rows:
-    """Hands out incrementing grid rows, so a row index is genuinely computed.
+    """Incrementing grid rows, handed out so a row index is genuinely computed.
 
     Every row in `_build` comes from `take()` rather than a hand-counted
     literal, which is what keeps a widget's row correct if an earlier one is
@@ -436,7 +436,7 @@ class Panel:
             open_report=bool(self._open_var.get()),
         )
 
-    # -- behaviour ------------------------------------------------------
+    # -- behavior -------------------------------------------------------
 
     def _toggle_advanced(self) -> None:
         if self._advanced_visible.get():

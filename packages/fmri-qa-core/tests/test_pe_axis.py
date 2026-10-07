@@ -236,7 +236,7 @@ def test_from_nifti_leaves_an_unnamed_axis_to_the_pipeline(tmp_path) -> None:
 
     The loader reads metadata; the Nyquist-ghost estimate is physics, and making
     it here would point the I/O layer at the metrics above it *and* measure a
-    different image than the one analyzed. The warning names both ways out — the
+    different image than the one analyzed. The warning names both ways out -- the
     estimate `run_qa` will make, and the `--pe-axis` that skips it.
     """
     nifti = _write_scan(tmp_path, {"FlipAngle": 77}, phase=None)

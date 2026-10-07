@@ -10,7 +10,7 @@ from .mask import phantom_core_mask
 def hilo_stats(
     scan: QAScan, trim_sec: float, detrend: DetrendMethod, erode: int
 ) -> tuple[FloatArray, FloatArray, BoolArray]:
-    """(temporal-mean map, temporal-SD-of-residual map, eroded core mask) for a scan.
+    """Compute the mean map, residual SD map and eroded core mask of a scan.
 
     The whole 3-D volume is used (not a single slice): thermal/instability
     separation is a global scanner property. The series is trimmed like the rest

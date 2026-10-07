@@ -77,7 +77,7 @@ def build_artifact(result: QAResult, *, name: str = "", source: str = "") -> QAA
 
 
 def _provenance(result: QAResult, *, name: str, source: str) -> Provenance:
-    """Identity, timestamp, and the acquisition metadata, flattened."""
+    """Flatten identity, timestamp and acquisition metadata into `Provenance`."""
     meta: ScanMeta | None = result.meta
     base = Provenance(
         scan=name,
@@ -117,7 +117,7 @@ def _provenance(result: QAResult, *, name: str, source: str) -> Provenance:
 
 
 def _pe_label(result: QAResult) -> PeLabel:
-    """Resolve the phase-encode direction to display: "row", "col", or "?".
+    """Resolve the phase-encode direction to display: "row", "col" or "?".
 
     One rule, and the axis is the whole of it: the label names the axis the
     ghost masks were built on, whatever settled it -- the sidecar, the header,
@@ -187,7 +187,7 @@ def _measurements(result: QAResult) -> Measurements:
 
 
 def _roi_series(arr: FloatArray, roi: ROI) -> FloatArray:
-    """ROI-mean time series of a 3-D (X, Y, T) array."""
+    """Compute the ROI-mean time series of a 3-D (X, Y, T) array."""
     return np.asarray(roi.mean(arr), dtype=np.float64)
 
 

@@ -57,7 +57,7 @@ class WeisskoffResult(ArrayValue):
 
 
 def _relative_to_signal(value: float, *, signal: float) -> float:
-    """`value / signal`, or NaN when the ROI mean signal is exactly zero.
+    """Return `value / signal`, or NaN if the ROI mean signal is exactly zero.
 
     NaN rather than the `RuntimeWarning`-raising division numpy would otherwise
     perform: a zero ROI mean signal means background or a suppressed
@@ -70,8 +70,9 @@ def _relative_to_signal(value: float, *, signal: float) -> float:
 
 
 def _roi_cv(*, fluctuations: FloatArray, mean_image: FloatArray, roi: ROI) -> float:
-    """CV over an ROI: RMS of the ROI-mean fluctuation / ROI-mean signal.
+    """Compute the CV over an ROI.
 
+    The CV is the RMS of the ROI-mean fluctuation over the ROI-mean signal.
     ROI-averaging the per-voxel `fluctuations` equals detrending the ROI-mean
     timeseries (detrending commutes with the spatial mean), and the temporal
     mean of that timeseries is the ROI mean of `mean_image`.
@@ -89,7 +90,7 @@ def _roi_cv1(
     mean_image: FloatArray,
     roi: ROI,
 ) -> float:
-    """Single-voxel CV pooled over an ROI: RMS(noise) / ROI mean signal.
+    """Compute the pooled single-voxel CV: RMS(noise) / ROI mean signal.
 
     NaN when the ROI mean signal is exactly zero.
     """
@@ -99,7 +100,7 @@ def _roi_cv1(
 
 
 def weisskoff(images: QAImages, roi: ROI) -> WeisskoffResult:
-    """Weisskoff plot + radius of decorrelation over a resolved ROI.
+    """Compute the Weisskoff curves and radius of decorrelation for an ROI.
 
     For each ROI size, `cv` is the CV of the ROI-mean fluctuation and `cv1` is
     the single-voxel CV pooled within the ROI; `rdc_curve = cv1 / cv`.
@@ -142,19 +143,18 @@ def snr(images: QAImages, roi: ROI) -> float:
     SNR = signal / sqrt(variance / n_frames). The difference uses frame *sums*,
     not means, so the normalization matches the fBIRN definition.
 
-    Which is why the difference is formed over an *even* number of frames. With
-    an odd count the two subsets differ by one frame, so the difference carries
-    a whole frame of signal, and that frame's spatial variation across the ROI —
-    not noise — dominates the variance: a phantom shaded 25% across the FOV reads
-    25% low. Frame parity is set by the warm-up trim
-    (`AnalysisSettings.trim_sec`), so the same series would score differently
-    for a one-volume change in the warm-up trim. The trailing frame
-    is dropped from the difference only; the signal still averages the full
-    series. NaN for a series too short to hold one odd/even pair, and NaN when
-    the difference image has no variance across the ROI at all: there is no
-    static noise to measure the signal against, so the ratio is undefined rather
-    than infinite — the same answer the sibling metrics give for a quantity they
-    cannot resolve.
+    The difference is formed over an *even* number of frames. With an odd count
+    the two subsets differ by one frame, so the difference carries a whole frame
+    of signal, and that frame's spatial variation across the ROI — not noise —
+    dominates the variance: a phantom shaded 25% across the FOV reads 25% low.
+    Frame parity is set by the warm-up trim (`AnalysisSettings.trim_sec`), so the
+    same series would score differently for a one-volume change in the warm-up
+    trim. The trailing frame is dropped from the difference only; the signal
+    still averages the full series. NaN for a series too short to hold one
+    odd/even pair, and NaN when the difference image has no variance across the
+    ROI at all: there is no static noise to measure the signal against, so the
+    ratio is undefined rather than infinite — the same answer the sibling metrics
+    give for a quantity they cannot resolve.
     """
     idx = roi.index
     cs = images.center_slice
@@ -192,7 +192,7 @@ def sfnr(images: QAImages, roi: ROI) -> float:
 
 
 def drift_percent(images: QAImages, roi: ROI) -> float:
-    """Peak-to-peak of the ROI-mean fitted trend, as % of the ROI mean signal.
+    """Compute the peak-to-peak ROI-mean trend, as % of the ROI mean signal.
 
     NaN when the ROI mean signal is exactly zero.
     """
@@ -204,7 +204,7 @@ def drift_percent(images: QAImages, roi: ROI) -> float:
 
 
 def percent_fluctuation(images: QAImages, roi: ROI) -> float:
-    """SD of the ROI-mean residual, as % of the ROI mean signal (fBIRN).
+    """Compute the SD of the ROI-mean residual, as % of ROI mean signal.
 
     NaN when the ROI mean signal is exactly zero.
     """

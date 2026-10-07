@@ -31,5 +31,5 @@ def nifti_stem(path: str | Path) -> str:
 
 
 def sidecar_path(path: str | Path) -> Path:
-    """Where the BIDS JSON sidecar of the NIfTI at `path` sits: beside it, `.json`."""
+    """Return the sidecar path for the NIfTI at `path` (same stem, `.json`)."""
     return Path(path).with_name(nifti_stem(path) + ".json")

@@ -3,7 +3,7 @@
 The page needs no companion file: the stylesheet is inlined and every figure
 is embedded as a ``data:`` URI, so it opens from ``file://`` with no network
 or sibling asset. It is handed out entirely on its own: a physicist can
-double-click it, email it, or drop it into their own website.
+double-click it, email it or drop it into their own website.
 """
 
 import html

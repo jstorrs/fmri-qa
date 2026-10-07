@@ -4,11 +4,11 @@ The whole point of the split is that presentation depends on the *published
 artifact*, not on the pipeline that produced it. That is easy to state and easy
 to erode one convenient import at a time, so it is checked mechanically here:
 every `fmriqc` import in the report package must land in `fmriqc.analysis` (the
-artifact), `fmriqc.types` (the shared array/option vocabulary), or
-`fmriqc.rename` (how a finished file is moved into place), or
-`fmriqc.path_arguments` (wildcards and same-file checks on path arguments). An import of
-`fmriqc.metrics`, `fmriqc.pipeline`, `fmriqc.prep`, or `fmriqc.load` — or of the
-`fmriqc` package as a whole, which pulls all of them — fails this test.
+artifact), `fmriqc.types` (the shared array/option vocabulary), `fmriqc.rename`
+(how a finished file is moved into place) or `fmriqc.path_arguments` (wildcards
+and same-file checks on path arguments). An import of `fmriqc.metrics`,
+`fmriqc.pipeline`, `fmriqc.prep` or `fmriqc.load` — or of the `fmriqc` package
+as a whole, which pulls all of them — fails this test.
 
 That scan reads import *text*, which is necessary but not sufficient: an
 allowed import can still drag a forbidden module in behind it, through the
@@ -100,17 +100,17 @@ print(loaded)
 
 
 def _modules() -> list[Path]:
-    """Every source file in the report package."""
+    """List every source file in the report package."""
     return sorted(_SOURCE_ROOT.rglob("*.py"))
 
 
 def _from_fmriqc(module: str) -> bool:
-    """True if a dotted module name names the calculation package."""
+    """Return True if a dotted module name names the calculation package."""
     return module.split(".", maxsplit=1)[0] == "fmriqc"
 
 
 def _fmriqc_imports(tree: ast.Module) -> set[str]:
-    """The `fmriqc*` modules a parsed source file imports."""
+    """Return the `fmriqc*` modules a parsed source file imports."""
     found: set[str] = set()
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
@@ -149,7 +149,7 @@ def test_the_check_would_catch_a_pipeline_import() -> None:
 
 
 def test_presentation_never_imports_the_launcher() -> None:
-    """The application shell depends on `fmriqc_report`, never the other way around."""
+    """The application shell depends on the report, never the other way around."""
     offenders = [
         path.relative_to(_SOURCE_ROOT).as_posix()
         for path in _modules()

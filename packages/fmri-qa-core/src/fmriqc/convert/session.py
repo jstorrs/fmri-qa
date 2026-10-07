@@ -2,8 +2,8 @@
 
 The conversion runs into a staging directory this module creates and owns, and
 the results are moved into place only once every one of them has a name and no
-name lands on a file that already exists. Two things fall out of that order, and
-both are the reason for it:
+name lands on a file that already exists. Three things fall out of that order,
+and they are the reason for it:
 
 * **What was produced is read from the filesystem, not from dcm2niix's log.**
   Staging starts empty, so whatever is in it afterwards is exactly this run's
@@ -101,7 +101,7 @@ def _read_sidecar(path: Path) -> Sidecar | None:
 
 
 def _refiled(name: str, stem: str, target: str) -> str:
-    """`name` with its leading `stem` swapped for `target`.
+    """Swap the leading `stem` of `name` for `target`.
 
     A slice rather than `str.replace`, which would also rewrite a later
     occurrence: `_plan_files` matches on `stem + "."`, so the stem is always a
@@ -115,7 +115,7 @@ def _plan_files(
 ) -> dict[str, list[tuple[Path, Path]]]:
     """Assign each NIfTI and companion one destination before any file moves.
 
-    Returns each stem's `(staged, target)` moves, keyed by the stem.
+    Return each stem's `(staged, target)` moves, keyed by the stem.
 
     NIfTIs belong to their parsed stem: `x.nii.gz` belongs to `x` even when
     another series has stem `x.nii`. Other files belong to the longest matching
@@ -427,7 +427,7 @@ def _aftermath(
 def _describe(
     path: Path, targets: Sequence[Path], sidecar: Sidecar, *, renamed_from: str | None
 ) -> ImportedSeries:
-    """One filed series, with the sidecar fields worth showing in a listing.
+    """Describe one filed series, with the sidecar fields worth listing.
 
     `targets` are the series' files under their final names, in any order and
     including `path`; the ordering of `ImportedSeries.files` is done here.

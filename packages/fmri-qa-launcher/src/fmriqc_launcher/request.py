@@ -131,12 +131,12 @@ OPEN_REPORT_HELP = (
 
 
 def _choices(choices: tuple[str, ...]) -> str:
-    """Choices, comma-joined, for a "must be one of ..." problem message."""
+    """Join `choices` with commas for a "must be one of ..." problem message."""
     return ", ".join(choices)
 
 
 def _directory_problems(dicom_dir: Path, output_dir: Path) -> list[str]:
-    """Directory-existence and same-directory problems for an already-normalized pair.
+    """List directory problems for an already-normalized pair of paths.
 
     Pure over `dicom_dir`/`output_dir` once each has been through
     `expanduser()`/`resolve()`: `RunRequest.__post_init__` calls this after
@@ -222,7 +222,7 @@ class FormValues:
 
 
 def _require_path(text: str, label: str, problems: list[str]) -> Path | None:
-    """`text`, stripped, as a `Path`, or None with a problem appended if that's blank.
+    """Strip `text` into a `Path`, or return None with a problem if it is blank.
 
     Only the whitespace a form field routinely picks up from a paste or a
     trailing space is stripped here; `~` and relative-path normalization are
@@ -294,7 +294,7 @@ def _build_settings(
     roi_size: int | None,
     problems: list[str],
 ) -> AnalysisSettings | None:
-    """`AnalysisSettings` from already-converted values, or None with a problem.
+    """Build `AnalysisSettings` from converted values, or None with a problem.
 
     None whenever a conversion upstream already failed (nothing to build from)
     or `AnalysisSettings.__post_init__` itself refuses the combination.

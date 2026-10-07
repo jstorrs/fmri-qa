@@ -69,7 +69,7 @@ def _digits(value: object, count: int) -> str | None:
 
 
 def series_number(sidecar: Sidecar) -> int | None:
-    """`SeriesNumber` as an int, or None if absent or not a plain int.
+    """Return `SeriesNumber` as an int, or None if absent or not a plain int.
 
     A JSON boolean is a `SeriesNumber` no export ever means: `isinstance(True,
     int)` is true in Python, so `bool` is excluded explicitly rather than
@@ -82,7 +82,7 @@ def series_number(sidecar: Sidecar) -> int | None:
 
 
 def text_field(sidecar: Sidecar, key: str) -> str | None:
-    """`sidecar[key]` narrowed to `str`, or None if absent or of another type."""
+    """Return `sidecar[key]` if it is a `str`, else None."""
     value = sidecar.get(key)
     return value if isinstance(value, str) else None
 
@@ -103,7 +103,7 @@ def acquired(sidecar: Sidecar) -> tuple[str | None, str | None]:
 
 
 def _series_number(sidecar: Sidecar) -> str | None:
-    """`sNNN` from `SeriesNumber`, zero-padded so a listing sorts by it."""
+    """Format `sNNN` from `SeriesNumber`, zero-padded so a listing sorts by it."""
     number = series_number(sidecar)
     return f"s{number:03d}" if number is not None else None
 
@@ -133,7 +133,7 @@ def plan(sidecars: Mapping[str, Sidecar | None]) -> dict[str, str]:
     """Map each dcm2niix stem to the stem to file it under.
 
     Keyed and valued by stem so the caller can move a series' whole set of files
-    — NIfTI, sidecar, and anything else dcm2niix wrote beside them — under one
+    — NIfTI, sidecar and anything else dcm2niix wrote beside them — under one
     decision.
 
     Every final stem is unique. A series keeps its dcm2niix name when its
@@ -144,11 +144,11 @@ def plan(sidecars: Mapping[str, Sidecar | None]) -> dict[str, str]:
     of input order.
 
     For example, a multi-echo or magnitude/phase series produces several files
-    that agree on date, time, series number and
-    description and differ only in the postfix dcm2niix appended (`_e2`, `_ph`).
-    Renaming them all to one name would silently keep whichever moved last, so
-    the whole colliding group keeps the names dcm2niix already guaranteed to be
-    unique. Nothing is invented and nothing is lost; the caller reports it.
+    that agree on date, time, series number and description and differ only in
+    the postfix dcm2niix appended (`_e2`, `_ph`). Renaming them all to one name
+    would silently keep whichever moved last, so the whole colliding group keeps
+    the names dcm2niix already guaranteed to be unique.
+    Nothing is invented and nothing is lost; the caller reports it.
     """
     chosen = {
         stem: (qa_stem(sidecar) or stem) if sidecar is not None else stem

@@ -24,12 +24,13 @@ itself openable.
     >> tr   = ncreadatt('scan.qa.nc', '/', 'provenance.tr');
     >> roi  = ncreadatt('scan.qa.nc', '/', 'settings.roi_size');
 
-Version 4, written through the `netCDF4` package -- the Unidata C library
-itself, the one MATLAB, R and Octave are linked against, so what this writes is
-what those were tested on. It is a ~10 MB wheel carrying libhdf5 and libnetcdf,
-which is the price of writing the format through its reference implementation
-rather than re-deriving it. netCDF-4 is HDF5 underneath, and the three things
-that buys are the reasons it is version 4 and not the classic version 1:
+The file is version 4, written through the `netCDF4` package -- the Unidata C
+library itself, the one MATLAB, R and Octave are linked against, so what this
+writes is what those were tested on. It is a ~10 MB wheel carrying libhdf5 and
+libnetcdf, which is the price of writing the format through its reference
+implementation rather than re-deriving it. netCDF-4 is HDF5 underneath, and the
+three things this buys are the reasons it is version 4 and not the classic
+version 1:
 
 * **Per-variable compression** (`zlib` level 4, plus the byte `shuffle` filter
   for floats, which reorders a float64's bytes so like-magnitude exponents sit
@@ -78,7 +79,7 @@ Four things the layout does that a bag of arrays does not:
   `curves.weisskoff.roi_sizes`, and both arrays stay where they are. Where the
   axis is a position, the coordinate is that position: `frame` (which is what
   `measurements.outlier_worst_frame` indexes, counting from the trimmed series),
-  `row`, `col`, the two PSF sample axes, and the hull's vertices. The three
+  `row`, `col`, the two PSF sample axes and the hull's vertices. The three
   length-2 label axes name their positions with CF `flag_values`/`flag_meanings`
   on an NC_INT rather than as an NC_STRING: strings are a netCDF-4-only type
   that Octave's package and older readers handle poorly, and a flagged integer
@@ -106,18 +107,17 @@ document path, with a nested object flattening into the name (`measurements.snr`
 `provenance.tr`, `settings.roi_size`, `curves.psf.fwhm`, `images.roi.row0`), so
 no reader has to decode JSON at all -- `ncdisp` lists them all and `ncreadatt`
 hands one over. A float is an NC_DOUBLE, an integer an NC_INT, a bool an
-NC_UBYTE 0 or 1, a string NC_CHAR, and a JSON list of numbers the vector of its
+NC_UBYTE 0 or 1, a string NC_CHAR and a JSON list of numbers the vector of its
 element type: `provenance.voxel_mm` is three NC_DOUBLEs and `provenance.matrix`
 two NC_INTs, which is a shape a netCDF attribute has and a reader gets whole. A
 list of words is one space-separated NC_CHAR text, the way CF itself spells
 `flag_meanings`: `curves.psf.labels` reads `PE RO`. A field the document spells
 `null` gets **no attribute at all**, and that absence is the encoding: the
-document distinguishes
-a NaN ("the estimator could not resolve this") from a null ("the quantity does
-not apply here", in provenance "nothing recorded it", and in settings "not
-overridden"), an attribute cannot be null, and writing NaN for both would
-collapse the distinction. So a NaN attribute means what a NaN measurement means,
-and a missing one means the other thing.
+document distinguishes a NaN ("the estimator could not resolve this") from a
+null ("the quantity does not apply here", in provenance "nothing recorded it",
+and in settings "not overridden"), an attribute cannot be null, and writing NaN
+for both would collapse the distinction. So a NaN attribute means what a NaN
+measurement means, and a missing one means the other thing.
 
 Text is written as NC_CHAR, which netCDF4 encodes as a `str`'s UTF-8 bytes.
 Every string outside provenance is a closed vocabulary this package fixes
@@ -255,7 +255,7 @@ def _mask_attributes() -> dict[str, _AttributeValue]:
 
 @dataclass(frozen=True, slots=True)
 class _Layout:
-    """How one array is declared: its axes, and what a reader should be told.
+    """How one array is declared: its axes and what a reader should be told.
 
     `units` is omitted where the unit is not a fact about the layout -- an
     artifact's PSF abscissas are mm or voxels depending on what its header gave
@@ -517,7 +517,7 @@ def encode(
 def _coordinates(
     dimensions: dict[str, int], arrays: Mapping[str, Member], document: dict[str, Any]
 ) -> dict[str, _Variable]:
-    """One coordinate variable per axis, derived from the arrays and document.
+    """Build one coordinate variable per axis from the arrays and document.
 
     An axis whose values live in an array this file does not carry gets no
     coordinate rather than an invented one -- `encode` takes whatever arrays it
@@ -546,7 +546,7 @@ def _coordinate(
     arrays: Mapping[str, Member],
     document: dict[str, Any],
 ) -> _Variable | None:
-    """One axis's coordinate variable, or None when its values are not here."""
+    """Build one axis's coordinate variable, or None if its values are not here."""
     if isinstance(declared, _Values):
         return _value_coordinate(axis, declared, arrays)
     if isinstance(declared, _Labels):
@@ -648,7 +648,7 @@ def _global_attributes(text: str, stored: dict[str, Any]) -> dict[str, _Attribut
 def _section_attributes(
     section: str, document: dict[str, Any]
 ) -> dict[str, _AttributeValue]:
-    """Every recorded field of one document section, as an attribute apiece.
+    """Convert every recorded field of one document section to an attribute.
 
     Each attribute is named for the document path its value came from, so
     `measurements.snr` in the file is `measurements.snr` in the document and in
@@ -671,7 +671,7 @@ def _section_attributes(
 
 
 def _leaves(prefix: str, mapping: dict[str, Any]) -> Iterator[tuple[str, Any]]:
-    """Every recorded value under `mapping`, by its dotted path from `prefix`.
+    """Yield every recorded value under `mapping`, by dotted path from `prefix`.
 
     A nested object yields its own leaves under its key rather than itself, and
     a `null` yields nothing: see `_section_attributes`.
@@ -687,7 +687,7 @@ def _leaves(prefix: str, mapping: dict[str, Any]) -> Iterator[tuple[str, Any]]:
 
 
 def _attribute(name: str, value: Any) -> _AttributeValue:
-    """One JSON value, already validated, as the netCDF attribute that holds it.
+    """Convert one validated JSON value to the netCDF attribute that holds it.
 
     Bools are matched before ints because `bool` *is* an `int` in Python, and a
     verdict published as a number a reader has to know is a verdict would be
@@ -739,7 +739,7 @@ def _nc_int(name: str, value: int) -> np.int32:
 
 
 def _escaped(text: str) -> str:
-    """One string as the NC_CHAR text a reader is handed.
+    """Convert one string to the NC_CHAR text a reader is handed.
 
     netCDF4 writes a `str` attribute as the UTF-8 bytes of NC_CHAR, and ASCII
     and any other encodable text pass through unchanged. The one string with no
@@ -757,7 +757,7 @@ def _variable(
     dimensions: dict[str, int],
     auxiliary: dict[str, str],
 ) -> _Variable:
-    """One array as a netCDF variable, registering the axes it lies along.
+    """Convert one array to a netCDF variable, registering the axes it lies along.
 
     `dimensions` is extended in place with any axis this array is the first to
     fix, and checked against it for any axis already fixed -- so two variables
@@ -828,7 +828,7 @@ def _fix_dimension(
 
 
 def write(content: _NetcdfContent, path: Path) -> None:
-    """Write `content` to `path` as a netCDF-4 file, and close it.
+    """Write `content` to `path` as a netCDF-4 file and close it.
 
     Exactly one file is written and the handle is closed before this returns, so
     a caller can fsync and rename the result -- which is how `save_artifact`
@@ -981,7 +981,7 @@ def _document_text(dataset: "Dataset", path: Path) -> str:
 
 
 def _restored(variable: "Variable[Any]") -> NDArray[Any]:
-    """One stored variable as the array that was written.
+    """Restore one stored variable to the array that was written.
 
     A variable carrying the CF flag markers `_mask_attributes` writes is a
     boolean mask stored as 0/1 bytes, and comes back `bool`; everything else is

@@ -1,4 +1,4 @@
-"""Writing a file, or moving a directory, into place without a reader seeing half.
+"""Writing a file or moving a directory into place, all or nothing.
 
 This holds the whole write-then-rename: `atomic_file` stages a single file
 beside its destination and moves it in, and `replace_patiently` is the move

@@ -1,4 +1,4 @@
-"""Shared type vocabulary: array dtypes, Literals, the sidecar, and the ROI size.
+"""Shared types: array dtypes, Literals, the sidecar and the ROI size.
 
 The type primitives every layer speaks in — the three numpy array aliases,
 the `Literal` sets whose values are passed and published as options, and the
@@ -68,7 +68,7 @@ DETREND_METHODS: tuple[DetrendMethod, ...] = get_args(DetrendMethod)
 RoiCenter = Literal["image", "phantom"]
 ROI_CENTER_MODES: tuple[RoiCenter, ...] = get_args(RoiCenter)
 
-# Unit a reported length carries: millimetres when the header gave a voxel size,
+# Unit a reported length carries: millimeters when the header gave a voxel size,
 # voxels when it did not. Published on `Measurements.fwhm_unit` and
 # `PsfCurves.unit`, so it is a closed set a reader can switch on.
 LengthUnit = Literal["mm", "vox"]

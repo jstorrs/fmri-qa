@@ -102,7 +102,7 @@ def test_qaimages_finds_a_nulled_edge_under_a_nonzero_intercept() -> None:
     """A stored zero reads back as the intercept, and is still a dead line.
 
     `get_fdata` returns `stored * slope + inter`, so a Siemens-nulled row in a
-    scan with `scl_inter = 10` arrives as a row of exactly 10 — not of zeros.
+    scan with `scl_inter = 10` arrives as a row of exactly 10 -- not of zeros.
     Testing the edge against 0.0 would let that constant line into every ROI
     average and ghost statistic as if it were data.
     """

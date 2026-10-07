@@ -1,8 +1,8 @@
-"""The packaged, freeze-safe report resources: the run template and the stylesheet.
+"""The packaged, freeze-safe report resources: run template and stylesheet.
 
 Everything is read through :func:`importlib.resources.files` on this package —
 never ``__file__`` arithmetic — so a zipped or frozen install resolves the same
-way an unpacked one does.  These two names are the complete resource
+way an unpacked one does. These two names are the complete resource
 inventory; adding a third means teaching any future packaging step about it.
 """
 
@@ -30,7 +30,7 @@ def read_resource(name: ResourceName) -> str:
 
 
 def read_stylesheet() -> str:
-    """Return the packaged stylesheet, guarded against escaping its ``<style>`` tag.
+    """Return the packaged stylesheet, refusing a closing ``<style>`` tag.
 
     A run page inlines this text verbatim inside a ``<style>`` element, so a
     byte sequence that closes that element early would let arbitrary markup

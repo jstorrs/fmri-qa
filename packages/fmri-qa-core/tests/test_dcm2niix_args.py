@@ -1,7 +1,7 @@
 """The dcm2niix command line: the flags that are not a matter of taste.
 
 Covers `convert.dcm2niix` -- the pinned flags, argument order, passthrough
-handling and its warnings, reading the version banner, and finding (or failing to
+handling and its warnings, reading the version banner and finding (or failing to
 find) a binary to run. Nothing here converts a series.
 """
 

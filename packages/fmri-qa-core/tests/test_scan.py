@@ -1,14 +1,14 @@
 """The NIfTI loader's contract: spatial/TR units, and the optional BIDS sidecar.
 
 Both concerns are file-I/O boundaries, so these go through real files on disk.
-The TR cases matter because pixdim[4] carries no unit of its own — a scan whose
+The TR cases matter because pixdim[4] carries no unit of its own -- a scan whose
 header says milliseconds must still arrive in seconds, or the pipeline trims no
 warm-up and fits a detrend of absurd order. The sidecar cases pin the decision
 that a NIfTI exported straight off the scanner still analyzes, with a warning
 and empty acquisition metadata rather than a refusal.
 
 These build their own files rather than using conftest's `write_scan`: that
-fixture always writes a sidecar at a 2 s TR in unlabelled units, which is
+fixture always writes a sidecar at a 2 s TR in unlabeled units, which is
 exactly what is under test here.
 """
 
@@ -60,7 +60,7 @@ def _write_scan(
         ("sec", 2.0, 2.0),
         ("msec", 2000.0, 2.0),
         ("usec", 2_000_000.0, 2.0),
-        (None, 2.0, 2.0),  # unlabelled pixdim is read as seconds
+        (None, 2.0, 2.0),  # unlabeled pixdim is read as seconds
     ],
 )
 def test_header_tr_converts_by_its_time_unit(
@@ -71,7 +71,7 @@ def test_header_tr_converts_by_its_time_unit(
 
 
 def test_sidecar_repetition_time_wins_over_the_header(tmp_path) -> None:
-    # The header claims 3 s, the sidecar 2 s; BIDS fixes its unit, so it wins —
+    # The header claims 3 s, the sidecar 2 s; BIDS fixes its unit, so it wins --
     # loudly, because one of the two files describes a different acquisition.
     nifti = _write_scan(tmp_path, {"RepetitionTime": 2.0}, pixdim_t=3.0)
     with pytest.warns(UserWarning, match="disagrees"):
@@ -276,7 +276,7 @@ def test_loaded_scaling_preserves_clipping_and_dead_edges(
 
 
 def _spatial_affine_mm() -> np.ndarray:
-    """A rotated, translated grid with unequal voxel sizes of 2, 3, and 4 mm."""
+    """A rotated, translated grid with unequal voxel sizes of 2, 3 and 4 mm."""
     return np.array(
         [
             [1.2, -2.4, 0, 12.5],

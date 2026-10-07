@@ -91,7 +91,7 @@ class ROI(ArrayValue):
         return _roi_indexes(self.center, self.size)
 
     def mean(self, image: FloatArray) -> Any:
-        """Mean of `image` over the ROI's rows and columns.
+        """Average `image` over the ROI's rows and columns.
 
         A scalar for an (X, Y) image; a per-frame series for an (X, Y, T) one.
         """
@@ -99,7 +99,7 @@ class ROI(ArrayValue):
 
 
 def detect_phantom(images: QAImages) -> PhantomGeometry:
-    """Locate the phantom from the preprocessed images: mask and detected center.
+    """Locate the phantom in the preprocessed images: mask and center.
 
     Warns when the resulting mask is not a plausible phantom: degenerate —
     empty, or covering essentially the whole frame — or a partition of noise
@@ -127,7 +127,7 @@ def detect_phantom(images: QAImages) -> PhantomGeometry:
 
 
 def _implausibility(geom: PhantomGeometry) -> str:
-    """Which plausibility test the segmentation failed, for the warning."""
+    """Name the plausibility test the segmentation failed, for the warning."""
     if not DEGENERATE_PHANTOM_MIN < geom.fraction < DEGENERATE_PHANTOM_MAX:
         return (
             f"phantom segmentation covers {100 * geom.fraction:.1f}% of the frame; "
@@ -190,7 +190,7 @@ def roi_fits(phantom_mask: BoolArray, roi: ROI) -> bool:
 
 
 def _find_phantom_center(phantom_mask: BoolArray) -> IntArray:
-    """Center (row, col) of the largest inscribed circle of the phantom mask."""
+    """Find the center (row, col) of the phantom's largest inscribed circle."""
     dist = ndimage.distance_transform_edt(phantom_mask)
     roi_center = np.unravel_index(np.argmax(dist), dist.shape)
     return np.array(roi_center)
@@ -207,7 +207,7 @@ def _roi_indexes(roi_center: IntArray, n: int) -> tuple[slice, slice]:
 
 
 def _image_center(shape: tuple[int, ...]) -> IntArray:
-    """Geometric center (row, col) of an image, array-index order."""
+    """Return the geometric center (row, col) of an image, in array order."""
     return np.array(shape[:2]) // 2
 
 

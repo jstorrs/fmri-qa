@@ -29,7 +29,7 @@ def _disk(n: int = 32, radius: float | None = None) -> np.ndarray:
 
 
 def _air(shape: tuple[int, ...], seed: int = 0, scale: float = 8.0) -> np.ndarray:
-    """A magnitude noise floor — one frame's worth of air, holding no phantom."""
+    """A magnitude noise floor -- one frame's worth of air, holding no phantom."""
     rng = np.random.default_rng(seed)
     return np.abs(rng.normal(scale=scale, size=shape))
 
@@ -171,7 +171,7 @@ def test_detect_phantom_rejects_a_partition_of_noise() -> None:
 
     The fraction test alone passed it: the watershed labels roughly half of the
     noise, which is a share a real phantom could cover. What gives it away is
-    contrast -- the labelled half stands barely above the rest -- and the
+    contrast -- the labeled half stands barely above the rest -- and the
     verdict has to apply the same test slice selection does, or a run warns
     that no slice holds a phantom and then records the one it segmented as good.
     """
@@ -224,7 +224,7 @@ def test_phantom_area_scores_a_frame_of_air_as_no_phantom() -> None:
     The watershed seeds one quantile of the noise against the other and labels
     roughly half the frame, which is *larger* than a real phantom's share -- so
     area alone would rank an empty slice above the phantom. What separates them
-    is contrast: the labelled half of the air stands barely above the rest.
+    is contrast: the labeled half of the air stands barely above the rest.
     """
     air = _air((64, 64))
     assert 0.3 < segment_phantom(air).mean() < 0.6  # a mask, and a big one

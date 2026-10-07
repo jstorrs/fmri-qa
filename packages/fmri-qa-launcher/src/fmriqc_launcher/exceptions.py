@@ -22,7 +22,7 @@ class RequestError(LauncherError):
     """The run request could not be built from what the user supplied.
 
     A folder that does not exist, a number that does not parse, an option
-    outside its domain. ``problems`` carries every reason found, not just the
+    outside its domain. `problems` carries every reason found, not just the
     first, so a form can show them all at once; `str(exc)` joins them with
     "; " for a readable one-line summary.
     """
