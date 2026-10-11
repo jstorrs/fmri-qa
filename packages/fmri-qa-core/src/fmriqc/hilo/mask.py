@@ -1,4 +1,4 @@
-"""The eroded phantom-core mask each hi/lo scan is reduced over.
+"""The eroded phantom-core mask each high/low scan is reduced over.
 
 `HILO_ERODE` is the number of voxel layers peeled off the phantom, tuning the
 mask `phantom_core_mask` builds.
@@ -10,7 +10,7 @@ from scipy import ndimage
 from ..prep.imaging import segment_phantom
 from ..types import BoolArray, FloatArray
 
-# Voxel layers peeled off the phantom to form the hi/lo core mask (AFNI
+# Voxel layers peeled off the phantom to form the high/low core mask (AFNI
 # 3dAutomask -erode 5) -- excludes edge / partial-volume / ghost-contaminated voxels.
 HILO_ERODE = 5
 

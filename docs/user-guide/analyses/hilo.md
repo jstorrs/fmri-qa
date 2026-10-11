@@ -81,6 +81,7 @@ translation) to millimeters, so equivalent geometry encoded in meters,
 millimeters, or microns can be paired. An unknown spatial unit is assumed to be
 millimeters with one warning per loaded scan. Callers constructing `QAScan`
 directly must also supply its affine in millimeters.
+
 Pass the high-flip scan first — a warning fires if the recorded flip angles say
 otherwise.
 

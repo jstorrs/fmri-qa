@@ -18,7 +18,7 @@ artifact under the netCDF names a reader will see.
 | [Outliers and spikes](outliers.md) | the bad volume and the dominant periodic artifact that averages hide | `outlier_max_pct`, `outlier_worst_frame`, `tc_outlier`, `spec_outlier` |
 | [Motion and deformation](motion.md) | the translation, scale and shear gradient heating produces, and a mask-free centroid trace beside it | `max_translation`, `max_scale_pct`, `max_shear_pct`, `max_com_displacement`, `displacement_unit` |
 | [Smoothness and point spread](smoothness.md) | the correlation length of the noise field per direction, and the shape of the blur | `fwhm`, `fwhm_pe`, `fwhm_ro`, `fwhm_unit` |
-| [Thermal vs. instability noise](hilo.md) | a flip-angle pair split into additive and multiplicative noise | nothing — stdout only |
+| [Thermal versus instability noise](hilo.md) | a flip-angle pair split into additive and multiplicative noise | nothing — stdout only |
 
 The names in the last column are `measurements.*` attributes in the file; each
 page's own table gives them with their meanings, alongside the variables,

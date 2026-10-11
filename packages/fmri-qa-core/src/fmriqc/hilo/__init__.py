@@ -55,8 +55,7 @@ def run_hilo(
     temporal-SD-of-residual map over the whole volume (`hilo_stats`), and the
     statistics are pooled over the **shared** eroded phantom core — the intersection
     of the two scans' core masks — so `mean_high` and `mean_low` are averaged over
-    identical voxels. `separate_noise` then does the flip-angle algebra. Raises if
-    the two geometries differ or their cores do not overlap.
+    identical voxels. `separate_noise` then does the flip-angle algebra.
 
     Raises
     ------

@@ -43,12 +43,11 @@ with a message saying so, rather than replacing it.
 
 ## A failed series is skipped
 
-A failure in one series — an unreadable scan, a sidecar that is not valid
-JSON, too few volumes to analyze, a report that cannot be written — does not
-stop the run. That series is
-reported as failed, with the reason, nothing of it reaches the output
-directory, and every other series is still attempted. The run then counts as
-incomplete: `fmri-qa-run` exits `1`.
+A failure in one series — an unreadable scan, a sidecar that is not valid JSON,
+too few volumes to analyze, a report that cannot be written — does not stop the
+run. That series is reported as failed, with the reason, nothing of it reaches
+the output directory, and every other series is still attempted. The run then
+counts as incomplete: `fmri-qa-run` exits `1`.
 
 A failure before any series is reached is different: if the output directory
 cannot be created or written to, or the import itself fails or finds nothing,

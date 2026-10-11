@@ -28,9 +28,9 @@ artifact's file name when none was recorded.
 
 `--html` renders exactly one artifact. `ARTIFACT` may be a wildcard pattern,
 which the command expands itself — PowerShell and cmd pass `*.qa.nc` through
-unexpanded — so `fmri-qa-report artifacts\*-0924.qa.nc --html report.html` works on
-Windows as it does in a POSIX shell. A pattern (or a list of names) that comes
-to more than one artifact is a usage error:
+unexpanded — so `fmri-qa-report artifacts\*-0924.qa.nc --html report.html` works
+on Windows as it does in a POSIX shell. A pattern (or a list of names) that
+comes to more than one artifact is a usage error:
 
 ```text
 fmri-qa-report: error: --html renders one artifact to one file
@@ -55,11 +55,10 @@ link as well as the same spelling.
 
 ## How the page is written
 
-The page is rendered completely in memory before anything is written,
-then written to a temporary file beside `FILE` and renamed onto it. A reader
-never sees a partial page, and a render or write that fails leaves an existing
-`FILE` exactly as it was. The page is created with ordinary permissions — the
-process umask applies, not the owner-only mode a temporary file usually gets —
-so it gets the permissions any new file the process creates would (0644 under
-the usual umask of 022). Missing parent
-directories of `FILE` are created.
+The page is rendered completely in memory before anything is written, then
+written to a temporary file beside `FILE` and renamed onto it. A reader never
+sees a partial page, and a render or write that fails leaves an existing `FILE`
+exactly as it was. The page is created with ordinary permissions — the process
+umask applies, not the owner-only mode a temporary file usually gets — so it
+gets the permissions any new file the process creates would (0644 under the
+usual umask of 022). Missing parent directories of `FILE` are created.

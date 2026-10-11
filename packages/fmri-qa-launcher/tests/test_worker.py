@@ -88,7 +88,7 @@ def test_join_on_a_not_started_run_returns_immediately(request_: RunRequest) -> 
 def test_cancel_flips_should_continue_and_the_result_is_cancelled(
     request_: RunRequest,
 ) -> None:
-    """`cancel()` is set before the fake run ever checks `should_continue` again.
+    """`cancel()` is called before the fake run ever checks `should_continue` again.
 
     Rather than racing the background thread with a sleep-poll loop, the fake
     run signals `first_series_done` right after finishing the first series

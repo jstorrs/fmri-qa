@@ -1,9 +1,9 @@
 # From Python
 
 The command is a thin shell over `write_run_page`; it and `render_run_page` are
-importable from `fmriqc_report`. Both take a loaded `QAArtifact`; reading one from disk is
-core's job, through `fmriqc.analysis.load_artifact`, which reads any file the
-command would (see {doc}`/user-guide/artifact`).
+importable from `fmriqc_report`. Both take a loaded `QAArtifact`; reading one
+from disk is core's job, through `fmriqc.analysis.load_artifact`, which reads
+any file the command would (see {doc}`/user-guide/artifact`).
 
 ```python
 from fmriqc.analysis import load_artifact
@@ -65,7 +65,7 @@ stylesheet.
 `import fmriqc_report`, and importing `Theme` or `DEFAULT_THEME` from it, does
 not import matplotlib. The renderer, and with it matplotlib, is loaded when
 `render_run_page` or `write_run_page` is first looked up on the package —
-including by `from fmriqc_report import write_run_page`. Figures are built as `matplotlib.figure.Figure` objects and saved
-straight to SVG, under a local `rc_context` for the theme, so rendering needs
-no `pyplot`, selects no backend, and leaves the process's matplotlib settings
-as it found them.
+including by `from fmriqc_report import write_run_page`. Figures are built as
+`matplotlib.figure.Figure` objects and saved straight to SVG, under a local
+`rc_context` for the theme, so rendering needs no `pyplot`, selects no backend,
+and leaves the process's matplotlib settings as it found them.

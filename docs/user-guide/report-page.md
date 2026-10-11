@@ -8,13 +8,13 @@ beneath it links to each section.
 
 In the order they appear:
 
-1. **Metrics** — a tile for each of the fifteen headline metrics — SNR, SFNR,
+1. **Metrics** — a tile for each of the fifteen headline metrics (SNR, SFNR,
    RDC, the four ghost measures, drift, percent fluctuation, the three outlier
    and spike scores, the largest translation and center-of-mass displacement,
-   and FWHM — with its recorded unit and a one-line definition. A measurement
-   whose estimator could not be resolved shows a dash and says so instead of a
-   number. The values are descriptive: the report
-   applies no acceptance thresholds. Beneath the tiles, a note carries any
+   and FWHM), each with its recorded unit and a one-line definition. A
+   measurement whose estimator could not be resolved shows a dash and says so
+   instead of a number. The values are descriptive: the report applies no
+   acceptance thresholds. Beneath the tiles, a note carries any
    {doc}`localization </user-guide/analyses/localization>` or
    {doc}`clipping </user-guide/analyses/saturation>` warning the artifact
    recorded, or says that none was.

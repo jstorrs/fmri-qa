@@ -122,5 +122,5 @@ NameStyle = Literal["qa", "dcm2niix"]
 NAME_STYLES: tuple[NameStyle, ...] = get_args(NameStyle)
 
 
-# Fixed summary-ROI side (voxels). Glover/FBIRN uses 21; user-configurable.
+#: Default side of the square summary ROI, in voxels (FBIRN uses 21).
 FBIRN_ROI_SIZE = 21

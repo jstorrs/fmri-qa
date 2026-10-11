@@ -128,9 +128,9 @@ def _register_norotate(
     warps `moving` by the current parameters, then solves the linearized
     least-squares problem over `mask` for the additive update; the warp Jacobian
     is linear in the centered coordinates `rr`/`cc` and independent of the
-    parameters, so the additive scheme is exact up to the image interpolation. Returns
-    `[dr, dc, sr, sc, h]`, the frame's pose relative to the reference, or all
-    NaNs if the fit is rank-deficient, non-finite or exhausts its iterations.
+    parameters, so the additive scheme is exact up to the image interpolation.
+    Returns `[dr, dc, sr, sc, h]`, the frame's pose relative to the reference, or
+    all NaNs if the fit is rank-deficient, non-finite or exhausts its iterations.
     """
     m = mask.ravel()
     ref = reference.ravel()[m]

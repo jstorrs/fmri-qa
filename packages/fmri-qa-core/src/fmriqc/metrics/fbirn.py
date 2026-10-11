@@ -74,8 +74,8 @@ def _roi_cv(*, fluctuations: FloatArray, mean_image: FloatArray, roi: ROI) -> fl
 
     The CV is the RMS of the ROI-mean fluctuation over the ROI-mean signal.
     ROI-averaging the per-voxel `fluctuations` equals detrending the ROI-mean
-    timeseries (detrending commutes with the spatial mean), and the temporal
-    mean of that timeseries is the ROI mean of `mean_image`.
+    time series (detrending commutes with the spatial mean), and the temporal
+    mean of that time series is the ROI mean of `mean_image`.
 
     NaN when the ROI mean signal is exactly zero.
     """

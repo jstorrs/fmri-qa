@@ -1,4 +1,4 @@
-"""The hi/lo result value object and the pure flip-angle algebra that fills it.
+"""The high/low result value object and the pure flip-angle algebra that fills it.
 
 `separate_noise` is kept pure — no scan I/O, no masking — so the flip-angle
 algebra at the heart of `HiLoResult` can be exercised directly, independent of
@@ -103,7 +103,7 @@ def separate_noise(
     flip_high: float | None = None,
     flip_low: float | None = None,
 ) -> HiLoResult:
-    """Split thermal from instability variance in pooled hi/lo statistics.
+    """Split thermal from instability variance in pooled high/low statistics.
 
     The flip-angle noise-separation math of `HiLoResult`; `run_hilo` computes the
     pooled `mean_*`/`var_*` from a scan pair and calls this. Kept separate so the

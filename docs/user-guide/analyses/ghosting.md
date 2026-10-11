@@ -170,12 +170,12 @@ well-calibrated acquisition looks like.
 | `images.has_ghost` | attribute, ubyte flag | whether the four masks above are present |
 
 The four masks are present as a group or not at all: a run with no resolved
-phase-encode axis has no ghost regions, and `images.has_ghost` is 0. `measurements.pe_axis` is the one
-measurement that is *absent* rather than NaN when it does not apply, because
-"no axis" is not a number the estimator failed to resolve — it is a quantity
-that does not exist for that run. The four percentages are NaN in the same
-situation. `pe_label` is always present, and reads `?` when nothing named a
-direction.
+phase-encode axis has no ghost regions, and `images.has_ghost` is 0.
+`measurements.pe_axis` is the one measurement that is *absent* rather than NaN
+when it does not apply, because "no axis" is not a number the estimator failed
+to resolve — it is a quantity that does not exist for that run. The four
+percentages are NaN in the same situation. `pe_label` is always present, and
+reads `?` when nothing named a direction.
 
 ## References
 

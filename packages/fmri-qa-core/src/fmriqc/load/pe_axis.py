@@ -88,7 +88,7 @@ def _pe_axis_from_sidecar(sidecar: Sidecar) -> int | None:
     Raises
     ------
     InvalidScanError
-        The first present PE field has an invalid value.
+        If the first present PE field has an invalid value.
     """
     for field in _SIDECAR_PE_FIELDS:
         if field not in sidecar:

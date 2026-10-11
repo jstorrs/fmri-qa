@@ -16,7 +16,7 @@ _WILDCARD = re.compile(r"[*?\[]")
 
 
 def expand_globs(paths: Sequence[str]) -> list[str]:
-    """Every path, with any wildcard pattern that named nothing expanded here.
+    """Expand any wildcard pattern the shell left alone, and return every path.
 
     A POSIX shell expands a wildcard before the command is started, so `fmri-qa
     data/*.nii.gz` arrives as one argument per scan. PowerShell and cmd do not:

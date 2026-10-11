@@ -1,4 +1,4 @@
-"""Geometry and acquisition checks a hi/lo scan pair must satisfy before pooling."""
+"""Geometry and acquisition checks a high/low scan pair must satisfy before pooling."""
 
 import numpy as np
 

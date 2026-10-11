@@ -156,7 +156,7 @@ cover.
 uv run fmri-qa-import /path/to/dicom/dir -o session_nifti
 ```
 
-```
+```text
 # dcm2niix v1.0.20260724 (.../site-packages/dcm2niix/dcm2niix)
 series  acquired             file
      2  2026-09-09 14:30:12  20260909_143012_s002_QA_EPI_ISO.nii.gz
@@ -271,7 +271,7 @@ visibly.
 uv run fmri-qa [options] scan.nii.gz [more.nii.gz ...]
 ```
 
-```
+```text
 # detrend=poly  trim_sec=5.0  center=image  roi_size=21
 scan                                      PE      loc       SNR      SFNR      RDC   drift%   ghost%     ghT%      RO%    ACRg%   outl%   tcOut  spcOut   clip  clipPre    motn    scl%    shr%    com   fwPE   fwRO
 --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -325,7 +325,7 @@ every measurement and curve, and the summary images — as a compressed
 netCDF-4 file. With a single scan `PATH` is the output file; with several it is a
 directory taking one `<scan>.qa.nc` per scan. A `PATH` that is already a
 directory is filed into either way, so `mkdir results` and `--artifact results`
-does what it looks like:
+do what they say:
 
 ```bash
 uv run fmri-qa data/*_fMRI_*.nii.gz --artifact artifacts/
@@ -432,7 +432,7 @@ q.save_artifact(artifact, "qa.nc")
 `analyze` is the front door, but the pipeline underneath is a linear chain of
 small functions, each usable on its own:
 
-```
+```text
 QAScan → preprocess → QAImages → detect_phantom → resolve_roi
        → {weisskoff, snr, sfnr, estimate_ghost}
        → QAResult → build_artifact → QAArtifact

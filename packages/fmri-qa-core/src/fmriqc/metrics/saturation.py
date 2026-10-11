@@ -131,7 +131,7 @@ def detect_saturation(
     trim: int = 0,
     stored_integer: bool = True,
 ) -> SaturationResult | None:
-    """Detect ADC saturation (signal clipped at a `2**n - 1` rail) in a 4-D series.
+    """Detect ADC saturation (clipping at a `2**n - 1` rail) in a 4-D series.
 
     Returns `None` when `stored_integer` is False -- the series did not reach us
     as the scanner's integer samples, so there is no rail to find and no honest
