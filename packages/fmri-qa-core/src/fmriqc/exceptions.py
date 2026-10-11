@@ -1,19 +1,17 @@
 """Exception hierarchy for fmriqc.
 
-One base class (`FmriqcError`) is the error contract: catch it to catch anything
-the package raises, and new subclasses can be added without breaking that catch.
-Each subclass also inherits the natural stdlib type (`ValueError`) so code that
-already catches that keeps working — the dual base resolves the tension between
-"one base exception per package" and "use the standard exception when
-appropriate" (see style/exceptions.md).
+`FmriqcError` is the error contract: catch it to catch anything the package
+raises, including future subclasses. Each subclass also inherits the natural
+stdlib type (`ValueError`) so code that already catches that keeps working (see
+style/exceptions.md).
 """
 
 from collections.abc import Sequence
 from pathlib import Path
 from typing import Literal
 
-# The step of an import that can refuse. Declared here rather than with the
-# other closed sets in `types`, which imports numpy: this module stays a leaf.
+# The step of an import that can refuse. Declared here, not with the other
+# closed sets in `types`, which imports numpy; this module stays a leaf.
 ConversionStage = Literal["dcm2niix", "source", "destination"]
 
 
@@ -76,7 +74,7 @@ class IncompatibleScansError(FmriqcError, ValueError):
 
 
 class InvalidArtifactError(FmriqcError, ValueError):
-    """An analysis artifact on disk cannot be read back — or would not be.
+    """An analysis artifact on disk cannot be read back, or would not be.
 
     Raised by `analysis.load_artifact` for a file that is not an artifact
     archive, is malformed, or was written under a schema version this build does
@@ -98,8 +96,8 @@ class ConversionError(FmriqcError, RuntimeError):
     Raised by `convert` for every way an import can refuse: no dcm2niix to run,
     a source that is not a readable directory, a converter that exited non-zero,
     or a destination already holding files the import would overwrite. Also a
-    `RuntimeError` — the failure is in the environment or the external tool, not
-    in an argument's value, so `ValueError` would be the wrong stdlib kin.
+    `RuntimeError`, because the failure is in the environment or the external
+    tool, not in an argument's value, so `ValueError` would be wrong.
 
     ``stage`` names the step that refused, one of `ConversionStage`, and
     ``reason`` states what was wrong, so a caller can branch on the stage

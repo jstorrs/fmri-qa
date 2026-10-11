@@ -1,11 +1,10 @@
 """One `warn` for the whole package, attributed to the caller's own code.
 
-A warning is only useful if it names the line the user can change. Hand-
-counted frame offsets cannot do that here: the same helper is reached
-through different public entry points (`run_qa` directly, or via `analyze`), so
-no single number is right. Skipping every frame whose file lives in this
-package attributes the warning to the first frame outside it, however deep the
-call came from.
+A warning is only useful if it names a line the user can change. A fixed frame
+offset can't do that, because the same helper is reached through different
+entry points (`run_qa` directly, or via `analyze`). Instead this skips every
+frame whose file lives in this package, so the warning points at the first
+frame outside it, however deep the call.
 """
 
 import os

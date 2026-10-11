@@ -12,11 +12,12 @@ def hilo_stats(
 ) -> tuple[FloatArray, FloatArray, BoolArray]:
     """Compute the mean map, residual SD map and eroded core mask of a scan.
 
-    The whole 3-D volume is used (not a single slice): thermal/instability
-    separation is a global scanner property. The series is trimmed like the rest
-    of the pipeline, the mean map is taken on the trimmed signal, and the SD map
-    on the per-voxel detrended residual (poly degree scaled to this scan's own run
-    length, as elsewhere). The core mask comes from the mean map.
+    The whole 3-D volume is used, not a single slice, since thermal and
+    instability separation is a global scanner property. The series is trimmed
+    like the rest of the pipeline. The mean map is taken on the trimmed signal
+    and the SD map on the per-voxel detrended residual (poly degree scaled to
+    this scan's own run length, as elsewhere). The core mask comes from the mean
+    map.
     """
     data = trim_initial(scan.data, tr=scan.tr, trim_sec=trim_sec)  # (X, Y, Z, T)
     mean_map = data.mean(axis=-1)

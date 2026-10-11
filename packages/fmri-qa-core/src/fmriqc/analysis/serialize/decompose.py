@@ -2,11 +2,11 @@
 
 The write half of the archive layout: every array becomes a member keyed by its
 dotted path (`curves.weisskoff.cv`, `images.ghost.pe_ghost`), and everything
-that is not an array goes into one JSON document. `compose` is the mirror image
-and the two must be read together — a field added here needs a reader there.
+that is not an array goes into one JSON document. `compose` is the mirror image.
+Read the two together: a field added here needs a reader there.
 
-The mapping is written out explicitly, section by section, rather than derived
-by reflection over the dataclasses: the layout is a published contract pinned by
+The mapping is written out section by section, not derived by reflection over
+the dataclasses. The layout is a published contract pinned by
 `ARTIFACT_SCHEMA_VERSION`, so adding a field should be a deliberate edit, not a
 silent change of file format.
 """
@@ -19,7 +19,7 @@ from ..artifact import ArtifactImages, Curves, QAArtifact
 
 # An archive member: a float image/curve or a boolean mask, addressed by its
 # dotted path. The two dtypes share one alias because the archive is keyed by
-# name, not by kind; each reader re-narrows via `_floats`/`_bools`.
+# name, not by kind. Each reader re-narrows via `_floats`/`_bools`.
 type Member = FloatArray | BoolArray
 
 

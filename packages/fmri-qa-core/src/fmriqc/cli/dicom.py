@@ -1,16 +1,14 @@
 """`fmri-qa-import`: convert a DICOM directory into QA-ready NIfTI.
 
-A separate command rather than a subcommand of `fmri-qa`, following
-`fmri-qa-hilo`: `fmri-qa` takes scan paths as its positional arguments, so
-turning it into a subcommand parser would change how every existing invocation
-is written.
+This is a separate command, like `fmri-qa-hilo`, because `fmri-qa` takes scan
+paths as positional arguments and a subcommand parser would change every
+existing invocation.
 
-What it adds over running dcm2niix by hand is two things it is easy to get
-wrong: the flags that keep a series checkable (`convert.dcm2niix`, where `-l o`
-decides whether the saturation check can see an ADC rail at all) and names that
-sort and read (`convert.naming`). Everything else dcm2niix does it still does —
-`--filename` keeps its template language, and `--dcm2niix-arg` passes anything
-through.
+It adds two things that are easy to get wrong running dcm2niix by hand: the
+flags that keep a series checkable (`convert.dcm2niix`, where `-l o` decides
+whether the saturation check can see an ADC rail at all) and names that sort and
+read (`convert.naming`). `--filename` keeps dcm2niix's template language, and
+`--dcm2niix-arg` passes anything through.
 """
 
 import argparse
@@ -120,9 +118,9 @@ def _parser() -> argparse.ArgumentParser:
 def _destination(source: str, out: str | None) -> Path:
     """Resolve where the NIfTI goes: `--out`, else `<source name>_nifti` here.
 
-    Derived from the source rather than defaulting to the working directory, so
-    the common one-argument call puts a session's series together in a directory
-    named after it instead of scattering them where the command was run.
+    Derived from the source, not the working directory, so the common
+    one-argument call puts a session's series together in a directory named
+    after it instead of scattering them where the command was run.
     """
     if out is not None:
         return Path(out)
@@ -136,12 +134,10 @@ def _print_listing(result: ImportResult, destination: Path, *, renaming: bool) -
         acquired = (entry.acquired or "").replace("T", " ")[:19]
         number = "?" if entry.series is None else str(entry.series)
         print(f"{number:>6}  {acquired:<19}  {entry.path.name}")
-    # `renamed_from` is dcm2niix's stem when the series was renamed, so the
-    # ones that kept it are the Nones. Only worth saying under --names qa,
-    # where a file left with dcm2niix's name is the exception `naming.plan`
-    # made for a reason the reader can act on -- an uninformative sidecar, or
-    # two series that would have shared a name. Under --names dcm2niix every
-    # file keeps that name by request, and saying so would be noise.
+    # `renamed_from` is None for series that kept dcm2niix's stem. Only report
+    # those under --names qa, where `naming.plan` makes that exception for a
+    # reason the reader can act on (an uninformative sidecar, or two series that
+    # would have shared a name). Under --names dcm2niix it is by request.
     kept = [entry for entry in result.series if entry.renamed_from is None]
     if renaming and kept:
         print(
@@ -150,7 +146,7 @@ def _print_listing(result: ImportResult, destination: Path, *, renaming: bool) -
             file=sys.stderr,
         )
     print(f"# {len(result.series)} series -> {destination}")
-    # The glob names the suffix actually written, so the line can be pasted
+    # The glob uses the suffix actually written, so the line can be pasted
     # whether or not --no-compress was used.
     name = result.series[0].path.name
     suffix = next(s for s in NIFTI_SUFFIXES if name.endswith(s))

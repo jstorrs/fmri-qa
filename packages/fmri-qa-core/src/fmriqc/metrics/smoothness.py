@@ -22,12 +22,11 @@ __all__ = [
     "estimate_smoothness",
 ]
 
-# Gaussian FWHM per standard deviation: sqrt(8 ln 2) (AFNI 3dFWHMx uses 2.35482).
+# AFNI 3dFWHMx uses the rounded 2.35482.
 #: Gaussian FWHM per standard deviation, ``sqrt(8 ln 2)``.
 SIGMA_TO_FWHM = float(np.sqrt(8.0 * np.log(2.0)))
-# Lags (voxels) over which the directional noise autocorrelation / PSF is sampled.
-#: Largest lag, in voxels, at which the noise autocorrelation and point-spread curves
-#: are sampled.
+#: Largest lag, in voxels, at which the noise autocorrelation and point-spread
+#: curves are sampled.
 SMOOTHNESS_MAX_LAG = 10
 
 
@@ -35,29 +34,27 @@ SMOOTHNESS_MAX_LAG = 10
 class SmoothnessResult(ArrayValue):
     """Directional spatial smoothness of the noise field (AFNI 3dFWHMx + PSF).
 
-    The Gaussian FWHM of the detrended fluctuation (noise) field, estimated per
-    in-plane axis from the variance of first differences (AFNI's Classic
-    `mri_estimate_FWHM_1dif`): for a smoothed white-noise field the forward
-    first-difference variance relates to the voxel variance by
-    `arg = 1 - 0.5*var_diff/var`, giving `sigma = sqrt(-1/(4 ln arg))` and
-    `FWHM = sqrt(8 ln 2)*sigma`. Estimated on each fluctuation frame over the
-    phantom mask, then aggregated across frames by geometric mean (AFNI `-geom`).
-    A larger FWHM means a smoother noise field -- the spatial-correlation confound
-    the Weisskoff RDC is measured against.
+    The Gaussian FWHM of the detrended noise field, per in-plane axis, from the
+    variance of first differences (AFNI's Classic `mri_estimate_FWHM_1dif`). For
+    smoothed white noise, `arg = 1 - 0.5*var_diff/var` gives
+    `sigma = sqrt(-1/(4 ln arg))` and `FWHM = sqrt(8 ln 2)*sigma`. Each frame is
+    estimated over the phantom mask, then frames are combined by geometric mean
+    (AFNI `-geom`). A larger FWHM means a smoother noise field, the
+    spatial-correlation confound the Weisskoff RDC is measured against.
 
-    The axes are resolved to physical directions with `pe_axis`: `fwhm_pe` is the
-    FWHM along the phase-encode axis, `fwhm_ro` along the readout axis. `acf` is
-    the empirical spatial autocorrelation of the noise field at each lag in
-    `lags` (voxels), per axis; because the noise is a point-spread function (PSF)
-    convolved with white noise, the normalized autocorrelation is `PSF^2` under
-    the Gaussian random-field model, so `psf_empirical` (= `acf**2`) and the
-    Gaussian `psf_model` from the measured FWHM give the directional point-spread
-    profile -- PE/RO asymmetry is anisotropic reconstruction smoothing.
+    `pe_axis` maps the axes to directions: `fwhm_pe` is along phase-encode and
+    `fwhm_ro` along readout. `acf` is the empirical autocorrelation of the noise
+    field per axis at each lag in `lags` (voxels). The noise is white noise
+    convolved with a point-spread function (PSF), so under the Gaussian
+    random-field model the normalized autocorrelation is `PSF^2`. Thus
+    `psf_empirical` (= `acf**2`) and the Gaussian `psf_model` from the measured
+    FWHM give the directional PSF profile. PE/RO asymmetry is anisotropic
+    reconstruction smoothing.
 
-    `fwhm_vox` is (axis 0, axis 1) in voxels; `voxel` carries the in-plane voxel
-    size and so decides the unit the reported lengths carry. A NaN FWHM means
-    the estimator could not resolve smoothness on that axis (too little
-    correlation, or too few in-mask pairs).
+    `fwhm_vox` is (axis 0, axis 1) in voxels. `voxel` carries the in-plane voxel
+    size and so decides the unit of the reported lengths. A NaN FWHM means the
+    estimator could not resolve smoothness on that axis (too little correlation,
+    or too few in-mask pairs).
     """
 
     fwhm_vox: tuple[float, float]
@@ -79,17 +76,17 @@ class SmoothnessResult(ArrayValue):
         """Return the empirical PSF profile along `axis`, the squared `acf`.
 
         For white noise convolved with a PSF, the normalized spatial
-        autocorrelation is the autocorrelation of the PSF; for a Gaussian PSF that
-        equals `PSF**2`, so squaring the measured `acf` recovers the point-spread
-        profile implied by the data at each sampled lag.
+        autocorrelation is the autocorrelation of the PSF. For a Gaussian PSF
+        that equals `PSF**2`, so squaring the measured `acf` recovers the
+        point-spread profile the data imply at each sampled lag.
         """
         return np.asarray(self.acf[axis] ** 2, dtype=np.float64)
 
     def psf_model(self, x: FloatArray, axis: PeAxis) -> FloatArray:
         """Evaluate the Gaussian PSF profile along `axis` at displacement `x`.
 
-        The Gaussian whose FWHM is `fwhm_axis(axis)`; pass `x` from `displacement`
-        so the model shares the empirical PSF's units.
+        The Gaussian whose FWHM is `fwhm_axis(axis)`. Pass `x` from
+        `displacement` so the model shares the empirical PSF's units.
         """
         sigma = self.fwhm_axis(axis) / SIGMA_TO_FWHM
         return np.exp(-0.5 * (np.asarray(x, dtype=float) / sigma) ** 2)
@@ -122,9 +119,8 @@ class SmoothnessResult(ArrayValue):
     def fwhm_mm(self) -> tuple[float, float] | None:
         """(axis 0, axis 1) FWHM in mm, or None if voxel sizes are unknown.
 
-        Unlike `fwhm_axis`, this one answers None rather than falling back to
-        voxels: it promises millimeters in its name, so an unknown voxel size
-        has no answer to give.
+        Unlike `fwhm_axis`, this answers None instead of falling back to voxels,
+        since its name promises millimeters.
         """
         return None if self.voxel.mm is None else (self.fwhm_axis(0), self.fwhm_axis(1))
 
@@ -157,11 +153,11 @@ def _fwhm_1dif(image: FloatArray, mask: BoolArray) -> FloatArray:
     """Estimate the Gaussian FWHM (voxels) per in-plane axis (AFNI Classic).
 
     AFNI `mri_estimate_FWHM_1dif`: for each axis, the sample variance of forward
-    first differences over neighbor pairs that are *both* in `mask` relates to
-    the in-mask voxel variance as `arg = 1 - 0.5*var_diff/var`; then
+    first differences over neighbor pairs that are both in `mask` relates to the
+    in-mask voxel variance as `arg = 1 - 0.5*var_diff/var`. Then
     `sigma = sqrt(-1/(4 ln arg))` and `FWHM = sqrt(8 ln 2)*sigma`, in voxel units
-    (multiply by the voxel size for mm). An axis whose `arg` leaves (0, 1) -- too
-    little correlation to resolve, or too few in-mask pairs -- yields NaN.
+    (multiply by the voxel size for mm). An axis whose `arg` leaves (0, 1), from
+    too little correlation or too few in-mask pairs, yields NaN.
     """
     vals = image[mask]
     out = np.full(2, np.nan)
@@ -189,11 +185,11 @@ def _acf_1d(image: FloatArray, mask: BoolArray, axis: int, max_lag: int) -> Floa
 
     Follows AFNI `mri_estimate_ACF`: center by the in-mask mean and normalize by
     the in-mask variance, so `rho[d]` is the correlation of the noise field with
-    itself `d` voxels apart along `axis`, over neighbor pairs that are *both* in
-    `mask`. `rho[0]` is 1 by construction; a lag with too few in-mask pairs (or a
-    constant frame) is NaN. A mask holding fewer than two voxels — which the
-    working mask is whenever every voxel is constant over time — has neither a
-    mean nor a variance to normalize by, so every lag is NaN.
+    itself `d` voxels apart along `axis`, over neighbor pairs that are both in
+    `mask`. `rho[0]` is 1 by construction. A lag with too few in-mask pairs (or a
+    constant frame) is NaN. A mask with fewer than two voxels has no mean or
+    variance to normalize by, so every lag is NaN. The working mask is that small
+    whenever every voxel is constant over time.
     """
     rho = np.full(max_lag + 1, np.nan)
     rho[0] = 1.0
@@ -244,19 +240,17 @@ def estimate_smoothness(
 ) -> SmoothnessResult:
     """Estimate directional spatial smoothness of the detrended noise field.
 
-    Follows `3dFWHMx` run on detrended residuals: each voxel time series is first
-    robustly standardized -- subtract its temporal median, divide by its MAD
-    (AFNI's `-unif`, which the `-detrend` path forces on) -- so the estimate
-    reflects the noise *correlation length* rather than its spatially varying
-    amplitude, and voxels that are constant over time (MAD = 0) are dropped from
-    the mask. Per in-plane axis, the FWHM (AFNI's Classic first-difference
-    estimator) is estimated on each standardized fluctuation frame over the
-    phantom mask and aggregated across frames by geometric mean (AFNI `-geom`);
-    the empirical directional spatial autocorrelation is collected over
-    the same lags for the point-spread curves. `pe_axis` labels the axes as
-    phase-encode / readout; `voxel` (in-plane, from the header) lets lengths be
-    reported in mm. `fluctuations` is (X, Y, T) -- `QAImages.fluctuations`, the same
-    Legendre-detrended residual the noise metrics are measured on.
+    Follows `3dFWHMx` on detrended residuals. Each voxel series is first
+    standardized (subtract its temporal median, divide by its MAD; AFNI's
+    `-unif`, which `-detrend` forces on), so the estimate reflects the noise
+    correlation length, not its varying amplitude. Voxels constant over time
+    (MAD = 0) are dropped from the mask. The FWHM is estimated per axis on each
+    standardized frame over the phantom mask and combined by geometric mean (AFNI
+    `-geom`). The empirical autocorrelation is collected over the same lags for
+    the point-spread curves. `pe_axis` labels the axes phase-encode or readout,
+    and `voxel` (in-plane, from the header) lets lengths be reported in mm.
+    `fluctuations` is (X, Y, T): `QAImages.fluctuations`, the same
+    Legendre-detrended residual the noise metrics use.
     """
     centered = fluctuations - np.median(fluctuations, axis=-1, keepdims=True)
     mad = np.median(np.abs(centered), axis=-1)  # (X, Y)

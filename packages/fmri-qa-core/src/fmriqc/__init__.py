@@ -5,17 +5,17 @@ The root exports the analysis chain (`import_dicom`, `QAScan`, `analyze`,
 and the shared option types. Helpers live in their subpackages; import them
 from there (`fmriqc.prep.geometry`, `fmriqc.metrics.ghost`, ...).
 
-This package is the *calculation* half of fmri-qa. Reports and plots live in the
+This package is the calculation half of fmri-qa. Reports and plots live in the
 separate `fmri-qa-report` distribution, which consumes a `QAArtifact` and never
 imports the layers above.
 
-Every name in `__all__` is re-exported *lazily*: this module defines no eager
-`from .x import Y`. Building an `argparse.ArgumentParser` (`--version`,
-`--help`, a bad flag) would otherwise pay for every subpackage's imports, scipy
-and scikit-image included, before a single argument was parsed. `__getattr__`
-(PEP 562) imports a name's owning module on first access, so `import fmriqc`
-stays cheap. `_EXPORTS` maps each defining module to its names;
-`test_lazy_imports.py` asserts it flattens to exactly `__all__`.
+Every name in `__all__` is re-exported lazily, so this module has no eager
+`from .x import Y`. Otherwise building an `argparse.ArgumentParser`
+(`--version`, `--help`, a bad flag) would import every subpackage, scipy and
+scikit-image included, before parsing an argument. `__getattr__` (PEP 562)
+imports a name's owning module on first access, so `import fmriqc` stays cheap.
+`_EXPORTS` maps each defining module to its names, and `test_lazy_imports.py`
+asserts it flattens to exactly `__all__`.
 """
 
 import logging
@@ -23,8 +23,8 @@ from importlib import import_module
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    # Import statements kept verbatim (not the lazy `_EXPORTS` map below) so
-    # mypy and pyright resolve every name statically; never executed at runtime.
+    # Plain imports, not the lazy `_EXPORTS` map below, so mypy and pyright
+    # resolve every name statically. Never executed at runtime.
     from .analysis import (
         ARTIFACT_SCHEMA_VERSION,
         ArtifactImages,
@@ -286,8 +286,8 @@ def __getattr__(name: str) -> object:
     """Resolve `fmriqc.<name>` by importing its owning module on first access.
 
     Caches the result as a module global (assigning into `globals()`), so this
-    runs at most once per name -- every later access is a plain attribute
-    lookup, same as an eager re-export.
+    runs at most once per name. Later accesses are plain attribute lookups, as
+    with an eager re-export.
     """
     try:
         module_path = _NAME_TO_MODULE[name]

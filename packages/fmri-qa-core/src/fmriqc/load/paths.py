@@ -1,9 +1,8 @@
 """File-path conventions for a NIfTI series and the files that sit beside it.
 
 The stem and sidecar rules are BIDS/dcm2niix's: `sub-01_task-qa_bold.nii.gz`
-keeps its metadata in `sub-01_task-qa_bold.json`. Both the loader and the
-command line need them, so they are defined once here rather than each
-stripping `.nii.gz` its own way.
+keeps its metadata in `sub-01_task-qa_bold.json`. The loader and the command
+line both need them, so they live here.
 """
 
 from pathlib import Path
@@ -21,7 +20,7 @@ def nifti_stem(path: str | Path) -> str:
     """Strip the NIfTI suffix from a file name (`scan.nii.gz` -> `scan`).
 
     A name without a NIfTI suffix loses its last suffix instead, as `Path.stem`
-    would, so a caller always gets *something* to name an output after.
+    would, so a caller always gets something to name an output after.
     """
     name = Path(path).name
     for suffix in NIFTI_SUFFIXES:

@@ -2,13 +2,13 @@
 
 An artifact is written by moving a finished file over its destination, so a
 destination that names an input, or that two scans share, destroys work. Both
-are decided here, up front, from the paths alone — before any analysis runs.
+are decided here, from the paths alone, before any analysis runs.
 """
 
-# The `q.*` parameter annotations below name artifact types that live behind
-# `fmriqc`'s lazy re-exports; evaluated at `def` time they would resolve the
-# whole calculation stack just to import this module. Deferring them keeps a
-# `--help` or a usage error from paying for numpy, scipy and nibabel.
+# The `q.*` parameter annotations below name artifact types behind `fmriqc`'s
+# lazy re-exports. Evaluated at `def` time, they would load the whole
+# calculation stack just to import this module. Deferring them keeps `--help`
+# and usage errors from importing numpy, scipy and nibabel.
 from __future__ import annotations
 
 import sys
@@ -27,22 +27,20 @@ ARTIFACT_SUFFIX = ".qa.nc"
 def artifact_destinations(base: str, paths: Sequence[str]) -> list[tuple[str, Path]]:
     """Return `(input, destination)` pairs for every requested scan, in order.
 
-    A batch cannot share one file, so `BASE` is a directory and each scan gets
-    `<scan stem>.qa.nc` inside it. A single-scan run writes exactly `BASE` --
-    unless `BASE` is a directory that already exists, which is filed into the
-    same way a batch would be.
+    A batch can't share one file, so `BASE` is a directory and each scan gets
+    `<scan stem>.qa.nc` inside it. A single-scan run writes `BASE` itself,
+    unless `BASE` is an existing directory, which is filed into the same way a
+    batch would be (`<scan stem>.qa.nc` inside it). A file and a directory can't
+    share a name, so preferring the directory is never ambiguous.
 
-    That last rule is what `cp` does, and it is here because the alternative is
-    unrecoverable in a way a user cannot read: `mkdir results` then `--artifact
-    results` is the obvious way to ask for this, and taking `BASE` literally
-    made the run analyze the scan and then fail moving the finished file onto a
-    directory -- `[WinError 5] Access is denied` on Windows, `IsADirectoryError`
-    elsewhere, neither of which names the actual mistake. A file and a directory
-    cannot share a name, so preferring the directory is never ambiguous.
+    Without that rule, `mkdir results` then `--artifact results` would analyze
+    the scan and fail moving the finished file onto a directory, with
+    `[WinError 5] Access is denied` on Windows or `IsADirectoryError` elsewhere,
+    neither of which names the mistake.
 
-    An input named twice keeps both pairs -- collapsing them would silently
-    forgive `fmri-qa a.nii.gz a.nii.gz --artifact out/`, which `artifact_collisions`
-    below must instead refuse.
+    An input named twice keeps both pairs. Collapsing them would silently
+    forgive `fmri-qa a.nii.gz a.nii.gz --artifact out/`, which
+    `artifact_collisions` below must refuse.
     """
     batch = len(paths) > 1
     if batch or Path(base).is_dir():
@@ -59,10 +57,10 @@ def overwritten_inputs(
     """Return `(destination, input)` pairs where an artifact overwrites an input.
 
     An artifact is written by moving a finished file over its destination, and
-    the scans (and their sidecars) are read before any is written — so an
-    output that names an input succeeds, and leaves an archive where the data
-    was. Every destination is checked against every input file, not only its
-    own scan's: in a batch, one scan's artifact can land on another's file.
+    the scans (and their sidecars) are read before any is written. So an output
+    that names an input succeeds and leaves an archive where the data was. Every
+    destination is checked against every input file, not only its own scan's,
+    because in a batch one scan's artifact can land on another's file.
     """
     dests = [dest for _, dest in destinations]
     inputs = [str(f) for path, _ in destinations for f in (path, sidecar_path(path))]
@@ -74,12 +72,11 @@ def artifact_collisions(
 ) -> dict[Path, list[str]]:
     """Return destinations that more than one input scan would be written to.
 
-    A batch names each artifact by the scan's stem, so inputs from different
+    A batch names each artifact by the scan's stem, so inputs in different
     directories with the same file name (`sub-01/qa.nii.gz`, `sub-02/qa.nii.gz`)
-    collide. Writing them in turn would leave one file holding the last scan's
-    analysis and silently drop the rest, with nothing downstream able to tell
-    that scans went missing. `main` checks this up front and refuses rather than
-    analyze work it cannot keep.
+    collide. Writing them in turn would leave one file holding the last analysis
+    and silently drop the rest. `main` checks this up front and refuses instead
+    of analyzing work it can't keep.
     """
     by_dest: dict[Path, list[str]] = {}
     for path, dest in destinations:
@@ -90,10 +87,10 @@ def artifact_collisions(
 def report_destination_problems(destinations: Sequence[tuple[str, Path]]) -> bool:
     """Print every `--artifact` destination problem; return True to stop the run.
 
-    Both checks are made against the paths alone, before a single scan is read,
-    because either one costs work that cannot be recovered: an artifact written
-    over an input destroys the data, and two scans sharing a destination leave
-    one file holding the last analysis and silently drop the rest.
+    Both checks use the paths alone and run before any scan is read, because
+    either problem costs unrecoverable work. An artifact written over an input
+    destroys the data, and two scans sharing a destination leave one file
+    holding the last analysis and silently drop the rest.
     """
     stop = False
     for destination, source in overwritten_inputs(destinations):
@@ -126,7 +123,7 @@ def write_artifact(artifact: q.QAArtifact, out: Path, info: TextIO) -> str | Non
         q.save_artifact(artifact, out)
     except (OSError, q.InvalidArtifactError) as exc:
         # A bad destination is a user error, and an artifact the reader would
-        # refuse is a defect worth a line, not a traceback; either way the
+        # refuse is a defect worth a line, not a traceback. Either way the
         # batch goes on.
         problem = f"could not write artifact {out}: {exc}"
         print(f"ERROR: {problem}", file=sys.stderr)

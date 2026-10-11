@@ -1,8 +1,8 @@
 """`fmri-qa-hilo`: separate thermal from instability noise on a flip-angle pair.
 
 Greve's high/low flip-angle QA: two phantom runs differing only in flip angle,
-analyzed together. Its own command because it takes a *pair* of scans and
-reports a different set of numbers than the single-scan table.
+analyzed together. It is its own command because it takes a pair of scans and
+reports different numbers than the single-scan table.
 """
 
 import argparse
@@ -62,9 +62,8 @@ def hilo_main(argv: Sequence[str] | None = None) -> int:
     hi_name = Path(args.high).name
     lo_name = Path(args.low).name
     res: q.HiLoResult | None = None
-    # The pair is analyzed together, so a warning belongs to both scans; naming
-    # them is still the difference between an actionable line and one that only
-    # names a source line that is no use to an operator (see `print_warnings`).
+    # The pair is analyzed together, so a warning belongs to both scans. Naming
+    # them still makes the line actionable (see `print_warnings`).
     with attributed_warnings(f"{hi_name} + {lo_name}"):
         try:
             high = q.QAScan.from_nifti(args.high)

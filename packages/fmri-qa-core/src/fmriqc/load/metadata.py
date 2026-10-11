@@ -1,11 +1,11 @@
 """Parse the BIDS JSON sidecar into `ScanMeta`.
 
 dcm2niix writes a `.json` sidecar beside every NIfTI it converts; these helpers
-read the acquisition metadata out of it. The sidecar is optional — a NIfTI
-exported straight off the scanner never had one — so its absence leaves fields
-empty rather than failing. Phase-encode *axis* resolution lives in `pe_axis`
-and TR resolution in `repetition_time`; the row/col *direction* word the report
-header shows is derived here (`_pe_direction`) from that resolved axis.
+read the acquisition metadata out of it. The sidecar is optional, since a NIfTI
+exported straight off the scanner never had one, so its absence leaves fields
+empty instead of failing. Phase-encode axis resolution lives in `pe_axis` and TR
+resolution in `repetition_time`. The row/col direction word the report header
+shows is derived here (`_pe_direction`) from that resolved axis.
 """
 
 import json
@@ -30,7 +30,7 @@ class ScanMeta:
     """Human-readable acquisition metadata for the report header.
 
     Geometry (`voxel_mm`, `matrix`, `tr`) is always present: it comes from the
-    NIfTI header, with `tr` the resolved repetition time in seconds — the same
+    NIfTI header, with `tr` the resolved repetition time in seconds, the same
     value the pipeline runs on (see `repetition_time`). The rest comes from the
     BIDS JSON sidecar written alongside the NIfTI (dcm2niix) and is `None` when
     no sidecar is found. `voxel_mm` is (row, col, slice-spacing) from the header
@@ -59,12 +59,10 @@ class ScanMeta:
 def _load_sidecar(path: str | Path) -> dict[str, object]:
     """Parse the BIDS JSON sidecar beside `path` (.nii/.nii.gz -> .json).
 
-    dcm2niix writes one alongside every NIfTI it converts, but a scanner export
-    never went through that conversion, so a missing sidecar warns and yields an
-    empty mapping: the acquisition metadata is simply absent, which everything
-    downstream already tolerates. A sidecar that *is* there and cannot be read
-    is a different matter — the metadata exists and we would be misreading it —
-    so it fails loudly.
+    A scanner export never went through dcm2niix, so a missing sidecar warns and
+    yields an empty mapping, which everything downstream tolerates. A sidecar
+    that is present but unreadable fails loudly, since we would be misreading
+    real metadata.
 
     Raises
     ------
@@ -91,8 +89,8 @@ def _load_sidecar(path: str | Path) -> dict[str, object]:
             str(sidecar),
             "expected a JSON object of acquisition metadata",
         )
-    # A JSON object's keys are always strings; rebuilding is how the type
-    # checkers are told so, `json.loads` being typed as returning anything.
+    # A JSON object's keys are always strings. Rebuilding the dict tells the
+    # type checkers so, since `json.loads` is typed as returning anything.
     return {str(key): value for key, value in parsed.items()}
 
 
@@ -114,10 +112,10 @@ def _malformed(key: str, value: object, expected: str) -> None:
     """Warn that a sidecar field is unusable and is being recorded as unknown.
 
     The sidecar is optional and these fields only describe the acquisition, so
-    a malformed one is treated like an absent one — with a warning naming it,
+    a malformed one is treated like an absent one, with a warning naming it
     because the metadata exists and is being dropped. Coercing it instead (a
-    string that happens to parse as a number) would be guessing at what the
-    converter meant.
+    string that happens to parse as a number) would guess at what the converter
+    meant.
     """
     warn(
         f"sidecar {key} {value!r} is not {expected}; recording it as unknown",
@@ -142,7 +140,7 @@ def _optional_text(sidecar: Sidecar, key: str) -> str | None:
     """Read a text field from the sidecar, or None if absent or malformed.
 
     A number is kept as its text (a serial number written unquoted is still a
-    serial number); anything structured is not a value this field can hold.
+    serial number). Anything structured is not a value this field can hold.
     """
     value = sidecar.get(key)
     if value is None:
@@ -158,19 +156,17 @@ def _optional_text(sidecar: Sidecar, key: str) -> str | None:
 def _pe_direction(pe_axis: int | None) -> str | None:
     """Name the row/col word for the resolved axis, or None if unresolved.
 
-    Derived from `pe_axis` alone, and deliberately *not* from the sidecar's own
-    `InPlanePhaseEncodingDirectionDICOM` wording. Reading that word here made
-    this a second, independent answer to a question `pe_axis` had already
-    settled, and the two could disagree: `_pe_axis_from_sidecar` prefers
-    dcm2niix's BIDS fields, so a sidecar whose DICOM tag contradicted them
-    produced an axis from one source and a direction from the other. The report
-    then showed a direction that was not the axis the ghost masks used.
+    Derived from `pe_axis` alone, not from the sidecar's
+    `InPlanePhaseEncodingDirectionDICOM`. Reading that word gave a second answer
+    to a question `pe_axis` had settled, and the two could disagree:
+    `_pe_axis_from_sidecar` prefers dcm2niix's BIDS fields, so a sidecar whose
+    DICOM tag contradicted them gave an axis from one source and a direction
+    from the other, and the report showed a direction that was not the axis the
+    ghost masks used.
 
-    A word is not worth more for having come from the file. It is worth more for
-    naming the axis the analysis ran on, which is what this now does by
-    construction -- and None when there is no such axis, so a caller that has to
-    say something falls back to what the run actually used rather than to a
-    label for a different axis (see `analysis.build._pe_label`).
+    Returns None when there is no in-plane axis, so a caller falls back to what
+    the run used and not to a label for a different axis (see
+    `analysis.build._pe_label`).
     """
     axis = in_plane(pe_axis)
     return None if axis is None else PE_ROWCOL[axis]
@@ -186,13 +182,12 @@ def _scan_meta(
 ) -> ScanMeta:
     """Assemble `ScanMeta` from the NIfTI header and (optional) BIDS sidecar.
 
-    `tr` is handed in already resolved rather than re-read from pixdim[4], so
-    the TR the report shows is the one the pipeline ran on. `spatial_scale_mm`
-    is the same resolved unit conversion used for the scan's affine. The
-    sidecar's optional fields are held to the type each one promises here, at
-    the boundary, so that a malformed value is diagnosed against the file it
-    came from rather than surfacing as an unreadable artifact months later; one
-    that fails is recorded as unknown, with a warning.
+    `tr` is passed in already resolved, so the report shows the TR the pipeline
+    ran on. `spatial_scale_mm` is the same unit conversion used for the scan's
+    affine. The sidecar's optional fields are type-checked here at the boundary,
+    so a malformed value is diagnosed against its file and doesn't surface as an
+    unreadable artifact months later. A field that fails is recorded as unknown,
+    with a warning.
     """
     zooms = img.header.get_zooms()
     voxel_mm = tuple(float(z) * spatial_scale_mm for z in zooms[:3])

@@ -1,29 +1,23 @@
 """Running dcm2niix, and the flags a QA conversion must not leave to chance.
 
-dcm2niix has some thirty options and most are matters of taste. Four are not,
-because they decide whether the series that comes out can still answer the
-questions `fmri-qa` asks of it — and they are *defaults*, which is the problem:
-a default is not a decision, and dcm2niix reads `~/.dcm2nii.ini` before its own
-defaults, so a file written months ago by another tool can change what a QA
-import produces without appearing on anyone's command line. `PINNED` states
-them explicitly instead.
+Four of dcm2niix's thirty-odd options decide whether the converted series can
+still answer the questions `fmri-qa` asks of it. dcm2niix reads `~/.dcm2nii.ini`
+before its own defaults, so a file written months ago by another tool could
+change what a QA import produces without appearing on any command line.
+`PINNED` sets them explicitly.
 
-`-l o` is the one that matters most, and the reason this module exists rather
-than a line in the README telling people to run dcm2niix themselves. `-l y`
-"losslessly" rescales 16-bit integers to fill the dynamic range: the file it
-writes is *still an integer NIfTI*, so `QAScan.stored_integer` sees nothing
-wrong and no warning fires, but every stored sample has been multiplied and the
-ADC rail no longer sits at `2**n - 1`. Measured on a synthetic series clipped
-flat at 4095: `-l o` finds a 12-bit rail and 7140 clipped samples, `-l y` finds
-no rail and reports the run clean. That is the one saturation failure the
-storage gate in `metrics.saturation` cannot catch, because the evidence it tests
-for is present and merely wrong — which makes pinning the flag the only place
-the mistake can be prevented.
+`-l o` matters most. `-l y` "losslessly" rescales 16-bit integers to fill the
+dynamic range. The file is still an integer NIfTI, so `QAScan.stored_integer`
+sees nothing wrong and no warning fires, but every sample has been multiplied
+and the ADC rail no longer sits at `2**n - 1`. On a synthetic series clipped
+flat at 4095, `-l o` finds a 12-bit rail and 7140 clipped samples, and `-l y`
+finds no rail and reports the run clean. The storage gate in
+`metrics.saturation` can't catch this, because the evidence it tests for is
+present but wrong, so pinning the flag is the only prevention.
 
-The rest of the surface is deliberately thin. dcm2niix is a well-understood
-program and this is not a wrapper trying to hide it: `build_args` produces an
-argument list a reader can compare against `dcm2niix -h`, `extra` passes
-anything through, and `--filename` keeps its own template language available.
+The rest of the surface is thin. `build_args` produces an argument list a
+reader can compare against `dcm2niix -h`, `extra` passes anything through, and
+`--filename` keeps its own template language.
 """
 
 import re
@@ -37,31 +31,30 @@ from ..exceptions import ConversionError
 from ..types import Anonymize
 from ..warn import warn
 
-# dcm2niix's `-f` template for the staged conversion. Not the name a series is
-# finally filed under (see `naming`) — it is what dcm2niix distinguishes its own
-# outputs by, and the name a series falls back to when its sidecar cannot say
-# who it is. `%t` is the study date+time, `%s` the series number, `%d` the
-# series description.
+# dcm2niix's `-f` template for the staged conversion. This is not the final
+# name (see `naming`). It is what dcm2niix tells its own outputs apart by, and
+# the fallback name when the sidecar can't identify the series. `%t` is the
+# study date+time, `%s` the series number, `%d` the series description.
 DEFAULT_TEMPLATE = "%t_%s_%d"
 # `import_dicom`, `build_args` and `fmri-qa-import` all default to these.
 #: Default sidecar anonymization: ``"pii"``, strip the patient and keep the dates.
 DEFAULT_ANONYMIZE: Anonymize = "pii"
 DEFAULT_DEPTH = 5
 
-# The flags an import fixes rather than inherits. Each one is load-bearing:
+# The flags an import fixes instead of inheriting. Each is needed:
 #
-#   -g i   ignore ~/.dcm2nii.ini, so the three below are actually in force and
-#          the same directory converts the same way on every machine
-#   -l o   keep the stored integers exactly as the scanner sent them; see the
-#          module docstring for what `-l y` costs the saturation check
-#   -b y   write the BIDS sidecar — `load.metadata` reads TR, voxel size and
+#   -g i   ignore ~/.dcm2nii.ini, so the three below are in force and the same
+#          directory converts the same way on every machine
+#   -l o   keep the stored integers as the scanner sent them; see the module
+#          docstring for what `-l y` costs the saturation check
+#   -b y   write the BIDS sidecar; `load.metadata` reads TR, voxel size and
 #          phase-encode direction from it, and `naming` reads the series' date
-#   -w 2   add a suffix on a name conflict rather than overwrite; two series
-#          that collide must both survive to be told apart later
+#   -w 2   add a suffix on a name conflict instead of overwriting, so two
+#          colliding series both survive to be told apart later
 PINNED: tuple[str, ...] = ("-g", "i", "-l", "o", "-b", "y", "-w", "2")
 
-# `Anonymize` -> dcm2niix's `-ba`. Total over the Literal, so a new mode is a
-# type error here rather than a silently missing flag.
+# `Anonymize` -> dcm2niix's `-ba`. Covers the whole Literal, so a new mode is a
+# type error here, not a silently missing flag.
 _BA: dict[Anonymize, str] = {"pii": "o", "all": "y", "none": "n"}
 
 _VERSION = re.compile(r"version\s+(v[\w.]+)")
@@ -70,23 +63,22 @@ _VERSION = re.compile(r"version\s+(v[\w.]+)")
 def find_dcm2niix(explicit: str | Path | None = None) -> Path:
     """Find the dcm2niix to run: the one named, else bundled, else on PATH.
 
-    The `dcm2niix` PyPI package ships the compiled binary and exposes its path,
-    and it is a dependency of `fmri-qa-core`, so the bundled branch is the one
-    that answers on a working install and an import needs nothing from the
-    system. A site that already has its own dcm2niix — a newer build, or one
-    with vendor patches — names it with `--dcm2niix`; the bundled binary is
-    preferred over PATH, so having one installed is not enough to select it.
+    The `dcm2niix` PyPI package ships the compiled binary and exposes its path.
+    It is a dependency of `fmri-qa-core`, so a working install uses the bundled
+    binary and needs nothing from the system. A site with its own dcm2niix (a
+    newer build, or one with vendor patches) names it with `--dcm2niix`. The
+    bundled binary is preferred over PATH, so installing another is not enough
+    to select it.
 
-    The PATH branch and the error below are what is left for an install that
-    cannot import the bundled binary at all: a platform with no wheel that
-    fell back to the sdist and failed to build it, or a pruned environment.
+    The PATH branch and the error below cover an install that can't import the
+    bundled binary: a platform with no wheel whose sdist failed to build, or a
+    pruned environment.
 
     Raises
     ------
     ConversionError
         If no dcm2niix can be found, or the named one is not an executable file.
-        Naming one that cannot be run is a mistake worth reporting rather than
-        quietly falling back past.
+        A named binary that can't be run is reported, not quietly skipped.
     """
     if explicit is not None:
         found = shutil.which(str(explicit))
@@ -123,10 +115,9 @@ def build_args(
 ) -> list[str]:
     """Build the dcm2niix argument list for one import, pinned flags first.
 
-    `extra` is appended *after* everything this function chooses, so a
-    passthrough argument wins — that is what makes it an escape hatch rather
-    than a suggestion. The one it should not win is `-l`, which is what
-    `_warn_if_rescaling` says out loud.
+    `extra` is appended after everything this function chooses, so a
+    passthrough argument wins. The one that should not win is `-l`, which
+    `_warn_if_rescaling` warns about.
     """
     _warn_if_rescaling(extra)
     return [
@@ -149,10 +140,10 @@ def build_args(
 def _warn_if_rescaling(extra: Sequence[str]) -> None:
     """Warn if a passthrough `-l` would undo the pinned `-l o`.
 
-    Overriding a pinned flag is allowed — `extra` exists for the case the author
-    of this module did not foresee — but this particular override silently
-    disarms the saturation check rather than breaking anything visibly, so it
-    does not get to happen quietly. See the module docstring for the numbers.
+    Overriding a pinned flag is allowed, since `extra` exists for cases not
+    foreseen here. But this override silently disarms the saturation check
+    without visibly breaking anything, so it warns. See the module docstring for
+    the numbers.
     """
     for flag, value in pairwise(extra):
         if flag == "-l" and value != "o":
@@ -166,11 +157,10 @@ def _warn_if_rescaling(extra: Sequence[str]) -> None:
 def run(binary: Path, args: Sequence[str]) -> str:
     """Run dcm2niix and return everything it printed.
 
-    dcm2niix reports per series on stdout and is quiet about nothing, so its
-    output is the log of what happened; the caller decides how much of it to
-    show. Which files were produced is *not* read back out of it — `session`
-    converts into a directory it owns and lists that instead, so the answer
-    comes from the filesystem rather than from parsing a human-readable line.
+    dcm2niix reports per series on stdout, so its output is the log of what
+    happened, and the caller decides how much to show. Which files were produced
+    is not read from it. `session` converts into a directory it owns and lists
+    that instead.
 
     Raises
     ------
@@ -180,7 +170,7 @@ def run(binary: Path, args: Sequence[str]) -> str:
     """
     try:
         # Not shell=True, and `binary` is an absolute path resolved by
-        # `find_dcm2niix` rather than a name looked up at run time.
+        # `find_dcm2niix`, not a name looked up at run time.
         result = subprocess.run(  # noqa: S603
             [str(binary), *args], capture_output=True, text=True, check=False
         )
@@ -196,9 +186,8 @@ def run(binary: Path, args: Sequence[str]) -> str:
 def version(output: str) -> str | None:
     """Parse the dcm2niix version from its banner, or None if it did not say.
 
-    Read from the run's output rather than asked for with a second `--version`
-    call: the banner is the first line of every conversion, and the version that
-    did the work is the one worth reporting.
+    Read from the run's own banner, not a second `--version` call, so it is the
+    version that did the work.
     """
     match = _VERSION.search(output)
     return match.group(1) if match else None

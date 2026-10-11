@@ -1,10 +1,9 @@
 """`AnalysisSettings`: the record of what a run was asked for.
 
-A leaf of its own, below every layer, because of who speaks it: the request is
-common to the pipeline that honors it (`pipeline.run_qa`) and the artifact that
-publishes it (`analysis.artifact.QAArtifact`), and reading an artifact must not
-load the pipeline to name a type. Here it costs nothing but the shared
-vocabulary.
+A leaf module below every layer. Both the pipeline that honors the request
+(`pipeline.run_qa`) and the artifact that publishes it
+(`analysis.artifact.QAArtifact`) use it, and reading an artifact must not load
+the pipeline just to name a type.
 """
 
 import math
@@ -19,28 +18,25 @@ from .types import FBIRN_ROI_SIZE, DetrendMethod, PeAxis, RoiCenter
 class AnalysisSettings:
     """The analysis knobs: what a run was asked for and what that resolved to.
 
-    The first five fields are the request — this record is what `run_qa`,
-    `preprocess` and `analyze` take, so re-running with it reproduces the result.
-    `roi_size` is the side *asked for*; the side actually analyzed (the same,
-    unless the image is smaller) is the ROI the result carries. `detrend_order`
-    is the one *resolved* value (the polynomial degree or the spline
-    interior-knot count the detrender chose for this series length), recorded
-    because it is a run parameter a reader must be able to report but only the
-    pipeline knows. A request handed in already carrying one — a published
-    record fed back to reproduce its run — is accepted, and the order the new
-    run resolves overwrites it.
+    The first five fields are the request. `run_qa`, `preprocess` and `analyze`
+    take this record, so re-running with it reproduces the result. `roi_size` is
+    the side asked for; the side actually analyzed (the same unless the image is
+    smaller) is the ROI the result carries. `detrend_order` is the one resolved
+    value: the polynomial degree or spline interior-knot count the detrender
+    chose for this series length. A reader needs it but only the pipeline knows
+    it. A request that already carries one, such as a published record fed back
+    to reproduce its run, is accepted, and the order the new run resolves
+    overwrites it.
 
-    `run_qa` writes this record onto its `QAResult`, so an artifact built from
-    a result publishes the settings that result was computed with — never a
-    default filled in afterwards.
+    `run_qa` writes this record onto its `QAResult`, so an artifact built from a
+    result publishes the settings it was computed with, never a default filled
+    in afterwards.
 
-    The knob domains are held by the constructor, not by a validator: a trim
-    that names a real duration, a positive ROI side, and a detrend order that is
-    absent or non-negative are an `InvalidScanError` when they are not, so
-    holding an `AnalysisSettings` means the run it asks for is one that could be
-    honored. `run_qa`'s `replace(settings, detrend_order=...)` passes through
-    the same door, so the order a run resolves is held to the same domain as one
-    a caller hands in.
+    The constructor raises `InvalidScanError` unless `trim_sec` is a finite
+    non-negative duration, `roi_size` is positive, and `detrend_order` is absent
+    or non-negative. Holding an `AnalysisSettings` therefore means the run can
+    be honored. `run_qa`'s `replace(settings, detrend_order=...)` goes through
+    the same check.
     """
 
     trim_sec: float = 5.0

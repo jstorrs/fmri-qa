@@ -1,9 +1,9 @@
 """Core FBIRN ROI stability metrics: SNR, SFNR, drift, fluctuation, Weisskoff/RDC.
 
-Every statistic here reads from the preprocessed `QAImages` over a resolved
-`ROI`. ROI-averaging the per-voxel fluctuations equals detrending the ROI-mean
-time course (detrending commutes with the spatial mean), which is what lets the
-Weisskoff and drift measures reuse the pipeline's per-voxel residual.
+Every statistic reads the preprocessed `QAImages` over a resolved `ROI`.
+ROI-averaging the per-voxel fluctuations equals detrending the ROI-mean time
+course (detrending commutes with the spatial mean), so the Weisskoff and drift
+measures can reuse the pipeline's per-voxel residual.
 """
 
 from dataclasses import dataclass
@@ -31,9 +31,9 @@ class WeisskoffResult(ArrayValue):
 
     `cv` is the ROI-averaged CV and `cv1` the single-voxel CV pooled within each
     ROI size; `rdc_curve = cv1 / cv` is the effective decorrelation factor at
-    each size (ideal = ROI width). The last entry of each curve is the full
-    ROI, so `cv1_pooled` and `rdc` are read off the curves rather than stored
-    beside them, where they could disagree.
+    each size (ideal = ROI width). The last entry of each curve is the full ROI,
+    so `cv1_pooled` and `rdc` are read off the curves, not stored beside them
+    where they could disagree.
     """
 
     roi_sizes: IntArray
@@ -59,10 +59,9 @@ class WeisskoffResult(ArrayValue):
 def _relative_to_signal(value: float, *, signal: float) -> float:
     """Return `value / signal`, or NaN if the ROI mean signal is exactly zero.
 
-    NaN rather than the `RuntimeWarning`-raising division numpy would otherwise
-    perform: a zero ROI mean signal means background or a suppressed
-    reconstruction, so the estimator could not resolve the quantity -- not an
-    accident of the ROI landing on nothing.
+    A zero ROI mean signal means background or a suppressed reconstruction, so
+    the estimator could not resolve the quantity. NaN also avoids the
+    `RuntimeWarning` numpy's division would raise.
     """
     if signal == 0.0:
         return float("nan")
@@ -74,8 +73,7 @@ def _roi_cv(*, fluctuations: FloatArray, mean_image: FloatArray, roi: ROI) -> fl
 
     The CV is the RMS of the ROI-mean fluctuation over the ROI-mean signal.
     ROI-averaging the per-voxel `fluctuations` equals detrending the ROI-mean
-    time series (detrending commutes with the spatial mean), and the temporal
-    mean of that time series is the ROI mean of `mean_image`.
+    time series, and that series' temporal mean is the ROI mean of `mean_image`.
 
     NaN when the ROI mean signal is exactly zero.
     """
@@ -106,11 +104,11 @@ def weisskoff(images: QAImages, roi: ROI) -> WeisskoffResult:
     the single-voxel CV pooled within the ROI; `rdc_curve = cv1 / cv`.
     The result's `cv1_pooled` and `rdc` are the full-ROI values of those curves.
     """
-    # derived images are properties; read each once rather than per ROI size
+    # Derived images are properties, so read each once, not per ROI size.
     fluctuations, mean_image = images.fluctuations, images.mean_image
     noise = images.fluctuation_noise
-    # every integer width 1..roi.size, per the FBIRN/Glover Weisskoff protocol
-    # (Friedman & Glover 2006); cv[-1] is at the full ROI the pooled cv1 spans
+    # Every integer width 1..roi.size, per the FBIRN/Glover Weisskoff protocol
+    # (Friedman & Glover 2006). cv[-1] is at the full ROI the pooled cv1 spans.
     roi_sizes = np.arange(1, roi.size + 1)
     cv = np.array(
         [
@@ -140,21 +138,19 @@ def snr(images: QAImages, roi: ROI) -> float:
 
     Signal is the mean of the temporal-mean image over the ROI. Static spatial
     noise is the ROI variance of the (odd-sum minus even-sum) difference image;
-    SNR = signal / sqrt(variance / n_frames). The difference uses frame *sums*,
-    not means, so the normalization matches the FBIRN definition.
+    SNR = signal / sqrt(variance / n_frames). The difference uses frame sums,
+    not means, to match the FBIRN definition.
 
-    The difference is formed over an *even* number of frames. With an odd count
-    the two subsets differ by one frame, so the difference carries a whole frame
-    of signal, and that frame's spatial variation across the ROI — not noise —
-    dominates the variance: a phantom shaded 25% across the FOV reads 25% low.
-    Frame parity is set by the warm-up trim (`AnalysisSettings.trim_sec`), so the
-    same series would score differently for a one-volume change in the warm-up
-    trim. The trailing frame is dropped from the difference only; the signal
-    still averages the full series. NaN for a series too short to hold one
-    odd/even pair, and NaN when the difference image has no variance across the
-    ROI at all: there is no static noise to measure the signal against, so the
-    ratio is undefined rather than infinite — the same answer the sibling metrics
-    give for a quantity they cannot resolve.
+    The difference uses an even number of frames. With an odd count the two
+    subsets differ by one frame, so the difference carries a whole frame of
+    signal, and its spatial variation across the ROI, not noise, dominates the
+    variance (a phantom shaded 25% across the FOV reads 25% low). Frame parity
+    follows the warm-up trim (`AnalysisSettings.trim_sec`), so a one-volume
+    change in the trim would change the score. The trailing frame is dropped
+    from the difference only; the signal still averages the full series. NaN for
+    a series too short for one odd/even pair, and NaN when the difference image
+    has no variance across the ROI (no static noise to measure against, so the
+    ratio is undefined, not infinite).
     """
     idx = roi.index
     cs = images.center_slice
@@ -178,11 +174,11 @@ def sfnr(images: QAImages, roi: ROI) -> float:
     Mean over the ROI of the voxelwise SFNR image (temporal-mean signal divided
     by temporal fluctuation noise).
 
-    NaN if any ROI voxel has no fluctuation noise at all: its own ratio is
-    undefined, and an average over the ROI cannot be more defined than the
-    voxels it averages. (The per-voxel SFNR *image* in `analysis.build` is a
-    different question — it is drawn, not reduced, and floors the divisor so a
-    noiseless voxel renders instead of blanking the map.)
+    NaN if any ROI voxel has no fluctuation noise at all, since its own ratio is
+    undefined and an average cannot be better defined than what it averages. The
+    per-voxel SFNR image in `analysis.build` is different. It is drawn, not
+    reduced, and floors the divisor so a noiseless voxel renders instead of
+    blanking the map.
     """
     idx = roi.index
     noise = images.fluctuation_noise[idx]

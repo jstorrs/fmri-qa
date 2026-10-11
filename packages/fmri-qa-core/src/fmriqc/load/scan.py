@@ -1,10 +1,10 @@
 """The `QAScan` value object and its NIfTI loader (the I/O boundary).
 
-`QAScan` is the imperative shell's entry point: `from_nifti` does the file I/O
+`QAScan` is the imperative shell's entry point. `from_nifti` does the file I/O
 and header/sidecar parsing, then hands the pure pipeline a plain array plus the
 metadata it needs. It reads the phase-encode axis from the sidecar first and the
-NIfTI `dim_info` second; if neither carries one it says so and leaves the axis
-None, because estimating it from the Nyquist ghost is the *pipeline's* job (see
+NIfTI `dim_info` second. If neither has one, it warns and leaves the axis None,
+because estimating it from the Nyquist ghost is the pipeline's job (see
 `pipeline.run_qa`) and would make this layer depend on the metrics above it. The
 TR likewise prefers the sidecar over the unit-converted header pixdim.
 """
@@ -41,30 +41,25 @@ class QAScan:
     """A raw QA acquisition plus the header metadata the pipeline needs.
 
     `pe_axis` is the phase-encode axis as a NIfTI voxel-array index (0/1/2). The
-    single-slice QA pipeline supports the in-plane axes 0/1 and rejects axis 2.
-    The value comes from the sidecar (authoritative -- see `pe_axis` for the
-    order it reads its three fields in), falling back to the header `dim_info`
-    phase field; it is `None` when the metadata names no axis, and `run_qa` then
-    estimates one from the Nyquist ghost. Polarity is dropped (unneeded here).
-    `tr` is in seconds, from the sidecar `RepetitionTime` or the header pixdim
-    converted by its declared time unit.
-    `meta` holds the human-readable acquisition metadata for the report; the
-    BIDS JSON sidecar it comes from is optional, and its fields are `None` when
-    no sidecar sits beside the NIfTI.
+    single-slice pipeline supports the in-plane axes 0/1 and rejects axis 2. It
+    comes from the sidecar (see `pe_axis` for the three fields it reads), falling
+    back to the header `dim_info` phase field, and is `None` when neither names
+    an axis; `run_qa` then estimates one from the Nyquist ghost. Polarity is
+    dropped. `tr` is in seconds, from the sidecar `RepetitionTime` or the header
+    pixdim converted by its declared time unit. `meta` is the human-readable
+    acquisition metadata for the report. Its fields are `None` when no BIDS
+    sidecar sits beside the NIfTI.
 
     `affine`, when present, maps voxel indices to world coordinates in
     millimeters, including its translation. Direct callers must supply it in
-    millimeters; `from_nifti` converts it and the header voxel sizes together,
+    millimeters. `from_nifti` converts it and the header voxel sizes together,
     assuming millimeters with a warning when the spatial unit is unknown.
 
     `stored_integer` says whether the file held the scanner's integer samples,
-    which is the precondition for the ADC-saturation check: that test asks
-    whether the acquisition piled up on a `2**n - 1` hardware rail, and a
-    converter that wrote floats -- rescaling as it went -- has destroyed the
-    only evidence of where that rail was. `from_nifti` reads it from the NIfTI
-    datatype. It defaults to True for a `QAScan` built directly from an array,
-    because such a caller is handing over the samples themselves; only a file
-    can have lost them on the way in.
+    which the ADC-saturation check needs to find a `2**n - 1` hardware rail. A
+    converter that wrote rescaled floats destroyed that evidence. `from_nifti`
+    reads it from the NIfTI datatype. It defaults to True for a `QAScan` built
+    from an array, since that caller hands over the samples themselves.
     """
 
     data: FloatArray  # (X, Y, Z, T)
@@ -87,11 +82,11 @@ class QAScan:
                 "data shape", img.shape, "expected a 4-D (X, Y, Z, T) NIfTI series"
             )
         # Optional: a scanner export never went through dcm2niix. Read after the
-        # image so a missing NIfTI fails on the NIfTI, not on its sidecar.
+        # image so a missing NIfTI fails on the NIfTI, not its sidecar.
         sidecar = _load_sidecar(path)
         data = img.get_fdata()
-        # Loading consumes header scaling; the proxy retains the transform
-        # actually applied by get_fdata (including identity for unscaled files).
+        # Loading consumes header scaling. The proxy keeps the transform that
+        # get_fdata applied (identity for unscaled files).
         slope, inter = img.dataobj.slope, img.dataobj.inter
         # The on-disk datatype, before `get_fdata` widened everything to float64.
         stored_integer = img.header.get_data_dtype().kind in "iu"

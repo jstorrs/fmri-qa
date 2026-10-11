@@ -1,12 +1,10 @@
 """Project a finished `QAResult` into the publishable `QAArtifact`.
 
-This is the seam itself: everything a downstream reader could want is *resolved
-here*, once, while the full images and the metric result objects are still in
-hand. Derived properties are settled into plain fields, the ROI time series and
-the residual spectrum are extracted, the ghost sampling regions and the phantom
-outline are materialized, and the PSF model is sampled — so no consumer has to
-re-derive analysis quantities from raw arrays, and none of them needs the
-`metrics`/`prep`/`load` layers to read a result.
+This is the seam. Everything a reader could want is resolved here, once, while
+the full images and metric results are in hand: derived properties become plain
+fields, the ROI series and residual spectrum are extracted, the ghost regions
+and phantom outline are materialized, and the PSF model is sampled. No consumer
+has to re-derive anything from raw arrays or import `metrics`, `prep` or `load`.
 
 `analyze` is the one-call front door: series in, artifact out.
 """
@@ -50,10 +48,10 @@ def analyze(
 ) -> QAArtifact:
     """Run the QA pipeline on one series and publish the artifact.
 
-    The calculation half's entry point: `scan` in, `QAArtifact` out, with the
-    heavy intermediates discarded. `settings` is the analysis request, whose own
-    fields carry the defaults; `name` and `source` are recorded as provenance —
-    the display name and the path the series was read from.
+    `scan` in, `QAArtifact` out, with the heavy intermediates discarded.
+    `settings` is the analysis request and carries the defaults. `name` and
+    `source` are recorded as provenance: the display name and the path the
+    series was read from.
     """
     return build_artifact(run_qa(scan, settings), name=name, source=source)
 
@@ -61,11 +59,9 @@ def analyze(
 def build_artifact(result: QAResult, *, name: str = "", source: str = "") -> QAArtifact:
     """Project a computed `QAResult` into a `QAArtifact`.
 
-    Separate from `analyze` so an existing result — one already in hand from
-    `run_qa`, with its images still live — can be published without recomputing.
-    The settings published are the ones the result carries, which `run_qa` wrote
-    from the request it was handed: there is nothing to pass and nothing to
-    disagree with it.
+    Separate from `analyze` so a result already in hand from `run_qa` can be
+    published without recomputing. The settings published are the ones the
+    result carries.
     """
     return QAArtifact(
         settings=result.settings,
@@ -92,11 +88,10 @@ def _provenance(result: QAResult, *, name: str, source: str) -> Provenance:
     )
     if meta is None:
         return base
-    # Every sidecar field is spelled out, because the artifact's acquisition
-    # block is a published contract and a new field should be a deliberate
-    # addition here -- but the nine identifying fields above are not repeated to
-    # say so. `replace` carries them, which is the one reading of this code that
-    # cannot drift from `base`: re-listing them was nine chances to drop one.
+    # Every sidecar field is spelled out because the acquisition block is a
+    # published contract. The nine identifying fields are not re-listed:
+    # `replace` carries them from `base`, and re-listing them would give nine
+    # chances to drop one.
     return replace(
         base,
         voxel_mm=meta.voxel_mm,
@@ -119,19 +114,13 @@ def _provenance(result: QAResult, *, name: str, source: str) -> Provenance:
 def _pe_label(result: QAResult) -> PeLabel:
     """Resolve the phase-encode direction to display: "row", "col" or "?".
 
-    One rule, and the axis is the whole of it: the label names the axis the
-    ghost masks were built on, whatever settled it -- the sidecar, the header,
-    an explicit `--pe-axis`, or the Nyquist-ghost estimate. "?" is the answer
-    when nothing did.
+    The label names the axis the ghost masks were built on, however it was
+    settled (sidecar, header, `--pe-axis`, or the Nyquist-ghost estimate). "?"
+    means none was.
 
-    This used to consult `meta.pe_dir` first, back when that carried the
-    sidecar's own DICOM row/col wording and could therefore name a *different*
-    axis than the run used; the special case, and the `--pe-axis` exception
-    carved out of it, existed to manage that disagreement. `load.metadata.
-    _pe_direction` now derives `pe_dir` from the resolved axis, so the two
-    branches had become the same answer and only one is left. `PE_ROWCOL` is
-    keyed by `PeAxis` and total, so an axis indexes straight into a `PeLabel`
-    with no lookup default standing in for a case that cannot arise.
+    `load.metadata._pe_direction` derives `pe_dir` from the resolved axis, so
+    `meta.pe_dir` is not consulted here. `PE_ROWCOL` is total over `PeAxis`, so
+    no lookup default is needed.
     """
     axis = result.metrics.pe_axis
     return "?" if axis is None else PE_ROWCOL[axis]
@@ -141,9 +130,8 @@ def _measurements(result: QAResult) -> Measurements:
     """Settle every reported scalar, resolving the metric objects' properties."""
     m = result.metrics
     sat, sm, ghost = m.saturation, m.smoothness, m.ghost
-    # The four ghost percentages stand or fall together: with no PE axis there is
-    # no ghost result, and each of them is NaN -- an estimator that could not
-    # resolve the quantity, which is what the artifact's NaN means.
+    # With no PE axis there is no ghost result, and all four ghost percentages
+    # are NaN (the estimator could not resolve them).
     undefined = float("nan")
     return Measurements(
         snr=m.snr,
@@ -161,9 +149,8 @@ def _measurements(result: QAResult) -> Measurements:
         outlier_worst_frame=m.outliers.worst_volume,
         tc_outlier=m.spikes.tc_outlier,
         spec_outlier=m.spikes.spec_outlier,
-        # The clipping block stands or falls together: with no integer samples
-        # there was no rail to seek, and every one of these is None -- "not
-        # determinable", which is not the same answer as "nothing clipped".
+        # With no integer samples there was no rail to seek, so these are all
+        # None ("not determinable"), which differs from "nothing clipped".
         clip_ceiling=sat.ceiling if sat is not None else None,
         clip_bits=sat.bits if sat is not None else None,
         n_clipped_kept=sat.n_clipped_kept if sat is not None else None,
@@ -197,8 +184,8 @@ def _curves(result: QAResult) -> Curves:
     n = images.center_slice.shape[-1]
     time = np.asarray(np.arange(n) * images.tr, dtype=np.float64)
     residual = _roi_series(images.fluctuations, roi)
-    # DC dropped here rather than at plot time: the zero-frequency bin is the
-    # residual's mean (~0 by construction) and would otherwise dwarf the axis.
+    # Drop DC here, not at plot time. It is the residual's mean (~0) and would
+    # dwarf the axis.
     freqs = np.fft.rfftfreq(residual.size, d=images.tr)
     magnitude = np.abs(np.fft.rfft(residual))
     return Curves(
@@ -226,8 +213,9 @@ def _weisskoff_curve(result: QAResult) -> WeisskoffCurve:
     return WeisskoffCurve(
         roi_sizes=sizes,
         cv=np.asarray(wk.cv, dtype=np.float64),
-        # Anchored at the pooled single-voxel CV, so the width where the measured
-        # plateau meets this line is the reported RDC (see `plot_weisskoff`).
+        # Anchored at the pooled single-voxel CV, so the width where the
+        # measured plateau meets this line is the reported RDC (see
+        # `plot_weisskoff`).
         cv_ideal=np.asarray(wk.cv1_pooled / sizes, dtype=np.float64),
         rdc=np.asarray(wk.rdc_curve, dtype=np.float64),
     )
@@ -236,19 +224,19 @@ def _weisskoff_curve(result: QAResult) -> WeisskoffCurve:
 def _psf_curves(s: SmoothnessResult) -> PsfCurves:
     """Sample the directional PSF: empirical points plus the Gaussian model.
 
-    The plotting range is fixed here — a few FWHM, but at least three voxels so a
-    PSF narrower than the voxel grid is not squashed — because it depends on the
-    measured smoothness, which is analysis, not layout.
+    The plotting range depends on the measured smoothness, so it is fixed here:
+    a few FWHM, but at least three voxels so a PSF narrower than the voxel grid
+    is not squashed.
     """
     dirs: tuple[tuple[str, PeAxis], tuple[str, PeAxis]]
     if s.pe_axis is not None:
         dirs = (("PE", s.pe_axis), ("RO", readout_axis(s.pe_axis)))
-    else:  # no PE axis resolved -- fall back to raw array axes
+    else:  # no PE axis resolved: fall back to raw array axes
         dirs = (("axis0", 0), ("axis1", 1))
     mm_per = [s.voxel.per_axis(a) for _, a in dirs]
     fwhm = [s.fwhm_axis(a) for _, a in dirs]
-    # An unresolvable axis yields a NaN FWHM; fall back to the voxel-scale floor
-    # so the range stays finite and the empirical points remain plottable.
+    # An unresolvable axis yields a NaN FWHM. Fall back to the voxel-scale floor
+    # so the range stays finite and the empirical points stay plottable.
     spans = [
         max(2.6 * f, 3.0 * mm) if np.isfinite(f) else 3.0 * mm
         for f, mm in zip(fwhm, mm_per, strict=True)
@@ -270,23 +258,21 @@ def _psf_curves(s: SmoothnessResult) -> PsfCurves:
 def _convex_hull(mask: BoolArray) -> FloatArray:
     """Compute the closed convex hull of a mask as an (N, 2) (x, y) polygon.
 
-    Materialized here so a renderer can stroke the phantom boundary without any
-    computational geometry. `imshow` maps column -> x and row -> y, so the mask's
-    (row, col) pixels are emitted as (col, row). A mask too small to have a hull
-    yields an empty polygon.
-
-    Too small is not only a matter of count: a mask that is a single row or
-    column has no area either, however many pixels it holds, and Qhull refuses
-    it ("initial simplex is flat"). That is a degenerate segmentation, not a bad
-    scan, and it arrives after the whole analysis has run — so it yields the same
-    empty polygon rather than losing the artifact to a geometry library's error.
+    Computed here so a renderer can stroke the phantom boundary without any
+    computational geometry. `imshow` maps column to x and row to y, so (row, col)
+    pixels are emitted as (col, row). A mask too small to have a hull yields an
+    empty polygon. That includes a mask that is a single row or column, which has
+    no area however many pixels it holds and which Qhull refuses ("initial
+    simplex is flat"). It is a degenerate segmentation that shows up after the
+    whole analysis has run, so it gets the empty polygon instead of losing the
+    artifact to a geometry library error.
     """
     ys, xs = np.nonzero(mask)
     if xs.size < 3:
         return np.zeros((0, 2), dtype=np.float64)
     pts = np.column_stack([xs, ys]).astype(np.float64)
-    # Deferred: scipy.spatial costs over a second to import and this is its only
-    # use in the package, so a bare --version/--help never pays for it.
+    # Imported here: scipy.spatial takes over a second to import, and a bare
+    # --version or --help should not pay for it.
     from scipy.spatial import ConvexHull, QhullError
 
     try:
@@ -300,10 +286,9 @@ def _convex_hull(mask: BoolArray) -> FloatArray:
 def _ghost_regions(result: QAResult) -> GhostRegions | None:
     """Copy the region-matched signal/ghost masks per axis, or None.
 
-    Copied off the `GhostResult` the run measured on, not rebuilt here: the
-    published regions are the ones the percentages were averaged over, by
-    construction rather than by two call sites agreeing. None when no axis
-    resolved — nothing was sampled, so there is nothing to draw.
+    Copied off the `GhostResult` the run measured on, not rebuilt here, so the
+    published regions are the ones the percentages were averaged over. None when
+    no axis resolved, since nothing was sampled.
     """
     ghost = result.metrics.ghost
     if ghost is None:
@@ -320,8 +305,8 @@ def _images(result: QAResult) -> ArtifactImages:
     """Assemble the four FBIRN summary images plus the geometry drawn over them."""
     images, geom, roi = result.images, result.geom, result.roi
     fluctuation_noise = images.fluctuation_noise
-    # Per-voxel SFNR inside the phantom; the epsilon keeps the ratio finite where
-    # a masked-in voxel has no temporal noise at all.
+    # Per-voxel SFNR inside the phantom. The epsilon keeps the ratio finite where
+    # a masked-in voxel has no temporal noise.
     sfnr = np.where(
         geom.phantom_mask, images.mean_image / (fluctuation_noise + 1e-9), 0.0
     )

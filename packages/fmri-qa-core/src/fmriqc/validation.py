@@ -1,10 +1,9 @@
 """Validation at the boundary between loaded scans and numerical metrics.
 
-The parameter domains are not here. `AnalysisSettings` holds its own knobs to
-theirs, so a request that reaches this module is already one that could be
-honored by some scan; what is left is everything that is only true relative to
-*this* scan -- its shape and samples, how many frames the trim leaves it, and
-which axis the request and the header settle on between them.
+The parameter domains are not checked here. `AnalysisSettings` holds its own
+knobs to theirs, so a request that reaches this module could be honored by some
+scan. What is left is what depends on this scan: its shape and samples, how many
+frames the trim leaves, and which axis the request and the header settle on.
 """
 
 import numpy as np
@@ -46,11 +45,11 @@ def _validate_scan(scan: QAScan) -> None:
 
 
 def _validate_trim_sec(trim_sec: float) -> None:
-    """Require a warm-up trim that names a real duration: the high/low path's copy.
+    """Require a warm-up trim that names a real duration (high/low path).
 
     The single-slice path takes its trim inside an `AnalysisSettings`, which
-    holds this domain itself; `run_hilo` takes a loose `trim_sec`, so this is
-    the only place that trim is held to being a duration.
+    enforces this domain itself. `run_hilo` takes a loose `trim_sec`, so this is
+    the only place that trim is checked.
     """
     if not np.isfinite(trim_sec) or trim_sec < 0:
         raise InvalidScanError(
@@ -83,16 +82,14 @@ def _require_enough_frames(scan: QAScan, trim_sec: float, frames: str) -> None:
 def validate_qa_run(scan: QAScan, settings: AnalysisSettings) -> PeAxis | None:
     """Validate a scan against the request the single-slice QA pipeline got.
 
-    The knobs themselves are already in their domains -- `AnalysisSettings`
-    refuses a request that is not -- so what is checked here is what only the
-    scan can answer: that the series is analyzable, and that the trim leaves
-    enough of it behind.
+    `AnalysisSettings` already refuses out-of-domain knobs, so this checks what
+    only the scan can answer: that the series is analyzable and the trim leaves
+    enough of it.
 
-    Returns the axis the request and the header settle on between them --
-    `settings.pe_axis_override` if given, else `scan.pe_axis` narrowed to
-    in-plane -- or None when neither names one. This is the one place that
-    precedence is decided; `run_qa` falls back to the Nyquist-ghost estimate only
-    when the return here is None.
+    Returns the phase-encode axis: `settings.pe_axis_override` if given, else
+    `scan.pe_axis` narrowed to in-plane, or None when neither names one. This is
+    the one place that precedence is decided. `run_qa` estimates from the
+    Nyquist ghost only when this returns None.
     """
     _validate_scan(scan)
     _require_enough_frames(scan, settings.trim_sec, "frames")
@@ -101,10 +98,10 @@ def validate_qa_run(scan: QAScan, settings: AnalysisSettings) -> PeAxis | None:
     candidate = scan.pe_axis if override is None else override
     if candidate is None:
         return None
-    # `pe_axis_override` is already a `PeAxis`, so only `scan.pe_axis` -- the
-    # header's own answer, read when no explicit axis is given -- can still name
-    # the through-plane axis here. That scan is refused by name rather than
-    # quietly analyzed on an axis estimated from the Nyquist ghost.
+    # `pe_axis_override` is already a `PeAxis`, so only `scan.pe_axis` (the
+    # header's answer, read when no explicit axis is given) can still name the
+    # through-plane axis. Refuse that scan by name instead of quietly analyzing
+    # it on an axis estimated from the Nyquist ghost.
     resolved = in_plane(candidate)
     if resolved is None:
         raise InvalidScanError(

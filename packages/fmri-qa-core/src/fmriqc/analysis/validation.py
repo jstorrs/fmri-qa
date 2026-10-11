@@ -1,19 +1,16 @@
 """Validate the published artifact contract at the archive boundary.
 
-Half the contract is not here. An invariant of one record alone is held by that
-value object's own constructor (`AnalysisSettings`, `Provenance`,
-`Measurements` and `RoiBox` hold their own today), because an artifact built
-in-process and printed or rendered is never saved and so never reaches this
-module: a new single-record invariant added here would go unchecked for every
-consumer but the archive. What is left here is what a constructor cannot see —
-facts that span two records (`displacement_unit` against `provenance.voxel_mm`,
-`outlier_worst_frame` against `provenance.n_frames`, the ROI box against the
-image it sits on), and everything about arrays: their dimensions, shapes and
-coordinates.
+Single-record invariants live in the value objects' own constructors
+(`AnalysisSettings`, `Provenance`, `Measurements`, `RoiBox`), because an artifact
+built in-process and never saved does not reach this module, and an invariant
+added here would go unchecked for everyone but the archive. This module checks
+what a constructor cannot see: facts spanning two records (`displacement_unit`
+against `provenance.voxel_mm`, `outlier_worst_frame` against
+`provenance.n_frames`, the ROI box against its image) and everything about arrays
+(dimensions, shapes, coordinates).
 
-Scalar types follow the value objects; dimensional relationships and numeric
-domains are checked explicitly. NaN/Infinity measurements remain meaningful,
-but coordinates and counts must be usable.
+Scalar types follow the value objects. NaN and Infinity measurements stay
+meaningful, but coordinates and counts must be usable.
 """
 
 import math
@@ -98,15 +95,13 @@ def validate_artifact(artifact: QAArtifact) -> None:
 
 def _validate_parameters(artifact: QAArtifact) -> None:
     p, m = artifact.provenance, artifact.measurements
-    # `settings.pe_axis_override` and `measurements.pe_axis` are not checked
-    # here: both are `PeAxis | None`, so `validate_document` -- which reads the
-    # field annotations -- already refuses any other axis, on save and on load
-    # alike. Repeating the domain as a literal `(None, 0, 1)` would be a second
-    # place to update the day a pipeline measures a third axis.
-    # The converse does not hold: a migrated (schema <= 5) artifact can carry a
-    # known voxel size with `displacement_unit` still "vox", because the old
-    # peaks were always voxels regardless (see `serialize.migrate`). "mm"
-    # without a known voxel size to have produced it, though, is never valid.
+    # `pe_axis_override` and `pe_axis` need no check here: `validate_document`
+    # reads the `PeAxis | None` annotations and refuses any other axis, on save
+    # and on load alike. Repeating the domain as a literal `(None, 0, 1)` would
+    # be a second place to update when a third axis appears.
+    # A migrated (schema <= 5) artifact can have a known voxel size with
+    # `displacement_unit` still "vox", since the old peaks were always voxels
+    # (see `serialize.migrate`). "mm" without a known voxel size is never valid.
     _require(
         m.displacement_unit != "mm" or p.voxel_mm is not None,
         "measurements.displacement_unit is mm but provenance.voxel_mm is unknown",
@@ -175,8 +170,8 @@ def _validate_images(artifact: QAArtifact) -> None:
                 f"images.ghost.{name} shape mismatch",
             )
     roi = images.roi
-    # `RoiBox.__post_init__` has already held the box to being square and
-    # positive; what is left is the half that needs the image it sits on.
+    # `RoiBox.__post_init__` already checks that the box is square and
+    # positive. What is left needs the image it sits on.
     _require(
         roi.row1 <= shape[0] and roi.col1 <= shape[1],
         "images.roi must be square and inside the image",

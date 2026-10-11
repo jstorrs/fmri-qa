@@ -1,26 +1,20 @@
 """Shared types: array dtypes, Literals, the sidecar and the ROI size.
 
-The type primitives every layer speaks in — the three numpy array aliases,
-the `Literal` sets whose values are passed and published as options, and the
-`Sidecar` mapping type. Kept central (not scattered to the operation modules)
-precisely because they are the cross-cutting vocabulary: nearly every module
-annotates against them, and a closed option set defined once is a set that
-can't drift. The one constant here is here for the same reason: `FBIRN_ROI_SIZE`
-is spoken by the layer that resolves an ROI and by the artifact that records
-the one a run asked for, and the artifact may not import the prep layer to
-learn it.
+The type primitives every layer uses: the three numpy array aliases, the
+`Literal` sets passed and published as options, and the `Sidecar` mapping type.
+Nearly every module annotates against them, and a closed option set defined once
+can't drift. `FBIRN_ROI_SIZE` is here because both the layer that resolves an
+ROI and the artifact that records the requested size use it, and the artifact
+may not import the prep layer.
 
-`readout_axis` is the one function, and it is here rather than in an operation
-module because it is the sole *operation on* a closed set defined here: the
-other in-plane axis is only meaningful for a `PeAxis`, and the three layers that
-ask for it (ghost, smoothness, artifact) already speak this vocabulary and would
-otherwise each spell `1 - pe_axis` and lose the type.
+`readout_axis` is the one function. It operates on a closed set defined here,
+and the three layers that need it (ghost, smoothness, artifact) would otherwise
+each spell `1 - pe_axis` and lose the type.
 
-The frozen dataclass *value objects* used to live here too; they now sit with
-the operation that produces them (`ls` the package): `QAImages` in
-`prep.images`, `PhantomGeometry`/`ROI` in `prep.geometry`, `ScanMeta` in
-`load.metadata`, each metric's `*Result` in its `metrics.*` module, and the
-aggregate `QAMetrics`/`QAResult` in `pipeline`.
+The frozen dataclass value objects live with the operation that produces them:
+`QAImages` in `prep.images`, `PhantomGeometry`/`ROI` in `prep.geometry`,
+`ScanMeta` in `load.metadata`, each metric's `*Result` in its `metrics.*`
+module, and the aggregate `QAMetrics`/`QAResult` in `pipeline`.
 """
 
 from collections.abc import Mapping
@@ -45,16 +39,16 @@ __all__ = [
 ]
 
 # Array aliases. numpy's generic `NDArray` needs a dtype parameter under strict
-# typing; naming the three element kinds the pipeline actually uses keeps the
-# annotations honest (signal is float64 end to end -- nibabel `get_fdata`
-# returns float64 -- masks are bool, index/size arrays are int) and lets dtype
-# flow through arithmetic instead of decaying to Any.
+# typing. Naming the three element kinds the pipeline uses keeps the annotations
+# accurate (signal is float64 end to end, since nibabel `get_fdata` returns
+# float64; masks are bool; index/size arrays are int) and lets dtype flow
+# through arithmetic instead of decaying to Any.
 FloatArray = NDArray[np.float64]
 BoolArray = NDArray[np.bool_]
 IntArray = NDArray[np.intp]
 
-# A sidecar value, as `json.load` hands it over: the sidecar is written by an
-# external tool, so nothing here assumes a field has the type it usually has.
+# A sidecar value, as `json.load` hands it over. An external tool writes the
+# sidecar, so nothing here assumes a field has its usual type.
 Sidecar = Mapping[str, object]
 
 # Closed sets of option strings, modeled as Literal so a bad value is a type
@@ -78,23 +72,22 @@ ROI_CENTER_MODES: tuple[RoiCenter, ...] = get_args(RoiCenter)
 # `PsfCurves.unit`, so it is a closed set a reader can switch on.
 LengthUnit = Literal["mm", "vox"]
 
-# Phase-encode direction as *displayed*: the two DICOM in-plane words, or "?"
-# when no axis resolved. "?" is a real answer, not a missing one -- see
-# `analysis.artifact.Measurements`.
+# Phase-encode direction as displayed: the two DICOM in-plane words, or "?"
+# when no axis resolved. "?" is a real answer, not a missing one (see
+# `analysis.artifact.Measurements`).
 PeLabel = Literal["row", "col", "?"]
 
-# The phase-encode axis, as a *resolved, in-plane* NIfTI voxel-array index. The
+# The phase-encode axis as a resolved, in-plane NIfTI voxel-array index. The
 # single-slice pipeline measures the Nyquist ghost by rolling the phantom half
-# the FOV along one in-plane axis, so 0 and 1 are the only axes any of it is
-# defined on -- which makes this a closed set like the option strings above, and
-# it is modeled the same way rather than as a bare `int` each layer re-checks
-# against `(0, 1)` on its own.
+# the FOV along one in-plane axis, so 0 and 1 are the only axes it is defined
+# on. That makes this a closed set like the option strings above, modeled the
+# same way instead of as a bare `int` that each layer re-checks against `(0, 1)`.
 #
-# It is deliberately narrower than what the *loader* can read: a BIDS sidecar
-# may name the through-plane axis (`k`), so `QAScan.pe_axis` stays a plain
-# `int | None` and `load.pe_axis.in_plane` is the one place that narrows one to
-# the other. `validation.validate_qa_run` resolves the axis a run measures on
-# and hands it back, and everything inward of that speaks this type.
+# It is narrower than what the loader can read: a BIDS sidecar may name the
+# through-plane axis (`k`), so `QAScan.pe_axis` stays a plain `int | None` and
+# `load.pe_axis.in_plane` is the one place that narrows one to the other.
+# `validation.validate_qa_run` resolves the axis a run measures on and hands it
+# back, and everything inward of that uses this type.
 #: In-plane phase-encode axis as a voxel-array index: ``0`` or ``1``.
 PeAxis = Literal[0, 1]
 #: Every `PeAxis`, as a tuple.
@@ -104,20 +97,19 @@ PE_AXES: tuple[PeAxis, ...] = get_args(PeAxis)
 def readout_axis(pe_axis: PeAxis) -> PeAxis:
     """Return the readout axis: the in-plane axis other than phase-encode.
 
-    `1 - pe_axis` says this in fewer characters but evaluates to a plain `int`,
-    which then has to be re-narrowed at each use. Naming it keeps the pair
-    closed, and gives the readout baseline one definition: the ghost's RO mask
-    pair, `SmoothnessResult.ro_axis`, and the artifact's RO point-spread curve
-    are all this same fact.
+    `1 - pe_axis` is shorter but evaluates to a plain `int`, which has to be
+    re-narrowed at each use. This keeps the pair closed and gives the readout
+    baseline one definition: the ghost's RO mask pair, `SmoothnessResult.ro_axis`
+    and the artifact's RO point-spread curve are all this same fact.
     """
     return 1 if pe_axis == 0 else 0
 
 
 # How much of the DICOM identity dcm2niix keeps in the BIDS sidecar it writes
-# (`convert.dcm2niix`). "pii" strips the patient and keeps the dates, which is
-# what a QA import wants: `convert.naming` builds the file name from the series'
-# acquisition date and time, and "all" throws that date away. Named here rather
-# than passed as dcm2niix's own `-ba o/y/n` so the choice reads as what it means.
+# (`convert.dcm2niix`). "pii" strips the patient and keeps the dates, which a QA
+# import wants: `convert.naming` builds the file name from the series'
+# acquisition date and time, and "all" throws that date away. Named here instead
+# of using dcm2niix's own `-ba o/y/n` so the choice reads as what it means.
 #: Sidecar anonymization level: ``"pii"`` (strip the patient, keep the dates),
 #: ``"all"`` or ``"none"``.
 Anonymize = Literal["pii", "all", "none"]
@@ -126,8 +118,8 @@ ANONYMIZE_MODES: tuple[Anonymize, ...] = get_args(Anonymize)
 
 # Which name an imported series is filed under: the one `convert.naming` builds
 # from the sidecar (date, time, zero-padded series, description), or whatever
-# dcm2niix's own `-f` template produced. See `convert.naming` for why the two
-# are not the same thing.
+# dcm2niix's own `-f` template produced. See `convert.naming` for how they
+# differ.
 #: How an imported series is named: ``"qa"`` (date, time, series, description) or
 #: ``"dcm2niix"``.
 NameStyle = Literal["qa", "dcm2niix"]

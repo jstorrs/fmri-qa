@@ -3,7 +3,7 @@
 Reads NIfTI scans, runs the pipeline on each, and prints either the fixed-width
 table (`table`) or a JSON document (`record`), optionally saving each run's
 `QAArtifact` (`destinations`). A batch keeps going after a failed scan and
-reports every failure at the end, so one bad file does not cost the rest.
+reports every failure at the end, so one bad file doesn't cost the rest.
 """
 
 import argparse
@@ -39,15 +39,14 @@ def _parser() -> argparse.ArgumentParser:
         description="Phantom fMRI QA: SNR, SFNR, RDC (Weisskoff), Nyquist ghost.",
     )
     # `action="version"` would need the string built here, and reading
-    # `q.core_version` is what drags the whole calculation stack in before
-    # argparse has looked at a single flag (see `fmriqc.__init__`). Resolve it
-    # when the flag is actually used instead, so `--help` and a usage error
-    # stay as cheap as parsing.
+    # `q.core_version` loads the whole calculation stack before argparse has
+    # looked at a flag (see `fmriqc.__init__`). Resolve it when the flag is used
+    # instead, so `--help` and usage errors stay as cheap as parsing.
     parser.add_argument("--version", action=PrintVersion, nargs=0)
     parser.add_argument("paths", nargs="+", help="NIfTI (.nii/.nii.gz) QA scans")
     # Every analysis default is read off the record `main` goes on to build, so
     # a bare `fmri-qa scan` and a bare `q.analyze(scan)` are the same run and the
-    # help text cannot name a default the command does not use.
+    # help text can't name a default the command doesn't use.
     defaults = q.AnalysisSettings()
     parser.add_argument(
         "--trim-sec",
@@ -110,17 +109,17 @@ def main(argv: Sequence[str] | None = None) -> int:
     # Before anything counts the scans: on Windows the wildcard is still here.
     args.paths = expand_globs(args.paths)
 
-    # Resolved once, up front: the check that clears a destination and the
-    # write that uses it are handed the same `Path`, so they cannot disagree.
-    # A duplicated input maps to one destination here, but such a run has
-    # already been refused below, so nothing is lost collapsing it.
+    # Resolved once, up front, so the check that clears a destination and the
+    # write that uses it get the same `Path`. A duplicated input maps to one
+    # destination here, but such a run is already refused below, so nothing is
+    # lost collapsing it.
     destinations: dict[str, Path] = {}
     if args.artifact:
         pairs = artifact_destinations(args.artifact, args.paths)
-        # Refuse before analyzing anything: a destination that lands on an
-        # input or on another scan's artifact would silently discard a
-        # completed analysis or the data it came from, so it is a usage
-        # error, not a per-scan failure.
+        # Refuse before analyzing anything. A destination that lands on an
+        # input or on another scan's artifact would silently discard a completed
+        # analysis or the data it came from, so it is a usage error, not a
+        # per-scan failure.
         if report_destination_problems(pairs):
             return 1
         destinations = dict(pairs)
@@ -132,7 +131,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         roi_size=args.roi_size,
         pe_axis_override=args.pe_axis,
     )
-    # In --json mode stdout carries only the JSON document; the config banner,
+    # In --json mode stdout carries only the JSON document. The config banner,
     # table and save notices go to stderr so a consumer can pipe stdout cleanly.
     info = sys.stderr if args.json else sys.stdout
     print(
@@ -145,17 +144,17 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(header)
         print(rule)
 
-    # Every per-scan failure, kept as well as printed: the JSON document lists
+    # Every per-scan failure is kept as well as printed. The JSON document lists
     # them beside the scans that ran, so a consumer holding only the output can
-    # tell an omitted scan from one that was never requested.
+    # tell an omitted scan from one never requested.
     errors: list[dict[str, str]] = []
     records = []
     for path in args.paths:
         name = Path(path).name
         artifact: q.QAArtifact | None = None
         # The attempt's own ERROR line prints inside the manager, so it comes
-        # first; a scan that failed may well have warned on the way down, and
-        # that warning is part of the diagnosis.
+        # first. A scan that failed may have warned on the way down, and that
+        # warning is part of the diagnosis.
         with attributed_warnings(name):
             try:
                 scan = q.QAScan.from_nifti(path)

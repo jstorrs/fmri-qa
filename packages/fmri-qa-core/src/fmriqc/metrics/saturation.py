@@ -1,19 +1,17 @@
 """ADC saturation (signal clipping) detection.
 
 A clipped magnitude image piles up on a hardware `2**n - 1` rail. The ceiling is
-sequence-dependent and unrecorded, so it is inferred from the series maximum,
-and the pile-up is counted — split at the trim boundary so clips in the dropped
-warm-up volumes are reported apart from clips that bias the analyzed metrics.
+sequence-dependent and unrecorded, so it is inferred from the series maximum.
+The pile-up is counted separately for the dropped warm-up volumes and the
+analyzed volumes, since only the latter bias the metrics.
 
-The whole test rests on one precondition: the samples must still be the
-scanner's integers. A rail is an *integer* artifact of the receiver's ADC, and a
-converter that wrote floats — rescaling as it went — has destroyed the evidence
-of where it was. On such a series `detect_saturation` answers `None`: not
-determinable, which is a third answer distinct from "no clipping". Reporting
-clean there would be the wrong verdict rather than a safe default, the same
-reasoning the zero-slope guard already applies (see `detect_saturation`), and it
-would hide exactly the acquisitions this check exists to catch — a saturated run
-whose receiver gain wants turning down.
+The samples must still be the scanner's integers. A rail is an artifact of the
+receiver's integer ADC, and a converter that wrote rescaled floats has destroyed
+the evidence. On such a series `detect_saturation` returns `None` (not
+determinable), a third answer distinct from "no clipping". Reporting clean there
+would be wrong, the same reasoning the zero-slope guard already applies (see
+`detect_saturation`). It would hide exactly what this check exists to catch: a
+saturated run whose receiver gain needs turning down.
 """
 
 from dataclasses import dataclass
@@ -30,8 +28,7 @@ __all__ = [
     "detect_saturation",
 ]
 
-# Plausible ADC saturation rails. A clipped magnitude image piles up at a
-# hardware 2**n - 1 ceiling; only these n are realistic for MR (12-bit -> 4095).
+# Only these n are realistic for MR (12-bit gives 4095).
 #: ADC bit depths whose ``2**n - 1`` ceiling is tested as a clipping rail.
 SATURATION_BITS = range(8, 17)  # 255 .. 65535
 
@@ -40,16 +37,15 @@ SATURATION_BITS = range(8, 17)  # 255 .. 65535
 class ClipRail:
     """The hardware rail a clipped series piled up on, and where it hit hardest.
 
-    Every field here is undefined without a rail, which is why they sit together
-    behind one `SaturationResult.rail` that is either present or `None`: there is
-    no ceiling without a detected rail, and no "worst volume" either -- the
-    question does not arise for a series that never touched one.
+    Every field here is undefined without a rail, so they sit together behind
+    one `SaturationResult.rail` that is either present or `None`. There is no
+    ceiling and no worst volume for a series that never touched a rail.
 
-    The two trim-split counts stay outside, on the result, because *zero* is a
-    true answer for them: a clean series clipped no samples before the trim and
-    none after. "Which volume was worst" has no such answer, and an `int | None`
-    beside a rail that might independently be `None` is two ways to say one
-    thing, kept in step by hand.
+    The two trim-split counts stay on the result, because zero is a true answer
+    for them: a clean series clipped no samples before the trim or after. "Which
+    volume was worst" has no such answer, and an `int | None` beside a rail that
+    might independently be `None` would be two ways to say one thing, kept in
+    step by hand.
     """
 
     ceiling: float  # clip level (image units)
@@ -64,8 +60,8 @@ class SaturationResult:
 
     The clip ceiling is sequence-dependent and not recorded, so it is inferred:
     a clipped magnitude image piles up on a hardware `2**n - 1` rail. `rail`
-    describes that rail when the series maximum sits on one, and is `None` when
-    it does not -- a maximum that is not a `2**n - 1` value means no clipping.
+    describes that rail when the series maximum sits on one. It is `None` when
+    the maximum is not a `2**n - 1` value, which means no clipping.
     """
 
     rail: ClipRail | None
@@ -102,7 +98,7 @@ class SaturationResult:
         """True if clipping falls in the analyzed data, where it biases the metrics.
 
         Clips confined to the dropped warm-up volumes (`clipped and not
-        clipped_kept`) don't affect the statistics — and are expected for
+        clipped_kept`) don't affect the statistics. They are expected for
         sequences that deliberately acquire through the approach to steady state.
         """
         return self.n_clipped_kept > 0
@@ -111,7 +107,7 @@ class SaturationResult:
 def _saturation_bits(stored_max: float) -> int | None:
     """Return n if `stored_max` is a `2**n - 1` rail for a plausible n, else None.
 
-    `stored_max` is the series maximum in stored-integer units; it must round to
+    `stored_max` is the series maximum in stored-integer units. It must round to
     an integer of the form `2**n - 1` (all low bits set) with n in
     `SATURATION_BITS`. A non-integer or off-rail maximum means no clipping.
     """
@@ -134,37 +130,36 @@ def detect_saturation(
 ) -> SaturationResult | None:
     """Detect ADC saturation (clipping at a `2**n - 1` rail) in a 4-D series.
 
-    Returns `None` when `stored_integer` is False -- the series did not reach us
+    Returns `None` when `stored_integer` is False. The series did not reach us
     as the scanner's integer samples, so there is no rail to find and no honest
-    verdict to give. See the module docstring; `QAScan.stored_integer` carries
+    verdict to give. See the module docstring. `QAScan.stored_integer` carries
     this from the NIfTI datatype and warns at load.
 
     The clip ceiling is sequence-dependent and unrecorded, so it is inferred
-    from the data: reconstructed magnitude images are stored as unsigned
+    from the data. Reconstructed magnitude images are stored as unsigned
     integers, so a clipped acquisition piles up on the hardware rail `2**n - 1`
-    (12-bit ADC -> 4095 is the classic case). A series maximum that is not a
-    `2**n - 1` value means no clipping occurred and the check reports clean.
+    (a 12-bit ADC gives 4095). A series maximum that is not a `2**n - 1` value
+    means no clipping, and the check reports clean.
 
-    `slope`/`inter` recover the stored integer from scaled image units for the
-    rail test; the pile-up is then counted in image units, where every clipped
-    voxel shares the identical maximum value. The full untrimmed series is
-    checked because clipping is worst in the high-signal warm-up volumes -- but
-    the count is split at `trim` (the number of initial volumes the analysis
-    drops): clips in the first `trim` volumes (`n_clipped_pre`) don't reach the
-    statistics, while clips in the kept volumes (`n_clipped_kept`) bias them.
-    NOTE: with the ceiling inferred from the series maximum, at least one sample
-    always sits on it, so `clipped` is True for any detected rail -- including a
-    lone bright voxel that happens to land there, which the reasoning above says
-    is not saturation. Judge severity by the counts, not the flag.
+    `slope` and `inter` recover the stored integer from scaled image units for
+    the rail test. The pile-up is then counted in image units, where every
+    clipped voxel shares the same maximum value. The full untrimmed series is
+    checked because clipping is worst in the high-signal warm-up volumes. The
+    count is split at `trim` (the number of initial volumes the analysis drops).
+    Clips in the first `trim` volumes (`n_clipped_pre`) don't reach the
+    statistics, and clips in the kept volumes (`n_clipped_kept`) bias them.
+    NOTE: the ceiling is inferred from the series maximum, so at least one
+    sample always sits on it and `clipped` is True for any detected rail. That
+    includes a lone bright voxel that happens to land there, which is not
+    saturation. Judge severity by the counts, not the flag.
 
     Raises
     ------
     InvalidScanError
-        If `slope` is zero, infinite or NaN. The rail test below divides by
-        `slope` to undo the scaling, so a non-finite or zero value makes it
-        meaningless -- not a series with no clipping, which is what a caller
-        silently getting `suspected=False` back would read this as. Refusing is
-        safer than a wrong "clean" verdict.
+        If `slope` is zero, infinite or NaN. The rail test divides by `slope` to
+        undo the scaling, so such a value makes it meaningless. A caller
+        silently getting `suspected=False` back would read that as no clipping,
+        so refusing is safer than a wrong "clean" verdict.
     """
     if not stored_integer:
         return None

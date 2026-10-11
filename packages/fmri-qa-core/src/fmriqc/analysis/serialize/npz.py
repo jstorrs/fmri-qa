@@ -3,15 +3,14 @@
 The reader half of the layout this package used to write: one compressed NumPy
 archive, each array a member under its dotted path and the JSON document in a
 member named `__document__`. Nothing writes it any more (see `netcdf` for what
-replaced it and why), and this module deliberately has no writer -- *support
-reading old versions, write the new one only*, from style/stability.md. It is
-kept because an artifact outlives the build that wrote it, which is the whole
-point of saving one: a trend database filled over months is a directory of
-these files, and they must keep opening.
+replaced it and why), and this module has no writer, following "support reading
+old versions, write the new one only" from style/stability.md. It is kept
+because an artifact outlives the build that wrote it. A trend database filled
+over months is a directory of these files, and they must keep opening.
 
 A file's container is decided by its leading bytes, not its name (see
-`serialize`), so a `.qa.npz` renamed by a user still reads here and one written
-under any name still reads as what it is.
+`serialize`), so a renamed `.qa.npz` still reads here, and a file written under
+any name reads as what it is.
 """
 
 from pathlib import Path
@@ -22,7 +21,7 @@ from numpy.typing import NDArray
 
 from ...exceptions import InvalidArtifactError
 
-# What an `.npz` starts with, and so how `serialize` recognizes one: the archive
+# What an `.npz` starts with, and so how `serialize` recognizes one. The archive
 # is a zip, and a zip opens on its local file header's signature.
 MAGIC: Final = b"PK\x03\x04"
 
@@ -52,9 +51,8 @@ def read(path: Path) -> tuple[str, dict[str, NDArray[Any]]]:
         # Broad on purpose, and only around the library calls. A damaged archive
         # comes back as `BadZipFile`, but a fuzzed one also reaches `zlib.error`
         # from the inflater, `NotImplementedError` and `tokenize.TokenError` from
-        # the `.npy` header parser, and `EOFError` from a truncated member --
-        # four libraries' worth of exceptions that all mean the one thing this
-        # function has to say.
+        # the `.npy` header parser, and `EOFError` from a truncated member.
+        # They all mean the same thing here.
         raise InvalidArtifactError(path, f"unreadable NumPy archive: {exc}") from exc
     return text, arrays
 
@@ -62,10 +60,10 @@ def read(path: Path) -> tuple[str, dict[str, NDArray[Any]]]:
 def _document_text(member: NDArray[Any]) -> str:
     """Decode the JSON text of the `__document__` member, in either stored form.
 
-    Read before the schema version is known -- the version is *inside* this
-    document -- so the two forms are told apart by dtype rather than by version:
-    `uint8` is the UTF-8 bytes the last builds to write an `.npz` used, and a
-    NumPy `<U` string is what every archive written before those carries.
+    This is read before the schema version is known, since the version is
+    inside this document. So the two forms are told apart by dtype, not by
+    version. `uint8` is the UTF-8 bytes the last builds to write an `.npz` used,
+    and a NumPy `<U` string is what every earlier archive carries.
     """
     if member.dtype == np.uint8:
         return bytes(member).decode("utf-8")

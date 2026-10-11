@@ -1,15 +1,15 @@
 """The `--json` document: the same metrics as a record a trend database can file.
 
-Mirrors the table's columns as raw numbers rather than fixed-width text, with
+Mirrors the table's columns as raw numbers instead of fixed-width text, with
 enough provenance that a stored row still means something months later. The
-layout is a published contract, pinned by `JSON_SCHEMA_VERSION`; adding or
-renaming a field is a deliberate edit here and a bump there.
+layout is a published contract pinned by `JSON_SCHEMA_VERSION`. Adding or
+renaming a field means editing it here and bumping the version.
 """
 
-# The `q.*` parameter annotations below name artifact types that live behind
-# `fmriqc`'s lazy re-exports; evaluated at `def` time they would resolve the
-# whole calculation stack just to import this module. Deferring them keeps a
-# `--help` or a usage error from paying for numpy, scipy and nibabel.
+# The `q.*` parameter annotations below name artifact types behind `fmriqc`'s
+# lazy re-exports. Evaluated at `def` time, they would load the whole
+# calculation stack just to import this module. Deferring them keeps `--help`
+# and usage errors from importing numpy, scipy and nibabel.
 from __future__ import annotations
 
 import math
@@ -22,25 +22,23 @@ JSON_SCHEMA_VERSION = 6
 def metric_record(artifact: q.QAArtifact) -> dict[str, object]:
     """Build the scalar metrics for one scan as a JSON-serializable record.
 
-    Mirrors the human table's columns, but as raw numbers (not the fixed-width
-    formatting), so downstream tools can consume `--json` directly. The table's
-    one `loc` cell is three fields here: a consumer that files these away —
-    the trend database this output exists for — needs the measured fraction and
-    contrast and both verdicts, not the abbreviation an operator reads.
+    Mirrors the human table's columns as raw numbers, so downstream tools can
+    read `--json` directly. The table's one `loc` cell is three fields here: the
+    measured fraction, the contrast and both verdicts, which the trend database
+    needs.
 
     A directional FWHM the run could not name (no phase-encode axis) is `null`,
-    with the combined `fwhm` and its `fwhm_unit` alongside so the numbers that
-    *were* measured stay interpretable. `motn` and `com` carry their own unit
-    the same way, in `displacement_unit` -- "mm" when the header's voxel size
-    is known, else "vox" (an artifact migrated from schema <= 5 always reads
-    "vox" here, since those schemas published both peaks in voxels regardless
-    of the voxel size; see `analysis.serialize.migrate`).
+    with the combined `fwhm` and its `fwhm_unit` alongside. `motn` and `com`
+    carry their unit in `displacement_unit`: "mm" when the header's voxel size
+    is known, else "vox". An artifact migrated from schema <= 5 always reads
+    "vox", since those schemas published both peaks in voxels whatever the voxel
+    size (see `analysis.serialize.migrate`).
 
-    The record carries a little more than the table does, because a stored row
-    outlives the terminal it was printed to: the source path and acquisition
-    timestamp key and date it, and `tr`/`n_frames`/`n_trimmed` say what series
-    the numbers describe — without which the frame index in
-    `outlier_worst_frame` names a volume nobody can find again.
+    The record carries more than the table because a stored row outlives the
+    terminal. The source path and acquisition timestamp key and date it, and
+    `tr`, `n_frames` and `n_trimmed` say what series the numbers describe.
+    Without them the frame index in `outlier_worst_frame` names a volume nobody
+    can find again.
     """
     m = artifact.measurements
     prov = artifact.provenance
@@ -72,8 +70,8 @@ def metric_record(artifact: q.QAArtifact) -> dict[str, object]:
         "ro_ghost_pct": m.ro_ghost_pct,
         "acr_ghost_pct": m.acr_ghost_pct,
         "outl_pct": m.outlier_max_pct,
-        # Indexes the *analyzed* series, so frame 0 is the first volume kept;
-        # add `n_trimmed` to reach the acquired volume number.
+        # Indexes the analyzed series, so frame 0 is the first volume kept.
+        # Add `n_trimmed` to get the acquired volume number.
         "outlier_worst_frame": m.outlier_worst_frame,
         "tc_outlier": m.tc_outlier,
         "spec_outlier": m.spec_outlier,
@@ -91,7 +89,7 @@ def metric_record(artifact: q.QAArtifact) -> dict[str, object]:
         "fwhm_unit": m.fwhm_unit,  # "mm", or "vox" when the voxel size is unknown
     }
     # Undefined numerical metrics are JSON null, not Python's non-standard NaN
-    # or Infinity tokens. This keeps stdout consumable by strict JSON parsers.
+    # or Infinity tokens, so strict JSON parsers can read stdout.
     return {
         key: None if isinstance(value, float) and not math.isfinite(value) else value
         for key, value in record.items()

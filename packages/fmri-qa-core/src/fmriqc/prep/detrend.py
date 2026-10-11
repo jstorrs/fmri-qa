@@ -2,9 +2,9 @@
 
 Both remove low-frequency drift along the time axis before the noise metrics are
 measured. The fit complexity (poly degree / spline knots) is derived once from
-the run length and TR, and `Detrender` is that settled choice: a callable value
+the run length and TR. `Detrender` is that settled choice: a callable value
 object carrying the method and the order it resolved to, so the operator and the
-two numbers describing it travel together.
+two facts describing it travel together.
 """
 
 from dataclasses import dataclass
@@ -26,7 +26,7 @@ __all__ = [
 ]
 
 # Detrend cutoff period (s). Drift slower than this is removed before noise is
-# measured. `poly` and `spline` historically used 200 vs 256; kept distinct
+# measured. `poly` and `spline` historically used 200 vs 256. They stay distinct
 # because only `poly` feeds the settled pipeline.
 #: Cutoff period, in seconds, of the ``poly`` detrender.
 POLY_CUTOFF_S = 200.0
@@ -34,8 +34,8 @@ POLY_CUTOFF_S = 200.0
 SPLINE_CUTOFF_S = 256.0
 
 # B-spline degree of the `spline` detrender. Named because the fit's coefficient
-# count -- `n_nodes + SPLINE_DEGREE + 1`, what `Detrender.for_series` weighs
-# against the frame count -- depends on it.
+# count, `n_nodes + SPLINE_DEGREE + 1`, which `Detrender.for_series` weighs
+# against the frame count, depends on it.
 #: B-spline degree of the ``spline`` detrender.
 SPLINE_DEGREE = 2
 
@@ -43,8 +43,8 @@ SPLINE_DEGREE = 2
 def _spline_nodes(y: FloatArray, tr: float) -> int:
     """Return the interior-knot count: one spline segment per `SPLINE_CUTOFF_S`.
 
-    The spline analogue of `_poly_degree` — the fit-complexity knob for
-    `spline_residuals`, separated so it can be computed once from the header.
+    The spline analogue of `_poly_degree`: the fit-complexity knob for
+    `spline_residuals`, separate so it can be computed once from the header.
     """
     nt = y.shape[-1]
     return int(max(round(nt * tr / SPLINE_CUTOFF_S) - 1, 0))
@@ -53,11 +53,11 @@ def _spline_nodes(y: FloatArray, tr: float) -> int:
 def spline_residuals(y: FloatArray, n_nodes: int) -> FloatArray:
     """Detrend along the last axis with a least-squares B-spline (handles N-D).
 
-    A drop-in alternative to `poly_residuals`; `n_nodes` (interior knots, which
+    A drop-in alternative to `poly_residuals`. `n_nodes` (interior knots, which
     `Detrender.for_series` sets to one fewer than the run duration in
-    `SPLINE_CUTOFF_S` units, so one spline segment per `SPLINE_CUTOFF_S`) sets
-    the fit complexity the way `degree` does for the poly, with the spline's
-    own degree fixed at `SPLINE_DEGREE`.
+    `SPLINE_CUTOFF_S` units, giving one spline segment per `SPLINE_CUTOFF_S`)
+    sets the fit complexity the way `degree` does for the poly. The spline's
+    own degree is fixed at `SPLINE_DEGREE`.
     """
     nt = y.shape[-1]
     x = np.arange(nt, dtype=np.float64)
@@ -106,21 +106,18 @@ class Detrender:
     """A settled detrender: its method, its fit order and the fit itself.
 
     `Detrender.for_series` derives the fit complexity from a series' length and
-    TR; the result is callable, so `detrender(y)` returns the residuals of `y`
-    detrended along its last axis (it handles N-D, and is applied to the full
-    slice and to each ROI timeseries alike).
+    TR. The result is callable: `detrender(y)` returns the residuals of `y`
+    detrended along its last axis, for N-D input, so it applies to the full
+    slice and to each ROI timeseries alike.
 
-    The point of the object is that the operator and the two facts describing it
-    cannot come apart. `QAImages` records the method and order a run used, and
-    when those were an operator plus a loose `int` the method had to be copied
-    from the *caller's argument* while the order came from the fit -- two
-    sources for one decision. Here `method` and `order` are the fit, and
-    applying it re-reads them, so an operator that says "poly, degree 3" is one
-    that fits a degree-3 Legendre polynomial.
+    `method` and `order` are the fit itself, so the operator and the facts
+    `QAImages` records about it can't disagree. With a loose `int` order, the
+    method was copied from the caller's argument while the order came from the
+    fit, giving two sources for one decision.
 
     `order` means what the method means by it: the polynomial degree for
     "poly", the interior-knot count for "spline" (`SPLINE_DEGREE` sets the
-    spline's own degree). That is the same value `AnalysisSettings.detrend_order`
+    spline's own degree). It is the same value `AnalysisSettings.detrend_order`
     publishes, which is why one field carries both readings.
     """
 
@@ -136,12 +133,12 @@ class Detrender:
         Complexity (poly degree / spline nodes) is derived once here from the
         timeseries length and `tr`, so every later application shares it.
 
-        The order comes from the run *duration*, so a TR in the wrong unit
-        inflates it without bound: a header carrying milliseconds makes the fit
-        as many coefficients as there are frames, `lstsq` obliges by fitting the
-        noise as well as the drift, and every stability metric downstream is
-        then measured on a residual of nothing. Refuse the fit rather than
-        return zeros that look like a very stable scanner.
+        The order comes from the run duration, so a TR in the wrong unit
+        inflates it without bound. A header carrying milliseconds makes the fit
+        as many coefficients as there are frames, `lstsq` fits the noise as well
+        as the drift, and every stability metric downstream is measured on a
+        residual of nothing. Refuse the fit instead of returning zeros that look
+        like a very stable scanner.
 
         Raises
         ------
@@ -152,9 +149,9 @@ class Detrender:
             residual degrees of freedom for noise estimation.
         """
         # Guarded up front so an untyped caller still gets the named error, then
-        # matched exhaustively: `assert_never` is unreachable for a
-        # `DetrendMethod`, so adding a method to that Literal makes this a type
-        # error rather than a silent fall-through at runtime.
+        # matched exhaustively. `assert_never` is unreachable for a
+        # `DetrendMethod`, so adding a method to that Literal is a type error,
+        # not a silent fall-through at runtime.
         if method not in DETREND_METHODS:
             raise InvalidChoiceError("detrend method", method, DETREND_METHODS)
         match method:
@@ -168,10 +165,9 @@ class Detrender:
     def __call__(self, y: FloatArray) -> FloatArray:
         """Detrend `y` along its last axis, returning the residuals.
 
-        Dispatches on `method` the same exhaustive way `for_series` does, so a
-        method that can be *chosen* is one that can be *applied* -- adding a
-        member to `DetrendMethod` fails type-checking at both ends, not just
-        where the order is picked.
+        Dispatches on `method` exhaustively, as `for_series` does, so a method
+        that can be chosen can be applied. Adding a member to `DetrendMethod`
+        fails type-checking at both ends, not just where the order is picked.
         """
         match self.method:
             case "poly":

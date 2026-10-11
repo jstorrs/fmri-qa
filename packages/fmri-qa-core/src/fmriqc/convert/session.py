@@ -1,28 +1,24 @@
 """One import: a DICOM directory in, named QA-ready NIfTI out.
 
-The conversion runs into a staging directory this module creates and owns, and
-the results are moved into place only once every one of them has a name and no
-name lands on a file that already exists. Three things fall out of that order,
-and they are the reason for it:
+The conversion runs into a staging directory this module creates and owns. The
+results move into place only once every one has a name and no name lands on an
+existing file. That order has three consequences:
 
-* **What was produced is read from the filesystem, not from dcm2niix's log.**
-  Staging starts empty, so whatever is in it afterwards is exactly this run's
-  output — no parsing of `Convert 20 DICOM as ...` lines, and no confusion with
-  files a previous import left in the destination.
+* **What was produced is read from the filesystem, not dcm2niix's log.**
+  Staging starts empty, so its contents are exactly this run's output. There is
+  no parsing of `Convert 20 DICOM as ...` lines and no confusion with files a
+  previous import left in the destination.
 * **A destination collision costs nothing.** The names depend on the DICOM
-  content, so they cannot be checked before converting the way
-  `cli.destinations` checks `--artifact` paths. Checking them before the *move*
-  is the next best thing: the import refuses with every conflict named and the
-  destination exactly as it was.
+  content, so they can't be checked before converting the way `cli.destinations`
+  checks `--artifact` paths. They are checked before the move instead: the
+  import refuses with every conflict named and the destination untouched.
 * **A move that fails part-way is undone.** Filing is a sequence of renames, and
-  the fifth of twelve can be refused -- a sync client holding the file, a disk
-  error. The import records the renames it has made and reverses them, so the
-  destination is as it was; where that cannot be promised, the error says what
-  state the destination is left in.
+  the fifth of twelve can be refused (a sync client holding the file, a disk
+  error). The import records its renames and reverses them. Where that can't be
+  promised, the error says what state the destination is left in.
 
 Staging is created inside the destination so the move is a rename within one
-filesystem rather than a copy, and is removed whether or not the import
-succeeds.
+filesystem, not a copy, and is removed whether or not the import succeeds.
 """
 
 import json
@@ -60,10 +56,10 @@ class ImportedSeries:
     """One converted series, as filed.
 
     `renamed_from` is dcm2niix's own stem when the series was renamed and None
-    when it kept that stem — which is how a caller reports the two cases
+    when it kept that stem. A caller can use it to report the two cases
     `naming.plan` leaves alone (an uninformative sidecar, a name two series
-    would share) without re-deriving why. `files` is every file filed for the
-    series, so a caller needs no rule of its own for which files belong to it.
+    would share). `files` is every file filed for the series, so a caller needs
+    no rule of its own for which files belong to it.
     """
 
     path: Path  # the NIfTI, under its final name
@@ -88,9 +84,9 @@ class ImportResult:
 def _read_sidecar(path: Path) -> Sidecar | None:
     """Read the BIDS sidecar beside `path`; None if missing or unreadable.
 
-    An unreadable sidecar is not fatal: it costs the series its QA name (the
-    dcm2niix one is kept) but not its conversion, and the NIfTI is still
-    analyzable — with a warning from `load.metadata`, whose job that is.
+    An unreadable sidecar is not fatal. The series keeps its dcm2niix name
+    instead of a QA name, and the NIfTI is still analyzable, with a warning from
+    `load.metadata`.
     """
     beside = sidecar_path(path)
     try:
@@ -103,9 +99,8 @@ def _read_sidecar(path: Path) -> Sidecar | None:
 def _refiled(name: str, stem: str, target: str) -> str:
     """Swap the leading `stem` of `name` for `target`.
 
-    A slice rather than `str.replace`, which would also rewrite a later
-    occurrence: `_plan_files` matches on `stem + "."`, so the stem is always a
-    prefix and this is exact.
+    A slice, not `str.replace`, which would also rewrite a later occurrence.
+    `_plan_files` matches on `stem + "."`, so the stem is always a prefix.
     """
     return target + name[len(stem) :]
 
@@ -169,15 +164,15 @@ def import_dicom(
         any file moves, and a move that fails is undone.
     """
     # Guarded up front so an untyped caller still gets the named error.
-    # `_file_series` then matches it exhaustively: its `assert_never` is
-    # unreachable for a `NameStyle`, so adding a style to that Literal makes the
-    # match a type error rather than a silent fall-through at runtime.
+    # `_file_series` then matches exhaustively: its `assert_never` is
+    # unreachable for a `NameStyle`, so adding a style to that Literal is a type
+    # error, not a silent fall-through at runtime.
     if names not in NAME_STYLES:
         raise InvalidChoiceError("names", names, NAME_STYLES)
-    # `anonymize` is only ever looked up in `dcm2niix._BA`, a `dict[Anonymize,
-    # str]` total over the Literal -- there is no `match`/`assert_never` here to
-    # make it a type error later, so this guard is the only thing standing
-    # between an untyped caller and a bare `KeyError`.
+    # `anonymize` is only looked up in `dcm2niix._BA`, a `dict[Anonymize, str]`
+    # covering the Literal. Nothing here would make a new mode a type error, so
+    # this guard is all that stands between an untyped caller and a bare
+    # `KeyError`.
     if anonymize not in ANONYMIZE_MODES:
         raise InvalidChoiceError("anonymize", anonymize, ANONYMIZE_MODES)
     source = Path(source)
@@ -193,8 +188,8 @@ def import_dicom(
         raise ConversionError(
             "destination", f"cannot create {destination}: {exc}"
         ) from exc
-    # Inside the destination, so `Path.replace` below is a rename on one
-    # filesystem; dot-prefixed so a crashed run leaves nothing a `*.nii.gz`
+    # Inside the destination, so `Path.replace` below renames within one
+    # filesystem. Dot-prefixed so a crashed run leaves nothing a `*.nii.gz`
     # glob would pick up.
     staging = Path(tempfile.mkdtemp(prefix=".fmri-qa-import-", dir=destination))
     try:
@@ -213,10 +208,10 @@ def import_dicom(
         converted = _file_series(staging, destination, names, force)
     finally:
         shutil.rmtree(staging, ignore_errors=True)
-        # A refused import leaves nothing behind, including the directory it
-        # had to create to stage into. Only one this call made, and only while
-        # still empty: a destination the caller already had stays, and so does
-        # one holding a successful import's files.
+        # A refused import leaves nothing behind, including a directory it
+        # created to stage into. Only remove one this call made and only while
+        # empty, so a destination the caller already had stays, as does one
+        # holding a successful import's files.
         if fresh and destination.is_dir() and not any(destination.iterdir()):
             destination.rmdir()
     return ImportResult(
@@ -266,10 +261,10 @@ def _refuse_collisions(
 ) -> None:
     """Refuse duplicate or directory targets, and existing files unless forced.
 
-    Checked across every file of every series before a single one moves, so a
-    refusal costs nothing: the destination is exactly as it was. That is half of
-    "updated completely or not at all"; the other half, a move that starts and
-    cannot finish, is `_file_atomically`'s.
+    Checked across every file of every series before any moves, so a refusal
+    leaves the destination as it was. That is half of "updated completely or not
+    at all". The other half, a move that starts and can't finish, is
+    `_file_atomically`'s.
     """
     counts = Counter(target for _, target in planned)
     duplicates = sorted(path.name for path, count in counts.items() if count > 1)
@@ -300,37 +295,31 @@ def _refuse_collisions(
 def _file_atomically(planned: Sequence[tuple[Path, Path]], destination: Path) -> None:
     """Move every planned file into `destination`, or leave it as it was.
 
-    A half-moved import is the state that is hardest to reason about afterwards,
-    and under `--force` it is worse than untidy: a new sidecar left beside the
-    *previous* import's scan is a scan described by the wrong series, and
-    nothing about either file says so. So every step here is a rename, recorded
-    as it is made, and a step that fails has the record reversed.
+    A half-moved import is hard to reason about, and under `--force` it can be
+    wrong: a new sidecar beside the previous import's scan describes that scan
+    with the wrong series. So every step is a rename, recorded as it is made, and
+    a failing step has the record reversed.
 
-    It is done in two passes, and the order is the safety. First every target
-    that already exists is moved aside -- only ever reached under `--force`
-    (`_refuse_collisions` has refused it otherwise), and moved rather than
-    overwritten so that it can be put back. Only then is anything filed. A pass
-    that fails part-way therefore fails with one vintage of file in
-    `destination`: the old ones while setting aside, since nothing new has been
-    filed, and the new ones while filing, since everything they collide with is
-    already out of the way. Interleaved -- set one aside, file its replacement,
-    go on to the next -- a refused set-aside leaves an old scan that never moved
-    beside a new sidecar that may not come back out.
+    There are two passes, and the order matters. First every existing target is
+    moved aside (only under `--force`; `_refuse_collisions` refuses it
+    otherwise), not overwritten, so it can be put back. Only then is anything
+    filed. A failure therefore leaves one vintage of file in `destination`: old
+    ones while setting aside, new ones while filing. Interleaving the passes
+    could leave an old scan that never moved beside a new sidecar that may not
+    come back out.
 
-    Aside is a hidden directory in `destination`, not the staging directory:
-    staging is removed unconditionally when the import ends, and what is set
-    aside is the caller's own file until the import has succeeded. Once it has,
-    the files set aside are deleted -- that is what `--force` asked for.
+    The set-aside files go in a hidden directory in `destination`, not the
+    staging directory, because staging is always removed and these are the
+    caller's own files until the import succeeds. After that they are deleted, as
+    `--force` asked.
 
-    Undoing is itself a sequence of renames and can be refused for the reason
-    the move was, so it too is ordered to stop safely: every file this import
-    filed is withdrawn, and only if all of them went are the files set aside put
-    back. A new file that will not leave never has an old one restored around
-    it; what was set aside is *kept*, where nothing will read it as a result,
-    and the error says which files are which. Two things this cannot cover: a
-    process killed part-way, which leaves the half-moved state with whatever it
-    had replaced still set aside; and a file of an earlier import that this one
-    does not collide with, which was never this function's to move.
+    Undoing can be refused for the same reason as the move, so it also stops
+    safely. Every file this import filed is withdrawn first, and only if all
+    went are the set-aside files put back. A new file that won't leave never has
+    an old one restored around it. The set-aside files are kept instead, and the
+    error says which files are which. Two cases are not covered: a process killed
+    part-way, which leaves the half-moved state with the replaced files still set
+    aside, and a file from an earlier import that this one doesn't collide with.
 
     Raises
     ------
@@ -364,8 +353,8 @@ def _file_atomically(planned: Sequence[tuple[Path, Path]], destination: Path) ->
         ) from exc
     if aside is not None:
         shutil.rmtree(aside, ignore_errors=True)
-        # `ignore_errors` must not mean silently: what is in there is the scans
-        # `--force` was asked to replace, in a directory nothing else removes.
+        # Don't fail silently: this directory holds the scans `--force` was
+        # asked to replace, and nothing else removes it.
         if aside.exists():
             warn(
                 f"could not remove {aside}; it holds the files this import "
@@ -387,10 +376,10 @@ def _undo(moves: Sequence[tuple[Path, Path]]) -> list[tuple[Path, Path]]:
 def _remove_if_empty(aside: Path | None) -> None:
     """Remove the set-aside directory once an undo has emptied it.
 
-    Cleanup, made while an error is being raised, in a directory something may
-    be holding open -- so it is never allowed to raise. A refusal here would
-    replace the statement of what state the destination is in with a bare errno
-    naming a hidden directory the caller has never heard of.
+    This is cleanup made while an error is being raised, in a directory
+    something may hold open, so it must never raise. A refusal here would replace
+    the statement of the destination's state with a bare errno naming a hidden
+    directory the caller has never heard of.
     """
     if aside is not None:
         with suppress(OSError):
@@ -405,9 +394,9 @@ def _aftermath(
 ) -> str:
     """Build the error's second half: the state the move left `destination` in.
 
-    `ours` are files of this import that could not be withdrawn; `kept` are files
-    it had replaced that are still set aside, because they could not be put back
-    or because, with `ours` still in place, they were deliberately not.
+    `ours` are files of this import that could not be withdrawn. `kept` are files
+    it had replaced that are still set aside, either because they could not be
+    put back or because `ours` is still in place.
     """
     if not ours and not kept:
         return f"the import was undone and {destination} is as it was"
@@ -430,7 +419,7 @@ def _describe(
     """Describe one filed series, with the sidecar fields worth listing.
 
     `targets` are the series' files under their final names, in any order and
-    including `path`; the ordering of `ImportedSeries.files` is done here.
+    including `path`. This orders `ImportedSeries.files`.
     """
     stamp = naming.text_field(sidecar, "AcquisitionDateTime") or naming.text_field(
         sidecar, "AcquisitionTime"

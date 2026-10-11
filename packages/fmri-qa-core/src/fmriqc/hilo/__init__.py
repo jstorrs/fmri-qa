@@ -1,19 +1,19 @@
 """High/low flip-angle noise separation (thermal vs. instability).
 
 Greve's high/low flip-angle QA: two phantom runs that differ only in flip angle
-let thermal (additive) noise be separated from instability (multiplicative)
-noise, because their variances scale differently with signal level. `run_hilo`
-pools statistics over the shared eroded phantom core; `separate_noise` is the
-flip-angle algebra, kept pure so it can be exercised directly.
+separate thermal (additive) noise from instability (multiplicative) noise,
+because their variances scale differently with signal level. `run_hilo` pools
+statistics over the shared eroded phantom core. `separate_noise` is the
+flip-angle algebra, kept pure so it can be tested directly.
 
 `ls` this package to find a concern:
 
-* `result`        -- `HiLoResult`, the value object, and `separate_noise`, the
-                      pure algebra that fills it
-* `mask`          -- `phantom_core_mask`, the eroded phantom-core mask each
-                      scan is reduced over, and its `HILO_ERODE` tuning constant
+* `result`        -- `HiLoResult` and `separate_noise`, the pure algebra that
+                      fills it
+* `mask`          -- `phantom_core_mask`, the eroded core each scan is reduced
+                      over, and its `HILO_ERODE` constant
 * `stats`         -- per-scan reduction to the mean/SD maps `run_hilo` pools
-* `compatibility` -- the geometry/acquisition checks the two scans must satisfy
+* `compatibility` -- the geometry and acquisition checks the two scans must pass
 """
 
 from ..exceptions import IncompatibleScansError
@@ -49,13 +49,14 @@ def run_hilo(
 ) -> HiLoResult:
     """Separate thermal from instability noise in a high/low flip-angle pair.
 
-    Following Greve's high/low flip-angle method (bxh `fmriqa` tooling): `high` and
-    `low` must be the same acquisition except for flip angle (the high-flip run
-    first). Each scan is reduced to a temporal-mean map and a
-    temporal-SD-of-residual map over the whole volume (`hilo_stats`), and the
-    statistics are pooled over the **shared** eroded phantom core — the intersection
-    of the two scans' core masks — so `mean_high` and `mean_low` are averaged over
-    identical voxels. `separate_noise` then does the flip-angle algebra.
+    Follows Greve's high/low flip-angle method (bxh `fmriqa` tooling). `high` and
+    `low` must be the same acquisition except for flip angle, with the high-flip
+    run first. Each scan is reduced to a temporal-mean map and a
+    temporal-SD-of-residual map over the whole volume (`hilo_stats`). The
+    statistics are pooled over the **shared** eroded phantom core, the
+    intersection of the two scans' core masks, so `mean_high` and `mean_low` are
+    averaged over identical voxels. `separate_noise` then does the flip-angle
+    algebra.
 
     Raises
     ------

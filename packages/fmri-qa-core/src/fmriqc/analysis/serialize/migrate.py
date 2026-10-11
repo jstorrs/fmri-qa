@@ -1,25 +1,22 @@
 """Bring a stored document up to the current schema, one version step at a time.
 
-An artifact outlives the build that wrote it — that is the point of saving one —
-so a schema bump must not orphan a QA archive a trend database has been filling
-for months. Every older layout this build knows a route from is migrated forward
-here, in memory, on read.
+An artifact outlives the build that wrote it, so a schema bump must not orphan a
+QA archive a trend database has filled for months. Every older layout this build
+knows a route from is migrated forward here, in memory, on read.
 
-Each `_vN_to_vN1` knows only about its own version bump; `migrated` applies them
-in sequence, so a v1 file reaches the current schema through every intermediate
-step. A field the older schema did not carry comes back *unknown*, never
-reconstructed: a value this build derives would be a fact about this build, not
-about the artifact.
+Each `_vN_to_vN1` handles one version bump, and `migrated` applies them in
+sequence. A field the older schema did not carry comes back unknown, never
+reconstructed, because a value this build derives would be a fact about this
+build, not about the artifact.
 
 Bumping `ARTIFACT_SCHEMA_VERSION` is not done until the outgoing version has a
-committed fixture: run the old code (a `git worktree` checkout of the last
-commit at that version) over the shared synthetic phantom and save the file to
-`tests/fixtures/schema_v{N}.qa.nc` -- or `.qa.npz`, if the build being checked
-out is old enough to still write that container; `test_artifact_fixtures.py`
-finds either, and the loader tells them apart by their leading bytes. A
-migration step tested only against a same-build document synthesized to look
-old -- which is what `test_artifact_archive.py` does -- proves the step matches
-its own docstring, not that a real file from that version still parses.
+committed fixture. Run the old code (a `git worktree` checkout of the last commit
+at that version) over the shared synthetic phantom and save the file to
+`tests/fixtures/schema_v{N}.qa.nc`, or `.qa.npz` if that build still wrote that
+container. `test_artifact_fixtures.py` finds either, and the loader tells them
+apart by leading bytes. A migration tested only against a same-build document
+synthesized to look old (as `test_artifact_archive.py` does) proves the step
+matches its docstring, not that a real file from that version still parses.
 """
 
 from collections.abc import Callable
@@ -34,11 +31,11 @@ from ..artifact import ARTIFACT_SCHEMA_VERSION
 def _v1_to_v2(document: dict[str, Any]) -> dict[str, Any]:
     """Migrate schema 1 to 2, recording the localization diagnostics as unknown.
 
-    A v1 artifact was analyzed by a build that never asked whether the phantom
-    segmentation or the summary ROI held, so nothing in the file answers it.
-    Inventing a pass would vouch for numbers this package cannot vouch for, and
-    inventing a failure would condemn scans that were probably fine; the
-    diagnostics are therefore *absent*, not false (see `Measurements`).
+    A v1 build never asked whether the phantom segmentation or the summary ROI
+    held, so nothing in the file answers it. A made-up pass would vouch for
+    numbers this package cannot vouch for, and a made-up failure would condemn
+    scans that were probably fine. So the diagnostics are absent, not false (see
+    `Measurements`).
     """
     document["measurements"] |= {
         "phantom_fraction": float("nan"),
@@ -50,10 +47,10 @@ def _v1_to_v2(document: dict[str, Any]) -> dict[str, Any]:
 def _v2_to_v3(document: dict[str, Any]) -> dict[str, Any]:
     """Migrate schema 2 to 3, recording the phantom-mask verdict as unknown.
 
-    The verdict is not re-derived from the stored fraction even though it could
-    be: the bounds belong to the segmentation in `prep`, which this module does
-    not import at read time (see `analysis`), and a verdict reached by some other
-    build's bounds would be a fact about this build, not about the artifact.
+    The verdict is not re-derived from the stored fraction. The bounds belong to
+    the segmentation in `prep`, which this module does not import at read time
+    (see `analysis`), and a verdict from another build's bounds would describe
+    this build, not the artifact.
     """
     document["measurements"]["phantom_mask_ok"] = None
     return document
@@ -62,12 +59,11 @@ def _v2_to_v3(document: dict[str, Any]) -> dict[str, Any]:
 def _v3_to_v4(document: dict[str, Any]) -> dict[str, Any]:
     """Migrate schema 3 to 4, recording the trim count as not recorded.
 
-    The trim is not recomputed from the stored `trim_sec` and `tr` even though
-    the arithmetic is one line: `trim_count` belongs to `prep`, and a count this
-    build derives would be a fact about this build's rounding, not about the
-    volumes the writing build actually dropped. So the field says "not recorded",
-    and a reader keeps its frame indices in the analyzed series where they were
-    measured (see `Provenance`).
+    The trim is not recomputed from the stored `trim_sec` and `tr`.
+    `trim_count` belongs to `prep`, and a count this build derives would reflect
+    this build's rounding, not the volumes the writing build dropped. So the
+    field says "not recorded", and frame indices stay in the analyzed series
+    where they were measured (see `Provenance`).
     """
     document["provenance"]["n_trimmed"] = None
     return document
@@ -76,12 +72,11 @@ def _v3_to_v4(document: dict[str, Any]) -> dict[str, Any]:
 def _v4_to_v5(document: dict[str, Any]) -> dict[str, Any]:
     """Migrate schema 4 to 5, recording the plane and mask contrast as unknown.
 
-    Both are measurements the writing build made and did not write down, so
-    they come back unknown: the slice cannot be re-derived (it depends on the
-    volume, which the artifact does not carry) and the contrast could only be
-    recomputed from the stored images with this build's definition. Schema 4
-    also stored `settings.roi_size` already clamped to the image; that value is
-    still a request that reproduces the run, so it is left as it is.
+    The writing build made both measurements and did not write them down. The
+    slice cannot be re-derived, since it depends on the volume, which the
+    artifact does not carry. The contrast could only be recomputed with this
+    build's definition. Schema 4 also stored `settings.roi_size` already clamped
+    to the image. That value still reproduces the run, so it is left as it is.
     """
     document["provenance"] |= {"slice_index": None, "n_slices": None}
     document["measurements"]["phantom_contrast"] = float("nan")
@@ -91,25 +86,21 @@ def _v4_to_v5(document: dict[str, Any]) -> dict[str, Any]:
 def _v5_to_v6(document: dict[str, Any]) -> dict[str, Any]:
     """Migrate schema 5 to 6, declaring its displacements to be in voxels.
 
-    This migration does not follow the "unknown, never reconstructed" pattern
-    the others do, because there is nothing to reconstruct: before this build,
-    `MotionResult.max_translation` and `CenterOfMassResult.max_displacement`
-    computed a voxel `np.hypot` unconditionally, whether or not the header's
-    voxel size was known, so every schema <= 5 artifact's stored numbers *are*
-    voxels -- a documented fact about the old format, not a value only this
-    build could derive. `displacement_unit` is recorded as "vox" outright, not
-    left unknown; unlike, say, `phantom_contrast`, `LengthUnit` has no unknown
-    state to fall back on ("mm"/"vox" is all `fwhm_unit` has ever offered).
+    Unlike the other steps, this one does not record "unknown, never
+    reconstructed", because there is nothing to reconstruct.
+    `MotionResult.max_translation` and `CenterOfMassResult.max_displacement` used
+    to compute a voxel `np.hypot` unconditionally, whether or not the voxel size
+    was known. So every schema <= 5 artifact's stored numbers *are* voxels. That
+    is a documented fact about the old format, not a value only this build could
+    derive. `displacement_unit` is recorded as "vox" outright. `LengthUnit` has
+    no unknown state to fall back on.
 
-    This can leave a migrated artifact with `displacement_unit` disagreeing
-    with `fwhm_unit` -- e.g. "vox" beside a `fwhm_unit` of "mm", when the
-    voxel size was known but schema 5 never used it for these two peaks. That
-    is real history, not a bug: only an artifact this build produces itself is
-    guaranteed to have both fields agree (see `Measurements.displacement_unit`).
-    The stored `max_translation`/`max_com_displacement` values themselves are
-    left untouched -- converting them to mm now, using `Provenance.voxel_mm`,
-    would publish this build's convention as if it were the measurement the
-    writing build made.
+    A migrated artifact can therefore have `displacement_unit` "vox" beside a
+    `fwhm_unit` of "mm". That is real history, not a bug. Only an artifact this
+    build produces is guaranteed to have both agree (see
+    `Measurements.displacement_unit`). The stored values are left untouched.
+    Converting them to mm with `Provenance.voxel_mm` would publish this build's
+    convention as the writing build's measurement.
     """
     document["measurements"]["displacement_unit"] = "vox"
     return document
@@ -118,28 +109,25 @@ def _v5_to_v6(document: dict[str, Any]) -> dict[str, Any]:
 def _v6_to_v7(document: dict[str, Any]) -> dict[str, Any]:
     """Migrate schema 6 to 7, carrying its clipping answers forward unchanged.
 
-    Schema 7 lets the clipping block be None -- "the series did not arrive as
-    integers, so the rail test could not run". No schema 6 document can need
-    that value: the build that wrote it ran the test unconditionally and
-    recorded a bool either way, so every stored `clipped_any` is an answer that
-    build actually reached. They carry forward untouched, and this step edits
-    nothing.
+    Schema 7 lets the clipping block be None, meaning the series was not stored
+    as integers and the rail test could not run. No schema 6 document needs that
+    value, because the build that wrote it ran the test unconditionally and
+    recorded a bool. This step edits nothing.
 
-    What it cannot do is *audit* them. A schema 6 artifact built from a
-    float-converted NIfTI carries `clipped_any` False, which that build believed
-    and which this one would call not determinable -- but the artifact does not
-    record the storage datatype, so there is no way to tell those apart from
-    here. Rewriting them to None would condemn every genuinely clean scan along
-    with them; leaving them is the same "never reconstruct" rule the steps above
-    follow, and `Measurements` says what a schema <= 6 False is worth.
+    It cannot audit those bools. A schema 6 artifact built from a
+    float-converted NIfTI carries `clipped_any` False, which this build would
+    call not determinable, but the artifact does not record the storage datatype.
+    Rewriting to None would condemn every genuinely clean scan with them, so the
+    values stay, as with the steps above. `Measurements` says what a schema <= 6
+    False is worth.
     """
     return document
 
 
 # One step per version: `_MIGRATIONS[n]` takes a document at schema `n` and
-# returns it at `n + 1`. Applied in sequence, so a v1 file reaches the current
-# schema through every intermediate step and each migration only has to know
-# about its own version bump.
+# returns it at `n + 1`. They are applied in sequence, so a v1 file reaches the
+# current schema through every intermediate step and each migration only has to
+# know about its own version bump.
 _MIGRATIONS: dict[int, Callable[[dict[str, Any]], dict[str, Any]]] = {
     1: _v1_to_v2,
     2: _v2_to_v3,
@@ -153,10 +141,9 @@ _MIGRATIONS: dict[int, Callable[[dict[str, Any]], dict[str, Any]]] = {
 def migrated(document: dict[str, Any], path: Path) -> dict[str, Any]:
     """Bring a stored document up to the current schema, or refuse it.
 
-    The caller is warned when anything it is reading was recorded as unknown
-    rather than measured. Two versions are refused, because neither has an
-    honest answer: one from a newer build (whose layout this one cannot know)
-    and an older one with no route from.
+    The caller is warned when anything it reads was recorded as unknown rather
+    than measured. Two kinds of version are refused: one from a newer build,
+    whose layout this one cannot know, and an older one with no route from it.
     """
     found = document.get("schema_version")
     if not isinstance(found, int) or isinstance(found, bool):
