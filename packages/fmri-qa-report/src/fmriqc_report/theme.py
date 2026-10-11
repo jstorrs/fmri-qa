@@ -57,4 +57,6 @@ class Theme:
         return rc
 
 
+#: The theme a report uses when none is given: gray colormap, tab:blue accent,
+#: default font.
 DEFAULT_THEME = Theme()

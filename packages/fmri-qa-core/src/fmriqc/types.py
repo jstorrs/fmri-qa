@@ -60,12 +60,17 @@ Sidecar = Mapping[str, object]
 # Closed sets of option strings, modeled as Literal so a bad value is a type
 # error at the call site (see style/architecture.md). The runtime tuple each CLI
 # and validator uses is derived from the Literal, so the set is defined once.
+#: Detrending method: ``"poly"`` or ``"spline"``.
 DetrendMethod = Literal["poly", "spline"]
+#: Every `DetrendMethod`, as a tuple.
 DETREND_METHODS: tuple[DetrendMethod, ...] = get_args(DetrendMethod)
 
 # ROI localization mode. "image": middle slice + image-center ROI (Glover).
 # "phantom": largest-cross-section slice + detected phantom-center ROI.
+#: ROI localization mode: ``"image"`` (image center) or ``"phantom"`` (detected phantom
+#: center).
 RoiCenter = Literal["image", "phantom"]
+#: Every `RoiCenter`, as a tuple.
 ROI_CENTER_MODES: tuple[RoiCenter, ...] = get_args(RoiCenter)
 
 # Unit a reported length carries: millimeters when the header gave a voxel size,
@@ -90,7 +95,9 @@ PeLabel = Literal["row", "col", "?"]
 # `int | None` and `load.pe_axis.in_plane` is the one place that narrows one to
 # the other. `validation.validate_qa_run` resolves the axis a run measures on
 # and hands it back, and everything inward of that speaks this type.
+#: In-plane phase-encode axis as a voxel-array index: ``0`` or ``1``.
 PeAxis = Literal[0, 1]
+#: Every `PeAxis`, as a tuple.
 PE_AXES: tuple[PeAxis, ...] = get_args(PeAxis)
 
 
@@ -111,14 +118,20 @@ def readout_axis(pe_axis: PeAxis) -> PeAxis:
 # what a QA import wants: `convert.naming` builds the file name from the series'
 # acquisition date and time, and "all" throws that date away. Named here rather
 # than passed as dcm2niix's own `-ba o/y/n` so the choice reads as what it means.
+#: Sidecar anonymization level: ``"pii"`` (strip the patient, keep the dates),
+#: ``"all"`` or ``"none"``.
 Anonymize = Literal["pii", "all", "none"]
+#: Every `Anonymize` level, as a tuple.
 ANONYMIZE_MODES: tuple[Anonymize, ...] = get_args(Anonymize)
 
 # Which name an imported series is filed under: the one `convert.naming` builds
 # from the sidecar (date, time, zero-padded series, description), or whatever
 # dcm2niix's own `-f` template produced. See `convert.naming` for why the two
 # are not the same thing.
+#: How an imported series is named: ``"qa"`` (date, time, series, description) or
+#: ``"dcm2niix"``.
 NameStyle = Literal["qa", "dcm2niix"]
+#: Every `NameStyle`, as a tuple.
 NAME_STYLES: tuple[NameStyle, ...] = get_args(NameStyle)
 
 

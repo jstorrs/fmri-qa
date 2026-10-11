@@ -32,11 +32,15 @@ __all__ = [
 # Fraction of the brightest ghost-region voxels averaged for the localized-ghost
 # statistic (Greve / bxh fmriqa_ghostiness "top-10%"): catches a concentrated
 # bright ghost that the region-mean ghost ratio dilutes.
+#: Fraction of the brightest ghost-region voxels averaged for the localized-ghost
+#: statistic.
 GHOST_TOP_FRACTION = 0.10
 
 # Erosion/dilation radius (voxels) that sets the ghost/signal band width. The
 # single source of truth for every ghost statistic's default and for the report
 # overlay, so the drawn masks always match the masks the numbers were sampled on.
+#: Erosion/dilation radius, in voxels, that sets the width of the ghost and signal
+#: bands.
 GHOST_RADIUS = 3
 
 

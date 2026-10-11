@@ -65,17 +65,23 @@ __all__ = [
 
 # `fmriqc`'s own defaults, restated nowhere else: every default a form shows
 # and every domain a form is checked against reads from this one instance.
+#: The `~fmriqc.AnalysisSettings` defaults every form shows and validates against.
 DEFAULT_SETTINGS: AnalysisSettings = AnalysisSettings()
 
 # Aliases of `fmriqc`'s closed option sets, under the names this form speaks.
 # `anonymize` has no field on `FormValues` (the panel has no way to ask for
 # it), but the `--anonymize` flag needs its domain and wording, in one place,
 # same as the others.
+#: Detrend methods the form offers.
 DETREND_CHOICES: tuple[DetrendMethod, ...] = DETREND_METHODS
+#: ROI centering modes the form offers.
 CENTER_CHOICES: tuple[RoiCenter, ...] = ROI_CENTER_MODES
+#: Anonymization levels the ``--anonymize`` flag offers.
 ANONYMIZE_CHOICES: tuple[Anonymize, ...] = ANONYMIZE_MODES
 
+#: Label of the DICOM directory field in the CLI and in problem messages.
 DICOM_DIR_LABEL = "DICOM directory"
+#: Help text of the DICOM directory field.
 DICOM_DIR_HELP = "Directory of DICOM files (searched recursively)."
 # The panel speaks to a physicist, not a script: "folder" is the word the
 # panel's own widgets and Browse dialogs use, kept here rather than forked
@@ -83,46 +89,62 @@ DICOM_DIR_HELP = "Directory of DICOM files (searched recursively)."
 # lives in one place. `DICOM_DIR_LABEL` stays "directory": it is the wording
 # of the CLI's positional-argument help and of `parse_form`'s problem
 # messages, which the panel shows verbatim in its error dialog.
+#: Label of the DICOM directory field in the panel.
 DICOM_DIR_PANEL_LABEL = "DICOM folder"
 
+#: Label of the output directory field in the CLI and in problem messages.
 OUTPUT_DIR_LABEL = "Output directory"
+#: Help text of the output directory field.
 OUTPUT_DIR_HELP = (
     "Where to write one folder per series -- the converted scan, its sidecar, "
     "the QA artifact, and the report. Created if missing; an existing series "
     "folder is never overwritten."
 )
+#: Label of the output directory field in the panel.
 OUTPUT_DIR_PANEL_LABEL = "Output folder"
 
+#: Label of the trim field.
 TRIM_SEC_LABEL = "Trim"
+#: Help text of the trim field.
 TRIM_SEC_HELP = (
     "Seconds of initial (non-steady-state) volumes to drop (default: "
     f"{DEFAULT_SETTINGS.trim_sec:g})."
 )
 
+#: Label of the detrend method field.
 DETREND_LABEL = "Detrend method"
+#: Help text of the detrend method field.
 DETREND_HELP = f"Detrending method (default: {DEFAULT_SETTINGS.detrend})."
 
+#: Label of the ROI center field.
 CENTER_LABEL = "ROI center"
+#: Help text of the ROI center field.
 CENTER_HELP = (
     "Slice + ROI localization: 'image' (middle slice + image center, Glover) "
     f"or 'phantom' (largest slice + detected center). Default: "
     f"{DEFAULT_SETTINGS.center}."
 )
 
+#: Label of the ROI size field.
 ROI_SIZE_LABEL = "ROI size"
+#: Help text of the ROI size field.
 ROI_SIZE_HELP = (
     f"Fixed summary/Weisskoff ROI side in voxels (default: "
     f"{DEFAULT_SETTINGS.roi_size})."
 )
 
+#: Label of the anonymize field.
 ANONYMIZE_LABEL = "Anonymize"
+#: Help text of the anonymize field.
 ANONYMIZE_HELP = (
     "Sidecar content: 'pii' strips the patient and keeps the dates (default, "
     "and what 'qa' names need), 'all' strips the dates too, 'none' keeps "
     "everything."
 )
 
+#: Label of the open-the-report checkbox.
 OPEN_REPORT_LABEL = "Open the report when done"
+#: Help text of the open-the-report checkbox.
 OPEN_REPORT_HELP = (
     "Open the report in a browser once the run finishes -- the one report, if "
     "exactly one series was published, else the output folder (a browser can "

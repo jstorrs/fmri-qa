@@ -62,6 +62,7 @@ class Crashed:
     details: str = ""
 
 
+#: Anything a background run posts to its queue.
 type Event = Progress | CleanupNotice | Finished | Crashed
 
 type _Runner = Callable[..., "RunResult"]

@@ -26,7 +26,10 @@ __all__ = [
 # Per-volume registration budget (in-plane phantom motion). Phantom drift is
 # sub-voxel, so a few Gauss-Newton steps converge; TOL is on the largest
 # per-step parameter update (voxels for translation, fraction for strain).
+#: Most Gauss-Newton steps per volume in the motion registration.
 MOTION_MAX_ITER = 12
+#: Convergence tolerance on the largest per-step parameter update (voxels for
+#: translation, fraction for strain).
 MOTION_TOL = 1e-4
 
 

@@ -14,6 +14,8 @@ __all__ = ["Opener", "open_results"]
 
 # Injectable so a test never launches a real browser; the default is the one
 # `cli.main` uses in production.
+#: Callable that opens a URL and reports whether it succeeded; ``webbrowser.open`` in
+#: production.
 Opener = Callable[[str], bool]
 
 

@@ -32,6 +32,7 @@ __all__ = [
 
 # Plausible ADC saturation rails. A clipped magnitude image piles up at a
 # hardware 2**n - 1 ceiling; only these n are realistic for MR (12-bit -> 4095).
+#: ADC bit depths whose ``2**n - 1`` ceiling is tested as a clipping rail.
 SATURATION_BITS = range(8, 17)  # 255 .. 65535
 
 

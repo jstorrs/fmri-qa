@@ -66,6 +66,7 @@ class RenderedFigure:
 # The stable figure inventory in render order; each asset names its own section.
 # Keeping this vocabulary at module scope means the HTML composer can use it
 # without duplicating its fourteen figure identities.
+#: Every figure of the report, in render order; each asset names its own section.
 FIGURE_ASSETS: tuple[FigureAsset, ...] = (
     FigureAsset(
         name="signal",

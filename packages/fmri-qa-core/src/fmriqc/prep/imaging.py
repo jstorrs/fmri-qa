@@ -38,13 +38,16 @@ __all__ = [
 # and never none. Deliberately wide — this catches collapse, not miscalibration.
 # Defined here beside `segment_phantom`, whose output they describe; `geometry`
 # imports them for the warning `detect_phantom` raises.
+#: Lower open bound on the fraction of a frame a plausible phantom mask covers.
 DEGENERATE_PHANTOM_MIN = 0.0
+#: Upper open bound on the fraction of a frame a plausible phantom mask covers.
 DEGENERATE_PHANTOM_MAX = 0.95
 
 # Least in-mask/out-of-mask intensity ratio a mask must show to be a phantom
 # rather than a partition of noise (see `_phantom_area`). Measured on synthetic
 # frames: air segments at ~1.5-1.9, a phantom only 7x above the air floor at
 # ~10, a normal phantom at ~160. Deliberately nearer the noise end.
+#: Least in-mask to out-of-mask intensity ratio for a mask to count as a phantom.
 MIN_PHANTOM_CONTRAST = 4.0
 
 

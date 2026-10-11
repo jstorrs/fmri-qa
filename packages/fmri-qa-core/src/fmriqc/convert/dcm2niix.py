@@ -44,6 +44,7 @@ from ..warn import warn
 # series description.
 DEFAULT_TEMPLATE = "%t_%s_%d"
 # `import_dicom`, `build_args` and `fmri-qa-import` all default to these.
+#: Default sidecar anonymization: ``"pii"``, strip the patient and keep the dates.
 DEFAULT_ANONYMIZE: Anonymize = "pii"
 DEFAULT_DEPTH = 5
 

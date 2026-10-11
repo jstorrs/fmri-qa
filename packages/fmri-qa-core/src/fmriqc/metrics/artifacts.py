@@ -26,10 +26,14 @@ __all__ = [
 
 # R `mad()` default scale constant: 1.4826 makes the MAD a consistent estimator
 # of the SD for normal data. cran-fmriqa's spike scores divide by this MAD.
+#: Factor that makes the median absolute deviation estimate the standard deviation of
+#: normal data (R ``mad()``).
 MAD_SCALE = 1.4826
 
 # Threshold tuning parameter (3dToutcount default), used as qthr / n_t in the
 # normal upper-tail quantile; it is not an expected per-frame outlier fraction.
+#: Outlier threshold tuning parameter (the 3dToutcount default); not an expected
+#: per-frame outlier fraction.
 OUTLIER_QTHR = 0.001
 
 

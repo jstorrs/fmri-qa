@@ -57,6 +57,7 @@ class Failed:
     warnings: tuple[str, ...] = ()
 
 
+#: What happened to one series: `Published`, `Refused` or `Failed`.
 type SeriesOutcome = Published | Refused | Failed
 
 

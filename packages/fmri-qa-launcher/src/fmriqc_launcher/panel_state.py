@@ -50,6 +50,7 @@ class Determinate:
     maximum: int
 
 
+#: Where the progress bar sits: `Indeterminate` (pulsing) or `Determinate`.
 type BarState = Indeterminate | Determinate
 
 # One series passes through three stages that mark visible progress --
@@ -79,6 +80,7 @@ _STAGE_OFFSET: dict[Stage, int] = {
 # series, after some but not all of its files were staged), so the honest
 # answer is "empty" rather than guessing a partial fraction from wherever the
 # last `Progress` happened to land.
+#: Bar state after a crash that produced no `~fmriqc_launcher.RunResult`: empty.
 CRASHED_BAR: BarState = Determinate(value=0, maximum=1)
 
 

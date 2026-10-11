@@ -62,6 +62,7 @@ def describe(progress: Progress) -> str:
             assert_never(progress.stage)
 
 
+#: Callable that receives each `Progress` update as a run advances.
 type ProgressCallback = Callable[[Progress], None]
 
 

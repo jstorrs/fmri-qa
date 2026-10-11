@@ -12,6 +12,7 @@ from ..types import BoolArray, FloatArray
 
 # Voxel layers peeled off the phantom to form the high/low core mask (AFNI
 # 3dAutomask -erode 5) -- excludes edge / partial-volume / ghost-contaminated voxels.
+#: Voxel layers eroded from the phantom to form the high/low core mask.
 HILO_ERODE = 5
 
 

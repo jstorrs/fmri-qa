@@ -17,10 +17,13 @@ __all__ = [
     "read_stylesheet",
 ]
 
+#: Package-relative name of a bundled resource.
 type ResourceName = Literal["assets/report.css", "templates/run.html"]
 
 
+#: Name of the report stylesheet.
 STYLESHEET: ResourceName = "assets/report.css"
+#: Name of the run page template.
 RUN_TEMPLATE: ResourceName = "templates/run.html"
 
 

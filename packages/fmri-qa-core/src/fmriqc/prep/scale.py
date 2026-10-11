@@ -104,4 +104,5 @@ class VoxelSize:
 # frozen and slotted, so this single instance cannot be mutated by any holder --
 # which is also why a bare `VoxelSize()` default would have been correct, if
 # indistinguishable at a glance from the mutable default RUF009 exists to catch.
+#: The `VoxelSize` for a header that gave no voxel size.
 UNKNOWN_VOXEL_SIZE = VoxelSize()

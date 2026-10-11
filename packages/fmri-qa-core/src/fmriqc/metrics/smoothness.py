@@ -23,8 +23,11 @@ __all__ = [
 ]
 
 # Gaussian FWHM per standard deviation: sqrt(8 ln 2) (AFNI 3dFWHMx uses 2.35482).
+#: Gaussian FWHM per standard deviation, ``sqrt(8 ln 2)``.
 SIGMA_TO_FWHM = float(np.sqrt(8.0 * np.log(2.0)))
 # Lags (voxels) over which the directional noise autocorrelation / PSF is sampled.
+#: Largest lag, in voxels, at which the noise autocorrelation and point-spread curves
+#: are sampled.
 SMOOTHNESS_MAX_LAG = 10
 
 

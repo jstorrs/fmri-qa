@@ -28,12 +28,15 @@ __all__ = [
 # Detrend cutoff period (s). Drift slower than this is removed before noise is
 # measured. `poly` and `spline` historically used 200 vs 256; kept distinct
 # because only `poly` feeds the settled pipeline.
+#: Cutoff period, in seconds, of the ``poly`` detrender.
 POLY_CUTOFF_S = 200.0
+#: Cutoff period, in seconds, of the ``spline`` detrender.
 SPLINE_CUTOFF_S = 256.0
 
 # B-spline degree of the `spline` detrender. Named because the fit's coefficient
 # count -- `n_nodes + SPLINE_DEGREE + 1`, what `Detrender.for_series` weighs
 # against the frame count -- depends on it.
+#: B-spline degree of the ``spline`` detrender.
 SPLINE_DEGREE = 2
 
 

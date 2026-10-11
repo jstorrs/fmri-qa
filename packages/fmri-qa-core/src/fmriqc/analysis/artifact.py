@@ -42,6 +42,8 @@ from ..types import BoolArray, FloatArray, LengthUnit, PeAxis, PeLabel
 # 7: the whole clipping block is now optional -- `n_clipped_kept`,
 #    `n_clipped_pre`, `clipped_kept` and `clipped_any` are None together when
 #    the series did not arrive as integers and the rail test could not be run.
+#: On-disk schema version of the QA artifact; bumped on every incompatible layout
+#: change.
 ARTIFACT_SCHEMA_VERSION = 7
 
 
