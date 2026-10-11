@@ -181,11 +181,6 @@ were lost, and how many, without recomputing anything. The centroid trace is
 independent of that failure: it has no fit to fail, and a NaN there means only
 that the coordinate or its temporal reference has no resolved circular direction.
 
-One unit caveat survives migration. Schema 5 and earlier always published these
-two peaks in voxels regardless of whether the voxel size was known, so a
-migrated artifact can carry `displacement_unit` of `vox` beside a
-`measurements.fwhm_unit` of `mm`. On anything this build writes the two agree.
-
 ## References
 
 - AFNI `3dvolreg` — per-volume registration to a reference volume, which this

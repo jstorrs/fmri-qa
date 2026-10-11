@@ -182,10 +182,7 @@ Everything from `voxel_mm` down is acquisition metadata copied from the BIDS
 sidecar and the NIfTI header, and every one of those is optional: a scan
 without a sidecar still analyzes. A sidecar field of the wrong type (an
 `EchoTime` written as a string, say) is recorded as unknown with a warning
-naming it, rather than guessed at. `n_trimmed`, `slice_index` and `n_slices`
-can also be missing, but only on an artifact migrated from a schema that
-predates them — the trim and the slice choice happened, but nothing wrote them
-down.
+naming it, rather than guessed at.
 
 Text is written as `NC_CHAR`, UTF-8 encoded. A measurement's strings are
 closed vocabularies this package fixes (`mm`/`vox`, `row`/`col`/`?`), all

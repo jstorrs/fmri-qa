@@ -90,9 +90,7 @@ fields are absent together when the series did not arrive as integers: the
 estimator did not decline, it never ran. `clipped_any` is the field to test
 first — `clip_ceiling` and `clip_bits` are also absent on a perfectly
 determinable series that simply has no rail, so their absence alone says
-nothing. An artifact from schema 6 or earlier always answers true or false
-here, because the build that wrote it always answered; that false means "found
-no rail", not "the storage was checked".
+nothing.
 
 The check contributes no arrays and no coordinates.
 

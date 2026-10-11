@@ -167,8 +167,8 @@ scalar on the [stability](stability.md) page is averaged over.
 | --- | --- | --- |
 | `measurements.phantom_fraction` | attribute, double | share of the frame the mask covers, in [0, 1] |
 | `measurements.phantom_contrast` | attribute, double | mask interior over background; infinite over an exactly-zero background |
-| `measurements.phantom_mask_ok` | attribute, ubyte flag | the verdict on the two numbers above; **absent** on an artifact migrated from a schema that predates it |
-| `measurements.roi_inside_phantom` | attribute, ubyte flag | whether the summary ROI lies wholly within the mask; **absent** on the same migrated artifacts |
+| `measurements.phantom_mask_ok` | attribute, ubyte flag | the verdict on the two numbers above |
+| `measurements.roi_inside_phantom` | attribute, ubyte flag | whether the summary ROI lies wholly within the mask |
 | `images.phantom_mask` | variable `(row, col)`, mask | the phantom segmentation, stored as CF-flagged 0/1 bytes |
 | `images.invalid_mask` | variable `(row, col)`, mask | the zeroed image edge, excluded from every statistic |
 | `images.phantom_hull` | variable `(hull_vertex, hull_coord)` | closed convex outline of the mask, in (x, y) plot order |
