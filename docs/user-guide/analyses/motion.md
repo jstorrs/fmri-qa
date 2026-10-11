@@ -2,19 +2,16 @@
 
 ## What it is for
 
-A phantom on a scanner bed does not move. What *does* happen over a long run is
-that the gradient coils heat, their calibration drifts, and the image the
-scanner reconstructs slowly stretches and slides — which looks like motion in
-the reconstructed series without anything having been displaced. Measuring that
-is the point: a slow monotonic strain ramp is the thermal-drift signature, and
-a sudden step is something knocked, dropped, or mis-triggered.
+A phantom on a scanner bed does not move. Over a long run, though, the gradient
+coils heat, their calibration drifts, and the reconstructed image stretches and
+slides as if it had moved. A slow monotonic strain ramp is the thermal-drift
+signature. A sudden step means something was knocked, dropped, or mis-triggered.
 
-Two independent estimators are published, one expensive and one cheap. The
-first registers every frame to the run's temporal mean under a deformation
-model built for a rigid phantom. The second tracks the intensity centroid of
-the whole slice, which needs no mask and no registration at all. Agreement
-between them is reassuring; disagreement usually means the registration is
-looking at something the centroid is not.
+Two independent estimators are published. The expensive one registers every
+frame to the temporal mean under a deformation model built for a rigid phantom.
+The cheap one tracks the intensity centroid of the whole slice, with no mask or
+registration. If they disagree, the registration is usually looking at something
+the centroid is not.
 
 Both are **diagnostics only**. The analyzed series is never resampled from the
 fit, so the FBIRN metrics stay measured on the acquired data.
@@ -23,12 +20,11 @@ fit, so the FBIRN metrics stay measured on the acquired data.
 
 ### The registration model
 
-This is AFNI `3dvolreg`'s per-volume registration with the model tailored to a
-phantom. A stationary phantom cannot rotate, so the rotation degrees of freedom
-are dropped; what gradient heating does produce is a translation plus a scaling
-and shear. Each frame is aligned to the temporal-mean image under a 2-D affine
-restricted to translation and *symmetric* strain — five parameters, no
-rotation:
+This is AFNI `3dvolreg`'s per-volume registration with a model tailored to a
+phantom. A stationary phantom cannot rotate, so rotation is dropped. Gradient
+heating produces translation plus scaling and shear. Each frame is aligned to
+the temporal-mean image under a 2-D affine limited to translation and
+*symmetric* strain, which is five parameters and no rotation:
 
 $$W(\mathbf{x}) = \mathbf{c} + U(\mathbf{x} - \mathbf{c}) + \mathbf{t},
 \qquad
@@ -36,13 +32,12 @@ U = \begin{bmatrix} 1 + s_r & h \\ h & 1 + s_c \end{bmatrix},
 \qquad
 \mathbf{t} = \begin{bmatrix} d_r \\ d_c \end{bmatrix}$$
 
-$U$ is symmetric, which is exactly what excludes rotation: a general $2\times2$
-matrix carries an antisymmetric part, and that part *is* the rotation. The
-strain is pivoted at the phantom centroid $\mathbf{c}$ so that translation and
-deformation stay separable — pivot anywhere else and a pure scaling shows up as
-a translation too.
+$U$ is symmetric, which excludes rotation: a general $2\times2$ matrix has an
+antisymmetric part, and that part is the rotation. The strain is pivoted at the
+phantom centroid $\mathbf{c}$ to keep translation and deformation separable.
+Pivot elsewhere and a pure scaling also shows up as a translation.
 
-The fit is forward-additive Lucas-Kanade over the phantom mask: each step warps
+The fit is forward-additive Lucas-Kanade over the phantom mask. Each step warps
 the frame by the current parameters, forms the steepest-descent images from the
 warped frame's gradients,
 
@@ -53,10 +48,9 @@ g_r \tilde c + g_c \tilde r\,\big]$$
 (with $\tilde r, \tilde c$ the centered coordinates), and solves the linearized
 least-squares problem for the additive update. The warp Jacobian is linear in
 the centered coordinates and independent of the parameters, so the additive
-scheme is exact up to the image interpolation. At most 12 iterations are
-allowed and convergence is declared when the largest parameter update falls
-below $10^{-4}$ (voxels for translation, fraction for strain) — phantom drift
-is sub-voxel, so a handful of Gauss-Newton steps is enough.
+scheme is exact up to image interpolation. The fit stops after 12 iterations, or
+when the largest parameter update falls below $10^{-4}$ (voxels for translation,
+fraction for strain). Phantom drift is sub-voxel, so a few steps suffice.
 
 The published scalars are the peaks over frames:
 
@@ -68,17 +62,17 @@ with the translation magnitude in millimeters when the in-plane voxel size is
 known and in voxels when it is not.
 
 Each fit must be identifiable, finite, and converged. A frame that is
-rank-deficient, non-finite, or out of iterations is published as an all-NaN
-row rather than as a partial fit, a warning names how many frames failed, and
-the run's *peak* motion measurements are NaN — a peak over an incomplete series
-would be a smaller number presented as a larger claim.
+rank-deficient, non-finite, or out of iterations is published as an all-NaN row
+instead of a partial fit, and a warning gives the number of failed frames. The
+*peak* motion measurements are then NaN, since a peak over an incomplete series
+understates the true peak.
 
 ### The centroid trace
 
 The second estimator is bxh `fmriqa_volmeasures`' center of mass: the
-intensity-weighted first moment of the whole slice, computed *circularly*.
-An MRI image is periodic under FFT reconstruction, so the moment is taken
-through the unit circle,
+intensity-weighted first moment of the whole slice, computed *circularly*. An
+MRI image is periodic under FFT reconstruction, so the moment goes through the
+unit circle,
 
 $$\theta_a(t) = \frac{2\pi}{N_a}\,\mathbf{x}_a, \qquad
 \bar\theta_a(t) = \operatorname{atan2}\!\big(
@@ -86,32 +80,29 @@ $$\theta_a(t) = \frac{2\pi}{N_a}\,\mathbf{x}_a, \qquad
 \qquad
 \text{COM}_a(t) = \frac{N_a}{2\pi}\,\bar\theta_a(t) \bmod N_a$$
 
-which is what lets a phantom sitting against a wrapped image edge yield its
-true centroid instead of aliasing to mid-FOV. The circular mean has a second
-useful property: a uniform background and the 180-degree Nyquist ghost
-self-cancel on the periodic grid, so this needs no phantom mask at all — only
-genuinely missing data (a vendor-nulled edge) is healed first. The reference is
-the circular mean of the per-frame centroids, and the published deviation is
-wrapped into $(-N_a/2,\, N_a/2]$ so a centroid that crosses the periodic
-boundary reads as a small displacement rather than a full-FOV jump.
+so a phantom against a wrapped image edge gets its true centroid instead of
+aliasing to mid-FOV. The circular mean also cancels a uniform background and the
+180-degree Nyquist ghost on the periodic grid, so no phantom mask is needed.
+Only missing data (a vendor-nulled edge) is filled first. The reference is the
+circular mean of the per-frame centroids. The published deviation is wrapped
+into $(-N_a/2,\, N_a/2]$, so a centroid crossing the periodic boundary reads as
+a small displacement, not a full-FOV jump.
 
 An axis has a defined centroid only when its sine/cosine resultant norm exceeds
 $10^{-12}$ times the total positive above-pedestal intensity. This relative
-numerical tolerance rejects cancellation roundoff regardless of brightness:
-a uniform positive frame has no centroid even when it has nonzero total
-intensity. An unresolved coordinate is NaN and does not enter that axis's
-temporal reference; the other coordinate can still resolve. The reference uses
-the same tolerance relative to the number of resolved coordinates on each axis.
-It is NaN when none resolve or their unit vectors cancel, as with balanced
-antipodal centroids.
+tolerance rejects cancellation roundoff at any brightness, so a uniform positive
+frame has no centroid. An unresolved coordinate is NaN and stays out of that
+axis's temporal reference, but the other coordinate can still resolve. The
+reference uses the same tolerance relative to the number of resolved coordinates
+on each axis. It is NaN when none resolve or their unit vectors cancel, as with
+balanced antipodal centroids.
 
-`com` is the peak of that deviation's magnitude, in the same unit as the
-registration's translation. It is a first-moment measure, so it is blind to any
-deformation that preserves the centroid — which is exactly why it is published
-beside the registration rather than instead of it. Each magnitude requires both
-centroid coordinates and both reference axes to resolve. The peak ignores
-missing magnitudes and is NaN when no complete displacement is available,
-including when an axis of the temporal reference is ambiguous.
+`com` is the peak magnitude of that deviation, in the same unit as the
+registration's translation. A first-moment measure is blind to any deformation
+that preserves the centroid, so it sits beside the registration and does not
+replace it. Each magnitude needs both centroid coordinates and both reference
+axes. The peak ignores missing magnitudes and is NaN when no complete
+displacement exists, including when a reference axis is ambiguous.
 
 ## What it looks like
 
@@ -155,9 +146,9 @@ including when an axis of the temporal reference is ambiguous.
    )
 ```
 
-The traces are stored in voxels; the *peak* measurements are converted to
-millimeters when the header gave a voxel size, which is what
-`measurements.displacement_unit` records.
+The traces are stored in voxels. The *peak* measurements are converted to
+millimeters when the header gave a voxel size, and
+`measurements.displacement_unit` records which.
 
 ## What it contributes to the artifact
 
@@ -175,16 +166,16 @@ millimeters when the header gave a voxel size, which is what
 | `image_axis` | coordinate, flags `row col` | the in-plane array axis, for the two-column traces |
 
 The three registration measurements are NaN whenever *any* frame failed to
-converge, and the failed frames are all-NaN rows in `curves.translation`,
-`curves.scale_pct` and `curves.shear_pct` — so a consumer can tell which frames
-were lost, and how many, without recomputing anything. The centroid trace is
-independent of that failure: it has no fit to fail, and a NaN there means only
-that the coordinate or its temporal reference has no resolved circular direction.
+converge. The failed frames are all-NaN rows in `curves.translation`,
+`curves.scale_pct` and `curves.shear_pct`, so a consumer can see which and how
+many frames were lost. The centroid trace has no fit to fail. A NaN there means
+only that the coordinate or its temporal reference has no resolved circular
+direction.
 
 ## References
 
-- AFNI `3dvolreg` — per-volume registration to a reference volume, which this
+- AFNI `3dvolreg`. Per-volume registration to a reference volume, which this
   follows with the rotation removed and strain added.
-- Greve DN, bxh/XCEDE `fmriqa_volmeasures` — the circular center-of-mass trace.
+- Greve DN, bxh/XCEDE `fmriqa_volmeasures`. The circular center-of-mass trace.
 - Baker S, Matthews I. *Lucas-Kanade 20 years on: a unifying framework.* Int J
-  Comput Vis 2004;56:221–255 — the forward-additive formulation used here.
+  Comput Vis 2004;56:221–255. The forward-additive formulation used here.

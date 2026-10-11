@@ -3,64 +3,62 @@
 ## What it is for
 
 This is the core of the Glover/FBIRN phantom protocol (Friedman & Glover, 2006)
-and the reason the rest of the package exists: a stationary phantom emits a
-constant signal, so everything that moves in the measured time course is the
-scanner. Four scalars summarize how much moves and on what time scale — SNR
+and the reason the rest of the package exists. A stationary phantom emits a
+constant signal, so anything that changes in the measured time course comes from
+the scanner. Four scalars say how much changes and on what time scale: SNR
 against the static spatial noise, SFNR against the temporal fluctuation noise,
-the percentage of the mean signal that drift accounts for, and the percentage
-that the residual fluctuation accounts for — and a fifth, the Weisskoff radius
-of decorrelation, says how far the noise is from independent voxel to voxel,
-which is what decides whether averaging over an ROI actually buys precision.
+and the percentages of the mean signal due to drift and to residual fluctuation.
+A fifth, the Weisskoff radius of decorrelation, says how far the noise is from
+independent voxel to voxel, which decides whether averaging over an ROI buys
+precision.
 
-Every number here is measured over one fixed square ROI on one slice, so a
-number is comparable across sessions only if the localization is
-(see [phantom localization](localization.md)). The trim and the detrending
-described below are shared by every other analysis in the package: the
-residual field the outlier, smoothness and spike analyses read is the one this
-page's detrending produces.
+Every number is measured over one fixed square ROI on one slice, so it is
+comparable across sessions only if the localization is (see
+[phantom localization](localization.md)). The trim and detrending below are
+shared by every analysis. The outlier, smoothness and spike analyses read the
+residual field this detrending produces.
 
 ## Method
 
 ### The preprocessing every analysis shares
 
-The first volumes of an EPI run are not at steady state — longitudinal
-magnetization is still approaching its equilibrium, so the signal decays
-steeply through them. They are dropped before anything is measured:
+The first volumes of an EPI run are not at steady state. Longitudinal
+magnetization is still approaching equilibrium, so the signal decays steeply
+through them. They are dropped before anything is measured:
 
 $$n_{\text{trim}} = \max\!\left(\operatorname{round}\!\left(
 \frac{t_{\text{trim}}}{\mathrm{TR}}\right),\, 0\right)$$
 
 with $t_{\text{trim}}$ the `--trim-sec` setting (5 s by default). Every frame
-index published in the artifact counts from the *trimmed* series; adding
-`provenance.n_trimmed` recovers the acquired volume number.
+index in the artifact counts from the *trimmed* series. Add `provenance.n_trimmed`
+for the acquired volume number.
 
-One slice is then selected (the geometric middle slice under
-`--center image`), and each voxel's time course is detrended along time. The
-default fit is a Legendre polynomial of degree
+One slice is then selected (the middle slice under `--center image`) and each
+voxel's time course is detrended. The default fit is a Legendre polynomial of
+degree
 
 $$d = \operatorname{round}\!\left(\frac{N\,\mathrm{TR}}{200\ \mathrm{s}}\right)$$
 
-so the fit complexity follows the *duration* of the run rather than its frame
-count: a 200 s run gets one degree of freedom of drift, a 600 s run three.
-`--detrend spline` instead fits a least-squares B-spline of degree 2 with
+so fit complexity follows run *duration*, not frame count: a 200 s run gets one
+degree of freedom of drift, a 600 s run three. `--detrend spline` instead fits a
+least-squares B-spline of degree 2 with
 $\operatorname{round}(N\,\mathrm{TR}/256\ \mathrm{s}) - 1$ interior knots. The
-resolved order is published as part of the settings, because only the pipeline
-knows it. A fit with at least as many coefficients as there are frames is
-refused rather than performed — that leaves no residual for the noise metrics
-to be measured on, and the run would score as a perfectly stable scanner.
+resolved order is published with the settings, because only the pipeline knows
+it. A fit with at least as many coefficients as frames is refused. It would
+leave no residual for the noise metrics, and the run would score as a perfectly
+stable scanner.
 
-Writing $I_v(t)$ for the voxel time series, the fit gives a trend $T_v(t)$ and
-a residual (the *fluctuation*) $r_v(t) = I_v(t) - T_v(t)$. Two derived images
-follow, and both are published:
+Writing $I_v(t)$ for the voxel time series, the fit gives a trend $T_v(t)$ and a
+residual (the *fluctuation*) $r_v(t) = I_v(t) - T_v(t)$. Two derived images
+follow, both published:
 
 $$\bar S_v = \frac{1}{N}\sum_t I_v(t), \qquad
 \sigma_v = \sqrt{\frac{1}{N}\sum_t r_v(t)^2}$$
 
-the temporal mean (the *signal* image) and the temporal RMS of the residual
-(the *fluctuation noise* image). Detrending commutes with the spatial mean, so
-ROI-averaging these per-voxel fluctuations is the same thing as detrending the
-ROI-mean time course — which is why the ROI curves on this page and the
-per-voxel images agree by construction rather than by coincidence.
+the temporal mean (the *signal* image) and the temporal RMS of the residual (the
+*fluctuation noise* image). Detrending commutes with the spatial mean, so
+ROI-averaging the per-voxel fluctuations equals detrending the ROI-mean time
+course, and the ROI curves here agree with the per-voxel images by construction.
 
 ### SNR
 
@@ -74,12 +72,11 @@ $$D_v = \sum_{t \text{ odd}} I_v(t) \;-\; \sum_{t \text{ even}} I_v(t), \qquad
 
 where $\bar S_{\mathrm{ROI}}$ is the ROI mean of the signal image and
 $\operatorname{var}_{\mathrm{ROI}}(D)$ the variance of $D$ across the ROI's
-voxels. The difference is formed over an *even* number of frames, dropping a
-trailing frame if necessary: with an odd count the two subsets differ by one
-whole frame, so $D$ carries a frame of signal and the phantom's spatial
-shading — not noise — dominates the variance. The signal still averages the
-full series. SNR is NaN for a series too short to hold one odd/even pair, and
-NaN when $D$ has no variance across the ROI at all.
+voxels. The difference uses an *even* number of frames, dropping a trailing
+frame if needed. With an odd count the two subsets differ by a whole frame, so
+$D$ carries signal and the phantom's spatial shading, not noise, dominates the
+variance. The signal still averages the full series. SNR is NaN for a series too
+short to hold one odd/even pair, and when $D$ has no variance across the ROI.
 
 ### SFNR
 
@@ -88,15 +85,14 @@ by voxel, and averages the ratio over the ROI $R$:
 
 $$\mathrm{SFNR} = \frac{1}{|R|}\sum_{v \in R} \frac{\bar S_v}{\sigma_v}$$
 
-It is NaN if any ROI voxel has no fluctuation noise at all — an average over
-the ROI cannot be better defined than the voxels it averages. (The per-voxel
-SFNR *image* is a separate question: it is drawn rather than reduced, so it
-floors the divisor and a noiseless voxel renders instead of blanking the map.)
+It is NaN if any ROI voxel has no fluctuation noise, since an average is only as
+well defined as its voxels. (The per-voxel SFNR *image* is drawn, not reduced.
+It floors the divisor so a noiseless voxel renders instead of blanking the map.)
 
 ### Drift and fluctuation
 
-Both are percentages of the ROI mean signal, one read off the fitted trend and
-one off the residual:
+Both are percentages of the ROI mean signal, from the fitted trend and the
+residual respectively:
 
 $$\text{drift \%} = 100\,\frac{\max_t \bar T(t) - \min_t \bar T(t)}
 {\bar S_{\mathrm{ROI}}}, \qquad
@@ -104,43 +100,40 @@ $$\text{drift \%} = 100\,\frac{\max_t \bar T(t) - \min_t \bar T(t)}
 {\bar S_{\mathrm{ROI}}}$$
 
 with $\bar T$ and $\bar r$ the ROI-mean trend and residual. The fluctuation is
-an RMS about zero rather than about the residual's own mean, which the
-detrending has already removed. Both are NaN when the ROI mean signal is
-exactly zero — a percentage of nothing — rather than a division warning.
+an RMS about zero, since detrending has already removed the residual's mean.
+Both are NaN when the ROI mean signal is zero, with no division warning.
 
 ### The Weisskoff curve and the RDC
 
-Averaging $k \times k$ voxels should reduce the coefficient of variation by a
+Averaging $k \times k$ voxels should cut the coefficient of variation by a
 factor of $k$ if the noise is independent from voxel to voxel. It never quite
-does, and how far short it falls is the Weisskoff measurement (Weisskoff,
-1996). For each width $k = 1 \dots K$ (with $K$ the full ROI side), two
-coefficients of variation are formed on the concentric $k \times k$ ROI $R_k$:
+does, and the shortfall is the Weisskoff measurement (Weisskoff, 1996). For each
+width $k = 1 \dots K$ (with $K$ the full ROI side), two coefficients of
+variation are formed on the concentric $k \times k$ ROI $R_k$:
 
 $$\mathrm{CV}(k) = \frac{\operatorname{rms}_t\,\bar r_{R_k}(t)}{\bar S_{R_k}},
 \qquad
 \mathrm{CV}_1(k) = \frac{\sqrt{\langle \sigma_v^2 \rangle_{v \in R_k}}}
 {\bar S_{R_k}}$$
 
-$\mathrm{CV}$ is the measured variation of the ROI-mean time course;
+$\mathrm{CV}$ is the measured variation of the ROI-mean time course.
 $\mathrm{CV}_1$ is the single-voxel variation pooled over the same ROI. The
-uncorrelated-noise reference line is $\mathrm{CV}_1(K)/k$ — what $\mathrm{CV}$
-would be if averaging paid full dividends — and the ratio of the two at each
-width is the decorrelation factor. The reported scalar is that ratio at the
-full ROI:
+uncorrelated-noise reference line is $\mathrm{CV}_1(K)/k$, what $\mathrm{CV}$
+would be if averaging paid in full. The ratio of the two at each width is the
+decorrelation factor, and the reported scalar is that ratio at the full ROI:
 
 $$\mathrm{RDC} = \frac{\mathrm{CV}_1(K)}{\mathrm{CV}(K)}$$
 
-read as the width of an ROI over which the noise is effectively independent: a
-perfect scanner gives $\mathrm{RDC} = K$, and a real one gives less. The RDC is
-confounded by spatial smoothness — a smoother noise field decorrelates more
-slowly — which is why the [smoothness](smoothness.md) analysis reports an
-explicit FWHM beside it.
+read as the width of an ROI over which the noise is effectively independent. A
+perfect scanner gives $\mathrm{RDC} = K$ and a real one gives less. Spatial
+smoothness confounds the RDC, since smoother noise decorrelates more slowly, so
+the [smoothness](smoothness.md) analysis reports an explicit FWHM beside it.
 
 ## What it looks like
 
-The ROI time course, the trend that was removed from it, and the spectrum of
-what was left. The spectrum is stored with DC dropped, so it starts at the
-first nonzero bin and a plot needs no windowing knowledge of its own.
+The ROI time course, the trend removed from it, and the spectrum of what was
+left. The spectrum is stored with DC dropped, so it starts at the first nonzero
+bin and a plot needs no windowing of its own.
 
 ```{eval-rst}
 .. plot::
@@ -260,12 +253,11 @@ SFNR, the fluctuation noise, and the static (odd/even difference) noise.
 | `row` | coordinate, index | image row, in array-index order |
 | `col` | coordinate, index | image column, in array-index order |
 
-Any of the five measurements can be NaN, and NaN here always means *the
-estimator ran and could not resolve the value* — not that the quantity does not
-apply. None of them is ever absent. The settings that produced them
-(`trim_sec`, `detrend`, the resolved `detrend_order`, `roi_size`, `center`)
-ride in the JSON document's `settings` section; see
-[the artifact](../artifact.md).
+Any of the five measurements can be NaN. NaN always means the estimator ran and
+could not resolve the value, never that the quantity does not apply, and none is
+ever absent. The settings that produced them (`trim_sec`, `detrend`, the
+resolved `detrend_order`, `roi_size`, `center`) ride in the JSON document's
+`settings` section; see [the artifact](../artifact.md).
 
 ## References
 
@@ -276,5 +268,4 @@ ride in the JSON document's `settings` section; see
   contrast at 1.5 T.* Magn Reson Med 1996;36:643–645. (the ROI-size curve and
   the radius of decorrelation)
 - AFNI `afni_proc.py` recommends detrending before any noise statistic is
-  classified, which is why the residual field defined here is the one every
-  other analysis reads.
+  classified, so every other analysis reads the residual field defined here.

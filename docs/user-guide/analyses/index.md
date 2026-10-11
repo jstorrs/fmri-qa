@@ -4,10 +4,9 @@ Eight analyses run over a phantom series. Seven of them publish into the
 [analysis artifact](../artifact.md); the eighth takes a pair of scans and
 publishes nothing.
 
-Every page has the same shape: what the analysis is for, how it computes what it
-computes, a figure drawn by running the real pipeline over a synthetic phantom
-while these pages are built, and a table of exactly what it contributes to the
-artifact under the netCDF names a reader will see.
+Each page covers what the analysis is for, how it works, a figure drawn by the
+real pipeline on a synthetic phantom when the docs are built, and a table of
+what it adds to the artifact under its netCDF names.
 
 | Analysis | What it measures | Publishes |
 | --- | --- | --- |
@@ -20,9 +19,8 @@ artifact under the netCDF names a reader will see.
 | [Smoothness and point spread](smoothness.md) | the correlation length of the noise field per direction, and the shape of the blur | `fwhm`, `fwhm_pe`, `fwhm_ro`, `fwhm_unit` |
 | [Thermal versus instability noise](hilo.md) | a flip-angle pair split into additive and multiplicative noise | nothing — stdout only |
 
-The names in the last column are `measurements.*` attributes in the file; each
-page's own table gives them with their meanings, alongside the variables,
-masks, and coordinates that analysis owns.
+The last column lists `measurements.*` attributes. Each page's table gives their
+meanings and the variables, masks, and coordinates that analysis owns.
 
 ```{toctree}
 :maxdepth: 1

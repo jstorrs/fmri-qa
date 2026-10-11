@@ -4,11 +4,10 @@
 $ fmri-qa-run DICOM_DIR OUTPUT_DIR [options]
 ```
 
-`DICOM_DIR` is searched for DICOM files, down to five levels of
-sub-directories, and every series found there is converted and, unless its
-folder already exists, analyzed and published as its own folder under
-`OUTPUT_DIR` — see {doc}`run-output` for what each folder holds. `OUTPUT_DIR` is
-created if it does not exist, and must not be `DICOM_DIR` itself.
+`DICOM_DIR` is searched down to five levels of sub-directories. Each series found
+is converted and, unless its folder already exists, analyzed and published as a
+folder under `OUTPUT_DIR` (see {doc}`run-output`). `OUTPUT_DIR` is created if
+missing and must not be `DICOM_DIR`.
 
 ## Options
 
@@ -23,42 +22,39 @@ created if it does not exist, and must not be `DICOM_DIR` itself.
 | `--open` | off | once the run finishes, open the report in a browser if exactly one series was published, or the output directory if several were, so the browser lists the series folders; nothing if none was |
 | `--version` | — | print the installed version and exit |
 
-The four analysis settings are the ones `fmri-qa` takes, with the same
-defaults, and each is recorded in the artifact and shown in the report. Each
-is explained where it is used:
+The four analysis settings match `fmri-qa`'s, with the same defaults. Each is
+recorded in the artifact and shown in the report, and explained where it is
+used:
 
-- `--trim-sec` — {doc}`/user-guide/analyses/stability`, which describes the
-  trim every analysis shares; {doc}`/user-guide/analyses/saturation` counts
-  clipping on either side of it.
-- `--detrend` — {doc}`/user-guide/analyses/stability`, with the polynomial
-  and spline fits.
-- `--center` and `--roi-size` — {doc}`/user-guide/analyses/localization`,
-  under choosing the slice and placing the ROI.
+- `--trim-sec`: {doc}`/user-guide/analyses/stability` describes the trim every
+  analysis shares. {doc}`/user-guide/analyses/saturation` counts clipping on
+  either side of it.
+- `--detrend`: {doc}`/user-guide/analyses/stability`, with the polynomial and
+  spline fits.
+- `--center` and `--roi-size`: {doc}`/user-guide/analyses/localization`, under
+  choosing the slice and placing the ROI.
 
 `fmri-qa-run --help` lists them too, in the wording the panel shows under
 each field.
 
 ## No arguments: the desktop panel
 
-With neither directory given, `fmri-qa-run` opens the {doc}`panel` instead.
-When it cannot — this Python was built without `tkinter`, or there is no
-graphical display to attach to — it prints a message saying so, and the usage
-line, to stderr and exits `2`.
+With neither directory, `fmri-qa-run` opens the {doc}`panel`. If it cannot,
+because this Python has no `tkinter` or there is no display, it prints a message
+and the usage line to stderr and exits `2`.
 
-The panel takes no options of its own. Giving only one of the two directories,
-or any other option without both (only `--help` and `--version` stand
-alone), is a usage error rather than a partly filled panel.
+The panel takes no options. One directory alone, or any other option without both
+(only `--help` and `--version` stand alone), is a usage error, not a partly
+filled panel.
 
 ## Output and exit codes
 
-stdout carries only the path of each published report's HTML file, one per
-line and nothing else, so the command composes with whatever reads it. The
-paths are printed once the whole run has finished, in the order the series
-were found.
+stdout carries only the path of each published report, one per line, so the
+command composes with other tools. The paths are printed after the whole run
+finishes, in the order the series were found.
 
-stderr carries everything else: a line as each stage begins, then one line
-for each series refused, each series that failed and why, and each warning a
-series raised, and last a summary line.
+stderr carries everything else: a line as each stage begins, one line per refused
+series, per failed series and why, and per warning, and a final summary line.
 
 ```text
 Importing DICOM series
@@ -70,9 +66,9 @@ refusing to replace existing results: OUTPUT_DIR/20260909_140101_s001_QA_EPI_ISO
 # 2 of 3 series published to OUTPUT_DIR
 ```
 
-A refused series is found while the series are listed, before any analysis,
-so it has no progress lines and is not counted in "1 of 2"; the summary
-counts every series found.
+A refused series is found while the series are listed, before any analysis. It
+has no progress lines and is not counted in "1 of 2". The summary counts every
+series found.
 
 | Exit | When | On stderr |
 | --- | --- | --- |

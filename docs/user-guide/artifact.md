@@ -1,62 +1,56 @@
 # The analysis artifact
 
-One `.qa.nc` file is the whole published result of analyzing one series:
-the settings the run was asked for, where the data came from, every scalar
-measurement, every curve, and the summary images with the geometry drawn on
-them. It is what the calculation half produces and the only thing the report
-half accepts, and it is fully resolved — a consumer never recomputes a metric.
+One `.qa.nc` file is the whole published result of analyzing one series: the
+settings the run was asked for, where the data came from, every scalar
+measurement, every curve, and the summary images with the geometry drawn on them.
+The calculation half produces it and the report half accepts nothing else. It is
+fully resolved, so a consumer never recomputes a metric.
 
-This page documents the file. What each analysis puts *into* it is on that
-analysis's own page; the [analysis index](analyses/index.md) maps names to
+This page documents the file. What each analysis puts into it is on that
+analysis's own page. The [analysis index](analyses/index.md) maps names to
 pages.
 
 ## The container
 
-The file is netCDF-4, written through the `netCDF4` package — the Unidata C
-library itself, the one MATLAB, R and Octave are linked against, so what is
-written is what those readers were tested on.
+The file is netCDF-4, written through the `netCDF4` package, which wraps the
+Unidata C library that MATLAB, R and Octave link against. What is written is what
+those readers were tested on.
 
-netCDF rather than a NumPy archive because a QA archive outlives the Python
-environment that wrote it and is read at a site that may have none. MATLAB's
-`ncread`, `ncinfo`, `ncdisp` and `ncreadatt` are in the base product and need
-no toolbox; R's `ncdf4` is on CRAN; `ncdump` ships with the netCDF tools;
-xarray opens one in a call. A `.npz`, by contrast, needs npy-matlab (a package
-somebody has to find and install) and offers R only numeric arrays.
+It is netCDF instead of a NumPy archive because a QA archive outlives the Python
+environment that wrote it, and the site reading it may have none. MATLAB's
+`ncread`, `ncinfo`, `ncdisp` and `ncreadatt` need no toolbox. R's `ncdf4` is on
+CRAN. `ncdump` ships with the netCDF tools, and xarray opens one in a call. A
+`.npz` needs npy-matlab, which someone has to find and install, and gives R only
+numeric arrays.
 
-Version 4 rather than the classic version 1 buys three things this layout
-needs:
+Version 4 rather than the classic version 1 buys three things this layout needs:
 
-- **Per-variable compression** — zlib level 4 with the byte shuffle filter,
-  which reorders a float64's bytes so like-magnitude exponents sit together.
-- **A per-variable checksum** — `fletcher32`, stored with every array and
-  verified on every read, so a flipped bit inside an array's stored bytes is an
-  error rather than a plausible number.
-- **Zero-length dimensions** — `images.phantom_hull` is legitimately $(0, 2)$
-  when the mask is too small to have an outline, and netCDF-3 spells a
-  zero-length dimension as *the* unlimited one, of which a file may have
-  exactly one.
+- **Per-variable compression**: zlib level 4 with the byte shuffle filter, which
+  reorders a float64's bytes so like-magnitude exponents sit together.
+- **A per-variable checksum**: `fletcher32`, stored with every array and verified
+  on every read, so a flipped bit inside an array's stored bytes is an error and
+  not a plausible number.
+- **Zero-length dimensions**: `images.phantom_hull` is legitimately $(0, 2)$ when
+  the mask is too small to have an outline. netCDF-3 spells a zero-length
+  dimension as the unlimited one, and a file may have only one.
 
-Everything sits in the root group: `xr.open_dataset` sees only the root group
-and Octave's group support is uneven, so a subgroup would cost readers more
-than the tidiness is worth. `Conventions` is claimed as CF-1.10, which the mask
-flags and the labeled units follow. The dotted variable names do deviate from
-CF's recommendation of letters, digits and underscores; they are kept because
-the dotted path is the artifact's own vocabulary, and a reader who learns
-`images.sfnr` from `ncdisp` can look it up in these pages, which `images_sfnr`
-would not give.
+Everything sits in the root group, because `xr.open_dataset` sees only the root
+group and Octave's group support is uneven. `Conventions` is claimed as CF-1.10, which the
+mask flags and labeled units follow. The dotted variable names deviate from CF's
+recommendation of letters, digits and underscores. They stay because the dotted
+path is the artifact's own vocabulary: a reader who sees `images.sfnr` in
+`ncdisp` can look it up in these pages.
 
 ## Dimensions and coordinates
 
-Every array is declared over shared, named dimensions, so a reader sees which
-arrays lie along the same axis instead of inferring it from equal lengths. Two
-axes that merely happen to be the same size stay separate — `image_axis`,
-`psf_direction` and `hull_coord` are three different length-2 meanings, and
-conflating them would publish a relationship that is not there.
+Every array is declared over shared, named dimensions, so a reader can see which
+arrays share an axis without comparing lengths. Axes of equal size stay separate:
+`image_axis`, `psf_direction` and `hull_coord` are three different length-2
+meanings, and merging them would imply a relationship that is not there.
 
-Every dimension also carries a coordinate variable of its own, named for the
-dimension, which is the only spelling CF — and so xarray, and so `ncdisp` —
-reads as the axis itself. Without them a reader gets "dimensions without
-coordinates" and plots against 0…n−1.
+Every dimension also has a coordinate variable of the same name. CF, and so
+xarray and `ncdisp`, reads only that as the axis. Without it a reader gets
+"dimensions without coordinates" and plots against 0…n−1.
 
 | Dimension | Coordinate | Owned by |
 | --- | --- | --- |
@@ -70,42 +64,39 @@ coordinates" and plots against 0…n−1.
 | `hull_vertex` | vertex of the closed phantom outline | [localization](analyses/localization.md) |
 | `hull_coord` | flags `x y`, in plot order | [localization](analyses/localization.md) |
 
-Three of the label axes are stored as CF-flagged `NC_INT` rather than as
-`NC_STRING`: strings are a netCDF-4-only type that Octave's netCDF package and
-older readers handle poorly, and the flag vocabulary says the same thing in the
-terms the masks already use.
+Three of the label axes are stored as CF-flagged `NC_INT` instead of `NC_STRING`.
+Strings are a netCDF-4-only type that Octave's netCDF package and older readers
+handle poorly, and the flag vocabulary uses the same terms as the masks.
 
-Where an axis's real values cannot *be* its coordinate — because they are not
-one-dimensional — they stay where they are and the axis points at them with a
-CF `coordinates` attribute. `frame` is an index and the seconds along it are
-`curves.time`; the PSF lags differ by direction and so are 2-D. That is what
-makes xarray hand a reader `ds["curves.roi_signal"].coords["curves.time"]`
-beside the frame index.
+Where an axis's real values are not one-dimensional, they stay where they are and
+the axis points at them with a CF `coordinates` attribute. `frame` is an index
+and the seconds along it are `curves.time`. The PSF lags differ by direction and
+so are 2-D. This is why xarray gives
+`ds["curves.roi_signal"].coords["curves.time"]` beside the frame index.
 
 `frame` counts along the **analyzed** series, after the warm-up trim: the
 acquired volume number is the index plus `provenance.n_trimmed`, and
 `measurements.outlier_worst_frame` indexes this axis directly.
 
-All of the coordinates are derived at encode time and **none is ever read
-back**. The dotted arrays and the JSON document remain the single source of
-truth for `load_artifact`, so a coordinate cannot drift from what it was
-derived from.
+All coordinates are derived at encode time and **none is ever read back**. The
+dotted arrays and the JSON document remain the single source of truth for
+`load_artifact`, so a coordinate cannot drift from what it was derived from.
 
 ## Masks are flagged bytes
 
 netCDF-4 has no boolean type, so each mask (`images.phantom_mask`,
-`images.invalid_mask`, and the four `images.ghost.*` regions) is stored as
-`uint8` 0/1 bytes carrying CF's `flag_values = [0, 1]` and
-`flag_meanings = "outside inside"`. That is what makes the bytes
-self-describing enough to be turned back into `bool` on read; the artifact in
-memory is unchanged either way.
+`images.invalid_mask`, and the four `images.ghost.*` regions) is stored as `uint8`
+0/1 bytes carrying CF's `flag_values = [0, 1]` and
+`flag_meanings = "outside inside"`. That makes the bytes self-describing enough to
+be turned back into `bool` on read. The artifact in memory is the same either
+way.
 
 ## Global attributes
 
 ### `document`
 
-The whole of everything that is not an array rides as one JSON string in the
-global attribute `document`, with six top-level keys:
+Everything that is not an array rides as one JSON string in the global attribute
+`document`, with six top-level keys:
 
 | Key | Holds |
 | --- | --- |
@@ -118,28 +109,27 @@ global attribute `document`, with six top-level keys:
 
 ### Every scalar, as an attribute
 
-**Every scalar the document holds is also a global attribute of its own**,
-named for its document path, with a nested object flattening into the name —
+**Every scalar the document holds is also a global attribute of its own**, named
+for its document path, with a nested object flattening into the name:
 `settings.roi_size`, `measurements.snr`, `provenance.tr`, `curves.psf.fwhm`,
-`images.roi.row0` — so no reader has to decode JSON at all. `ncdisp` lists them
-all and `ncreadatt` hands one over.
+`images.roi.row0`. No reader has to decode JSON. `ncdisp` lists them all and
+`ncreadatt` hands one over.
 
-A float is an `NC_DOUBLE`, an integer an `NC_INT`, a bool an `NC_UBYTE` 0 or 1,
-a string `NC_CHAR`, and a JSON list of numbers the vector of its element type:
-`provenance.voxel_mm` is three doubles and `provenance.matrix` two ints, which
-is a shape a netCDF attribute has and a reader gets whole. A list of words is
-one space-separated text, the way CF spells `flag_meanings`: `curves.psf.labels`
-reads `PE RO`.
+A float is an `NC_DOUBLE`, an integer an `NC_INT`, a bool an `NC_UBYTE` 0 or 1, a
+string `NC_CHAR`, and a JSON list of numbers the vector of its element type.
+`provenance.voxel_mm` is three doubles and `provenance.matrix` two ints, a shape
+a netCDF attribute has and a reader gets whole. A list of words is one
+space-separated text, the way CF spells `flag_meanings`: `curves.psf.labels` reads
+`PE RO`.
 
-These attributes are a convenience for a foreign reader and nothing else. The
-JSON document stays the single source of truth for `load_artifact`, which never
-consults them — so the two can only disagree if the document does.
+These attributes are a convenience for foreign readers. The JSON document is the
+single source of truth for `load_artifact`, which never consults them. So the two can only disagree if the document does.
 
 ### The settings
 
 What the run was asked for, and the one thing it resolved. A setting that was
-not given — `pe_axis_override` unless `--pe-axis` was passed — has no
-attribute, by the same rule as a `null` provenance field.
+not given (`pe_axis_override` unless `--pe-axis` was passed) has no attribute, by
+the same rule as a `null` provenance field.
 
 | Attribute | Type | Meaning |
 | --- | --- | --- |
@@ -179,47 +169,46 @@ attribute, by the same rule as a `null` provenance field.
 | `provenance.series` | text | series description |
 
 Everything from `voxel_mm` down is acquisition metadata copied from the BIDS
-sidecar and the NIfTI header, and every one of those is optional: a scan
-without a sidecar still analyzes. A sidecar field of the wrong type (an
-`EchoTime` written as a string, say) is recorded as unknown with a warning
-naming it, rather than guessed at.
+sidecar and the NIfTI header. All of it is optional, and a scan without a sidecar
+still analyzes. A sidecar field of the wrong type (an `EchoTime` written as a
+string, say) is recorded as unknown, with a warning naming it. It is not guessed
+at.
 
-Text is written as `NC_CHAR`, UTF-8 encoded. A measurement's strings are closed
-vocabularies this package fixes (`mm`/`vox`, `row`/`col`/`?`), all ASCII.
-Provenance strings are not this package's to constrain — they come from file
-names and scanner headers — and the one string with no UTF-8 form at all is the
-lone surrogate a Windows file name with an undecodable byte becomes in Python.
-It rides as its `\udcff` escape; that attribute is lossy where the document
-beside it is not, which is the trade a convenience copy should make rather than
-failing the save.
+Text is written as `NC_CHAR`, UTF-8 encoded. Measurement strings come from closed
+ASCII vocabularies (`mm`/`vox`, `row`/`col`/`?`). Provenance strings come from
+file names and scanner headers, which this package cannot constrain. The one
+string with no UTF-8 form is the lone surrogate a Windows file name with an
+undecodable byte becomes in Python. It is written as its `\udcff` escape. That
+attribute is lossy where the document is not, which is better for a convenience
+copy than failing the save.
 
 ## NaN, and absent
 
-The distinction runs through the whole file and is worth stating once:
+The distinction runs through the whole file:
 
 - **NaN** means *the estimator ran and could not resolve the value*. The
-  attribute is present and holds a NaN; the document spells it with the bare
+  attribute is present and holds a NaN. The document spells it with the bare
   token `NaN`.
-- **Absent** means *the quantity does not apply here* — and, in provenance,
+- **Absent** means *the quantity does not apply here*, or, in provenance,
   *nothing recorded it*. There is **no attribute at all**, and the document
   spells it `null`.
 
-A netCDF attribute cannot be null, so absence *is* the encoding, and writing
-NaN for both would collapse a distinction a physicist reads. The clipping
-ceiling of a series with no ADC rail is absent; a ghost ratio whose region came
-back empty is NaN. See [saturation](analyses/saturation.md) for the clearest
-case of the first and [ghosting](analyses/ghosting.md) for the second.
+A netCDF attribute cannot be null, so absence is the encoding. Writing NaN for
+both would lose a distinction a physicist reads. The clipping ceiling of a series
+with no ADC rail is absent. A ghost ratio whose region came back empty is NaN.
+See [saturation](analyses/saturation.md) for the first case and
+[ghosting](analyses/ghosting.md) for the second.
 
 ## Reading an artifact elsewhere
 
-netCDF-4 is the format the readers a site already has can open without going
-looking for a package that understands NumPy's. Each array is a variable under
-the dotted name the library gives it (`curves.roi_signal`, `images.sfnr`),
-declared over shared named dimensions (`frame`, `frequency`, `row`, `col`, …),
-each of which carries a coordinate variable of its own so an axis has values
-and not only a name; boolean masks are flagged `uint8` bytes in CF style; every
-setting, scalar measurement and recorded provenance field is a global attribute
-of its own; and the JSON document is the global attribute `document`.
+The readers a site already has can open netCDF-4 without a package that
+understands NumPy's format. Each array is a variable under its dotted name
+(`curves.roi_signal`, `images.sfnr`), declared over shared named dimensions
+(`frame`, `frequency`, `row`, `col`, …). Each dimension carries a coordinate
+variable of its own, so an axis has values and not only a name. Boolean masks are
+flagged `uint8` bytes in CF style. Every setting, scalar measurement and recorded
+provenance field is a global attribute of its own, and the JSON document is the
+global attribute `document`.
 
 ```matlab
 ncdisp('scan.qa.nc')                                   % the whole layout
@@ -247,49 +236,46 @@ dataset.attrs["document"]
 
 `ncdump -h scan.qa.nc` prints the same header at a shell.
 
-One caveat on that last MATLAB line: the document spells an unresolved
-measurement as the bare token `NaN`, which Python and R's JSON parsers accept
-and MATLAB's `jsondecode` rejects. It only affects decoding the *document* —
-the arrays and the attributes are unaffected, and every scalar in the document
-is also an attribute, so a MATLAB user never needs to decode it.
+Caveat on the last MATLAB line: the document spells an unresolved measurement as
+the bare token `NaN`, which Python and R's JSON parsers accept and MATLAB's
+`jsondecode` rejects. Arrays and attributes are unaffected, and every scalar in
+the document is also an attribute, so MATLAB users never need to decode it.
 
-A netCDF-4 file is an HDF5 file, and HDF5 takes an advisory lock on a file it
-opens. On an NFS or SMB share with locking disabled or broken, a reader can
-fail where a plain read would have worked; `HDF5_USE_FILE_LOCKING=FALSE` in
-that reader's environment is the escape. Nothing here sets it for you — a
-library that quietly disables locking for its whole process is deciding that
-for code it knows nothing about.
+A netCDF-4 file is an HDF5 file, and HDF5 takes an advisory lock on files it
+opens. On an NFS or SMB share with locking disabled or broken, a reader can fail
+where a plain read would work. Set `HDF5_USE_FILE_LOCKING=FALSE` in the reader's
+environment to work around it. Nothing here sets it for you, since a library that
+disables locking for its whole process decides that for code it knows nothing
+about.
 
-Damage is caught, but not in every form. A sweep of 408 single-byte flips over
-a stored artifact refused 153, left 247 in slack space where they changed
-nothing a reader can see, sent one variable to another variable's intact
-chunk — which passes its own checksum and so reads back as the wrong image —
-and seven times aborted the process inside libhdf5, which is a C library
-reading a file it was not written to distrust. The checksum makes damage to an
-array's own bytes loud; it does not make the file tamper-proof.
+Damage is caught, but not in every form. A sweep of 408 single-byte flips over a
+stored artifact refused 153 and left 247 in slack space, where they changed
+nothing a reader can see. One flip sent a variable to another variable's intact
+chunk, which passes its own checksum and so reads back as the wrong image. Seven
+aborted the process inside libhdf5, a C library that reads files it was not
+written to distrust. The checksum makes damage to an array's own bytes loud. It
+does not make the file tamper-proof.
 
 ## Versions, and older files
 
-The file records the schema it was written under, and a later build reads it:
-an older layout is migrated forward on load, with a warning, and any field that
-schema did not carry comes back as *not recorded* rather than as a value
-nothing measured. Only an artifact from a **newer** build than the one reading
-it is refused, since its layout cannot be known.
+The file records the schema it was written under. A later build upgrades an older
+layout on load, with a warning, and any field that schema lacked comes back as
+*not recorded*, not as a value nothing measured. Only an artifact from a
+**newer** build than the reader is refused, because its layout cannot be known.
 
-Artifacts written by earlier builds as compressed `.qa.npz` archives still
-load. The container is recognized from the file's leading bytes rather than
-from its name, so a directory filled before the netCDF change keeps opening.
-Nothing writes an `.npz` any more.
+Artifacts written by earlier builds as compressed `.qa.npz` archives still load.
+The container is recognized from the file's leading bytes, not its name, so a
+directory filled before the netCDF change keeps opening. Nothing writes an `.npz`
+any more.
 
-`ARTIFACT_SCHEMA_VERSION` pins the *document's* layout — which fields exist and
-what they mean — and not the envelope. The move from `.npz` to netCDF changed
-no field and so bumped no version: bumping it would have told every older build
-"this file is from the future, refuse it" about a document those builds
-understand perfectly.
+`ARTIFACT_SCHEMA_VERSION` pins the layout of the *document* (which fields exist
+and what they mean), not the envelope. The move from `.npz` to netCDF changed no
+field, so it bumped no version. Bumping it would have made older builds refuse
+files as "from the future" when they understand the document perfectly.
 
 ## References
 
-- `notes/analysis_report_split.md` in this repository — why the project splits
+- `notes/analysis_report_split.md` in this repository: why the project splits
   into a calculation half and a presentation half, and what the seam carries.
-- CF Conventions 1.10 — the flag vocabulary the masks use and the coordinate
+- CF Conventions 1.10: the flag vocabulary the masks use and the coordinate
   convention the axes follow.
