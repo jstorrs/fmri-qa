@@ -189,18 +189,28 @@ Declare exceptions in docstrings:
 def connect(host: str, port: int, timeout: float = 30.0) -> Connection:
     """Connect to the server.
 
-    Args:
-        host: Server hostname.
-        port: Server port.
-        timeout: Connection timeout in seconds.
+    Parameters
+    ----------
+    host : str
+        Server hostname.
+    port : int
+        Server port.
+    timeout : float, optional
+        Connection timeout in seconds. Default is 30.0.
 
-    Returns:
+    Returns
+    -------
+    Connection
         Active connection to the server.
 
-    Raises:
-        ConnectionError: If unable to establish connection.
-        TimeoutError: If connection times out.
-        ValueError: If port is not in valid range.
+    Raises
+    ------
+    ConnectionError
+        If unable to establish a connection.
+    TimeoutError
+        If the connection times out.
+    ValueError
+        If `port` is not in the valid range.
     """
 ```
 

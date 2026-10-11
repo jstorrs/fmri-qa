@@ -79,7 +79,7 @@ arguments). You don't have to fight the linter to write direct tests.
 ## What to Cover
 
 - **The happy path** of every public operation.
-- **Each exception you promise** — if a docstring's `Raises:` lists `ValidationError`, a
+- **Each exception you promise** — if a docstring's `Raises` section lists `ValidationError`, a
   test provokes it. Exceptions are part of the contract ([exceptions.md](exceptions.md));
   cover them like one.
 - **Boundaries** — empty input, a single element, the off-by-one edges of any range.
