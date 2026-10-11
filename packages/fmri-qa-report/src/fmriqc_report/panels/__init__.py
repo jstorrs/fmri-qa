@@ -1,6 +1,6 @@
 """Format-agnostic report figures: matplotlib panels from a `QAArtifact`.
 
-`images` builds the labelled phantom-image panels (signal, SFNR, noise, N/2
+`images` builds the labeled phantom-image panels (signal, SFNR, noise, N/2
 ghost overlay); `timeseries` builds the stability plots (Weisskoff/RDC, signal,
 residual, spectrum, outliers, motion, COM, PSF). Every image, mask, outline and
 trace they draw comes ready-made from the artifact, so a panel only chooses

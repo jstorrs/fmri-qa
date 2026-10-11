@@ -1,6 +1,6 @@
 """Phantom-image panels: signal, SFNR, noise and the N/2 ghost overlay.
 
-Each builder returns a labelled matplotlib `Figure` (a square-ish `imshow` panel
+Each builder returns a labeled matplotlib `Figure` (a square-ish `imshow` panel
 with the phantom outline and ROI drawn on top); `panel_figs` assembles the row a
 report shows. Every image, mask and outline comes ready-made from the artifact,
 so this module only draws. Format-agnostic — a driver embeds the returned figures.
@@ -83,7 +83,7 @@ def _panel_fig(
     roi: RoiBox | None = None,
     log: bool = False,
 ) -> Figure:
-    """Build a single labelled image panel as a square-ish figure."""
+    """Build a single labeled image panel as a square-ish figure."""
     fig = Figure(figsize=(2.0, 2.0 * _PANEL_ASPECT))
     ax = fig.add_subplot(111)
     data = np.log(np.clip(img, 1e-9, None)) if log else img

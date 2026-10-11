@@ -48,7 +48,7 @@ $$\mathrm{arg} = 1 - \frac{1}{2}\,
 \qquad
 \mathrm{FWHM} = \sqrt{8 \ln 2}\;\sigma$$
 
-in voxels, multiplied by the voxel size for millimetres. An axis whose
+in voxels, multiplied by the voxel size for millimeters. An axis whose
 $\mathrm{arg}$ leaves $(0, 1)$ — too little correlation to resolve, or too few
 in-mask pairs — yields NaN rather than a number pulled out of a logarithm of a
 non-positive value.
@@ -156,7 +156,7 @@ differently.
 | `curves.psf.xmax` | attribute, double | the plotting range the analysis chose, so a plot draws the curve it meant |
 
 The two PSF abscissas carry no `units` attribute, because the unit is not a
-fact about the layout: it is millimetres or voxels depending on what the
+fact about the layout: it is millimeters or voxels depending on what the
 artifact's own header gave, and `curves.psf.unit` is where that is recorded.
 
 `measurements.fwhm` is NaN when the estimator could not resolve smoothness at

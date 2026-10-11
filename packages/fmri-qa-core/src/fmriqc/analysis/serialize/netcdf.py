@@ -85,7 +85,7 @@ Four things the layout does that a bag of arrays does not:
   that Octave's package and older readers handle poorly, and a flagged integer
   says the same thing in the vocabulary the masks already use. An axis whose
   real values are not one-dimensional keeps them where they are and points at
-  them instead -- the seconds labelling `frame` are `curves.time`, and the PSF
+  them instead -- the seconds labeling `frame` are `curves.time`, and the PSF
   lags differ by direction, so they are 2-D -- which a CF `coordinates`
   attribute on each variable does, and which is why xarray hands a user
   `ds["curves.roi_signal"].coords["curves.time"]` beside the frame index. Like
@@ -98,9 +98,9 @@ Four things the layout does that a bag of arrays does not:
   `flag_meanings`), which is what makes the bytes self-describing enough to turn
   back into `bool` on read -- the artifact in memory is unchanged either way.
 * **Units and long names where they are certain.** Seconds, hertz, percent and
-  dimensionless ratios are labelled; anything whose unit depends on the artifact
+  dimensionless ratios are labeled; anything whose unit depends on the artifact
   (the PSF abscissas, in mm or voxels per `curves.psf.unit`) or that has no unit
-  at all (raw image intensity) is left unlabelled rather than guessed at.
+  at all (raw image intensity) is left unlabeled rather than guessed at.
 
 **Every scalar the document holds is also a global attribute**, named for its
 document path, with a nested object flattening into the name (`measurements.snr`,
@@ -135,7 +135,7 @@ never consults them, and the JSON document stays the single source of truth for
 attributes are derived from its text.
 
 `Conventions` is claimed because the mask variables follow CF's flag convention
-and the labelled units are CF's. The dotted variable names do deviate from CF,
+and the labeled units are CF's. The dotted variable names do deviate from CF,
 which says a name *should* be letters, digits and underscores; they are kept
 because the dotted path is the artifact's own vocabulary and a reader that
 learns `images.sfnr` from `ncdisp` can find it in this package's docs, which
@@ -369,7 +369,7 @@ class _Index:
 
 @dataclass(frozen=True, slots=True)
 class _Values:
-    """An axis labelled by an array the artifact already publishes.
+    """An axis labeled by an array the artifact already publishes.
 
     That array stays exactly where it is under its own dotted name; the
     coordinate is the same numbers again under the dimension's name, which is
@@ -406,7 +406,7 @@ class _Labels:
 # One coordinate variable per dimension the table above declares, written out
 # in the same explicit style and for the same reason: which values a reader is
 # handed for an axis is a published claim, so an axis that reaches `encode`
-# without an entry here is refused rather than left unlabelled. Every one is
+# without an entry here is refused rather than left unlabeled. Every one is
 # derived at encode time and none is ever read back -- see the module
 # docstring.
 _COORDINATES: dict[str, _Index | _Values | _Labels] = {
@@ -584,7 +584,7 @@ def _label_coordinate(
 
 
 def _label_meanings(declared: _Labels, document: dict[str, Any]) -> list[str]:
-    """Resolve a labelled axis's position names, fixed or from the document."""
+    """Resolve a labeled axis's position names, fixed or from the document."""
     if isinstance(declared.meanings, str):
         return declared.meanings.split()
     labels: Any = document

@@ -6,7 +6,7 @@
 # ruff, which drifts from the locked one and lets the hook and `make check`
 # disagree about formatting.
 #
-# `--force-exclude` makes ruff honour the root pyproject's `extend-exclude` even
+# `--force-exclude` makes ruff honor the root pyproject's `extend-exclude` even
 # for the paths pre-commit hands it explicitly.
 repos:
   - repo: local

@@ -222,7 +222,7 @@ details.method p strong{color:var(--ink)}
   #methods.panel{column-count:1} /* one predictable reading column on paper */
   details::details-content{content-visibility:visible; block-size:auto}
   /* backgrounds are dropped by default when printing: fall back to a
-     border so pills stay legible without relying on fill colour */
+     border so pills stay legible without relying on fill color */
   .pill{border:1px solid currentColor; print-color-adjust:exact; -webkit-print-color-adjust:exact}
   .pill::before{print-color-adjust:exact; -webkit-print-color-adjust:exact}
   .fig img{print-color-adjust:exact; -webkit-print-color-adjust:exact}

@@ -64,7 +64,7 @@ $$\text{motn} = \max_t \lVert \mathbf{t}(t) \rVert, \qquad
 \text{scl \%} = \max_{t,a} 100\,\lvert s_a(t) \rvert, \qquad
 \text{shr \%} = \max_t 100\,\lvert h(t) \rvert$$
 
-with the translation magnitude in millimetres when the in-plane voxel size is
+with the translation magnitude in millimeters when the in-plane voxel size is
 known and in voxels when it is not.
 
 Each fit must be identifiable, finite, and converged. A frame that is
@@ -156,7 +156,7 @@ including when an axis of the temporal reference is ambiguous.
 ```
 
 The traces are stored in voxels; the *peak* measurements are converted to
-millimetres when the header gave a voxel size, which is what
+millimeters when the header gave a voxel size, which is what
 `measurements.displacement_unit` records.
 
 ## What it contributes to the artifact

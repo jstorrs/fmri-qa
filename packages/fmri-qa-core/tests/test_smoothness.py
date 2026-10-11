@@ -1,6 +1,6 @@
 """Directional noise smoothness: result-object algebra and the FWHM estimator.
 
-`SmoothnessResult` conversions (voxels<->mm, PE/RO labelling, combined geomean,
+`SmoothnessResult` conversions (voxels<->mm, PE/RO labeling, combined geomean,
 PSF) are pinned against hand values; `estimate_smoothness` is checked to recover
 the direction of an anisotropically smoothed noise field (larger FWHM along the
 smoothed axis).

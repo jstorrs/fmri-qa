@@ -1,6 +1,6 @@
 """Phase-encode axis resolution and its priority chain.
 
-The PE axis drives the ghost masks and the report's row/col labelling, and its
+The PE axis drives the ghost masks and the report's row/col labeling, and its
 source order is load-bearing: the BIDS sidecar is authoritative -- dcm2niix's
 `PhaseEncodingDirection` and `PhaseEncodingAxis` ahead of the raw DICOM row/col
 tag -- and the NIfTI `dim_info` phase field is the fallback. If neither

@@ -39,7 +39,7 @@ needs:
 Everything sits in the root group: `xr.open_dataset` sees only the root group
 and Octave's group support is uneven, so a subgroup would cost readers more
 than the tidiness is worth. `Conventions` is claimed as CF-1.10, which the mask
-flags and the labelled units follow. The dotted variable names do deviate from
+flags and the labeled units follow. The dotted variable names do deviate from
 CF's recommendation of letters, digits and underscores; they are kept because
 the dotted path is the artifact's own vocabulary, and a reader who learns
 `images.sfnr` from `ncdisp` can look it up in these pages, which `images_sfnr`
@@ -145,7 +145,7 @@ attribute, by the same rule as a `null` provenance field.
 | --- | --- | --- |
 | `settings.trim_sec` | double | warm-up seconds dropped before analysis |
 | `settings.detrend` | text | `poly` or `spline`, the detrending method |
-| `settings.center` | text | `image` or `phantom`, where the ROI was centred |
+| `settings.center` | text | `image` or `phantom`, where the ROI was centered |
 | `settings.roi_size` | int | side of the square ROI requested, in voxels |
 | `settings.pe_axis_override` | int | the phase-encode axis forced by `--pe-axis`; absent unless one was |
 | `settings.detrend_order` | int | the polynomial or spline order the run resolved from its duration |
