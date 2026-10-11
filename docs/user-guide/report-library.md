@@ -27,7 +27,8 @@ returns the complete page as a string. Nothing is written.
 renders the same page and writes it to `path`, returning the path. The write
 is the command's: rendered fully in memory first, then moved into place
 atomically, with missing parent directories created (see
-{doc}`fmri-qa-report`).
+{doc}`fmri-qa-report`). The signatures and parameters are also in the
+{doc}`API reference </api/fmri-qa-report>`.
 
 The keyword arguments are the same for both:
 

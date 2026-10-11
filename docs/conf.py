@@ -11,9 +11,15 @@ at build time over the synthetic phantom in `phantom.py`. `make docs` builds
 with `-W`, so a figure whose code stops matching the package fails the build
 rather than going stale.
 
+The API reference is generated from the installed packages' docstrings by
+autodoc, with numpydoc turning their numpydoc sections into rendered fields.
+
 Deliberately nothing here resolves against another project's inventory: every
 page links only within this one, and a build that reaches the network to
-succeed is one that fails offline.
+succeed is one that fails offline. The price is in the API reference: numpy,
+standard-library and xarray types in a signature or a docstring render as
+unlinked text. That is also why `nitpicky` stays off, and why `-W` cannot catch
+an unresolved `py:` reference there.
 """
 
 from pathlib import Path
@@ -26,6 +32,11 @@ extensions = [
     "myst_parser",
     "sphinx.ext.mathjax",
     "matplotlib.sphinxext.plot_directive",
+    "sphinx.ext.autodoc",
+    # Only for its `autolink` role (the default role below), not for stub pages.
+    # numpydoc loads it anyway; listing it records the dependency.
+    "sphinx.ext.autosummary",
+    "numpydoc",
 ]
 
 exclude_patterns = ["_build"]
@@ -52,3 +63,29 @@ plot_formats = [("png", 150)]
 # `sys.path`, which is what lets every figure `import phantom` and share one
 # analysis of the phantom rather than each rebuilding it.
 plot_working_directory = str(Path(__file__).parent)
+
+# A single-backtick name in a docstring (`roi`, `Theme`) links when it resolves
+# and does not warn when it cannot. Resolution runs in the defining module, so
+# a name imported from elsewhere links only when written fully qualified
+# (`~fmriqc.AnalysisSettings`); one that does not import renders as emphasis. The
+# house style uses single backticks for both cross-references and parameter
+# names, so the default role has to tolerate the latter.
+default_role = "autolink"
+
+# Document members, but only the ones with a docstring or a `#:` comment: an
+# undocumented name in the reference is noise. `show-inheritance` stays off:
+# the records are flat, and a "Bases: object" line says nothing.
+autodoc_default_options = {"members": True}
+
+# Each module's names in the order of kind (classes, functions, data), the way a
+# reader looks things up, not alphabetically across kinds or in source order.
+autodoc_member_order = "groupwise"
+
+# Types stay in the signature line, where they are written, rather than being
+# repeated as extra fields under the description (numpydoc supplies those). This
+# is Sphinx's default, set here so the choice is visible.
+autodoc_typehints = "signature"
+
+# numpydoc would otherwise append a table of every attribute and method to each
+# class, duplicating the members autodoc already lists below it.
+numpydoc_show_class_members = False

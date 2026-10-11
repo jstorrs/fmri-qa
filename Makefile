@@ -27,7 +27,8 @@ sync-docs:
 	uv sync --all-packages --group docs
 
 # The documentation is one Sphinx project, docs/, built into build/site: the
-# landing page at the root and the user guide for every package beneath it.
+# landing page at the root, and the user guide and API reference for every
+# package beneath it.
 #
 # Warnings are errors (-W): a reference that does not resolve, or a figure whose
 # code fails against the real pipeline, is a page that has drifted from the

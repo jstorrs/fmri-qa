@@ -56,8 +56,8 @@ synthetic phantom, and the exact netCDF names it contributes to the artifact:
 file those numbers are published in — its dimensions and coordinates, the
 global attributes that carry every scalar in it, and how to read one from MATLAB,
 R, Python or `ncdump`. The [user guide](docs/user-guide/index.md) builds into
-browsable HTML with `make sync-docs && make docs`, as part of the documentation
-site under `build/site`.
+browsable HTML, alongside an API reference generated from the docstrings, with
+`make sync-docs && make docs`, as part of the documentation site under `build/site`.
 
 ## Install
 

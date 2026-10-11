@@ -11,6 +11,7 @@ spreadsheet, or a trend database reads.
 :hidden:
 
 user-guide/index
+api/index
 ```
 
 ## The packages
@@ -42,6 +43,8 @@ user-guide/index
 - **"Can I put a report on our website?"** — {doc}`/user-guide/report-page`
   says what the file contains and what an embedding site's
   Content-Security-Policy has to allow.
+- **"Calling it from Python?"** — {doc}`/api/index` lists the public API of each
+  package, and the building blocks beneath it.
 
 Installing, importing DICOM on its own with `fmri-qa-import`, and the `fmri-qa`
 command line are covered in the repository's `README.md`.

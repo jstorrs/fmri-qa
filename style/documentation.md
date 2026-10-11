@@ -222,7 +222,9 @@ values, exceptions) document them under `Parameters`, because that is how they a
 called. Properties and methods document themselves.
 
 **Constants** get a `#:` comment on the line above, which Sphinx picks up as the
-description.
+description. Module-level data without one does not appear in the reference at all.
+A constant re-exported from a package root is documented where it is defined, and the
+reference lists it once.
 
 **Plotting functions** take the data first and a keyword `ax=None`, return the Axes,
 and are styled through `matplotlib.rc_context`, not through style keywords.
