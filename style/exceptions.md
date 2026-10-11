@@ -1,16 +1,14 @@
 # Exception Best Practices for Python Modules
 
-This document describes how modules in this repository should handle and define exceptions.
-It is the concrete expression of *errors should never pass silently* and *in the face of
-ambiguity, refuse the temptation to guess* from [zen.md](zen.md): fail fast, name the bad
-value, and report once at the top.
+How modules in this repository define and handle exceptions. Fail fast, name the bad value,
+and report once at the top ([zen.md](zen.md): *errors should never pass silently*).
 
 ## Core Principles
 
-1. **Define a package base exception for catchability** — one base class per package is the
-   error contract; new subclasses can be added without breaking callers who catch the base
-2. **Wrap external exceptions to hide implementation details**
-3. **Carry structured context, not just a message** — put the bad value on the exception
+1. **Define a package base exception.** One base class per package is the error contract.
+   You can add subclasses without breaking callers who catch the base.
+2. **Wrap external exceptions to hide implementation details.**
+3. **Carry structured context, not just a message.** Put the bad value on the exception.
 4. **Fail fast with clear error messages**
 
 ## Standard Pattern
@@ -142,10 +140,8 @@ raise ValidationError(f"field 'age' must be positive, got {age}")
 
 ## Structured Payloads, Not Just Messages
 
-A message string is enough when the caller only ever prints the error. But when a variant
-carries a value a caller might want to *inspect* — a path, an offset, an out-of-range number
-— put it on the exception as an attribute, not only interpolated into the message. A
-stringified value reads fine in a log but throws away everything a caller could branch on.
+When a caller might inspect a value (a path, an offset, an out-of-range number), also put
+it on the exception as an attribute. A caller can't branch on a value buried in a message.
 
 ```python
 class OutOfRange(ValidationError):
@@ -167,19 +163,12 @@ except OutOfRange as e:
         config = replace(config, threshold=e.high)  # clamp and retry
 ```
 
-Keep it proportionate — don't mint a struct-like exception for a value that is only ever
-displayed:
-
-- **A message you wrote, or one lone value being named, is fine as a plain message.**
-  `raise NotFound(f"no archive at {path}")` discards nothing — there was no extra field to
-  lose.
-- **Reach for attributes when you have *several* distinct fields** a caller or log might use
-  (`field`, `value`, `low`, `high`), or when downstream code needs to branch on the payload.
-- **Wrapping a foreign exception is different — never flatten it to a string.** Preserve the
-  original with `raise ... from e` (below) so the traceback and the underlying type survive.
-
-In short: a message for what *you* wrote; attributes for what a caller might inspect; `from
-e` for what a *dependency* handed you.
+- **A plain message is fine** for a message you wrote or one named value:
+  `raise NotFound(f"no archive at {path}")`.
+- **Use attributes** for several distinct fields (`field`, `value`, `low`, `high`) or when
+  downstream code branches on the payload.
+- **Never flatten a foreign exception to a string.** Use `raise ... from e` so the
+  traceback and underlying type survive.
 
 ## Documenting Exceptions
 
@@ -214,8 +203,8 @@ def connect(host: str, port: int, timeout: float = 30.0) -> Connection:
     """
 ```
 
-A documented exception is part of the contract — cover each one with a test that provokes
-it, the same way you test the happy path (see [testing.md](testing.md)).
+A documented exception is part of the contract. Test each one with a case that provokes it
+(see [testing.md](testing.md)).
 
 ## Exception Handling Patterns
 
@@ -237,9 +226,8 @@ except KeyError:
 
 ### Re-raise After Logging
 
-Log at the point you have context, then re-raise so the error still propagates to the top
-and is reported once (see [logging.md](logging.md) — libraries diagnose, the binary decides
-how to present):
+Log where you have context, then re-raise so the error still reaches the top and is reported
+once (see [logging.md](logging.md): libraries diagnose, the binary decides how to present):
 
 ```python
 try:

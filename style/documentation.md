@@ -1,14 +1,14 @@
 # Documentation and Naming Style Guide
 
-This document describes the philosophy for documentation and naming in this repository. The core idea: **code and documentation should tell the same story**. It is the concrete expression of *readability counts* and *if the implementation is hard to explain, it's a bad idea* from [zen.md](zen.md).
+This document covers documentation and naming in this repository. The core idea: **code and documentation should tell the same story**. It applies *readability counts* and *if the implementation is hard to explain, it's a bad idea* from [zen.md](zen.md).
 
 ## Core Principles
 
-1. **Names should align with documentation** - Reading a function name and reading its docstring should produce the same mental model
+1. **Names should align with documentation** - A function's name and its docstring should give the same mental model
 2. **Code should be self-documenting** - Good names and structure reduce the need for explanation
 3. **Docstrings describe the contract** - What the function does, not how
 4. **Comments explain why** - Non-obvious context, constraints, and decisions
-5. **Tension is a design signal** - Difficulty documenting indicates design problems
+5. **Tension is a design signal** - Difficulty documenting points to a design problem
 
 ## The Coherence Test
 
@@ -16,7 +16,7 @@ Good code passes this test:
 
 > Can someone read just the function signature and docstring, then read just the implementation, and arrive at the same mental model from both?
 
-If not, either the names/structure don't match the abstraction, or the abstraction itself needs work.
+If not, either the names and structure don't match the abstraction, or the abstraction needs work.
 
 ## Tension as a Design Signal
 
@@ -34,7 +34,7 @@ When documentation is difficult to write, **fix the code first**.
 
 ### Functions
 
-Names should describe what the function does, making the docstring almost redundant:
+Names should say what the function does, so the docstring is almost redundant:
 
 ```python
 # Good - name tells you what it does
@@ -98,12 +98,12 @@ if not is_invalid:  # confusing
 - **Nouns for data and value types**: `Study`, `Archive`, `Measurement`, `IndexEntry`
 - **Nouns/verbs for processors and wrappers**: `Reader`, `Writer`, `Validator`, `Processor`
 - **`Error` suffix for exceptions**: `ParseError`, `ValidationError` (see [exceptions.md](exceptions.md))
-- **Enums name a closed set**: `Mode`, `Disposition` — prefer these to `bool`/`str`
+- **Enums name a closed set**: `Mode`, `Disposition`. Prefer these to `bool`/`str`
   parameters ([architecture.md](architecture.md#type-driven-design))
 
 ### Modules and Files
 
-File and directory names should be self-explanatory. Running `ls` or `tree` should answer questions, not reveal mysteries.
+File and directory names should be self-explanatory. `ls` or `tree` should answer questions, not raise them.
 
 ```
 # Good - structure tells you what's here
@@ -135,7 +135,7 @@ mypackage/
 
 #### The `ls` Test
 
-Ask yourself: if someone runs `ls` on this directory, will they understand what's here?
+If someone runs `ls` on this directory, will they understand what's here?
 
 ```
 # Passes the ls test - clear purpose for each file
@@ -160,24 +160,16 @@ __init__.py  base.py  core.py  impl.py  main.py  utils.py
 
 ### Purpose
 
-Docstrings document the **contract** - what the function does from the caller's perspective:
+Docstrings document the **contract** from the caller's side: what the function accepts,
+returns and raises, and any constraints or preconditions.
 
-- What it accepts
-- What it returns
-- What exceptions it raises
-- Any important constraints or preconditions
-
-Docstrings should **not** explain implementation details. Rationale, history
-and workarounds go in `#` comments next to the code they explain.
+Docstrings should not explain implementation details. Rationale, history and workarounds
+go in `#` comments next to the code they explain.
 
 ### Format: numpydoc
 
-Docstrings use [numpydoc](https://numpydoc.readthedocs.io/) sections. The format is
-the contract, written down in a fixed place: the same sections in the same order
-mean a reader (and the rendered reference) always finds the type of a parameter,
-the units of a result, and the failure modes where they expect them. Sphinx
-renders these docstrings into the API reference, so the format is not optional
-decoration; it is how the reference gets written.
+Docstrings use [numpydoc](https://numpydoc.readthedocs.io/) sections. Sphinx renders them
+into the API reference.
 
 **Sections**, in this order, omitting any that do not apply: Parameters, Returns,
 Yields, Raises, Warns, See Also, Notes, References, Examples.
@@ -185,13 +177,12 @@ Yields, Raises, Warns, See Also, Notes, References, Examples.
 **Summary line**: one line, at most 75 characters, ending in a period.
 
 - Functions and methods are **imperative**: "Compute...", "Measure...", "Return...",
-  "Plot...". Ruff enforces this (D401). It also suits the functional style: a
-  calculation is a verb applied to data, and the summary reads as the call.
+  "Plot...". Ruff enforces this (D401).
 - Classes, dataclasses and properties are **noun phrases**: "Voxel dimensions of an
   acquisition."
 
-**Types** are written for the reader, not for the type checker (annotations already
-do that). Name the array shape and dtype: `mean_image : (X, Y) ndarray of float64`,
+**Types** are for the reader, since annotations already serve the type checker. Name the
+array shape and dtype: `mean_image : (X, Y) ndarray of float64`,
 `series : (X, Y, T) ndarray of float64`. Use `pe_axis : {0, 1}` for closed sets,
 `radius : int, optional` for optional arguments, and say "Default is ..." in the
 description.
@@ -203,55 +194,51 @@ description.
 estimator ran and could not resolve a value. None means the quantity does not apply
 or was not measured. A reader should never have to guess which absence they hold.
 
-**Notes** carry method and background: the equation, why it is that equation,
-assumptions. Put short equations in `.. math::`. **References** are numbered
-`.. [1]` and cited as `[1]_` in Notes. Include a DOI where one exists, and never
-invent one; a source without a DOI is cited without it.
+**Notes** carry the method: the equation, why it is that equation, and assumptions. Put
+short equations in `.. math::`. **References** are numbered
+`.. [1]` and cited as `[1]_` in Notes. Include a DOI where one exists. Never
+invent one.
 
 **Examples** are doctests: self-contained, built from numpy, deterministic and
 quick. Print floats with format strings, never numpy scalar reprs. A plotting
 example ends with `plt.close(ax.figure)`.
 
 **Markup**: single backticks are cross-references and parameter names (`roi`).
-Double backticks are literals and expressions (``np.nan``). Never a bare `|`; it is
+Double backticks are literals and expressions (``np.nan``). Never use a bare `|`, which is
 reST syntax.
 
-**Records**: library-produced records (results the caller receives) document their
-fields under `Attributes`. Records the user constructs (settings, requests, form
-values, exceptions) document them under `Parameters`, because that is how they are
-called. Properties and methods document themselves.
+**Records**: document the fields of a result the caller receives under `Attributes`. For
+a record the user constructs (settings, requests, form values, exceptions), use
+`Parameters`. Properties and methods document themselves.
 
-**Constants** get a `#:` comment on the line above, which Sphinx picks up as the
-description. Module-level data without one does not appear in the reference at all.
-A constant re-exported from a package root is documented where it is defined, and the
-reference lists it once.
+**Constants** get a `#:` comment on the line above. Sphinx uses it as the description.
+Module-level data without one does not appear in the reference. Document a constant
+re-exported from a package root where it is defined. The reference lists it once.
 
 **Plotting functions** take the data first and a keyword `ax=None`, return the Axes,
 and are styled through `matplotlib.rc_context`, not through style keywords.
 
 ### API Tiers
 
-How much a name's docstring must say depends on who calls it. There are four tiers:
+A docstring says as much as its callers need. There are four tiers:
 
 - **Public**: in a root or subpackage `__all__`. Full numpydoc, listed in the
   reference.
 - **Building block**: in its module's `__all__` only. Concise numpydoc (summary,
   Parameters, Returns), listed on the "Building blocks" reference page, linked from
   the analysis page and from its caller's See Also.
-- **Internal**: no leading underscore and in no `__all__`; shared across modules or
+- **Internal**: no leading underscore and in no `__all__`. It is shared across modules or
   distributions. Not in the reference. A concise docstring.
-- **Private**: a leading underscore. Local to its module; the docstring may be
+- **Private**: a leading underscore. Local to its module. The docstring may be
   minimal or absent when the name says it all.
 
-Full numpydoc is for names in an `__all__`. Everywhere else, write a concise
-one-to-three-line docstring. A name that needs more than that is either doing too
-much or belongs in a higher tier.
+Outside an `__all__`, keep the docstring to one to three lines. A name that needs more is
+doing too much or belongs in a higher tier.
 
 ### When Docstrings Add Value
 
-This example is illustrative, not an existing function. The docstring earns its
-length: the NaN case, the units, the equation and its source are not in the
-signature.
+This is an illustrative function. The NaN case, the units, the equation and its source
+are not in the signature, so the docstring has to say them.
 
 ```python
 def compute_snr(
@@ -317,10 +304,10 @@ def compute_snr(
     """
 ```
 
-The docstring adds value by explaining:
+The docstring adds value by stating:
 - When the result is NaN (the estimator ran and could not resolve)
 - The units and shapes of every input
-- The method, with its source, in Notes where it does not clutter the contract
+- The method and its source, in Notes where they don't clutter the contract
 
 ### When Docstrings Can Be Minimal
 
@@ -330,7 +317,7 @@ def calculate_mean(values: Sequence[float]) -> float:
     return sum(values) / len(values)
 ```
 
-The function is simple, the name is clear, the types are explicit. A longer docstring would just repeat what's obvious. Building-block, internal and private names usually look like this.
+The function is simple, the name is clear, and the types are explicit. A longer docstring would repeat the obvious. Building-block, internal and private names usually look like this.
 
 ## Comment Guidelines
 
@@ -345,8 +332,8 @@ Use inline comments for:
 
 ```python
 def process_slices(slices: list[Slice]) -> list[Slice]:
-    # Sort by instance number to ensure consistent ordering across
-    # different DICOM sources (some vendors use acquisition time instead)
+    # Sort by instance number so order is consistent across DICOM
+    # sources (some vendors use acquisition time instead)
     sorted_slices = sorted(slices, key=lambda s: s.instance_number)
 
     # Skip first slice - often contains calibration data on Siemens scanners
@@ -387,6 +374,33 @@ for _ in range(3):
         return fetch(url)
     except TimeoutError:
         pass
+```
+
+## Voice
+
+Write the way you would explain it to a colleague: plainly, in few words. This applies
+to prose in docs, comments and docstring text. The numpydoc section structure stays as is.
+
+- Keep every fact: numbers, units, defaults, constraints, failure modes, warnings,
+  citations, and any "why" that prevents a mistake.
+- Cut justification for choices nobody would question, restatements, and throat-clearing.
+- Use short sentences, plain verbs, the active voice. One idea per sentence.
+- Skip em-dash asides, colon and semicolon chains, "not X but Y" flourishes, aphorisms, and
+  filler like "deliberately", "exactly", "load-bearing" and "the whole point".
+
+Before:
+
+```python
+# Figures are results, not examples: the reader wants the curve, and the code
+# that drew it bears on the page's subject only incidentally. PNG at 150 dpi
+# is what a browser and a printed page both want from a plot this size.
+```
+
+After:
+
+```python
+# Show the figure, not the code that drew it: readers want the result.
+# PNG at 150 dpi works on screen and in print.
 ```
 
 ## Self-Documenting Code Techniques
@@ -444,10 +458,10 @@ return complete_studies
 
 The goal is **coherence** between code and documentation:
 
-- Names should make docstrings feel almost redundant
+- Names should make docstrings almost redundant
 - Docstrings describe contracts, not implementations
 - Comments explain why, not what
 - If documentation is hard to write, the code needs work
 - If code is hard to understand after reading docs, the code needs work
 
-Good documentation doesn't compensate for unclear code - it complements clear code.
+Good documentation doesn't make up for unclear code. It complements clear code.

@@ -1,15 +1,15 @@
 # Architecture Style Guide
 
-This document describes the preferred architectural style for modules in this repository: **Functional Core, Imperative Shell** with value objects and facade-style public APIs. It is the concrete expression of several principles in [zen.md](zen.md) — *simple is better than complex*, *flat is better than nested*, and *explicit is better than implicit*.
+The architectural style for modules in this repository: **Functional Core, Imperative Shell** with value objects and facade-style public APIs ([zen.md](zen.md): *simple*, *flat*, *explicit*).
 
 ## Core Principles
 
 1. **Pure functions for logic** - Business logic lives in functions without side effects
 2. **Lightweight classes as wrappers** - Classes provide ergonomic interfaces, not logic
 3. **Short functions with helpers** - Extract helpers liberally to keep functions focused
-4. **Flat over nested** - Guard clauses and early returns over rightward-drifting `if`/`else`
+4. **Flat over nested** - Guard clauses and early returns over nested `if`/`else`
 5. **Simple public interfaces** - External API should be minimal and intuitive
-6. **Type-driven design** - Encode invariants in types so illegal states are hard to build; let the type checkers ([tooling.md](tooling.md)) enforce them
+6. **Type-driven design** - Encode invariants in types so illegal states are hard to build. The type checkers ([tooling.md](tooling.md)) enforce them
 
 ## Pure Functions for Logic
 
@@ -100,15 +100,15 @@ def normalize_values(study: Study) -> Study:
 
 ### Guidelines
 
-- If a function needs a comment explaining a block, extract that block
-- If a function exceeds ~20 lines, look for extraction opportunities
-- Helper functions can have complex signatures - they're internal
-- Name helpers to describe what they do, not how
+- If a block needs a comment to explain it, extract it
+- If a function exceeds ~20 lines, look for something to extract
+- Helpers are internal, so complex signatures are fine
+- Name helpers for what they do, not how
 
 ## Flat Over Nested
 
-Deeply nested `if`/`else` blocks drift rightward and bury the main path. Keep the happy
-path at the left margin: handle the exceptional cases first and return early.
+Nested `if`/`else` blocks bury the main path. Handle exceptional cases first and return
+early, so the happy path stays at the left margin.
 
 ```python
 # Avoid - the real work is buried three levels deep
@@ -140,19 +140,11 @@ def load(path: Path) -> Config:
     return parse_config(raw)
 ```
 
-Techniques that keep the body flat:
-
-- **Guard clauses** — validate preconditions and `raise`/`return` up front, so the body
-  isn't wrapped in a giant `if`.
-- **Early returns** — return the moment the answer is known instead of threading a result
-  variable through nested branches. The `RET` ruff rules ([tooling.md](tooling.md)) flag the
-  superfluous `else` after a `return`.
-- **`continue` in loops** — skip the uninteresting iteration early rather than indenting the
-  whole loop body inside an `if`.
-- **Extract a helper** when nesting is genuinely needed — a named function flattens the
-  caller even when its own body branches.
-
-This is *flat is better than nested* from [zen.md](zen.md), made concrete.
+- **Guard clauses.** Validate preconditions and `raise`/`return` up front.
+- **Early returns.** Return as soon as the answer is known. The `RET` ruff rules
+  ([tooling.md](tooling.md)) flag a superfluous `else` after a `return`.
+- **`continue` in loops.** Skip the uninteresting iteration instead of indenting the body.
+- **Extract a helper** when you need nesting. A named function flattens the caller.
 
 ## Simple Public Interfaces
 
@@ -190,9 +182,8 @@ def _write_index_segment(
 
 ## Frozen Dataclasses as Containers
 
-Frozen dataclasses are the workhorse of [type-driven design](#type-driven-design) in
-Python: small, immutable, and shaped so that holding the value means it's already valid.
-Use them for data containers:
+Frozen dataclasses are the workhorse of [type-driven design](#type-driven-design). Use them
+for data containers:
 
 ```python
 from dataclasses import dataclass
@@ -236,17 +227,13 @@ class Statistics:
 
 ## Type-Driven Design
 
-The type checkers (mypy, pyright — see [tooling.md](tooling.md)) are an always-on
-check that runs on every file. The leverage is in *what you give them to check*. Design
-types so a mistake fails type-checking rather than surfacing as a runtime bug that a
-reviewer has to catch — a state the types forbid is a bug that can't be written, reviewed
-for, or tested. This is *in the face of ambiguity, refuse the temptation to guess* from
-[zen.md](zen.md), pushed into the type system.
+Design types so a mistake fails type-checking (mypy, pyright; see
+[tooling.md](tooling.md)) instead of surfacing as a runtime bug. A state the types forbid
+is a bug that can't be written.
 
 ### Make illegal states unrepresentable
 
-Prefer a type whose every value is valid over a loose type guarded by scattered runtime
-checks.
+Prefer a type whose every value is valid over a loose type plus runtime checks.
 
 ```python
 # Avoid - every caller must remember the invariant
@@ -272,10 +259,10 @@ Connection = Open | Closed
 
 ### Parse, don't validate
 
-Validate once at the boundary and return a *narrower type* that proves the check happened,
-rather than re-checking a wide type everywhere downstream. A frozen dataclass with a
-validating `__post_init__` (or a classmethod constructor) is the natural home for this:
-once you hold the value, the question is settled.
+Validate once at the boundary and return a narrower type that proves the check happened.
+Don't re-check a wide type downstream. A frozen dataclass with a validating `__post_init__`
+(or a classmethod constructor) is the natural home for this. Once you hold the value, the
+question is settled.
 
 ```python
 @dataclass(frozen=True, slots=True)
@@ -294,8 +281,7 @@ def connect(host: str, port: Port) -> Connection: ...
 ```
 
 For a bare wrapper that carries no invariant but shouldn't be confused with a plain `int`,
-`NewType` costs nothing and stops you from passing a user id where a byte offset was
-expected:
+`NewType` costs nothing. It stops you passing a user id where a byte offset is expected:
 
 ```python
 from typing import NewType
@@ -326,17 +312,15 @@ class Mode(Enum):
 def open_file(path: Path, mode: Mode) -> IO: ...
 ```
 
-When a fixed set of *string* values is genuinely the interface (JSON tags, CLI choices),
-`Literal["read", "write"]` gives the same exhaustiveness without inventing an enum. Use
-`typing.assert_never` in the final `else` of a `match` so adding a case that isn't handled
-becomes a type error.
+When a fixed set of string values is the interface (JSON tags, CLI choices), use
+`Literal["read", "write"]`. Put `typing.assert_never` in the final `else` of a `match`, so
+an unhandled new case is a type error.
 
 ### Distinct types for distinct lifecycle states
 
-Give each stage of a value's lifecycle its own type, so a value can only be used in the
-context its type allows — the type checker makes "used in the wrong state" an error. The
-classic case is separating untrusted from trusted data: the only way to obtain the trusted
-type is to pass through the function that earns it.
+Give each stage of a value's lifecycle its own type, so using it in the wrong state is a
+type error. The classic case is untrusted versus trusted data: the only way to get the
+trusted type is through the function that earns it.
 
 ```python
 @dataclass(frozen=True, slots=True)
@@ -362,20 +346,14 @@ def sanitize(raw: UnsafeInput) -> SafeInput:
 def run_query(query: SafeInput) -> Rows: ...
 ```
 
-Reach for the simple two-type gate first; only model a multi-state machine as separate
-types when a value genuinely has several stages with stage-specific operations.
+Start with the two-type gate. Model a multi-state machine as separate types only when a
+value has several stages with stage-specific operations.
 
 ### Guidelines
 
-- **Focused types over primitives** — a `NewType` or a one-field frozen dataclass costs
-  almost nothing and buys type safety.
-- **Enums over booleans and magic strings** — a closed set of cases is an `Enum` or a
-  `Literal`, not a `bool` or a `str`.
-- **Validate at the boundary, then trust the type** — parse into a narrow type once; don't
-  re-check the same invariant downstream.
-- **Immutable by default** — `frozen=True` containers; return new values instead of mutating
-  in place where it's cheap.
-- **Prefer comprehensions and expressions** — over manual accumulation and sentinel values,
+- **Immutable by default.** Use `frozen=True` containers and return new values where it's
+  cheap.
+- **Prefer comprehensions and expressions** over manual accumulation and sentinel values,
   within the density limits in [documentation.md](documentation.md).
 
 ## Module Structure
@@ -398,29 +376,21 @@ Notes on this layout:
 
 - Name modules for the operation they perform (`reader`, `writer`, `validation`), not for
   the construct they hold. Avoid grab-bag names like `core.py`, `helpers.py`, `utils.py`,
-  `common.py`, `misc.py` — [documentation.md](documentation.md#modules-and-files) covers
-  this. Internal helpers live in the operation module they serve, not a shared `helpers.py`.
-- `types.py` and `exceptions.py` are acceptable generic names — they're well-understood
+  `common.py` and `misc.py`
+  ([documentation.md](documentation.md#modules-and-files)). Internal helpers live in the
+  operation module they serve.
+- `types.py` and `exceptions.py` are acceptable generic names. They are well-understood
   conventions. Core domain value types can live in `types.py` or a named `model.py`.
-- Keep the public surface narrow: `__init__.py` re-exports only what callers need and
-  declares `__all__`; everything else stays a private module or an underscore-prefixed name.
+- Keep the public surface narrow. `__init__.py` re-exports only what callers need and
+  declares `__all__`. Everything else stays a private module or an underscore-prefixed name.
 
 ### One File, One Topic
 
-A module's filename is a map. Someone scanning `ls` on a package should be able to guess
-which file holds a given concern and be right — every correct guess is a file they didn't
-have to open. That payoff only holds if each file has a single, nameable purpose.
-
-Keep modules cohesive and reasonably sized: everything in a file should plausibly fit under
-the file's name. The clearest signal a file has outgrown its purpose is when you reach for
-*section banners* — `# ==== parsing ====`, `# ==== validation ====` comments that sort a
-long file into topics. The urge to section is the urge to split: promote each section to
-its own module (`parse.py`, `validation.py`) instead. Sections hide several topics behind
-one filename; files surface them.
-
-When the sections all belong to one parent concern, promote them into a **subpackage**
-rather than scattering them at the top level. A `codec.py` that has grown a `# serialize`
-and a `# parse` banner becomes:
+A filename is a map: `ls` on a package should let you guess which file holds a concern.
+Keep modules cohesive and reasonably sized: everything in a file should fit under its name. If you reach for *section banners* such as
+`# ==== parsing ====`, split instead and promote each section to its own module
+(`parse.py`, `validation.py`). When the sections share a parent concern, make them a
+**subpackage**. A `codec.py` with a `# serialize` and a `# parse` banner becomes:
 
 ```
 codec/
@@ -432,21 +402,14 @@ codec/
 Callers still reach `mypackage.codec.serialize`, and `ls mypackage/codec/` now answers
 "where does parsing live?" without opening a 600-line file.
 
-Don't over-correct into fragments, though. A file per function is its own kind of noise —
-`codec/serialize.py` earns its place because *serializing* is a nameable half of the codec;
-a `codec/write_u16.py` would not. Split along topic seams, not arbitrarily. *Reasonable-size,
-single-purpose* is the target, not *smallest possible*. This is *namespaces are one honking
-great idea* from [zen.md](zen.md).
+Don't over-split. `codec/serialize.py` earns its place because serializing is a nameable
+half of the codec. A `codec/write_u16.py` would not. Split along topic seams.
 
 ### Layered Subpackages
 
 Once a package grows past a handful of operation modules, group them into subpackages by
-**domain layer**, not only by topic. A layer is a stage in the data's life — load it, prepare
-it, compute on it, aggregate, present it — and each stage becomes a subpackage. This is the
-one-topic rule applied a level up: `ls` on the package answers "which *stage* owns this?" the
-way `ls` on a subpackage answers "which *file* owns this?".
-
-The concrete shape this repo uses (`fmriqc`, the calculation package):
+**domain layer**: a stage in the data's life (load, prepare, compute, aggregate, present).
+This is the one-topic rule a level up. The shape `fmriqc` uses:
 
 ```
 fmriqc/
@@ -460,41 +423,38 @@ fmriqc/
     cli/                # the imperative shell: one module per command, plus its output forms
 ```
 
-Presentation is not a layer of this package at all — it is a second distribution,
-`fmri-qa-report`, sitting on top of `analysis/`. See
+Presentation is not a layer of this package. It is a second distribution, `fmri-qa-report`,
+on top of `analysis/`. See
 [Split the Product at Its Widest Seam](#split-the-product-at-its-widest-seam) below.
 
-Three rules keep the layering honest:
+Three rules keep the layering clean:
 
 - **Dependencies point down the stack.** `load < prep < metrics < pipeline < analysis`. A lower
-  layer never imports a higher one, and a leaf module (e.g. pure raw-array transforms) imports
-  nothing but the shared vocabulary. If you reach for an upward import, the thing you want is
-  usually sitting in the wrong layer. Where a genuine domain dependency crosses layers (a
-  loader needing a compute-layer estimate as a last-resort fallback), make it a single,
-  documented edge — not a habit.
+  layer never imports a higher one. A leaf module (e.g. pure raw-array transforms) imports
+  nothing but the shared vocabulary. If you want an upward import, the thing you want is
+  usually in the wrong layer. Where a real domain dependency crosses layers (a loader
+  needing a compute-layer estimate as a last-resort fallback), make it a single, documented
+  edge.
 - **Value objects live with the operation that produces them.** This is the domain-operation
-  rule from above, applied to types: each `metrics/` module owns its own result dataclass and
-  the constants that tune it; the aggregator owns the combined result. A single top-level
-  `types.py` grab-bag holding *every* dataclass is organized by language construct, exactly
-  what "organize by domain operation" warns against. Reserve `types.py` for the genuinely
-  shared *vocabulary* every layer speaks — array aliases, option `Literal`s — the definitions
-  that would otherwise force an arbitrary cross-module import.
+  rule applied to types. Each `metrics/` module owns its result dataclass and the constants
+  that tune it. The aggregator owns the combined result. A top-level `types.py` holding
+  every dataclass is organized by language construct, which "organize by domain operation"
+  warns against. Reserve `types.py` for the shared vocabulary every layer speaks (array
+  aliases, option `Literal`s), the definitions that would otherwise force an arbitrary
+  cross-module import.
 - **Keep tuning constants next to the code they tune.** A knob used by one operation lives in
-  that operation's module; only cross-cutting vocabulary stays central. `grep` finds a
-  scattered constant instantly; a central "ledger of every knob" is just a grab-bag sorted by
+  that operation's module. Only cross-cutting vocabulary stays central. `grep` finds a
+  scattered constant instantly. A central list of every knob is a grab-bag sorted by
   being-a-constant.
 
 ### Split the Product at Its Widest Seam
 
-Layered subpackages order the stages *inside* a package. Sometimes two stages have so
-little in common that the boundary between them deserves to be a **package boundary** —
-separate distributions, separate dependency sets, installable apart.
-
-The seam worth splitting on is where the two sides differ in almost everything: what they
-depend on, how fast they run, what changes them, and who deploys them. In this repo that
-seam is calculation versus presentation. Computing needs numpy, scipy, and the acquisition
-on disk, and changes when the physics changes; drawing needs matplotlib, and changes when
-someone wants a different report. Nothing but a *result* passes between them.
+When two stages differ in almost everything (dependencies, speed, what changes them, who
+deploys them), make the boundary a **package boundary**: separate distributions,
+installable apart. In this repo that seam is calculation versus presentation. Computing
+needs numpy, scipy, and the acquisition on disk, and changes when the physics changes.
+Drawing needs matplotlib, and changes when someone wants a different report. Only a result
+passes between them.
 
 ```
 packages/
@@ -506,31 +466,28 @@ packages/
 Three rules make such a split hold:
 
 - **One value object crosses, and it is complete.** Define the seam as a single published
-  type (here `QAArtifact`) and resolve *everything* a consumer could need while producing
-  it — derived properties settled into fields, curves extracted, masks and outlines
-  materialized. If the consuming side has to compute something, that is a gap in the seam
-  type, not a reason to reach back across. Nothing heavy or private crosses: the raw series
-  stays behind.
-- **Make the seam serializable, then use the serialized form.** A boundary you can write to
-  disk and read back is a boundary you have actually proved is complete — and it buys real
-  capability (render later, elsewhere, without the inputs). Version the layout and refuse an
-  unknown version by name. Test that a round-tripped value behaves identically to a live one.
-- **Enforce the direction mechanically.** "The report half must not import the pipeline" is
-  a rule that erodes one convenient import at a time. Make it a test: parse the consuming
-  package's sources and fail on any import outside the allowlist, and check the packaging
-  claim too (install the lower wheel alone and assert the upper stack is absent).
+  type (here `QAArtifact`). Resolve everything a consumer could need while producing it:
+  derived properties settled into fields, curves extracted, masks and outlines
+  materialized. If the consuming side has to compute something, the seam type has a gap.
+  Don't reach back across. Nothing heavy or private crosses: the raw series stays behind.
+- **Make the seam serializable, then use the serialized form.** If you can write the
+  boundary to disk and read it back, you have proved it is complete. It also lets you render
+  later, elsewhere, without the inputs. Version the layout and refuse an unknown version by
+  name. Test that a round-tripped value behaves identically to a live one.
+- **Enforce the direction mechanically.** A rule like "the report half must not import the
+  pipeline" erodes one convenient import at a time. Make it a test: parse the consuming
+  package's sources and fail on any import outside the allowlist. Check the packaging claim
+  too (install the lower wheel alone and assert the upper stack is absent).
 
-Don't split on a narrow seam. Two distributions cost a workspace, two release trains, and a
-version constraint between them; that is worth paying where the dependency sets and change
-rates genuinely diverge, and not worth paying to separate two modules that will always be
-installed together. See `notes/analysis_report_split.md` for this split's full rationale.
+Don't split on a narrow seam. Two distributions cost two release trains and a version
+constraint between them. Don't pay that to separate modules that are always installed
+together. See `notes/analysis_report_split.md` for this split's full rationale.
 
 ### Separate Content from Format
 
-Within the presentation package, split what a report *says* from how a particular format
-*renders it*. The content — the numbers, strings, and figures derived from an artifact —
-carries no dependency on the output format; a per-format **driver** composes that content
-into a document.
+In the presentation package, keep what a report says apart from how a format renders it.
+The content (numbers, strings, and figures from an artifact) doesn't depend on the output
+format. A per-format **driver** composes it into a document.
 
 ```
 fmriqc_report/
@@ -541,15 +498,10 @@ fmriqc_report/
         # contact_sheet.py, ...  # a second format reuses summary + panels unchanged
 ```
 
-Adding a format touches only `formats/`; the content modules never learn that a format exists.
-This is *simple public interfaces* and *one file, one topic* applied to output — the format is
-an implementation detail behind the content, not threaded through it. The payoff is concrete:
-a new output format is a new entry in `formats/`, not an edit to every figure-building function.
-
-A driver that outgrows one file becomes a subpackage in `formats/`, by the same one-topic
-rule a level down — the HTML driver holds `figures` (rendering each panel to a standalone
-SVG), `resources` (the packaged template and stylesheet), and `run` (composing them into
-one page).
+A new format is a new entry in `formats/`, not an edit to every figure-building function.
+A driver that outgrows one file becomes a subpackage. The HTML driver holds `figures`
+(rendering each panel to a standalone SVG), `resources` (the packaged template and
+stylesheet), and `run` (composing them into one page).
 
 ## Example: Complete Pattern
 

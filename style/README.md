@@ -1,12 +1,10 @@
 # Style Guides
 
-Conventions for Python packages in this repository. Many of these rules are enforced by the
-workspace tooling (`ruff`, `mypy`/`pyright`, `pytest` — see
-[tooling.md](tooling.md)); the guides explain the *why* behind them.
+Conventions for Python packages in this repository. The workspace tooling (`ruff`,
+`mypy`/`pyright`, `pytest`; see [tooling.md](tooling.md)) enforces many of them.
 
-**Start with [zen.md](zen.md).** It is the index of principles these guides descend from —
-the Zen of Python (PEP 20) made concrete for this repo. The other seven are detailed
-expressions of those principles; read them when you need the specifics.
+**Start with [zen.md](zen.md).** It maps the Zen of Python (PEP 20) to the other seven
+guides.
 
 ## The guides
 
@@ -23,22 +21,19 @@ expressions of those principles; read them when you need the specifics.
 
 ## Living documents
 
-These guides describe current preference, not settled law. If a rule here produces awkward
-code, seems wrong for a case in front of you, or pulls against another principle in an
-interesting way — **surface it** rather than silently complying or silently ignoring it. A
-good counterexample is how a guide earns its next revision. [zen.md](zen.md) already handles
-ordinary tension between principles (*practicality beats purity*); the conflicts worth
-raising are the ones those tie-breakers don't cleanly resolve.
+These guides describe current preference, not settled law. If a rule produces awkward code
+or conflicts with another principle, **say so**. Don't quietly comply or ignore it. A good
+counterexample is how a guide gets revised. [zen.md](zen.md) covers ordinary tension
+between principles. Raise the conflicts it doesn't resolve.
 
 ## In short
 
 - **Libraries are silent and return values; binaries talk and decide.**
-- **Explicit over implicit** — in APIs, errors, and output; type your public surface.
-- **Let the tools and the type checkers enforce the rules** — `ruff` and
-  `mypy`/`pyright` run aggressively; design types so illegal states can't be
-  constructed.
-- **Errors never pass silently** — fail fast, name the bad value, report once at the top.
-- **If it's hard to explain, the code (not the doc) needs work.**
+- **Explicit over implicit** in APIs, errors, and output. Type your public surface.
+- **Let the tools and type checkers enforce the rules.** `ruff` and `mypy`/`pyright` run
+  strict. Design types so illegal states can't be constructed.
+- **Errors never pass silently.** Fail fast, name the bad value, report once at the top.
+- **If it's hard to explain, fix the code, not the doc.**
 - **Be bold with code, careful with anything a user has on disk or in a script.**
-- **Test behavior, not implementation** — the pure core makes this cheap; keep tests
+- **Test behavior, not implementation.** The pure core makes this cheap. Keep tests
   deterministic.

@@ -1,68 +1,48 @@
 # Stability and API Changes
 
-This document describes the philosophy for API stability and breaking changes in this repository. It is the concrete expression of *now is better than never* (rip bandaids early) and *there should be one obvious way to do it* (don't keep a deprecated alias beside its replacement) from [zen.md](zen.md).
+How this repository handles API stability and breaking changes ([zen.md](zen.md): *now is better than never*, *one obvious way to do it*).
 
 ## Core Principle
 
-**The monorepo is the world.** Nothing outside the tree tracks `main`, so an API change is acceptable as long as all affected code within the repository is updated. Where something *does* need a fixed API, it pins a **release tag** rather than relying on `main` holding still; compatibility is a property of tags, not of the working branch (see [Code Maturity](#code-maturity)).
+**The monorepo is the world.** Nothing outside the tree tracks `main`, so you can change an API as long as you update all affected code here. Anything that needs a fixed API pins a **release tag** (see [Code Maturity](#code-maturity)).
 
-The exceptions to this freedom are anything a *user* has on disk or in a script — these are interfaces even though the code around them isn't:
+Anything a user has on disk or in a script is an exception. These are interfaces:
 
-- **On-disk file formats** — the `.qa.nc` analysis artifact, and any self-identifying file a tool reads back later
-- **Config / input file schemas** — user-authored, version-controlled files
+- **On-disk file formats**: the `.qa.nc` analysis artifact, and any self-identifying file a tool reads back later
+- **Config / input file schemas**: user-authored, version-controlled files
 - **CLI flags, subcommands, and positional arguments** that scripts may depend on
 - **stdout output** that downstream tools parse (see [logging.md](logging.md))
 - **Exit codes** that scripts check
 
 ## Code Maturity
 
-Treat this code as **prototype-maturity: high quality, but not backwards-compatible by
-contract.** "Prototype" here is about *commitment*, not polish — the code is still clean,
-tested, and typed; what it does not do is freeze an API for its own sake. Released, pinned
-versions carry the stability promise; `main` is where the design is still moving.
+This code is **prototype-maturity: clean, tested and typed, but not backwards-compatible
+by contract.** Released, pinned versions carry the stability promise. `main` is where the
+design still moves.
 
-- **Redesigning an API? Tear off the bandaid.** If the current shape is a bad idea, replace
-  it outright and update the call sites — don't preserve it behind a compatibility layer.
-  The old shape still exists at its tag for anyone who needs it.
-- **Shims are a strategic tool, not a maintained surface.** A temporary alias, adapter, or
-  `DeprecationWarning` earns its place when it *advances* a migration — letting you land a
-  big change in reviewable steps. It is not a permanent second way to do the same thing;
-  remove it once the migration lands (see [When Deprecation Markers Help](#when-deprecation-markers-help)).
-- **Specs develop in real time.** Much of this code is written to *discover* the need — the
-  spec emerges as you build. Something poorly understood or poorly specified early on should
-  not constrain later progress: revisit the design as understanding improves rather than
-  building forward on a shape you already know is wrong.
-
-This is *now is better than never; although never is often better than right now* from
-[zen.md](zen.md), applied to whole APIs rather than single changes.
+- **Replace a bad API outright** and update the call sites. Don't keep it behind a
+  compatibility layer. The old shape still exists at its tag.
+- **Shims are temporary.** An alias, adapter, or `DeprecationWarning` is fine when it
+  advances a migration, for example by splitting a big change into reviewable steps. Remove
+  it once the migration lands (see [When Deprecation Markers Help](#when-deprecation-markers-help)).
+- **Specs develop as you build.** A poorly understood early spec shouldn't constrain later
+  progress. Revisit the design instead of building on a shape you know is wrong.
 
 ## Code API Stability
 
 ### Breaking Changes Are Fine
 
-For Python APIs (functions, classes, modules):
-
-- **Rename freely** - Update all call sites in the repo
-- **Change signatures** - Grep for usages, update them
-- **Remove functions** - If nothing uses it, delete it
-- **Restructure modules** - Move code where it makes sense
-
-The impact of any refactoring can be evaluated by studying all uses in this repository. There are no hidden consumers to worry about.
+For Python APIs (functions, classes, modules), rename, change signatures, remove unused
+functions, and restructure modules freely. Update every call site in the repo. There are no
+hidden consumers.
 
 ### Rip Bandaids Early
 
-Avoid prolonged deprecation periods. When something needs to change:
-
-1. Make the change
-2. Update all affected code
-3. Run tests
-4. Done
-
-Don't maintain backward compatibility shims, re-exports for old names, or `# deprecated` comments that linger for months. Clean breaks are better than accumulated cruft.
+Make the change, update all affected code, run the tests, and you're done. Don't keep compatibility shims, re-exports for old names, or `# deprecated` comments for months.
 
 ### When Deprecation Markers Help
 
-Deprecation markers are useful *during* a refactoring session:
+During a refactoring session, a deprecation marker helps find call sites:
 
 ```python
 import warnings
@@ -73,11 +53,11 @@ def old_function():
     return new_function()
 ```
 
-This helps find call sites during migration. Remove the old function once migration is complete - don't leave it as a permanent compatibility layer.
+Remove the old function once migration is complete.
 
 ### Evaluating Impact
 
-Before making breaking changes:
+Before a breaking change, find the usages:
 
 ```bash
 # Find all usages of a function
@@ -88,18 +68,16 @@ rg "from mypackage import" src/
 rg "import mypackage" src/
 ```
 
-If you can see all the usages, you can update all the usages.
-
 ## Data Format Stability
 
-**Data lives outside the repository.** File formats and schemas require careful handling because users have files on disk that must remain readable.
+**Data lives outside the repository.** Users' files on disk must stay readable.
 
 ### What Requires Care
 
-- The `.qa.nc` analysis artifact — the seam between the two distributions, and the file a
-  user keeps. Its container has changed once already (a compressed `.npz` before
-  netCDF-4); the promise did not — new code reads every old file, and the
-  container is recognized from the file's leading bytes rather than its name
+- The `.qa.nc` analysis artifact. It is the seam between the two distributions and the file
+  a user keeps. Its container changed once (a compressed `.npz` before netCDF-4). The
+  promise did not: new code reads every old file. The container is recognized from the
+  file's leading bytes, not its name
 - The JSON the CLI emits, and the per-scan table it prints
 - Configuration and input file schemas
 - Any binary or serialization format a later run has to read back
@@ -107,9 +85,9 @@ If you can see all the usages, you can update all the usages.
 ### Schema Versioning
 
 The artifact carries its own version. `ARTIFACT_SCHEMA_VERSION` is written into every file
-as `schema_version`, and the mapping between the dataclasses and the file's variables is
-spelled out field by field rather than derived by reflection — so adding a field is a
-deliberate edit to the format, not a silent one.
+as `schema_version`. The mapping between the dataclasses and the file's variables is written
+out field by field, not derived by reflection. Adding a field is therefore an explicit edit
+to the format.
 
 Always provide a migration when changing the schema. `analysis/serialize/migrate.py` keeps one step
 per version, so a file two versions old is walked forward one step at a time:
@@ -122,8 +100,7 @@ _MIGRATIONS: dict[int, Callable[[dict[str, Any]], dict[str, Any]]] = {
 ```
 
 An artifact outlives the build that wrote it. A version this build has no route from is
-refused *loudly*, naming both versions — and so is a version from a newer build, because
-neither has an honest answer.
+refused with an error naming both versions. So is a version from a newer build.
 
 ### File Format Changes
 
@@ -134,38 +111,33 @@ When changing file formats:
 3. **Write new version only** - Don't maintain old writers
 4. **Document migrations** - If manual migration needed, document it
 
-A change of *container* — the same document and the same arrays in a different
-envelope, as when the artifact moved from `.npz` to netCDF-4 — is not a schema
-change and does not bump the version. The version pins the document's layout, so
-bumping it for an envelope would tell older builds to refuse a document they
-understand perfectly and put a step in the migration chain that changes no
-field. Tell the containers apart by the file's leading bytes instead: a version
-stored *inside* a file cannot be consulted until the container holding it has
-been opened. The old container keeps a reader and loses its writer, exactly as
-rule 2 and rule 3 say.
+A change of *container* is not a schema change and does not bump the version. An example is
+the artifact's move from `.npz` to netCDF-4: same document, different envelope. The version
+pins the document's layout, and bumping it would make older builds refuse a document they
+understand. Tell containers apart by the file's leading bytes, because a version stored
+inside a file can't be read until the container is open. The old container keeps a reader
+and loses its writer.
 
 ## CLI and Output Interfaces
 
-A package's command-line surface is an interface too: users wire flags and piped output
-into scripts. The "rip bandaids" philosophy still applies — just don't break someone's
-script *silently*. A loud failure (a clear error naming the removed flag) is acceptable; a
-silent behavior change is not.
+Users wire flags and piped output into scripts. Breaking changes are fine if they fail
+loudly, with a clear error naming the removed flag. A silent behavior change is not.
 
 ### CLI flags and arguments
 
-- **Add new flags freely** — defaults preserve existing behavior.
+- **Add new flags freely.** Defaults preserve existing behavior.
 - **Renaming a flag**: keep the old name as an alias, mark it deprecated in `--help`, and
   remove it after the call sites are updated. `click` supports multiple option names on one
-  parameter for exactly this.
+  parameter.
 - **Removing a flag**: prefer a clear error that names the removed flag over a silent no-op.
 
 ### stdout output and exit codes
 
-- **stdout is semi-stable** — anything a downstream tool might parse. Keep result data on
-  stdout and status/diagnostics on stderr ([logging.md](logging.md)) so a format change to
-  one channel doesn't surprise a pipeline reading the other.
-- **Exit codes are part of the contract** — scripts check them. `0` for success, non-zero
-  for failure; don't repurpose a code's meaning without noting it.
+- **stdout is semi-stable.** Downstream tools may parse it. Keep result data on stdout and
+  status/diagnostics on stderr ([logging.md](logging.md)), so a format change to one
+  channel doesn't surprise a pipeline reading the other.
+- **Exit codes are part of the contract.** Scripts check them. Use `0` for success and
+  non-zero for failure. Don't change a code's meaning without noting it.
 
 ## Summary
 
