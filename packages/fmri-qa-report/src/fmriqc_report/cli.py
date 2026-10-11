@@ -1,9 +1,8 @@
 """`fmri-qa-report`: render a saved artifact into a one-file HTML report.
 
-The presentation half's entry point. It reads the `.qa.nc` artifacts written by
-`fmri-qa --artifact` — never a NIfTI series — so reporting is a separate step
-that can run on a different machine, long after the calculation, with none of
-the acquisition data at hand.
+The presentation half's entry point. It reads `.qa.nc` artifacts written by
+`fmri-qa --artifact`, never a NIfTI series, so it can run on another machine,
+long after the calculation, without the acquisition data.
 """
 
 import argparse
@@ -52,15 +51,14 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser = _parser()
     args = parser.parse_args(argv)
 
-    # Expand patterns before the overwrite check counts them: on Windows the shell
-    # does not.
+    # Expand patterns before the overwrite check counts them. The Windows shell
+    # doesn't.
     artifacts = expand_globs(args.artifacts)
     if len(artifacts) != 1:
         parser.error("--html renders one artifact to one file")
     (path,) = artifacts
 
-    # Refuse before reading anything: an output that names an input is a usage
-    # error, and one that must be caught while the input is still intact.
+    # Refuse before reading anything, while the input is still intact.
     if same_file(args.html, path):
         print(
             f"ERROR: --html {args.html} would overwrite the input {path}",

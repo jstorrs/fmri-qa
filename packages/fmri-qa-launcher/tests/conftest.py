@@ -1,28 +1,23 @@
 """Shared fixtures for the launcher tests.
 
 `prepared_series` builds an analyzable synthetic phantom NIfTI + BIDS sidecar
-pair with nibabel -- the same recipe as `fmri-qa-core/tests/conftest.py`'s
-`write_scan` and `fmri-qa-report/tests/conftest.py`'s `_phantom`. This is a
-*third* copy of it rather than a shared import: a package's `tests/` directory
-is not itself importable by another package's tests (there is no shared
-test-support distribution in this workspace), and the alternative -- reaching
-into a sibling package's `tests/` with a path hack -- would tie this package's
-test collection to another package's internal layout. Three small, literal
-copies are the plainer failure mode.
+pair with nibabel. It is a third copy of `write_scan` in
+`fmri-qa-core/tests/conftest.py` and `_phantom` in
+`fmri-qa-report/tests/conftest.py`. One package can't import another's
+`tests/`, and a path hack would tie test collection to that package's layout.
 
-`stub_dcm2niix` stands in for the real converter. `fmri-qa-core`'s own
-`fake_dcm2niix` (in its `tests/conftest.py`) writes NIfTI files that do not
-load -- enough to test naming and staging, not enough to run `analyze` over.
-This one copies an already-analyzable `prepared_series` pair into the `-o`
-directory under dcm2niix-style stems instead, so `import_dicom`'s real staging,
-naming (`names="qa"`) and filing all run for real, and the series that comes
-out the other end is one `run_session` can actually analyze.
+`stub_dcm2niix` stands in for the real converter. `fmri-qa-core`'s
+`fake_dcm2niix` writes NIfTI files that don't load, which is enough for naming
+and staging but not for `analyze`. This stub copies an analyzable
+`prepared_series` pair into the `-o` directory under dcm2niix-style stems, so
+`import_dicom`'s real staging, naming (`names="qa"`) and filing run and the
+result is a series `run_session` can analyze.
 
-`stub_series`, `fast_render` and `warn_during_analysis` are the setup that
-`test_session.py` and `test_cli.py` would otherwise each paste. They are
-fixtures, not helpers, because under `--import-mode=importlib` a test module
-cannot import from conftest or from a sibling test module; this overrides
-testing.md's "helper functions over fixtures" preference.
+`stub_series`, `fast_render` and `warn_during_analysis` are setup shared by
+`test_session.py` and `test_cli.py`. They are fixtures because under
+`--import-mode=importlib` a test module can't import from conftest or a
+sibling test module. This overrides testing.md's "helper functions over
+fixtures" preference.
 """
 
 import json
@@ -66,11 +61,10 @@ def _synthetic_series(
 def prepared_series(tmp_path: Path) -> PreparedSeries:
     """Return a factory writing one analyzable phantom NIfTI + sidecar pair.
 
-    Each call gets its own subdirectory (so the NIfTI can be freely renamed
-    into a stub converter's output without colliding), and returns the NIfTI
-    path plus the sidecar dict as written beside it -- a caller layers on
-    whatever `SeriesNumber`/`SeriesDescription`/acquisition fields `naming`
-    needs before handing it to `stub_dcm2niix`.
+    Each call gets its own subdirectory, so the NIfTI can be renamed into a
+    stub converter's output without colliding. Returns the NIfTI path and the
+    sidecar dict written beside it. The caller adds the `SeriesNumber`,
+    `SeriesDescription` and acquisition fields `naming` needs.
     """
     counter = iter(range(10_000))
 
@@ -99,12 +93,11 @@ def prepared_series(tmp_path: Path) -> PreparedSeries:
 def stub_dcm2niix(tmp_path: Path) -> StubDcm2niix:
     """Return a factory building a stub dcm2niix from `{stem: (nifti, sidecar)}`.
 
-    `nifti`/`sidecar` are what `prepared_series` returns, `sidecar` merged with
-    whatever naming fields (`SeriesNumber`, `AcquisitionDateTime`,
-    `SeriesDescription`, ...) the caller adds. The script parses only what
-    `dcm2niix.build_args` actually passes -- the `-o DIR` this test cares
-    about -- and otherwise ignores its arguments, the same restraint
-    `fmri-qa-core`'s `fake_dcm2niix` shows.
+    `nifti`/`sidecar` are what `prepared_series` returns, with the naming
+    fields (`SeriesNumber`, `AcquisitionDateTime`, `SeriesDescription`, ...)
+    merged into `sidecar`. The script reads only the `-o DIR` argument from
+    `dcm2niix.build_args` and ignores the rest, like `fmri-qa-core`'s
+    `fake_dcm2niix`.
     """
 
     def build(series: dict[str, tuple[Path, dict[str, object]]]) -> Path:
@@ -162,10 +155,10 @@ def stub_series(
 ) -> StubSeries:
     """Return `build(frames=(40,)) -> (converter, names)` for N analyzable series.
 
-    One series per entry of `frames` (its length in volumes; a series of 2
-    cannot be analyzed, which is how a test gets a failing one), numbered
-    1..N in that order. `converter` is the stub dcm2niix that produces them and
-    `names` the `naming.qa_stem` name each is published under, in the same order.
+    One series per entry of `frames`, which is its length in volumes. A series
+    of 2 can't be analyzed, which is how a test gets a failing one. Series are
+    numbered 1..N. `converter` is the stub dcm2niix that produces them and
+    `names` holds the `naming.qa_stem` name each is published under, in order.
     """
 
     def build(frames: Sequence[int] = (40,)) -> tuple[Path, list[str]]:
@@ -189,8 +182,8 @@ def stub_series(
 def fast_render(monkeypatch: pytest.MonkeyPatch) -> Callable[..., Path]:
     """Replace `write_run_page` with a stand-in that skips the ~8 s render.
 
-    The stand-in still leaves a file behind for `Published.report` to point at.
-    It is returned too, for a test that wraps it.
+    The stand-in still writes a file for `Published.report` to point at, and
+    is returned for a test that wraps it.
     """
 
     def render(artifact: object, path: Path, **_kwargs: object) -> Path:
@@ -206,10 +199,9 @@ def fast_render(monkeypatch: pytest.MonkeyPatch) -> Callable[..., Path]:
 def warn_during_analysis(monkeypatch: pytest.MonkeyPatch) -> None:
     """Make `fmriqc.analyze` warn "a stub warning from the analysis" first.
 
-    `session.py` calls `fmriqc.analyze(...)` as an attribute of the `fmriqc`
-    module, so the warning has to come from there, not from a fake render:
-    only warnings around `from_nifti`/`analyze` are captured, exactly as
-    `fmriqc.cli.qa` does.
+    `session.py` calls `fmriqc.analyze(...)` as a module attribute, so the
+    warning has to come from there. Only warnings around `from_nifti`/`analyze`
+    are captured, as in `fmriqc.cli.qa`.
     """
     real = fmriqc.analyze
 
@@ -224,8 +216,8 @@ def warn_during_analysis(monkeypatch: pytest.MonkeyPatch) -> None:
 def dicom_dir(tmp_path: Path) -> Path:
     """A dummy non-empty directory standing in for a real DICOM source.
 
-    `stub_dcm2niix` never reads it -- only `import_dicom`'s own `source.is_dir()`
-    guard looks at it -- so its content does not matter, only that it exists.
+    `stub_dcm2niix` never reads it. Only `import_dicom`'s `source.is_dir()`
+    guard does.
     """
     directory = tmp_path / "dicom"
     directory.mkdir()

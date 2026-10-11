@@ -1,13 +1,13 @@
 # -*- mode: python -*-
 # PyInstaller spec for the single-file `fmri-qa-run`: the launcher, both
-# distributions under it, the interpreter, and dcm2niix in one executable that
-# needs nothing installed. Build it with `make bundle`, which runs PyInstaller
-# from an isolated environment resolved from uv.lock -- not the shared .venv,
-# whose extra tooling the import graph would otherwise drag in.
+# distributions under it, the interpreter and dcm2niix in one executable that
+# needs nothing installed. `make bundle` builds it from an isolated environment
+# resolved from uv.lock, because the shared .venv's extra tooling would get
+# dragged in by the import graph.
 #
-# PyInstaller follows `import` statements. Everything below is something this
-# project reaches some other way, stated once here rather than discovered as a
-# ModuleNotFoundError on a scanner console.
+# PyInstaller only follows `import` statements. Everything listed below is
+# reached another way and would otherwise fail with ModuleNotFoundError on a
+# scanner console.
 
 from pathlib import Path
 
@@ -27,32 +27,30 @@ FIRST_PARTY = {
 
 # All three packages resolve names lazily through `import_module` (PEP 562
 # `__getattr__` maps, and `cli._launch_panel` for the Tk panel), which the
-# import graph cannot see. Collecting every submodule is total over those maps;
-# naming the lazy ones individually would be a list to forget to extend.
+# import graph cannot see. Collecting every submodule avoids maintaining a list.
 hiddenimports = [
     module for package in FIRST_PARTY.values() for module in collect_submodules(package)
 ]
 
 # The report reads its templates and stylesheet through `importlib.resources`
-# (`formats/html/resources.py`), so they must exist as files in the bundle.
+# (`formats/html/resources.py`), so they must be files in the bundle.
 datas = collect_data_files("fmriqc_report")
 
-# `--version` and the artifact's provenance are answered by
-# `importlib.metadata`, which needs each distribution's dist-info. Without it
-# `version()` raises PackageNotFoundError and every version reads "unknown".
+# `--version` and the artifact's provenance come from `importlib.metadata`,
+# which needs each distribution's dist-info. Without it `version()` raises
+# PackageNotFoundError and every version reads "unknown".
 for distribution in FIRST_PARTY:
     datas += copy_metadata(distribution)
 
-# `find_dcm2niix` prefers the binary the `dcm2niix` wheel ships, located at
-# `dcm2niix.bin` beside the module's `__file__`. Placing it at the same relative
-# path keeps that branch the one that answers, so the executable converts DICOM
-# on a machine with no dcm2niix. As *binary* entries they keep their exec bit.
+# `find_dcm2niix` prefers the binary the `dcm2niix` wheel ships at
+# `dcm2niix.bin` beside the module's `__file__`. The same relative path keeps
+# that branch working, so the executable converts DICOM on a machine with no
+# dcm2niix. As *binary* entries they keep their exec bit.
 #
-# What is collected is every non-Python file in the package directory, not
-# `dcm2niix.bin` itself, because that path is not a file on every platform: it
-# is always the extensionless `dcm2niix`, while the Windows wheel ships
-# `dcm2niix.exe` (found at run time because CreateProcess appends `.exe`) with
-# the MSVC runtime DLLs it loads from its own directory beside it.
+# Collect every non-Python file in the package directory, not just
+# `dcm2niix.bin`: that path is always the extensionless `dcm2niix`, but the
+# Windows wheel ships `dcm2niix.exe` (found at run time because CreateProcess
+# appends `.exe`) plus the MSVC runtime DLLs it loads from its own directory.
 binaries = [
     (str(path), "dcm2niix")
     for path in Path(dcm2niix.__file__).parent.iterdir()
@@ -77,9 +75,9 @@ exe = EXE(
     a.binaries,
     a.datas,
     name="fmri-qa-run",
-    # `fmri-qa-run` has a stdout/stderr contract (report paths out, progress
-    # and failures on stderr), so it is a console program even though running
-    # it bare opens the panel.
+    # A console program despite opening the panel when run bare, because of
+    # its stdout/stderr contract: report paths out, progress and failures on
+    # stderr.
     console=True,
     upx=False,
 )

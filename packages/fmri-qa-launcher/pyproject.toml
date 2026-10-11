@@ -5,10 +5,10 @@ description = "Application shell that runs fmri-qa end to end: DICOM directory i
 readme = "README.md"
 requires-python = ">=3.13"
 license = "MIT"
-# A per-package copy of the root LICENSE. A path reaching out of the package
-# root (../../LICENSE) is not portable: hatchling drops it from the wheel
-# entirely and writes an unusable `../../` member into the sdist. `make check`
-# proves the copy is byte-identical to the root LICENSE.
+# A per-package copy of the root LICENSE. A path outside the package
+# (../../LICENSE) is not portable: hatchling drops it from the wheel and writes
+# an unusable `../../` member into the sdist. `make check` verifies the copy is
+# byte-identical to the root LICENSE.
 license-files = ["LICENSE"]
 authors = [
     { name = "Judd Storrs", email = "jstorrs@gmail.com" },
@@ -24,8 +24,8 @@ classifiers = [
     "Typing :: Typed",
 ]
 # The launcher only orchestrates fmri-qa-core (conversion and analysis) and
-# fmri-qa-report (rendering); it adds no third-party dependency of its own.
-# Its desktop panel is built on tkinter, which ships with the standard library.
+# fmri-qa-report (rendering). It adds no third-party dependency. Its desktop
+# panel uses tkinter, from the standard library.
 dependencies = [
     "fmri-qa-core==0.1.0",
     "fmri-qa-report==0.1.0",
@@ -34,11 +34,10 @@ dependencies = [
 [project.scripts]
 fmri-qa-run = "fmriqc_launcher.cli:main"
 
-# A gui-script, not a second `[project.scripts]` entry: on Windows this runs
-# under `pythonw` with no console attached, which is why `panel` never
-# prints (`sys.stdout`/`sys.stderr` are `None` there) and why the
-# console entry point above stays separate -- `fmri-qa-run` still needs a
-# console for its stdout/stderr contract.
+# A gui-script, not a second `[project.scripts]` entry. On Windows it runs
+# under `pythonw` with no console, so `panel` never prints (`sys.stdout` and
+# `sys.stderr` are `None` there). The console entry point above stays separate
+# because `fmri-qa-run` needs a console for its stdout/stderr contract.
 [project.gui-scripts]
 fmri-qa-panel = "fmriqc_launcher.panel:main"
 

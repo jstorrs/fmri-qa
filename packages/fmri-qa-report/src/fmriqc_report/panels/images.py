@@ -1,9 +1,9 @@
 """Phantom-image panels: signal, SFNR, noise and the N/2 ghost overlay.
 
-Each builder returns a labeled matplotlib `Figure` (a square-ish `imshow` panel
-with the phantom outline and ROI drawn on top); `panel_figs` assembles the row a
-report shows. Every image, mask and outline comes ready-made from the artifact,
-so this module only draws. Format-agnostic — a driver embeds the returned figures.
+Each builder returns a labeled matplotlib `Figure`: a square-ish `imshow` panel
+with the phantom outline and ROI on top. `panel_figs` assembles the row a report
+shows. Every image, mask and outline comes ready-made from the artifact, so
+this module only draws, and a format driver embeds the figures.
 """
 
 import numpy as np
@@ -29,10 +29,10 @@ _HULL_COLOR = "tab:cyan"  # phantom hull outline color
 def _data_per_point(ax: Axes) -> float:
     """Return the length of one typographic point (1/72 in) in axes data units.
 
-    `imshow` uses equal aspect, so x and y share a scale; `apply_aspect` finalizes
-    that scaling first so the measured transform is the one that will render. The
-    figure dpi cancels, making the result resolution-independent -- call only
-    after the axes position (subplots_adjust) is final.
+    `imshow` uses equal aspect, so x and y share a scale. `apply_aspect`
+    finalizes it first, so the measured transform is the one that will render.
+    The result is resolution-independent because the figure dpi cancels. Call
+    only after the axes position (subplots_adjust) is final.
     """
     ax.apply_aspect()
     (x0, x1) = ax.transData.transform([(0, 0), (1, 0)])[:, 0]
@@ -43,11 +43,10 @@ def _draw_roi(ax: Axes, roi: RoiBox) -> None:
     """Outline the ROI just outside its pixels so the stroke doesn't cover them.
 
     The ROI's outer boundary in imshow coordinates runs from `start - 0.5` to
-    `stop - 0.5`. The stroke is centered on the path, so drawing on that boundary
-    spills half the line width inward and hides the edge ROI pixels. Pad outward
-    by exactly half `_ROI_LW` -- converted from points to data units via the axes
-    scale -- so the stroke's inner edge lands back on the boundary and every ROI
-    pixel stays visible.
+    `stop - 0.5`. A stroke centered on that boundary would spill half its width
+    inward and hide the edge pixels. So pad outward by exactly half `_ROI_LW`,
+    converted from points to data units via the axes scale. The stroke's inner
+    edge then lands on the boundary and every ROI pixel stays visible.
     """
     pad = 0.5 * _ROI_LW * _data_per_point(ax)
     ax.add_patch(
@@ -65,10 +64,10 @@ def _draw_roi(ax: Axes, roi: RoiBox) -> None:
 def _draw_hull(ax: Axes, hull: FloatArray) -> None:
     """Stroke the phantom's convex outline, a closed polygon from the artifact.
 
-    The hull smooths the ragged phantom-mask boundary into a clean convex
-    outline. It arrives already closed and already in plot order (`imshow` maps
-    column -> x and row -> y), so this is a plain `plot`; an empty polygon (a
-    phantom too small to have a hull) draws nothing.
+    The hull smooths the ragged mask boundary into a convex outline. It arrives
+    closed and in plot order (`imshow` maps column -> x and row -> y), so this is
+    a plain `plot`. An empty polygon (a phantom too small to have a hull) draws
+    nothing.
     """
     if hull.shape[0] < 3:
         return
@@ -93,8 +92,8 @@ def _panel_fig(
     ax.imshow(data, vmin=vmin, vmax=vmax, interpolation="nearest")
     ax.set_xticks([])
     ax.set_yticks([])
-    # Fix the axes box before drawing the ROI: its pad is derived from the axes
-    # scale (see `_draw_roi`/`_data_per_point`), which subplots_adjust finalizes.
+    # Fix the axes box before drawing the ROI. Its pad comes from the axes scale
+    # (see `_draw_roi`/`_data_per_point`), which subplots_adjust finalizes.
     fig.subplots_adjust(left=0.02, right=0.98, bottom=0.02, top=0.90)
     if hull is not None:
         _draw_hull(ax, hull)
@@ -116,14 +115,15 @@ def _overlay(
 def _ghost_panel_fig(images: ArtifactImages) -> Figure:
     """Build the mean image with region-matched ghost/signal masks for both axes.
 
-    Draws the exact masks the ghost metrics averaged: for each in-plane axis, the
-    ghost patch (where the phantom rolled half the FOV lands clear of the phantom)
-    and its source on the phantom (that patch rolled back). The PE pair (cyan/red)
-    feeds ghost%; the readout pair (green/amber) feeds RO% -- the background-
-    relative baseline whose difference from ghost% is ACRg -- so both reported
-    percentages can be checked against where they are sampled. Any zeroed image
-    edge dropped from the statistics (magenta) is marked when present. The ghost
-    pairs are absent from the artifact, and so blank here, if the PE axis is unknown.
+    Draws the masks the ghost metrics averaged. For each in-plane axis it shows
+    the ghost patch (where the phantom rolled half the FOV lands clear of the
+    phantom) and its source on the phantom (that patch rolled back). The PE pair
+    (cyan/red) feeds ghost%. The readout pair (green/amber) feeds RO%, the
+    background-relative baseline whose difference from ghost% is ACRg. That way
+    both reported percentages can be checked against where they are sampled. A
+    zeroed image edge dropped from the statistics (magenta) is marked when
+    present. If the PE axis is unknown, the artifact has no ghost pairs and the
+    panel is blank.
     """
     fig = Figure(figsize=(2.0, 2.0 * _PANEL_ASPECT))
     ax = fig.add_subplot(111)

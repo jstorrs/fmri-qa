@@ -2,10 +2,10 @@
 
 Each `plot_*` (`plot_weisskoff`, `plot_rdc`, `plot_signal`, `plot_residual`,
 `plot_outliers`, `plot_motion`, `plot_com`, `plot_spectrum`, `plot_psf`) draws
-one stability panel onto a matplotlib `Axes` from the artifact's `Curves` —
-every trace arrives precomputed, so these functions only choose colors, labels
-and limits. `plot_fig` wraps a draw callback into a fresh `Figure`.
-Format-agnostic — a driver embeds the figures.
+one stability panel onto a matplotlib `Axes` from the artifact's `Curves`.
+Every trace arrives precomputed, so these functions only choose colors, labels
+and limits. `plot_fig` wraps a draw callback into a fresh `Figure` that a
+format driver can embed.
 """
 
 from collections.abc import Callable
@@ -32,10 +32,10 @@ def plot_weisskoff(ax: Axes, wk: WeisskoffCurve, rdc: float) -> None:
     """Plot measured CV against the ideal slope=-1 line anchored at pooled cv1.
 
     The ideal line is anchored at `cv1_pooled` (the single-voxel CV pooled over
-    the whole ROI) rather than at the single-voxel `cv[0]`, which makes the
-    graphical RDC — where the measured plateau meets this line — equal the
-    reported RDC, and is robust to the intensity non-uniformity that biases a
-    single-voxel anchor. The artifact carries the anchored line as `cv_ideal`.
+    the whole ROI), not at the single-voxel `cv[0]`. That makes the graphical
+    RDC, where the measured plateau meets this line, equal the reported RDC, and
+    resists the intensity non-uniformity that biases a single-voxel anchor. The
+    artifact carries the line as `cv_ideal`.
     """
     # Measured data on top (zorder), but first in the legend (call order).
     ax.loglog(wk.roi_sizes, wk.cv, "o-", ms=3, label="measured", zorder=3)
@@ -95,9 +95,9 @@ def plot_signal(ax: Axes, curves: Curves) -> None:
 def plot_residual(ax: Axes, curves: Curves, tc_outlier: float) -> None:
     """Plot the ROI-mean detrended residual with its cran `tc_outlier` score.
 
-    `tc_outlier` (max|residual| / MAD) is the peak-to-spread ratio of exactly this
-    series, so a lone volume standing far off the baseline is both visible here and
-    quantified in the title.
+    `tc_outlier` (max|residual| / MAD) is the peak-to-spread ratio of this
+    series, so a lone volume far off the baseline is visible here and quantified
+    in the title.
     """
     ax.plot(curves.time, curves.roi_residual, lw=0.5)
     ax.axhline(0, color="gray", lw=0.5)
@@ -117,10 +117,10 @@ def plot_outliers(ax: Axes, curves: Curves) -> None:
 def plot_motion(ax: Axes, curves: Curves) -> None:
     """Plot per-volume in-plane phantom motion: translation and strain.
 
-    3dvolreg-style registration to the temporal mean with the rotation dropped
-    (a rigid phantom cannot rotate). Translation drifts on the left axis; the
-    scaling/shear strain -- the gradient-heating signature -- shares a right axis
-    in percent. A stable phantom stays flat near zero; a slow ramp is thermal.
+    3dvolreg-style registration to the temporal mean, with rotation dropped
+    (a rigid phantom cannot rotate). Translation is on the left axis and the
+    scaling/shear strain, the gradient-heating signature, on a right axis in
+    percent. A stable phantom stays flat near zero; a slow ramp is thermal.
     """
     t = curves.time
     ax.axhline(0, color="gray", lw=0.5)
@@ -157,10 +157,10 @@ def plot_motion(ax: Axes, curves: Curves) -> None:
 def plot_com(ax: Axes, curves: Curves) -> None:
     """Plot the per-volume phantom center-of-mass shift (voxels).
 
-    Circular intensity centroid (bxh volmeasures) along each in-plane axis,
-    plotted as its signed deviation from the run's mean centroid. A rigid, stable
-    phantom stays flat near zero; a slow ramp is drift and a spike is a transient
-    jump -- gross first-moment instability the ROI summaries miss. Complements the
+    Circular intensity centroid (bxh volmeasures) along each in-plane axis, as
+    its signed deviation from the run's mean. A stable phantom stays flat near
+    zero; a slow ramp is drift and a spike is a transient jump. Both are gross
+    first-moment instabilities the ROI summaries miss. Complements the
     registration-based in-plane motion plot.
     """
     dev = curves.com_deviation
@@ -176,8 +176,8 @@ def plot_com(ax: Axes, curves: Curves) -> None:
 def plot_spectrum(ax: Axes, curves: Curves, spec_outlier: float) -> None:
     """Plot the residual FFT magnitude (DC dropped) with cran `spec_outlier`.
 
-    `spec_outlier` (max magnitude / MAD) is the peak-to-spread ratio of exactly
-    this DC-dropped spectrum, so a dominant periodic artifact shows as a spike here
+    `spec_outlier` (max magnitude / MAD) is the peak-to-spread ratio of this
+    DC-dropped spectrum, so a dominant periodic artifact shows as a spike here
     and as a large number in the title.
     """
     ax.plot(curves.spectrum_hz, curves.spectrum_magnitude, lw=0.7)
@@ -189,14 +189,13 @@ def plot_spectrum(ax: Axes, curves: Curves, spec_outlier: float) -> None:
 def plot_psf(ax: Axes, psf: PsfCurves) -> None:
     """Plot PE and RO point-spread profiles of the noise field (3dFWHMx).
 
-    Markers are the empirical PSF (the squared spatial autocorrelation of the
-    detrended noise field at each lag -- the point spread implied by the data
-    under the Gaussian random-field model); the line is the Gaussian PSF whose
-    FWHM is the Classic first-difference estimate for that axis. PE/RO asymmetry,
-    or empirical points falling off the Gaussian, flag anisotropic or non-Gaussian
-    reconstruction smoothing. The analysis fixes `xmax` -- a few FWHM, so a narrow
-    PSF isn't squashed by the full lag range -- and the empirical points are
-    clipped to it here.
+    Markers are the empirical PSF: the squared spatial autocorrelation of the
+    detrended noise field at each lag, the point spread the data imply under the
+    Gaussian random-field model. The line is the Gaussian PSF whose FWHM is the
+    Classic first-difference estimate for that axis. PE/RO asymmetry, or
+    empirical points off the Gaussian, flag anisotropic or non-Gaussian
+    reconstruction smoothing. The analysis fixes `xmax` at a few FWHM so a
+    narrow PSF isn't squashed, and the empirical points are clipped to it here.
     """
     colors = ("tab:blue", "tab:orange")
     for i, (label, color) in enumerate(zip(psf.labels, colors, strict=True)):

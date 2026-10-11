@@ -1,10 +1,9 @@
 """Self-contained SVG figures for one rendered QA run.
 
-``render_figures`` consumes a completed :class:`fmriqc.analysis.QAArtifact` and
-renders the fixed image and stability figure set as standalone SVG documents
-in memory: a run page embeds every one as a ``data:`` URI, so nothing here
-ever writes a figure to disk. Rendering only draws values already present in
-the artifact; it neither loads inputs nor recomputes measurements.
+``render_figures`` renders the fixed image and stability figure set of a
+completed :class:`fmriqc.analysis.QAArtifact` as standalone SVG documents in
+memory. A run page embeds each as a ``data:`` URI, so nothing is written to
+disk. Rendering only draws values already in the artifact.
 """
 
 import io
@@ -63,9 +62,8 @@ class RenderedFigure:
     svg: bytes
 
 
-# The stable figure inventory in render order; each asset names its own section.
-# Keeping this vocabulary at module scope means the HTML composer can use it
-# without duplicating its fourteen figure identities.
+# Module scope lets the HTML composer use this inventory without duplicating
+# the fourteen figure identities.
 #: Every figure of the report, in render order; each asset names its own section.
 FIGURE_ASSETS: tuple[FigureAsset, ...] = (
     FigureAsset(
@@ -189,9 +187,9 @@ def render_figures(
 ) -> tuple[RenderedFigure, ...]:
     """Render the fixed inventory as self-contained SVG documents, in order.
 
-    Rendering happens inside a local matplotlib ``rc_context``; this driver
-    neither selects a backend nor uses pyplot. Figures are built with the object
-    API, so nothing global holds them and they are freed with their references.
+    Rendering happens inside a local matplotlib ``rc_context``, with no backend
+    selection and no pyplot. Figures use the object API, so nothing global holds
+    them and they are freed with their references.
     """
     with matplotlib.rc_context(
         {

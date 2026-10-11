@@ -1,9 +1,8 @@
 """Shared fixtures for the presentation-half tests.
 
-Every fixture here stops at a `QAArtifact` — the report package's only input.
-The artifact is built in memory from a synthetic phantom, so these tests need no
-NIfTI on disk and no file-I/O layer: `QAScan` is constructed directly, which is
-also a small proof that the seam holds.
+Every fixture stops at a `QAArtifact`, the report package's only input. It is
+built in memory from a synthetic phantom, so no NIfTI on disk or file-I/O layer
+is needed. `QAScan` is constructed directly, which also shows the seam holds.
 """
 
 import numpy as np
@@ -15,10 +14,9 @@ import fmriqc as q
 def _phantom(n: int = 32, z: int = 3, t: int = 40, seed: int = 0) -> q.QAScan:
     """Build a synthetic bright-disk phantom series with seeded temporal noise.
 
-    The background gets a magnitude noise floor, mirroring the calculation half's
-    fixture: an exactly-constant background degenerates the intensity quantiles
-    that seed the phantom segmentation, and a report rendered from a collapsed
-    mask would be a report of NaNs rather than of panels.
+    The background gets a magnitude noise floor, as in the calculation half's
+    fixture. A constant background collapses the intensity quantiles that seed
+    the phantom segmentation, and the report would be full of NaNs.
     """
     rng = np.random.default_rng(seed)
     yy, xx = np.mgrid[0:n, 0:n]

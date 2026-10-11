@@ -1,9 +1,9 @@
-"""The report `Theme`, the visual decisions the matplotlib panels follow.
+"""The report `Theme`: the visual settings the matplotlib panels follow.
 
 A `Theme` carries the colormap, accent color and font family a run page's
 figures use, exposed as matplotlib rcParams through `rc_params()`. The default
-`Theme()` draws gray images with matplotlib's tab10 color cycle and default
-font; a group rebrands by instantiating it.
+draws gray images with matplotlib's tab10 color cycle and default font. A group
+rebrands by instantiating its own.
 """
 
 from dataclasses import dataclass
@@ -14,9 +14,10 @@ from cycler import cycler
 if TYPE_CHECKING:
     from matplotlib.typing import RcKeyType
 
-# matplotlib's default categorical cycle; the theme accent replaces its first
-# entry so a themed primary series recolors while the semantic tab10 colors
-# (used explicitly by the multi-series plots) stay put.
+# matplotlib's default categorical cycle. The theme accent replaces its first
+# entry, so a themed primary series recolors. The semantic tab10 colors stay
+# put: `plot_motion`, `plot_com` and `plot_psf` use them explicitly by name, not
+# through the cycle.
 _MPL_TAB10 = (
     "#1f77b4",
     "#ff7f0e",
@@ -43,10 +44,9 @@ class Theme:
     def rc_params(self) -> "dict[RcKeyType, object]":
         """Build the matplotlib rcParams that style the panels to match the page.
 
-        A driver activates these with `matplotlib.rc_context` around the figure
-        building so the phantom colormap, the primary-series color and the
-        font follow the theme. The default theme draws gray images with
-        matplotlib's tab10 color cycle and default font.
+        A driver activates these with `matplotlib.rc_context` around figure
+        building, so the phantom colormap, primary-series color and font follow
+        the theme.
         """
         rc: dict[RcKeyType, object] = {
             "image.cmap": self.panel_cmap,

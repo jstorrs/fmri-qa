@@ -24,7 +24,7 @@ def test_main_reports_a_write_failure_without_a_traceback(
     assert rc == 1
     assert "ERROR: could not write HTML" in captured.err
     assert "Traceback" not in captured.err
-    # the atomic write's temporary file is an implementation detail, not an error
+    # the atomic write's temporary file is an implementation detail
     assert ".tmp" not in captured.err
 
 
@@ -64,9 +64,9 @@ def test_html_refuses_to_overwrite_an_input(
 ) -> None:
     """`--html` naming an input must fail before the artifact is read or replaced.
 
-    The artifact is loaded first and the HTML is moved over its destination
-    last, so without the guard the run succeeds and leaves a report where the
-    archive was. The relative spelling is the one a shell produces.
+    The artifact is loaded first and the HTML is moved into place last, so
+    without the guard the run would replace the archive with a report. The
+    relative spelling is the one a shell produces.
     """
     archive = Path(saved)
     before = archive.read_bytes()

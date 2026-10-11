@@ -80,7 +80,7 @@ def test_figure_alt_text_is_the_title_not_the_visible_caption_sentence(
 ) -> None:
     """A screen reader must not read the description twice.
 
-    It must not appear both as `alt` and as the figcaption text right beside it.
+    It must not appear as both `alt` and the figcaption text beside it.
     """
     page = standalone_page
     parsed = _Page()
@@ -102,8 +102,8 @@ def test_run_page_offers_a_scriptless_enlarge_target_for_every_figure(
 
     for asset in FIGURE_ASSETS:
         assert f'id="fig-{asset.name}"' in page
-        # the image itself is the enlarge link, and a link over it closes,
-        # returning to the figure it came from
+        # the image is the enlarge link, and a link over it closes and returns
+        # to the figure it came from
         assert re.search(rf'<a [^>]*href="#fig-{asset.name}"[^>]*><img ', page)
         assert f'id="plate-{asset.name}"' in page
         assert f'<a class="zoom close" href="#plate-{asset.name}"' in page
@@ -246,8 +246,8 @@ def test_run_page_puts_metric_units_in_small_and_leaves_bare_numbers(
 ) -> None:
     page = standalone_page
     measurements = artifact.measurements
-    # "ghost" always carries a "%" unit and "SNR" never does; picked by label
-    # rather than a unit lookup so the test names what it expects.
+    # "ghost" always carries a "%" unit and "SNR" never does. Pick by label so
+    # the test names what it expects.
     unit_bearing = next(doc for doc in METRIC_DOCS if doc.label == "ghost")
     dimensionless = next(doc for doc in METRIC_DOCS if doc.label == "SNR")
     number = unit_bearing.number(measurements)

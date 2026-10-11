@@ -52,7 +52,7 @@ def test_last_series_publish_reaches_the_maximum() -> None:
 
 
 def test_only_the_last_series_publish_reaches_the_maximum() -> None:
-    """A middle series' publish stays short of the maximum -- more work remains."""
+    """A middle series' publish stays short of the maximum; more work remains."""
     state = bar_state(Progress(Stage.PUBLISH, index=2, total=3, series="b"))
     assert state != Determinate(value=9, maximum=9)
     assert state.maximum == 9
@@ -128,10 +128,9 @@ def test_cancelled_run_reports_stopped_early_with_no_denominator(
 ) -> None:
     """A run cancelled after 2 of 10 series must not claim "2 of 2".
 
-    `RunResult.outcomes` only ever holds the series a cancelled run actually
-    reached (`run_session` breaks the loop rather than padding it out with
-    the series never attempted -- see `session.py`), so the headline must
-    not show a denominator implying those two were the whole run.
+    `RunResult.outcomes` holds only the series a cancelled run reached
+    (`run_session` breaks the loop without padding), so the headline must not
+    imply those two were the whole run.
     """
     result = RunResult(
         tmp_path, (_published("a", tmp_path), _published("b", tmp_path)), cancelled=True

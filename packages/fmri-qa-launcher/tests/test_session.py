@@ -1,10 +1,9 @@
 """`run_session`: the functional core, exercised end to end over a stub converter.
 
 Only `test_one_series_is_imported_analyzed_and_published` renders a real
-report (~8 s); every other test that needs an outcome for a *published*
-series monkeypatches `write_run_page` with the `fast_render` fixture, a few
-milliseconds' stand-in that still leaves a file behind for `Published.report`
-to point at.
+report (~8 s). Other tests that need a *published* series use the
+`fast_render` fixture, which patches `write_run_page` to take a few
+milliseconds and still leaves a file for `Published.report`.
 """
 
 import logging
@@ -38,9 +37,9 @@ _SETTINGS = AnalysisSettings(roi_size=9)
 def staging_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     """A private stand-in for the system's temporary directory.
 
-    Staging is made with `tempfile.mkdtemp`, so where it lands is whatever
-    `tempfile.tempdir` says. Pointing that here lets a test see exactly what a
-    run made and left, in a place no other process is writing to.
+    Staging comes from `tempfile.mkdtemp`, so it lands in `tempfile.tempdir`.
+    Pointing that here lets a test see what a run made and left, where no
+    other process writes.
     """
     root = tmp_path / "system-tmp"
     root.mkdir()
@@ -119,8 +118,8 @@ def test_one_series_is_imported_analyzed_and_published(
     assert published.artifact == series_dir / f"{name}.qa.nc"
     assert published.report == series_dir / f"{name}.html"
 
-    # What is published honors the umask -- 0o755 and 0o644 -- and not the
-    # 0o700 of the `tempfile.mkdtemp` staging directory it was copied out of.
+    # What is published honors the umask (0o755 and 0o644), not the 0o700 of
+    # the `tempfile.mkdtemp` staging directory it was copied from.
     assert stat.S_IMODE(series_dir.stat().st_mode) == 0o755
     for published_file in series_dir.iterdir():
         assert stat.S_IMODE(published_file.stat().st_mode) == 0o644
@@ -335,9 +334,9 @@ def test_a_probe_that_cannot_be_removed_is_logged_and_does_not_stop_the_run(
 ) -> None:
     """Making the probe proved the directory writable; failing to remove it cannot.
 
-    A sync client opens what was just made, and the removal is refused -- the
-    very race `fmriqc.rename` exists for. Treated as "cannot write", it would
-    refuse every run into a watched directory before the run began.
+    A sync client opens what was just made and the removal is refused, the
+    race `fmriqc.rename` exists for. Treating it as "cannot write" would
+    refuse every run into a watched directory.
     """
     monkeypatch.setattr(
         "fmriqc_launcher.session.shutil.rmtree", _rmtree_except(".fmri-qa-probe.")
@@ -413,10 +412,9 @@ def test_two_series_with_a_dotted_prefix_pair_each_publish_their_own_files(
 ) -> None:
     """`scan.rep.json` must land beside `scan.rep`, not get stolen by `scan`.
 
-    Sidecars here carry none of `naming.qa_stem`'s fields, so `import_dicom`
-    keeps each series' original dcm2niix stem verbatim -- "scan" and
-    "scan.rep" -- reproducing the dotted-prefix collision that the converter's
-    longest-stem rule resolves.
+    These sidecars lack `naming.qa_stem`'s fields, so `import_dicom` keeps the
+    original dcm2niix stems ("scan" and "scan.rep"), reproducing the
+    dotted-prefix collision the converter's longest-stem rule resolves.
     """
     scan_nifti, scan_base = prepared_series(name="scan")
     rep_nifti, rep_base = prepared_series(name="scan.rep", seed=1)
@@ -537,9 +535,9 @@ def test_a_progress_callback_that_raises_propagates_and_fails_no_series(
     with pytest.raises(RuntimeError, match="callback queue is closed"):
         run_session(request, progress=_raise_at_analyze)
 
-    # No `Failed` outcome was ever produced (the exception escaped before one
-    # could be built), no staging directory survived, and no series directory
-    # exists either -- the run never reached publish.
+    # No `Failed` outcome was produced (the exception escaped before one could
+    # be built), no staging directory survived, and no series directory
+    # exists. The run never reached publish.
     assert output_dir.is_dir()
     assert list(output_dir.iterdir()) == []
 
@@ -572,13 +570,12 @@ def test_a_warning_during_render_is_not_captured(
     stub_series: StubSeries,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Only analysis is captured now, exactly as `fmriqc.cli.qa` does.
+    """Only analysis is captured, as in `fmriqc.cli.qa`.
 
     `simplefilter("always")` over save/render used to revive warnings a
-    library silences on purpose -- netCDF4's first-import numpy notice --
-    and present them as findings about the physicist's scan. A render that
-    warns is proof the fix holds: the warning still fires (`pytest.warns`
-    around the whole call), but nothing lands on the outcome.
+    library silences on purpose, such as netCDF4's first-import numpy notice,
+    and report them as findings about the scan. Here a render warns: it still
+    fires (`pytest.warns` around the call) but nothing lands on the outcome.
     """
 
     def _warn_then_render(artifact: object, path: Path, **_kwargs: object) -> Path:
@@ -598,10 +595,9 @@ def test_a_warning_during_render_is_not_captured(
 
     outcome = result.outcomes[0]
     assert isinstance(outcome, Published)
-    # This phantom's own analysis warns too (its motion fit never converges,
-    # by construction -- see `prepared_series`), so the assertion that
-    # matters is that the *render's* warning specifically never lands here,
-    # not that the tuple is empty.
+    # This phantom's own analysis warns too (its motion fit never converges
+    # by construction; see `prepared_series`). So assert that the *render's*
+    # warning never lands here, not that the tuple is empty.
     assert not any("stub warning from the render step" in w for w in outcome.warnings)
 
 
@@ -702,10 +698,10 @@ def test_the_output_directory_holds_no_intermediates_while_a_series_is_worked_on
 ) -> None:
     """What a sync client watching `output_dir` would have been handed to upload.
 
-    Looked at from inside the render, the last step before publishing: by then
-    the import has run, the scan has been filed and the artifact written, and
-    under the old staging-in-`output_dir` design every one of those was sitting
-    there. All of it is in the temporary directory instead.
+    Checked from inside the render, the last step before publishing, when the
+    import has run, the scan is filed and the artifact is written. The old
+    staging-in-`output_dir` design left all of that in `output_dir`; it is now
+    in the temporary directory.
     """
     output_dir = tmp_path / "output"
     seen: dict[str, list[str]] = {}
@@ -744,9 +740,9 @@ def test_a_published_series_is_dropped_from_staging_before_the_next_one_starts(
 ) -> None:
     """Publishing copies where it used to move, so staging has to be emptied by hand.
 
-    Otherwise a session's every finished series sits in the temporary
-    directory until the run ends -- the small, often RAM-backed disk, filling
-    while the output directory the user chose has room to spare.
+    Otherwise every finished series sits in the temporary directory until the
+    run ends. That disk is small and often RAM-backed; the output directory
+    has room to spare.
     """
     staged_at_each_render: list[set[str]] = []
 
@@ -810,8 +806,8 @@ def test_a_series_is_never_visible_under_its_name_until_it_is_whole(
     _publish(work, output / "series")
 
     assert seen == [False, False, False]
-    # One hidden sibling, in the output directory itself so the rename that
-    # follows stays on one filesystem -- and gone once it has become the series.
+    # One hidden sibling, in the output directory so the rename that follows
+    # stays on one filesystem. It is gone once it has become the series.
     (sibling,) = copied_into
     assert sibling.startswith(".series.")
     assert sibling.endswith(".partial")
@@ -910,9 +906,9 @@ def test_a_series_published_by_another_run_mid_rename_is_named_as_that(
 ) -> None:
     """Windows reports a rename onto an existing directory as `refusal`.
 
-    `PermissionError` is the one `replace_patiently` waits out, so by the time
-    it gives up the other run has long since published -- and "access is
-    denied" is no description of that.
+    `replace_patiently` waits out `PermissionError`, so by the time it gives up
+    the other run has long since published and "Access is denied" would be
+    misleading.
     """
     work, target = tmp_path / "work", tmp_path / "series"
     work.mkdir()

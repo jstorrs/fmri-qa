@@ -85,11 +85,10 @@ def test_device_and_provenance_lines_are_empty_without_metadata(
 def test_a_collapsed_phantom_mask_is_called_out(artifact) -> None:
     """A bad mask invalidates every mask-based number on the page.
 
-    It has to say so in the notes block: the metrics themselves still look
-    like ordinary measurements, so a reader has nothing else to go on. The
-    verdict is the artifact's -- the bounds it was judged by live with the
-    segmentation, in a package this one cannot import -- and the fraction beside
-    it is what the reader is shown.
+    The notes block has to say so, since the metrics still look like ordinary
+    measurements. The verdict is the artifact's, because the bounds it was
+    judged by live with the segmentation, in a package this one cannot import.
+    The fraction beside it is what the reader is shown.
     """
     collapsed = _clipped(artifact, phantom_fraction=1.0, phantom_mask_ok=False)
     assert "BAD PHANTOM MASK (100% of frame" in summary.acquisition_notes(collapsed)
@@ -99,8 +98,7 @@ def test_a_bad_mask_note_shows_the_contrast_when_the_artifact_has_it(artifact) -
     """The note shows which test the mask failed.
 
     A collapse shows in the share, noise in the contrast. An artifact migrated
-    from before the contrast was recorded shows the share alone rather than a
-    NaN.
+    from before the contrast was recorded shows the share alone, not a NaN.
     """
     noisy = _clipped(
         artifact, phantom_fraction=0.54, phantom_contrast=1.7, phantom_mask_ok=False
@@ -113,9 +111,9 @@ def test_a_bad_mask_note_shows_the_contrast_when_the_artifact_has_it(artifact) -
 def test_acquisition_notes_flag_an_analysis_of_background() -> None:
     """A noise-only scan's failed verdict reaches the page unchanged.
 
-    End to end rather than by overriding the field: the calculation half once
-    warned that no slice held a phantom and then recorded the mask as good, and
-    this is the page that would have shown ordinary-looking numbers for it.
+    This runs end to end instead of overriding the field. The calculation half
+    once warned that no slice held a phantom yet recorded the mask as good, and
+    this page showed ordinary-looking numbers for it.
     """
     noise = np.abs(np.random.default_rng(0).normal(size=(32, 32, 1, 40)))
     settings = q.AnalysisSettings(trim_sec=0, center="phantom", roi_size=3)
@@ -138,9 +136,8 @@ def test_a_well_localized_run_carries_no_localization_note(artifact) -> None:
 def test_an_unrecorded_localization_is_noted_without_alarm(artifact) -> None:
     """A migrated artifact predating the check is neither vouched for nor damned.
 
-    The page must not read as though the checks were made and passed, but there
-    is nothing to condemn either -- so it is stated plainly, in lower case, apart
-    from the failures that are called out in capitals.
+    The page must not read as though the checks passed, and there is nothing to
+    condemn, so it says so in lower case, apart from the failures in capitals.
     """
     migrated = _clipped(artifact, phantom_mask_ok=None, roi_inside_phantom=None)
     assert summary._localization_note(migrated) == "localization not recorded"

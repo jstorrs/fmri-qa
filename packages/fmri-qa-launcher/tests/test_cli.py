@@ -1,11 +1,9 @@
 """`fmri-qa-run`, exercised over a stub converter and a fast fake render.
 
-Only `test_the_published_run_matches_a_direct_analyze` (the equivalence claim
-that matters) pays for a real analysis; the other end-to-end tests
-monkeypatch `fmriqc_launcher.session.write_run_page` with the `fast_render`
-fixture, the same stand-in `tests/test_session.py` uses. What the command
-prints for each kind of outcome is pinned by calling `_print_outcomes` on a
-hand-built `RunResult`, with no run at all.
+Only `test_the_published_run_matches_a_direct_analyze` runs a real analysis.
+The other end-to-end tests patch `fmriqc_launcher.session.write_run_page` with
+the `fast_render` fixture, as `tests/test_session.py` does. Printed output per
+outcome is pinned by calling `_print_outcomes` on a hand-built `RunResult`.
 """
 
 import stat
@@ -32,7 +30,7 @@ StubSeries = Callable[..., tuple[Path, list[str]]]
 def fake_run_session(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> dict[str, object]:
-    """Replace `run_session` with a stub that records its request and runs nothing."""
+    """Replace `run_session` with a stub that records its request."""
     captured: dict[str, object] = {}
 
     def _fake_run_session(request: object, **_kwargs: object) -> RunResult:
@@ -185,7 +183,7 @@ def test_the_published_run_matches_a_direct_analyze(
     dicom_dir: Path,
     stub_series: StubSeries,
 ) -> None:
-    """The claim that matters: `fmri-qa-run` matches a direct `fmriqc.analyze`."""
+    """`fmri-qa-run` matches a direct `fmriqc.analyze`."""
     converter, (name,) = stub_series()
     output_dir = tmp_path / "output"
 
@@ -517,10 +515,10 @@ def test_zero_arguments_reports_the_missing_panel_by_a_failed_tkinter_import(
 def test_an_import_error_unrelated_to_tkinter_is_a_real_bug_and_propagates(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """`panel.py` failing to import `numpy` (say) is a packaging bug, not "no tkinter".
+    """`panel.py` failing to import `numpy` (say) is a packaging bug.
 
-    Reporting this as "install tkinter" would send a physicist chasing the
-    wrong fix entirely -- it must propagate and say what actually failed.
+    Reporting it as "install tkinter" would send the user after the wrong
+    fix, so the error must propagate and say what failed.
     """
 
     def _raise(_name: str) -> None:

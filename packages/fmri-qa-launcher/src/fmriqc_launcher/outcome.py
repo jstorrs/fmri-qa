@@ -1,9 +1,9 @@
 """What a run reports: one outcome per series, and the run's overall result.
 
-These are plain frozen values with no dependencies beyond the standard
-library, so a module that only presents a finished run (`results`, `worker`,
-`panel_state`, `panel`, `cli`) can import them without paying for the analysis
-and report stack that `session.run_session` needs.
+These are plain frozen values with only standard-library dependencies. Modules
+that just present a finished run (`results`, `worker`, `panel_state`, `panel`,
+`cli`) can import them without the analysis and report stack that
+`session.run_session` needs.
 """
 
 from dataclasses import dataclass
@@ -33,10 +33,10 @@ class Published:
 class Refused:
     """A series whose name already exists in `output_dir`.
 
-    Never overwritten -- see `run_session`'s docstring -- so a refused series
-    is one the converter did import into staging, but whose analysis, render,
-    and publish are all skipped: this costs it no analysis time and no render
-    time, only the import it shared with every other series in the run.
+    Never overwritten (see `run_session`'s docstring). The converter imported
+    it into staging, but analysis, render and publish are skipped. That costs
+    no analysis or render time, only the import it shared with every other
+    series.
     """
 
     name: str
@@ -47,9 +47,9 @@ class Refused:
 class Failed:
     """A series that raised somewhere between import and publish.
 
-    `reason` is `str(exc)`, or the exception's type name when that string is
-    empty. Whatever this series produced in staging is discarded with the rest
-    of it; nothing partial ever reaches `output_dir`.
+    `reason` is `str(exc)`, or the exception's type name if that is empty.
+    Anything staged for this series is discarded; nothing partial reaches
+    `output_dir`.
     """
 
     name: str
@@ -78,8 +78,8 @@ class RunResult:
     def complete(self) -> bool:
         """Whether every series found was published and nothing was cancelled.
 
-        False for a run that found nothing at all: a report of "0 of 0,
-        complete" is not a run a caller should treat as a success.
+        False for a run that found nothing: "0 of 0, complete" is not a
+        success.
         """
         return (
             bool(self.outcomes)

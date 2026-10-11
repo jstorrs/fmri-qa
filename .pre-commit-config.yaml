@@ -1,13 +1,13 @@
-# Runs the standard loop earlier — see style/tooling.md.
+# Runs the standard loop earlier; see style/tooling.md.
 # Install once with `uv run pre-commit install`.
 #
 # Every hook is local and goes through `uv run`, so a commit is checked by the
-# exact ruff and mypy pinned in uv.lock. A remote hook pins its own copy of
-# ruff, which drifts from the locked one and lets the hook and `make check`
-# disagree about formatting.
+# ruff and mypy pinned in uv.lock. A remote hook pins its own ruff, which drifts
+# from the locked one and lets the hook and `make check` disagree about
+# formatting.
 #
 # `--force-exclude` makes ruff honor the root pyproject's `extend-exclude` even
-# for the paths pre-commit hands it explicitly.
+# for paths pre-commit passes explicitly.
 repos:
   - repo: local
     hooks:

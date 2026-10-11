@@ -43,12 +43,11 @@ def test_every_exported_name_resolves() -> None:
 
 
 def test_bare_import_does_not_load_scipy_or_matplotlib() -> None:
-    """The lazy-import claim, from a fresh interpreter.
+    """Check the lazy-import claim from a fresh interpreter.
 
-    A bare `import fmriqc_launcher` still imports `.request`, which pulls in
-    numpy through `fmriqc.settings`/`fmriqc.types` -- see the package
-    docstring -- so this only checks that `.session`'s heavier stack (scipy,
-    matplotlib) stays unloaded, not that numpy does.
+    A bare `import fmriqc_launcher` still pulls in numpy through `.request`
+    (see the package docstring), so this only checks that `.session`'s heavier
+    stack (scipy, matplotlib) stays unloaded.
     """
     import subprocess
 

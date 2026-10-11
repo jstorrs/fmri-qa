@@ -1,21 +1,20 @@
 """The seam: the report half may read the artifact, and nothing else.
 
-The whole point of the split is that presentation depends on the *published
-artifact*, not on the pipeline that produced it. That is easy to state and easy
-to erode one convenient import at a time, so it is checked mechanically here:
-every `fmriqc` import in the report package must land in `fmriqc.analysis` (the
-artifact), `fmriqc.types` (the shared array/option vocabulary), `fmriqc.rename`
-(how a finished file is moved into place) or `fmriqc.path_arguments` (wildcards
-and same-file checks on path arguments). An import of `fmriqc.metrics`,
-`fmriqc.pipeline`, `fmriqc.prep` or `fmriqc.load` — or of the `fmriqc` package
-as a whole, which pulls all of them — fails this test.
+Presentation depends on the *published artifact*, not on the pipeline that
+produced it. That is easy to erode one convenient import at a time, so this
+file checks it mechanically. Every `fmriqc` import in the report package must
+land in `fmriqc.analysis` (the artifact), `fmriqc.types` (the shared
+array/option vocabulary), `fmriqc.rename` (how a finished file is moved into
+place) or `fmriqc.path_arguments` (wildcards and same-file checks on path
+arguments). An import of `fmriqc.metrics`, `fmriqc.pipeline`, `fmriqc.prep` or
+`fmriqc.load`, or of the `fmriqc` package as a whole (which pulls all of them),
+fails this test.
 
-That scan reads import *text*, which is necessary but not sufficient: an
-allowed import can still drag a forbidden module in behind it, through the
-`__init__.py` of the package it lands in. So the seam is checked twice here —
-once statically, over every source file, and once at runtime, by importing the
-report CLI in a fresh interpreter and looking at what actually ended up in
-`sys.modules`.
+That scan reads import *text*, which is necessary but not sufficient. An
+allowed import can still pull in a forbidden module through the `__init__.py`
+of the package it lands in. So the seam is checked twice: statically, over
+every source file, and at runtime, by importing the report CLI in a fresh
+interpreter and looking at what ended up in `sys.modules`.
 """
 
 import ast
@@ -29,17 +28,16 @@ import fmriqc_report
 
 # The only calculation-side modules presentation is allowed to reach for.
 #
-# `fmriqc.rename` is here although it is not about the artifact at all, and that
-# is the argument for it: it is a leaf over the standard library, so it cannot
-# bring a line of the calculation in behind it (the runtime half of this test
-# would catch it if that changed). What it carries is a policy -- how long to
-# outwait a sync client holding a just-written file -- that the artifact's
-# writer and the page's writer must agree on, and a second copy kept in step by
-# hand is the worse way to say so.
+# `fmriqc.rename` has nothing to do with the artifact, but it is a leaf over the
+# standard library, so it cannot bring any calculation code in behind it (the
+# runtime half of this test would catch it if that changed). It carries a
+# policy, how long to outwait a sync client holding a just-written file, that
+# the artifact's writer and the page's writer must agree on. A second copy kept
+# in step by hand is worse.
 #
-# `fmriqc.path_arguments` is the same kind of leaf: standard library only, and
-# what it carries is a shell quirk (an unexpanded wildcard) and an overwrite
-# guard that the report must apply exactly as the other commands do.
+# `fmriqc.path_arguments` is the same kind of leaf: standard library only. It
+# carries a shell quirk (an unexpanded wildcard) and an overwrite guard that the
+# report must apply the same way as the other commands.
 ALLOWED = frozenset(
     {"fmriqc.analysis", "fmriqc.types", "fmriqc.rename", "fmriqc.path_arguments"}
 )
@@ -47,9 +45,9 @@ ALLOWED = frozenset(
 _SOURCE_ROOT = Path(fmriqc_report.__file__).parent
 
 # The calculation stack, and the third-party libraries only it needs. Rendering
-# a report reaches none of these: `fmriqc.load` and `fmriqc.prep` are in the
-# list too, because the artifact carries everything a reader wants already
-# resolved, so not even a cheap leaf of those layers is touched at read time.
+# a report reaches none of these. `fmriqc.load` and `fmriqc.prep` are listed
+# too: the artifact carries everything a reader wants already resolved, so
+# reading touches none of those layers.
 _CALCULATION_ONLY = (
     "fmriqc.pipeline",
     "fmriqc.metrics",
@@ -62,8 +60,8 @@ _CALCULATION_ONLY = (
 )
 
 # The format-agnostic public surface must stay importable without the drawing
-# stack: the package resolves its driver lazily so that `import fmriqc_report`
-# never pays for matplotlib unused. Each target runs in its own new interpreter
+# stack. The package resolves its driver lazily so that `import fmriqc_report`
+# never pays for unused matplotlib. Each target runs in its own new interpreter
 # so a previous probe cannot hide a dependency imported by another target.
 _DRIVER_ONLY = ("matplotlib",)
 _REPORT_IMPORT_TARGETS = (
@@ -74,9 +72,9 @@ _REPORT_IMPORT_TARGETS = (
     "fmriqc_report.panels",
 )
 
-# Run in a fresh interpreter: only a process that has imported nothing else can
-# say what `import fmriqc_report.cli` costs. This one already has the whole
-# stack loaded from the other tests in the suite.
+# Run in a fresh interpreter. Only a process that has imported nothing else can
+# say what `import fmriqc_report.cli` costs; this one already has the whole
+# stack loaded by other tests.
 _PROBE = f"""
 import sys
 import fmriqc_report.cli
@@ -161,12 +159,12 @@ def test_presentation_never_imports_the_launcher() -> None:
 
 
 def test_importing_the_report_cli_does_not_load_the_calculation_stack() -> None:
-    """The seam at runtime, which the static scan above cannot speak to.
+    """The seam at runtime, which the static scan above cannot see.
 
     `fmriqc.analysis` is an allowed import, but what it *executes* is another
-    question: its `__init__` could pull the pipeline in behind the artifact and
+    question. Its `__init__` could pull the pipeline in behind the artifact and
     the scan would still pass. Only a fresh interpreter's `sys.modules` settles
-    it, so that is what this asks.
+    it.
     """
     result = subprocess.run(  # noqa: S603 - fixed literal script, not untrusted input
         [sys.executable, "-c", _PROBE],

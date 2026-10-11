@@ -1,10 +1,10 @@
 """Format-agnostic scan-level text: the acquisition/provenance metadata lines.
 
 The strings a report shows about a scan, derived from a `QAArtifact` with no
-dependency on any output format: the `*_line` helpers return the acquisition /
-provenance / device strings, and `package_version` the running renderer
-version. The per-metric vocabulary (tile labels and value formatting) lives in
-`content`. A format driver (see `formats`) decides how to lay these out.
+dependency on any output format. The `*_line` helpers return the acquisition,
+provenance and device strings, and `package_version` the renderer version.
+Tile labels and value formatting live in `content`; a format driver (see
+`formats`) lays everything out.
 """
 
 import math
@@ -40,8 +40,7 @@ def acquisition_line(artifact: QAArtifact) -> str:
     if prov.matrix is not None:
         parts.append(f"{prov.matrix[0]}×{prov.matrix[1]} px")
     if prov.slice_index is not None:
-        # The stored index, 0-based, so it names the same plane the artifact and
-        # the JSON record do; the count says how far into the stack it sits.
+        # The stored 0-based index, so it matches the artifact and JSON record.
         total = f"/{prov.n_slices}" if prov.n_slices is not None else ""
         parts.append(f"slice index {prov.slice_index}{total}")
     parts.append(f"{prov.n_frames} frames")
@@ -66,25 +65,23 @@ def acquisition_notes(artifact: QAArtifact) -> str:
 def _localization_note(artifact: QAArtifact) -> str:
     """Build the phantom/ROI localization warning for the notes; empty if fine.
 
-    Both failures make every mask-based number on the page meaningless while
-    leaving it looking like an ordinary measurement, so they are called out in
-    capitals next to the metrics they invalidate rather than left for a reader to
-    infer from a NaN.
+    Both failures make every mask-based number meaningless while leaving it
+    looking like an ordinary measurement. So they are called out in capitals
+    next to the metrics they invalidate, instead of being left for a reader to
+    infer from a NaN. The verdict comes from the artifact (`phantom_mask_ok`); the
+    bounds belong to the segmentation in the calculation half, which isn't
+    importable from here.
 
-    The verdict on the mask is the artifact's (`phantom_mask_ok`), not this
-    module's: the bounds belong to the segmentation, which lives in the
-    calculation half and is not importable from here.
-
-    A verdict of `None` — an artifact migrated from a schema written before the
-    check existed — is reported quietly rather than in capitals: nothing is known
-    to be wrong, but the page must not imply the checks were made and passed.
+    A verdict of `None` means the artifact was migrated from a schema that
+    predates the check. It is reported quietly, since nothing is known to be
+    wrong, but the page must not imply the checks ran and passed.
     """
     m = artifact.measurements
     notes = []
     if m.phantom_mask_ok is False:
-        # Both numbers the verdict was reached from, so the reader sees which
-        # failed: a collapse shows in the share, a segmentation of noise in the
-        # contrast. The contrast is absent from an artifact that predates it.
+        # Show both numbers so the reader sees which failed: a collapse shows in
+        # the share, a segmentation of noise in the contrast. Artifacts that
+        # predate the contrast don't have it.
         why = f"{100 * m.phantom_fraction:.0f}% of frame"
         if not math.isnan(m.phantom_contrast):
             why += f", {m.phantom_contrast:.3g}× contrast"
@@ -100,13 +97,12 @@ def _clipping_note(artifact: QAArtifact) -> str:
     """Build the ADC-saturation warning for the notes block; empty if none.
 
     Clipping inside the analyzed data biases every metric and is called out in
-    capitals; clipping confined to the dropped warm-up volumes is expected on
-    some scanners and is reported quietly, apart from the biasing kind.
+    capitals. Clipping confined to the dropped warm-up volumes is expected on
+    some scanners and is reported quietly.
 
-    A `clipped_any` of None is neither: the series did not arrive as integer
-    samples, so the rail test could not run. That is worth a line of its own --
-    silence would read as "no clipping found", which is the one thing this
-    artifact cannot say.
+    A `clipped_any` of None means the series wasn't integer samples, so the rail
+    test couldn't run. It gets its own line, since silence would read as "no
+    clipping found".
     """
     m = artifact.measurements
     if m.clipped_any is None:

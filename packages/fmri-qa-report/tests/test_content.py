@@ -90,7 +90,7 @@ def test_methods_describe_the_implemented_order_of_operations() -> None:
 
     SFNR averages voxelwise ratios (the ROI-mean form is `fluct`), the ghost
     denominator is the matched signal region, and ACRg is an absolute
-    difference; each of these once read as the other textbook form.
+    difference. Each once read as the other textbook form.
     """
     by_label = {doc.label: doc for doc in content.METRIC_DOCS}
     assert "per voxel" in by_label["SFNR"].method
@@ -118,11 +118,11 @@ def test_outlier_method_describes_threshold_tuning() -> None:
 def test_motn_and_com_tiles_carry_the_displacement_unit(
     artifact, bare_artifact
 ) -> None:
-    """`motn`/`com` render their unit exactly as `fwhm` already does.
+    """`motn` and `com` render their unit the way `fwhm` does.
 
-    `artifact` has a known voxel size and reports mm; `bare_artifact` has no
-    sidecar metadata at all and falls back to voxels -- the same "mm when known,
-    else voxels" rule `_fwhm_unit` applies, read off `displacement_unit`.
+    `artifact` has a known voxel size and reports mm. `bare_artifact` has no
+    sidecar metadata and falls back to voxels, the "mm when known, else voxels"
+    rule `_fwhm_unit` applies, read off `displacement_unit`.
     """
     by_label = {doc.label: doc for doc in content.METRIC_DOCS}
     m = artifact.measurements

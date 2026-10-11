@@ -13,11 +13,10 @@ def test_importing_the_package_leaves_the_matplotlib_backend_alone() -> None:
     """A library must not change a process-global its importer chose.
 
     `fmriqc_report` used to call `matplotlib.use("Agg")` at import time,
-    silently overriding whatever backend the importing process had already
-    selected (e.g. a notebook's inline backend). Run in a fresh interpreter
-    with a non-default, display-free backend set via `MPLBACKEND`, so the
-    probe reflects only this process's import, not whatever other tests have
-    already done to `matplotlib`'s global state.
+    overriding the backend the importing process had selected (e.g. a
+    notebook's inline backend). This runs in a fresh interpreter with a
+    non-default, display-free backend set via `MPLBACKEND`, so the probe is
+    unaffected by what other tests did to `matplotlib`'s global state.
     """
     code = (
         "import matplotlib\n"

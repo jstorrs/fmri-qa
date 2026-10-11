@@ -1,12 +1,10 @@
-"""`Panel`, driven against a fake background run -- no real pipeline, no sleeps.
+"""`Panel`, driven against a fake background run with no pipeline or sleeps.
 
-Every test here is gated on whether a real `tk.Tk()` root can be built at
-all, not on `$DISPLAY` (unset on Windows/macOS, where a display still
-exists) -- see the `root` fixture. `_FakeBackground` implements the same
-shape `worker.BackgroundRun` does (`start`/`poll`/`cancel`/`running`) with no
-thread behind it at all: a test pushes events onto it directly and calls
-`panel._tick()` itself, so these tests are fast and deterministic regardless
-of whether a display is actually available in CI.
+Tests are gated on whether a real `tk.Tk()` root can be built (see the `root`
+fixture), not on `$DISPLAY`, which is unset on Windows and macOS even when a
+display exists. `_FakeBackground` has the shape of `worker.BackgroundRun`
+(`start`/`poll`/`cancel`/`running`) with no thread. A test pushes events onto
+it and calls `panel._tick()` itself, so tests are fast and deterministic.
 """
 
 from __future__ import annotations
@@ -61,9 +59,8 @@ def root() -> Iterator[tk.Tk]:
 class _FakeBackground:
     """A `worker.BackgroundRun`-shaped stand-in: no thread, no real pipeline.
 
-    A test drives it by calling `push()` and then `Panel._tick()` directly --
-    `start()` only records that it was called, and `poll()` drains exactly
-    what `push()` put there, synchronously.
+    A test calls `push()` and then `Panel._tick()` directly. `start()` only
+    records the call and `poll()` synchronously drains what `push()` queued.
     """
 
     def __init__(self, request: RunRequest) -> None:

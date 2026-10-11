@@ -1,24 +1,18 @@
 """One run on its own thread, delivering typed events through a queue.
 
-`panel.py` is the only module that ever knows about `tkinter`; this one does
-not import it at all, so `BackgroundRun` and the pure `Event` types below are
-fully unit-testable without a display. `run_session` itself is reached only
-through `.session`, imported lazily inside the thread target rather than at
-module top, so that importing `fmriqc_launcher.worker` stays as cheap as
-importing `.request`/`.progress`.
+Only `panel.py` imports `tkinter`, so this module is testable headless.
+`run_session` is imported inside the thread target, so importing this module
+stays as cheap as importing `.request` or `.progress`.
 
-The thread is non-daemon on purpose: a windowed build has no console for a
-half-copied series to complain from, and `run_session` already promises
-nothing partial is ever left in `output_dir` -- but only if it is allowed to
-finish unwinding when the process is asked to exit. The `finally` that matters
-is `session._publish`'s, which removes the hidden `.partial` sibling a series
-is copied into before it is renamed into place; cut short, that is a partial
-scan left in the user's output directory, and uploaded if it is a synced one.
-(Staging itself is in the system's temporary directory, and losing the race to
-remove that would cost `output_dir` nothing.) A `Crashed` event is how *any*
-exception, expected or not, still reaches a caller that has no stderr of its
-own -- a windowed executable's `sys.stderr` is `None`, so an error that only
-ever reached a thread's default excepthook would be lost silently.
+The thread is non-daemon so `session._publish`'s `finally` can remove the
+hidden `.partial` sibling on exit. Otherwise a partial scan stays in
+`output_dir` and may be synced. That `finally` is the one that matters.
+Staging is in the system temp directory, so losing the race to remove it
+costs `output_dir` nothing.
+
+A `Crashed` event is how any exception, expected or not, still reaches a
+caller. Windowed builds have `sys.stderr` as `None`, so an error that only
+reached a thread's default excepthook would be lost silently.
 """
 
 import logging
@@ -49,13 +43,11 @@ class Finished:
 class Crashed:
     """The run raised before it could produce a `RunResult`.
 
-    `message` is plain text, safe to show a physicist as-is: for a
-    `LauncherError` it already is one (an expected, worded failure), and for
-    anything else it is `"{type}: {exc}"`. `details` is empty for a
-    `LauncherError` -- there is nothing more useful to add -- and otherwise
-    the formatted traceback, carried here (rather than only logged, which
-    goes nowhere under `pythonw`'s silent `sys.stderr`) so a panel can append
-    it to its log for a physicist to copy to whoever supports them.
+    `message` is plain text, safe to show a physicist as-is: the worded
+    failure for a `LauncherError`, otherwise `"{type}: {exc}"`. `details` is
+    the formatted traceback (empty for a `LauncherError`). It travels here
+    because logging goes nowhere under `pythonw`'s silent `sys.stderr`; a panel
+    can append it to its log for the physicist to pass to support.
     """
 
     message: str
@@ -88,11 +80,10 @@ class BackgroundRun:
 
     `start()` launches a non-daemon thread that calls `run` (by default the
     real pipeline) with `progress=queue.put`, `notice=queue.put`, and a
-    `should_continue` this object controls via `cancel()`. `poll()` drains
-    whatever events have arrived since the last call without blocking; the
-    thread always ends by putting exactly one terminal event, `Finished` or
-    `Crashed`, so a caller that keeps draining until it sees one has seen the
-    whole run, including cleanup notices produced during exception unwinding.
+    `should_continue` that `cancel()` controls. `poll()` drains arrived events
+    without blocking. The thread always ends with exactly one terminal event,
+    `Finished` or `Crashed`, so draining until one appears sees the whole run,
+    including cleanup notices from exception unwinding.
     """
 
     def __init__(self, request: RunRequest, *, run: _Runner | None = None) -> None:
@@ -109,8 +100,8 @@ class BackgroundRun:
         Raises
         ------
         RuntimeError
-            If called more than once -- a second call would run the pipeline
-            twice concurrently against the same request.
+            If called more than once, since a second call would run the
+            pipeline twice concurrently against the same request.
         """
         if self._thread is not None:
             raise RuntimeError("BackgroundRun.start() called more than once")
@@ -128,12 +119,9 @@ class BackgroundRun:
         except LauncherError as exc:
             self._queue.put(Crashed(str(exc)))
         except BaseException as exc:
-            # Every kind of thread exit -- including SystemExit and
-            # KeyboardInterrupt, which a plain `except Exception` would miss
-            # entirely -- must still leave exactly one terminal event queued
-            # (see the class docstring's invariant); the exception is then
-            # re-raised so the thread's own exit behaves as it would without
-            # this handler, just with the event already delivered.
+            # Catch SystemExit and KeyboardInterrupt too: every exit must
+            # queue exactly one terminal event. Re-raise so the thread exits
+            # as it would without this handler.
             _LOG.exception("background run crashed")
             details = "".join(traceback.format_exception(exc))
             self._queue.put(Crashed(f"{type(exc).__name__}: {exc}", details))

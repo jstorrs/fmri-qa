@@ -64,8 +64,8 @@ def test_output_dir_the_same_as_dicom_dir_is_refused(tmp_path: Path) -> None:
     dicom_dir = tmp_path / "dicom"
     dicom_dir.mkdir()
 
-    # A path that resolves to the same directory without being spelled
-    # identically -- `Path.resolve()` is what `RunRequest` compares by.
+    # Resolves to the same directory without the same spelling;
+    # `RunRequest` compares by `Path.resolve()`.
     detour = dicom_dir / "sub" / ".."
 
     with pytest.raises(RequestError) as excinfo:

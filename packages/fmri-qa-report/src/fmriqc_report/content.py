@@ -1,17 +1,15 @@
 """Per-metric vocabulary: the label, definition, method and display recipe.
 
-One `MetricDoc` per reported metric is the single source for what a metric is
-called, how its value is shown, what it means and how it is computed. Values
-are read off the artifact's flat `Measurements`, so a report needs nothing
-but the artifact to render a metric. The run page's metric tiles and its
-definitions list both read this catalog, so a metric's name and formatting
-can't drift between them.
+One `MetricDoc` per reported metric is the single source for its name, display
+format, meaning and method. Values come from the artifact's flat
+`Measurements`. The run page's metric tiles and definitions list both read this
+catalog, so a metric's name and formatting can't drift between them.
 
-The prose is condensed from `notes/` and the metric modules; see those for the
-full derivations. Each `method` names the order of operations the code actually
-performs — where two textbook forms differ (SFNR averaged over voxelwise ratios
-versus measured on the ROI-mean series, say), the text follows the code, and a
-test on the calculation side pins the difference.
+The prose is condensed from `notes/` and the metric modules, which have the full
+derivations. Each `method` gives the order of operations the code performs.
+Where two textbook forms differ (SFNR averaged over voxelwise ratios versus
+measured on the ROI-mean series, say), the text follows the code, and a test on
+the calculation side pins the difference.
 """
 
 from collections.abc import Callable
@@ -82,8 +80,8 @@ def _fwhm_unit(m: Measurements) -> str:
     return m.fwhm_unit
 
 
-# The reported metrics, in display order. The tile label, decimals and unit here
-# are the ones the metric tiles use, so the tiles and the definitions list agree.
+# The reported metrics, in display order. The metric tiles use the label,
+# decimals and unit given here, so the tiles and definitions list agree.
 METRIC_DOCS: tuple[MetricDoc, ...] = (
     MetricDoc(
         "SNR",

@@ -1,9 +1,8 @@
 """`BackgroundRun`: one run on its own thread, delivering typed events.
 
-Most tests inject a fake `run`; focused integration tests exercise the lazy
+Most tests inject a fake `run`. A few integration tests exercise the lazy
 wrapper and real session cleanup to pin callback wiring and terminal-event
-ordering. `worker.py` itself imports none of the analysis stack (see its
-docstring).
+ordering. `worker.py` imports none of the analysis stack (see its docstring).
 """
 
 import threading
@@ -90,12 +89,10 @@ def test_cancel_flips_should_continue_and_the_result_is_cancelled(
 ) -> None:
     """`cancel()` is called before the fake run ever checks `should_continue` again.
 
-    Rather than racing the background thread with a sleep-poll loop, the fake
-    run signals `first_series_done` right after finishing the first series
-    and then blocks on `may_continue` -- so `cancel()` (and setting
-    `may_continue`) only happens once the main thread knows the run is
-    parked exactly between the first and second `should_continue` checks.
-    Deterministic; no sleep involved.
+    The fake run signals `first_series_done` after the first series, then
+    blocks on `may_continue`. The main thread calls `cancel()` and sets
+    `may_continue` only once the run is parked between the first and second
+    `should_continue` checks. No sleeps, so no race.
     """
     first_series_done = threading.Event()
     may_continue = threading.Event()
@@ -169,9 +166,9 @@ def test_an_unexpected_exception_arrives_as_crashed_naming_its_type(
 def test_a_system_exit_still_arrives_as_a_crashed_event(request_: RunRequest) -> None:
     """`SystemExit`/`KeyboardInterrupt` are `BaseException`, not `Exception`.
 
-    A plain `except Exception` would miss these entirely, leaving `running`
-    False with no terminal event ever queued -- the one invariant `poll()`'s
-    callers depend on (see `BackgroundRun`'s docstring).
+    `except Exception` would miss them, leaving `running` False with no
+    terminal event queued, which `poll()` callers rely on never happening (see
+    `BackgroundRun`'s docstring).
     """
 
     def run(*_args: object, **_kwargs: object) -> RunResult:
@@ -216,10 +213,9 @@ def test_poll_drains_incrementally_while_the_run_is_still_going(
 ) -> None:
     """`poll()` must not wait for the terminal event to return what has already arrived.
 
-    Gated on `threading.Event`s rather than a sleep-poll loop, the same
-    deterministic shape as `test_cancel_flips_should_continue_...` above: the
-    fake run signals after its first `progress()` call and parks until the
-    main thread has drained that one event and told it to continue.
+    Like `test_cancel_flips_should_continue_...`, it uses `threading.Event`s:
+    the fake run signals after its first `progress()` call and parks until the
+    main thread has drained that event.
     """
     first_reported = threading.Event()
     may_continue = threading.Event()
@@ -268,9 +264,8 @@ def test_the_default_run_calls_the_real_session_lazily(
 ) -> None:
     """No injected `run`: the default wrapper reaches `session.run_session` itself.
 
-    Monkeypatches `fmriqc_launcher.session.run_session` rather than running
-    the real pipeline -- proving the wiring, not re-testing `session.py`,
-    which already has its own suite.
+    Monkeypatches `fmriqc_launcher.session.run_session` to test the wiring
+    without the real pipeline; `session.py` has its own suite.
     """
     import fmriqc_launcher.session as session_module
 
@@ -302,10 +297,8 @@ def test_the_default_run_calls_the_real_session_lazily(
 def test_the_thread_is_non_daemon(request_: RunRequest) -> None:
     """No public seam exposes daemon-ness, so this reaches the private `_thread`.
 
-    A daemon thread would let the interpreter exit in the middle of a publish,
-    before the half-copied series is removed from the output directory (see
-    the module docstring) -- worth pinning even at the cost of one
-    implementation-detail assertion.
+    A daemon thread would let the interpreter exit mid-publish and leave a
+    half-copied series in the output directory (see the module docstring).
     """
     background = BackgroundRun(request_, run=_fake_series_run(()))
     background.start()

@@ -1,9 +1,9 @@
 """What stage a run is in, and the one line a shell can show for it.
 
-A leaf module: no `fmriqc`/`fmriqc_report` import at all, so it costs nothing
-to keep eager in `__init__` (see that module's docstring). `Progress` is a
-plain value handed to a caller-supplied callback -- `session.run_session`
-never decides how progress is displayed, only what happened.
+A leaf module with no `fmriqc`/`fmriqc_report` import, so it is free to keep
+eager in `__init__` (see that module's docstring). `Progress` is a plain value
+handed to a caller's callback; `session.run_session` never decides how to
+display it.
 """
 
 from collections.abc import Callable
@@ -24,14 +24,12 @@ class Stage(StrEnum):
 
 @dataclass(frozen=True, slots=True)
 class Progress:
-    """One point in a run: which stage, and — past import — which series.
+    """One point in a run: which stage, and, past import, which series.
 
-    `index`/`total` are 1-based and count the series a run actually attempts
-    (a series refused up front because its name already exists in the output
-    directory never reaches analysis, so it is never counted here either —
-    see `session.run_session`). Both stay 0 while `stage` is `IMPORT`: dcm2niix
-    has not yet said how many series it found, and import is one step for the
-    whole DICOM directory, not one per series.
+    `index`/`total` are 1-based and count the series a run attempts. A series
+    refused up front because its name already exists in the output directory is
+    not counted (see `session.run_session`). Both stay 0 during `IMPORT`, which
+    is one step for the whole DICOM directory before dcm2niix reports a count.
     """
 
     stage: Stage
@@ -43,8 +41,8 @@ class Progress:
 def describe(progress: Progress) -> str:
     """Describe `progress` as a one-line, human-readable summary.
 
-    Import names no series -- there is none to name yet -- so its line reads
-    differently from the other three, which all share one "N of M: name" shape.
+    Import names no series yet, so its line differs from the other three,
+    which share an "N of M: name" shape.
     """
     match progress.stage:
         case Stage.IMPORT:

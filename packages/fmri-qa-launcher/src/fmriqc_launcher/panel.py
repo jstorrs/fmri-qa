@@ -1,33 +1,25 @@
 """The desktop panel: one `tkinter` window over `request`/`worker`/`session`.
 
-This is the only module in the package that imports `tkinter` -- `cli.py`
-reaches it through `importlib.import_module` precisely so that importing
-`fmriqc_launcher.cli` never pulls `tkinter` in (see its docstring), and every
-other module here stays free of it so it can be unit-tested without a
-display.
+This is the only module that imports `tkinter`. `cli.py` loads it through
+`importlib.import_module`, so importing `fmriqc_launcher.cli` never pulls
+`tkinter` in, and every other module can be tested without a display.
 
-Every decision about *what happened* -- where the progress bar sits, what a
-finished run means, whether a submission is valid, what the exit code should
-be -- lives in `panel_state`/`worker`/`request`; this module only wires
-widgets to those functions and manages the one piece of imperative-shell
-lifecycle those modules cannot express on their own: the window's own close
+What happened (bar position, what a finished run means, whether a submission
+is valid, the exit code) is decided in `panel_state`/`worker`/`request`. This
+module wires widgets to those functions and manages the window's close
 sequence. It never writes to stdout or stderr: under `pythonw` (the
-gui-script entry point, `fmri-qa-panel`) `sys.stdout`/`sys.stderr` are
-`None`, and a `print` would raise -- which is also why `root.mainloop()`
-alone is not enough supervision: `tkinter`'s default
-`report_callback_exception` calls `traceback.print_exception`, silently a
-no-op under `pythonw`, and worse, an exception there ends the `after` chain
-that drives `_tick`, freezing the panel mid-run. `_on_callback_exception`
-below is installed as a backstop against exactly that.
+`fmri-qa-panel` entry point) both are `None` and `print` would raise. For the
+same reason `mainloop()` alone is not enough supervision. `tkinter`'s default
+`report_callback_exception` prints a traceback, which does nothing under
+`pythonw`, and an exception ends the `after` chain that drives `_tick` and
+freezes the panel mid-run. `_on_callback_exception` is installed as a backstop.
 
-`Panel` is a plain object built on a `tk.Tk` root a caller supplies, with a
-`form_values()` accessor -- this is what lets the display-gated tests in
-`tests/test_panel.py` build a real window, read its defaults back, drive it
-with a fake background run, and destroy it without ever calling
-`mainloop()`. `background=`/`opener=` are injected the same way
-`worker.BackgroundRun` takes `run=` and `results.open_results` takes
-`opener=`, so those tests never touch a real pipeline, a real thread, or a
-real browser.
+`Panel` is built on a caller-supplied `tk.Tk` root and has a `form_values()`
+accessor, so the display-gated tests in `tests/test_panel.py` can build one,
+read its defaults, drive it, and destroy it without `mainloop()`. `background=`
+and `opener=` are injected like `worker.BackgroundRun`'s `run=` and
+`results.open_results`'s `opener=`, so those tests touch no pipeline, thread,
+or browser.
 """
 
 from __future__ import annotations
@@ -85,10 +77,8 @@ __all__ = ["Panel", "main", "run_panel"]
 
 _TITLE = "fMRI QA"
 _TICK_MS = 150
-# An indeterminate bar sweeps once per `maximum` steps, so `maximum` sets the
-# bounce speed. It has to be put back on every run: a finished run leaves the
-# bar's `maximum` at a handful of ticks, which would turn the next run's
-# bounce into a flicker between the two ends.
+# An indeterminate bar sweeps once per `maximum` steps. Reset it on every run:
+# a finished run leaves `maximum` at a few ticks and the next bounce flickers.
 _PULSE_MAXIMUM = 100
 _PULSE_STEP_MS = 10
 _MIN_WIDTH = 480
@@ -100,11 +90,9 @@ _ADVANCED_NOTE = (
 
 
 class _BackgroundLike(Protocol):
-    """What `Panel` needs from a background run -- exactly `BackgroundRun`'s shape.
+    """What `Panel` needs from a background run: `BackgroundRun`'s shape.
 
-    Naming the shape as a `Protocol`, rather than requiring `BackgroundRun`
-    itself, is what lets `tests/test_panel.py` inject a fake with no thread
-    and no real pipeline behind it (see that module's `_FakeBackground`).
+    Lets `tests/test_panel.py` inject a fake with no thread or pipeline.
     """
 
     def start(self) -> None: ...
@@ -119,12 +107,10 @@ type _BackgroundFactory = Callable[[RunRequest], _BackgroundLike]
 
 @dataclass(frozen=True, slots=True)
 class _AdvancedField:
-    """One row of the Advanced frame, described as data, not hand-written.
+    """One row of the Advanced frame, described as data.
 
-    Keeping this a list (see `_ADVANCED_FIELDS` below) rather than one
-    hand-built row per field is what makes adding a later row -- the
-    high/low flip-angle option, say -- a one-line addition instead of a new
-    block of widget code.
+    Rows live in a list (`_ADVANCED_FIELDS`), so a new one, such as a
+    high/low flip-angle option, is a one-line addition.
     """
 
     key: Literal["trim_sec", "detrend", "center", "roi_size"]
@@ -145,12 +131,10 @@ _DEFAULTS = FormValues()
 
 
 class _Rows:
-    """Incrementing grid rows, handed out so a row index is genuinely computed.
+    """Incrementing grid rows.
 
-    Every row in `_build` comes from `take()` rather than a hand-counted
-    literal, which is what keeps a widget's row correct if an earlier one is
-    ever inserted or removed -- including the log frame's own row, handed
-    back to the caller rather than redeclared as a module constant.
+    Every row in `_build`, including the log frame's, comes from `take()`
+    instead of a hand-counted literal, so inserting or removing a row is safe.
     """
 
     def __init__(self) -> None:
@@ -164,14 +148,11 @@ class _Rows:
 
 
 class Panel:
-    """The one window: built on a caller-supplied `tk.Tk` root.
+    """The one window, built on a caller-supplied `tk.Tk` root.
 
-    Taking `root` as a constructor argument (rather than creating it itself)
-    is what lets `tests/test_panel.py` build a real `Panel`, call
-    `form_values()`, and destroy the root without ever entering `mainloop()`.
-    `background` and `opener` are injected the same way for the same reason:
-    a display-gated test can drive a real `Panel` end to end against a fake
-    background run and a fake opener, with no thread and no browser.
+    `root`, `background` and `opener` are arguments so `tests/test_panel.py`
+    can build a real `Panel` and drive it against a fake background run and
+    opener, with no `mainloop()`, thread or browser.
     """
 
     def __init__(
@@ -204,9 +185,8 @@ class Panel:
         root.title(_TITLE)
         root.resizable(True, True)
         root.protocol("WM_DELETE_WINDOW", self._on_close)
-        # Installed once, here: the backstop against an exception in any
-        # `after` callback (`_tick`, in practice) silently ending the pump --
-        # see the module docstring.
+        # Backstop for an exception in an `after` callback ending the pump.
+        # See the module docstring.
         root.report_callback_exception = self._on_callback_exception
 
         outer = ttk.Frame(root, padding=12)
@@ -222,9 +202,8 @@ class Panel:
         )  # the panel defaults to opening the report
         self._advanced_visible = tk.BooleanVar(value=False)
         self._status_var = tk.StringVar(value="Ready")
-        # Only the entries/comboboxes and the Run button itself trigger Run
-        # on <Return> -- not a "Browse..." button, so <Return> is bound on
-        # these widgets and not on the root, where it would fire from any
+        # <Return> runs only from the entries, comboboxes and Run button, not
+        # "Browse...". Bind it on these widgets: on the root it fires from any
         # focused widget.
         self._return_widgets: list[tk.Widget] = []
 
@@ -301,14 +280,10 @@ class Panel:
             widget.bind("<Return>", self._on_return)
         outer.bind("<Configure>", self._on_container_resized)
 
-        # A label with no wraplength yet reports its *unwrapped* natural
-        # width -- the longest hint here runs to several hundred pixels of
-        # single-line text -- which would inflate the very first
-        # `_fit_window()` below into a needlessly wide window before
-        # `<Configure>` ever gets a chance to wrap it back down. Seeding a
-        # sane starting wraplength here breaks that chicken-and-egg: the
-        # window opens at a sensible width, and `<Configure>` only ever
-        # grows the wraplength again if the window ends up wider than this.
+        # An unwrapped label reports its full width (the longest hint is
+        # several hundred pixels), so the first `_fit_window()` would open an
+        # overly wide window before `<Configure>` wraps anything. Seed a
+        # wraplength; `<Configure>` grows it only if the window ends up wider.
         starting_width = _MIN_WIDTH - _HINT_PADDING
         for label in self._wrap_labels:
             label.configure(wraplength=starting_width)
@@ -394,15 +369,13 @@ class Panel:
     # -- layout ----------------------------------------------------------
 
     def _fit_window(self) -> None:
-        """Size the window from its requested layout, not a fixed literal.
+        """Size the window from its requested layout, not a fixed size.
 
-        No `geometry()` picked in advance: at a larger font or a higher Tk
-        `scaling` (150% on Windows, say) a fixed size can put the Run button
-        or the progress bar below the window's bottom edge with Advanced
-        expanded. `update_idletasks()` forces geometry management to run so
-        `winfo_reqwidth`/`reqheight` reflect the widgets actually built, and
-        `minsize` is set from the same numbers so the window can never be
-        resized smaller than its own content demands.
+        At a larger font or Tk `scaling` (150% on Windows, say) a fixed size
+        can push the Run button or progress bar off the bottom with Advanced
+        expanded. `update_idletasks()` makes `winfo_reqwidth`/`reqheight`
+        reflect the built widgets. `minsize` uses the same numbers, so the
+        window cannot shrink below its content.
         """
         self._root.update_idletasks()
         width = max(self._root.winfo_reqwidth(), _MIN_WIDTH)
@@ -413,10 +386,9 @@ class Panel:
     def _on_container_resized(self, event: tk.Event[tk.Misc]) -> None:
         """Rewrap every hint label to the container's current width.
 
-        A hard-coded `wraplength` wastes space at 100% scaling and is wrong
-        at any other -- this derives it from the actual available width
-        instead, recomputed on every resize (including the one `_fit_window`
-        and `_toggle_advanced` themselves trigger).
+        A fixed `wraplength` wastes space at 100% scaling and is wrong at any
+        other, so this derives it from the width on every resize, including
+        those `_fit_window` and `_toggle_advanced` trigger.
         """
         wraplength = max(event.width - _HINT_PADDING, _MIN_WRAPLENGTH)
         for label in self._wrap_labels:
@@ -425,7 +397,7 @@ class Panel:
     # -- reading the form ---------------------------------------------
 
     def form_values(self) -> FormValues:
-        """Read the widgets' current values as a `FormValues`, unparsed, as held."""
+        """Read the widgets' current values as an unparsed `FormValues`."""
         return FormValues(
             dicom_dir=self._dicom_var.get(),
             output_dir=self._output_var.get(),
@@ -456,9 +428,9 @@ class Panel:
             self._status_var.set("Could not open results")
 
     def _open_results(self, result: RunResult) -> bool:
-        """Open `result`; on an `OSError`, log it and return False instead of raising.
+        """Open `result`; on an `OSError`, log it and return False.
 
-        Shared by the Open button and "open when done"; only the button also
+        The Open button and "open when done" share this. Only the button also
         reports the failure on the status line.
         """
         try:
@@ -469,13 +441,10 @@ class Panel:
         return True
 
     def _set_inputs_enabled(self, enabled: bool) -> None:
-        """Enable or disable every input, via the ttk state API rather than `configure`.
+        """Enable or disable every input through the ttk state API.
 
-        `state(["!disabled"])` (a `ttk.Widget` method, not
-        `configure(state=...)`) is enough on its own for every widget kind
-        here, including a readonly combobox: "readonly" is set once, at
-        construction, and toggling `disabled`/`!disabled` never touches it --
-        so there is no separate combobox branch to carry.
+        `state(["!disabled"])` works for every widget here, including a
+        readonly combobox: toggling `disabled` never touches "readonly".
         """
         state = ["!disabled"] if enabled else ["disabled"]
         for widget in self._input_widgets:
@@ -568,7 +537,7 @@ class Panel:
         if background is None:
             return
         # Read before polling: once running is false, the terminal event is
-        # already queued. Reading afterwards could race its arrival and lose it.
+        # already queued. Reading afterwards could race its arrival.
         running = self._background_started and background.running
         try:
             self._pending_events.extend(background.poll())
@@ -608,9 +577,8 @@ class Panel:
         if isinstance(event, Progress):
             self._last_progress = event
             self._append_log(describe(event))
-            # A close in progress owns the status line (see `_on_close`):
-            # once it has said "stopping...", a later stage line must not
-            # paper back over it until the run actually ends.
+            # A close in progress owns the status line (see `_on_close`). Once
+            # it says "stopping...", a later stage line must not overwrite it.
             if not self._closing:
                 self._status_var.set(describe(event))
             self._apply_bar_state(bar_state(event))
@@ -621,8 +589,8 @@ class Panel:
             else:
                 self._on_crashed(event)
         finally:
-            # Unconditional, and last: whatever the handler raised must not
-            # leave a window that a close request can no longer dismiss.
+            # Always run this, and last. Whatever the handler raised, the
+            # window must stay dismissable.
             if self._closing:
                 self._destroy()
         return True
@@ -637,10 +605,10 @@ class Panel:
     ) -> None:
         """Put the panel back at rest after a run ends, however it ended.
 
-        Drops the background run, rests the bar on `bar`, shows `status`,
-        logs `log_lines`, re-enables the inputs, and records `code` as the
-        exit code. Only terminal-event handlers call this; callback failures
-        retain the worker until the separate recovery pump has drained it.
+        Drops the background run, rests the bar on `bar`, shows `status`, logs
+        `log_lines`, re-enables the inputs, and records `code` as the exit
+        code. Only terminal-event handlers call this. After a callback failure
+        the worker is kept until the recovery pump has drained it.
         """
         self._cancel_tick()
         self._background = None
@@ -684,14 +652,14 @@ class Panel:
         exc_value: BaseException,
         exc_tb: TracebackType | None,
     ) -> None:
-        """Handle an exception `tkinter` caught from a callback (`after`, a button...).
+        """Handle an exception `tkinter` caught from a callback.
 
-        Installed as `root.report_callback_exception` -- see the module
-        docstring for why the default handler is not enough. The failed
-        presentation pump is replaced by recovery polling, which retains
-        the cancelled worker until it ends and preserves cleanup notices.
-        Repeated presentation failures cannot replace the original error or
-        stop that supervision. A destroyed window needs no further reporting.
+        Installed as `root.report_callback_exception`; the module docstring
+        says why the default is not enough. Recovery polling replaces the
+        failed presentation pump: it keeps the cancelled worker until it ends
+        and preserves cleanup notices. Repeated presentation failures cannot
+        replace the original error or stop that supervision. A destroyed
+        window needs no further reporting.
         """
         self.exit_code = 1
         if self._recovering:
@@ -705,8 +673,8 @@ class Panel:
             details = "".join(traceback.format_exception(exc_type, exc_value, exc_tb))
             message = f"{exc_type.__name__}: {exc_value}"
             internal = f"Internal error: {message}"
-            # Secondary presentation failures must not escape this backstop:
-            # Tk would terminate mainloop before scheduled recovery can run.
+            # A secondary failure escaping here would end mainloop before
+            # scheduled recovery can run.
             with contextlib.suppress(Exception):
                 self._status_var.set(internal)
                 self._append_log(internal)
@@ -722,10 +690,9 @@ class Panel:
                     self._finish_recovery()
 
     def _destroy(self) -> None:
-        """Destroy the root, tolerating a second call (idempotent by design).
+        """Destroy the root; a second call is harmless.
 
-        A second close request, or a terminal event that arrives after the
-        window is already gone, must never raise merely for asking twice.
+        A second close request or a late terminal event must not raise.
         """
         with contextlib.suppress(tk.TclError):  # already destroyed
             self._cancel_tick()
@@ -733,10 +700,9 @@ class Panel:
 
     def _on_close(self) -> None:
         if self._closing:
-            # A second close request: stop waiting on the run. The
-            # non-daemon worker thread still runs `session._publish`'s
-            # `finally` to completion before the process actually exits, so
-            # no half-copied series is left in the output directory.
+            # Second close request: stop waiting on the run. The non-daemon
+            # worker still runs `session._publish`'s `finally` before exit, so
+            # no half-copied series stays in the output directory.
             self._destroy()
             return
         self._closing = True
@@ -754,10 +720,10 @@ def run_panel() -> int:
     Raises
     ------
     PanelUnavailableError
-        If no display is available -- either building the `tk.Tk` root or
-        constructing the panel's widgets raised `tkinter.TclError`. Never a bare
-        `tkinter.TclError`, so `cli._launch_panel` can report this without
-        importing `tkinter` itself.
+        If no display is available: building the `tk.Tk` root or the panel's
+        widgets raised `tkinter.TclError`. A bare `tkinter.TclError` never
+        escapes, so `cli._launch_panel` can report this without importing
+        `tkinter`.
     """
     try:
         root = tk.Tk()
@@ -771,9 +737,8 @@ def run_panel() -> int:
 def main() -> int:
     """Run the panel as the `fmri-qa-panel` gui-script entry point.
 
-    Under `pythonw` there is no console to explain a missing display to, so
-    `PanelUnavailableError` is reported the only way it can be from there: a
-    non-zero exit code, silently.
+    Under `pythonw` there is no console to report a missing display to, so
+    `PanelUnavailableError` becomes a silent exit code 2.
     """
     try:
         return run_panel()

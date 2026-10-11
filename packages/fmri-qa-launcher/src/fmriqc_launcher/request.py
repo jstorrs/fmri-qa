@@ -1,19 +1,14 @@
 """The one typed request a run is built from, and how a form's raw text becomes one.
 
-`RunRequest` is the parse-don't-validate boundary for the whole launcher: build
-one and every field is already known good, so `session.run_session` re-checks
-nothing before spending eight seconds per series on it. `FormValues` is the
-other side of that boundary -- exactly the strings a text field or a dropdown
-holds, before anything has looked at them -- and `parse_form` is the one
-function that turns one into the other, collecting every problem it finds
-rather than stopping at the first, so a panel can show a physicist everything
-wrong with a submission at once.
+`RunRequest` is the launcher's parse-don't-validate boundary. Every field of
+one is known good, so `session.run_session` re-checks nothing before spending
+eight seconds per series on it. `FormValues` holds the raw strings from the
+form's widgets, and `parse_form` turns them into a `RunRequest`. It collects
+every problem instead of stopping at the first, so a panel can show them all
+at once.
 
-The label/help constants defined alongside each option are read by two things:
-an `argparse` flag in `cli` (`help=`) and a `tkinter` widget in `panel` (its
-label). Defining the wording once here, next to the domain it describes, is
-what keeps the CLI's `--help` and the panel's field labels saying the same
-thing.
+The label and help constants are shared by `cli` (`help=`) and `panel` (field
+labels), so the CLI's `--help` and the panel agree.
 """
 
 import os
@@ -63,15 +58,14 @@ __all__ = [
     "parse_form",
 ]
 
-# `fmriqc`'s own defaults, restated nowhere else: every default a form shows
-# and every domain a form is checked against reads from this one instance.
+# `fmriqc`'s own defaults. Every default a form shows and every domain it
+# checks comes from this one instance.
 #: The `~fmriqc.AnalysisSettings` defaults every form shows and validates against.
 DEFAULT_SETTINGS: AnalysisSettings = AnalysisSettings()
 
-# Aliases of `fmriqc`'s closed option sets, under the names this form speaks.
-# `anonymize` has no field on `FormValues` (the panel has no way to ask for
-# it), but the `--anonymize` flag needs its domain and wording, in one place,
-# same as the others.
+# Aliases of `fmriqc`'s closed option sets. `anonymize` has no `FormValues`
+# field (the panel can't ask for it), but `--anonymize` needs its domain and
+# wording here too.
 #: Detrend methods the form offers.
 DETREND_CHOICES: tuple[DetrendMethod, ...] = DETREND_METHODS
 #: ROI centering modes the form offers.
@@ -83,12 +77,9 @@ ANONYMIZE_CHOICES: tuple[Anonymize, ...] = ANONYMIZE_MODES
 DICOM_DIR_LABEL = "DICOM directory"
 #: Help text of the DICOM directory field.
 DICOM_DIR_HELP = "Directory of DICOM files (searched recursively)."
-# The panel speaks to a physicist, not a script: "folder" is the word the
-# panel's own widgets and Browse dialogs use, kept here rather than forked
-# inline in `panel.py` so the two front ends' wording for the same concept
-# lives in one place. `DICOM_DIR_LABEL` stays "directory": it is the wording
-# of the CLI's positional-argument help and of `parse_form`'s problem
-# messages, which the panel shows verbatim in its error dialog.
+# The panel says "folder", as its Browse dialogs do. `DICOM_DIR_LABEL` stays
+# "directory" because the CLI help and `parse_form`'s problem messages use it,
+# and the panel shows those messages verbatim.
 #: Label of the DICOM directory field in the panel.
 DICOM_DIR_PANEL_LABEL = "DICOM folder"
 
@@ -160,11 +151,9 @@ def _choices(choices: tuple[str, ...]) -> str:
 def _directory_problems(dicom_dir: Path, output_dir: Path) -> list[str]:
     """List directory problems for an already-normalized pair of paths.
 
-    Pure over `dicom_dir`/`output_dir` once each has been through
-    `expanduser()`/`resolve()`: `RunRequest.__post_init__` calls this after
-    normalizing its own fields, and `parse_form` calls it the same way (via a
-    `RunRequest` it builds for exactly this check) so a submission with a bad
-    float still reports a directory problem alongside it, not instead of it.
+    Both paths must already have been through `expanduser()` and `resolve()`.
+    `RunRequest.__post_init__` calls this; `parse_form` reaches it through a
+    `RunRequest`, so a bad float doesn't hide a directory problem.
     """
     problems: list[str] = []
     if not dicom_dir.is_dir():
@@ -185,38 +174,33 @@ def _directory_problems(dicom_dir: Path, output_dir: Path) -> list[str]:
 class RunRequest:
     """Everything one run needs, past its own directory and anonymize checks.
 
-    Built either directly or through `parse_form`; `session.run_session` takes
-    one and checks none of this again. `dcm2niix` is not checked here even
-    when given -- a nonexistent or non-executable one only surfaces once
-    `run_session` tries to run it, as a `SessionError` (`find_dcm2niix`'s own
-    complaint, by way of `fmriqc.import_dicom`). `settings` and `anonymize`
-    default to `fmriqc`'s own defaults, restated nowhere else.
+    Build one directly or through `parse_form`. `session.run_session` checks
+    none of this again. `dcm2niix` is not checked here: a missing or
+    non-executable one surfaces when `run_session` runs it, as a `SessionError`
+    (`find_dcm2niix`'s complaint, by way of `fmriqc.import_dicom`). `settings`
+    and `anonymize` default to `fmriqc`'s own defaults.
     """
 
     dicom_dir: Path
     output_dir: Path
     settings: AnalysisSettings = DEFAULT_SETTINGS
     anonymize: Anonymize = DEFAULT_ANONYMIZE
-    # A specific converter, as the user named it; None = bundled, else PATH. A
-    # string, not a Path: `Path("./dcm2niix")` is `Path("dcm2niix")`, and the
-    # `./` is what tells `find_dcm2niix` to run that file rather than look the
-    # name up on PATH.
+    # The converter as the user named it; None = bundled, else PATH. A string
+    # because `Path("./dcm2niix")` drops the `./` that tells `find_dcm2niix`
+    # to run that file instead of searching PATH.
     dcm2niix: str | None = None
     open_report: bool = False
 
     def __post_init__(self) -> None:
         """Resolve paths, then refuse unusable directories or an unknown `anonymize`."""
-        # `resolve()` rather than `absolute()`: both anchor a relative path at
-        # the current directory, but only `resolve()` also collapses `.`/`..`
-        # and follows symlinks, which is what lets the same-directory check
-        # below compare two different spellings of one path with a plain
-        # `==` instead of resolving both sides again itself.
+        # `resolve()` collapses `.`/`..` and follows symlinks, so the
+        # same-directory check below can compare with `==`.
         object.__setattr__(self, "dicom_dir", self.dicom_dir.expanduser().resolve())
         object.__setattr__(self, "output_dir", self.output_dir.expanduser().resolve())
         if self.dcm2niix is not None:
-            # Only the tilde: `find_dcm2niix` looks a bare name up on PATH, and
-            # anchoring it at the current directory would defeat that. On the
-            # string, because a round trip through Path would drop a `./`.
+            # Only the tilde: anchoring a bare name at the current directory
+            # would stop `find_dcm2niix` searching PATH. Expand the string,
+            # since a round trip through Path drops a `./`.
             expanded = os.path.expanduser(self.dcm2niix)  # noqa: PTH111  (keeps ./)
             object.__setattr__(self, "dcm2niix", expanded)
 
@@ -232,7 +216,7 @@ class RunRequest:
 
 @dataclass(frozen=True, slots=True)
 class FormValues:
-    """Raw text, exactly as a widget holds it -- nothing here is parsed yet."""
+    """Raw text as a widget holds it, not yet parsed."""
 
     dicom_dir: str = ""
     output_dir: str = ""
@@ -246,10 +230,9 @@ class FormValues:
 def _require_path(text: str, label: str, problems: list[str]) -> Path | None:
     """Strip `text` into a `Path`, or return None with a problem if it is blank.
 
-    Only the whitespace a form field routinely picks up from a paste or a
-    trailing space is stripped here; `~` and relative-path normalization are
-    `RunRequest.__post_init__`'s job, so a directly constructed request (the
-    argparse front end builds one that way) gets the same treatment.
+    Only surrounding whitespace is stripped here. `RunRequest.__post_init__`
+    handles `~` and relative paths, so directly built requests (as in the CLI)
+    get the same treatment.
     """
     stripped = text.strip()
     if not stripped:
@@ -297,10 +280,8 @@ def _parse_center(text: str, problems: list[str]) -> RoiCenter | None:
 def _translate_settings_problem(exc: InvalidScanError) -> str:
     """Reword what `AnalysisSettings` refused in plain language.
 
-    `exc.field` names the constructor argument that failed; `trim_sec` and
-    `roi_size` are the only two a form built from `FormValues` can ever
-    reach (the third, `detrend_order`, is never set from a form), but the
-    fallback keeps this total over whatever `InvalidScanError` might carry.
+    `exc.field` names the failed constructor argument. A form can only reach
+    `trim_sec` and `roi_size`; the fallback covers any other `InvalidScanError`.
     """
     if exc.field == "trim_sec":
         return f"{TRIM_SEC_LABEL} must be zero seconds or more; got {exc.value!r}"
@@ -318,8 +299,8 @@ def _build_settings(
 ) -> AnalysisSettings | None:
     """Build `AnalysisSettings` from converted values, or None with a problem.
 
-    None whenever a conversion upstream already failed (nothing to build from)
-    or `AnalysisSettings.__post_init__` itself refuses the combination.
+    None if an earlier conversion failed or `AnalysisSettings.__post_init__`
+    refuses the combination.
     """
     if trim_sec is None or detrend is None or center is None or roi_size is None:
         return None
@@ -335,14 +316,11 @@ def _build_settings(
 def parse_form(values: FormValues) -> RunRequest:
     """Convert a form's raw text into a `RunRequest`, or raise every problem at once.
 
-    Every field is converted independently -- a bad float does not stop the
-    choice fields from being checked too -- and `RunRequest`'s own directory
-    and anonymize checks run as well (against `DEFAULT_SETTINGS` when the
-    settings fields could not be converted, just to reach that check), so a
-    submission with several mistakes is reported with all of them, not just
-    the first `parse_form` happens to notice. The `RunRequest` built to reach
-    those checks is returned as-is when nothing else went wrong -- built once,
-    not rebuilt identically for the return.
+    Every field is converted independently, so a bad float does not stop the
+    choice fields from being checked. `RunRequest`'s directory and anonymize
+    checks also run, against `DEFAULT_SETTINGS` if the settings fields could
+    not be converted. The `RunRequest` built for those checks is returned when
+    nothing else went wrong.
 
     Raises
     ------

@@ -1,15 +1,13 @@
 """`fmri-qa-run`: one DICOM directory in, one report directory per series out.
 
 The command-line front end over `session.run_session`. With both directories
-given it runs the pipeline once and reports every outcome; with neither, it
-opens the desktop panel (`.panel`, see `_launch_panel`). Giving exactly one
-directory, or any flag without both directories, is a usage error: the panel
-takes no flags, so there is no "partially configured panel" state to support.
+it runs the pipeline once and reports every outcome. With neither it opens the
+desktop panel (see `_launch_panel`). One directory, or any flag without both
+directories, is a usage error, because the panel takes no flags.
 
-The heavy stack (`fmriqc`'s pipeline, `fmriqc_report`'s renderer) is reached
-only through `.session`, imported inside `main` after argument parsing --
-never at module or parser-build time -- so `-h`, a bad flag, and the
-zero-argument panel path all stay as cheap as parsing itself.
+The heavy stack (`fmriqc`'s pipeline, `fmriqc_report`'s renderer) is imported
+through `.session` inside `main`, after argument parsing, so `-h`, a bad flag
+and the panel path stay as cheap as parsing.
 """
 
 import argparse
@@ -59,8 +57,8 @@ class _PrintVersion(argparse.Action):
         values: object,
         option_string: str | None = None,
     ) -> None:
-        # stdout, and only then exit: `parser.exit(message=...)` would send it
-        # to stderr, where argparse's own `action="version"` never put it.
+        # Print to stdout, then exit. `parser.exit(message=...)` would use
+        # stderr, which argparse's own `action="version"` never does.
         print(f"{parser.prog} {launcher_version()}")
         parser.exit()
 
@@ -123,12 +121,10 @@ def _build_parser() -> argparse.ArgumentParser:
 def _is_missing_tkinter(exc: ImportError) -> bool:
     """Check whether `exc` means `tkinter` (or `_tkinter`) is missing outright.
 
-    `exc.name` is the dotted module the failed import was looking for --
-    `tkinter` itself, one of its submodules (`tkinter.ttk`, `tkinter.font`,
-    ...), or `_tkinter`, the C extension `tkinter` is built on and the one
-    that is actually absent on a Python built without Tcl/Tk support. Any
-    other name (a typo in `panel.py`, a missing unrelated dependency) is a
-    real bug, not "no tkinter", and must not be reported as one.
+    `exc.name` is the module the failed import wanted: `tkinter`, a submodule
+    (`tkinter.ttk`, ...), or `_tkinter`, the C extension absent from a Python
+    built without Tcl/Tk. Any other name (a typo in `panel.py`, an unrelated
+    missing dependency) is a real bug and must not be reported as "no tkinter".
     """
     name = exc.name or ""
     return name == "tkinter" or name.startswith(("tkinter.", "_tkinter"))
@@ -137,19 +133,15 @@ def _is_missing_tkinter(exc: ImportError) -> bool:
 def _launch_panel() -> int:
     """Open the desktop panel, or explain on stderr why it could not start.
 
-    `import_module` (not a plain `from . import panel`) is what lets a type
-    checker resolve this module cleanly even on a Python built without
-    `tkinter`: there is then no import target for a plain import to fail to
-    find, whereas `import_module` fails at run time the same way either way.
-    Two distinct failures are reported the same way, since both leave a
-    physicist with the same fix: an `ImportError` naming `tkinter`/`_tkinter`
-    (see `_is_missing_tkinter`) when this Python has no `tkinter` at all, and
-    `panel.run_panel` raising `PanelUnavailableError` when `tkinter` imports
-    fine but there is no display for it to attach to (a `tkinter.TclError`
-    that never escapes this module -- `cli.py` imports no `tkinter` type at
-    all, at module scope or otherwise). Any other `ImportError` -- a genuine
-    bug or packaging fault -- propagates unchanged, naming whatever it is
-    that actually failed to import.
+    `import_module` rather than `from . import panel` lets a type checker
+    resolve this module on a Python built without `tkinter`. A plain import would
+    have no target to find there, whereas `import_module` fails at run time the
+    same way either way. Two failures get
+    the same report, since the fix is the same: an `ImportError` naming
+    `tkinter`/`_tkinter` (see `_is_missing_tkinter`), and `PanelUnavailableError`
+    from `panel.run_panel` when `tkinter` imports but no display exists, so
+    `tkinter.TclError` never reaches `cli.py`. Any other `ImportError` is a bug
+    or packaging fault and propagates.
     """
     message = (
         "ERROR: the desktop panel needs tkinter with a graphical display "
@@ -251,10 +243,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             print(f"ERROR: {problem}", file=sys.stderr)
         return 1
 
-    # Deferred past every usage error and every bad request: this is the
-    # import that pulls in scipy, scikit-image and matplotlib behind
-    # `fmriqc`'s pipeline and `fmriqc_report`'s renderer -- see the module
-    # docstring.
+    # Deferred past every usage error and bad request: this import pulls in
+    # scipy, scikit-image and matplotlib (see the module docstring).
     from .session import run_session
 
     def _report_progress(event: Progress) -> None:

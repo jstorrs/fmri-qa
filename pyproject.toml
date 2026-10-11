@@ -1,15 +1,15 @@
 # uv workspace root for fmri-qa. The project ships as three distributions:
 #
-#   packages/fmri-qa-core     the calculation half -- metrics, pipeline, and the
+#   packages/fmri-qa-core     the calculation half: metrics, pipeline, and the
 #                             QAArtifact it publishes (`fmri-qa`, `fmri-qa-hilo`)
-#   packages/fmri-qa-report   the presentation half -- a self-contained HTML report
+#   packages/fmri-qa-report   the presentation half: a self-contained HTML report
 #                             built from an artifact (`fmri-qa-report`)
-#   packages/fmri-qa-launcher the application shell -- a one-step DICOM-directory-in,
+#   packages/fmri-qa-launcher the application shell: a one-step DICOM-directory-in,
 #                             report-directory-out pipeline over the two above
 #
-# This root is virtual: it builds nothing of its own and only holds the shared
-# development environment and the tool configuration all members are checked
-# against. See style/architecture.md and notes/analysis_report_split.md.
+# This root is virtual. It builds nothing and only holds the shared development
+# environment and the tool configuration all members are checked against. See
+# style/architecture.md and notes/analysis_report_split.md.
 
 [tool.uv.workspace]
 members = ["packages/*"]
@@ -24,17 +24,15 @@ dev = [
     "pytest>=8.0",
     "pytest-cov>=6.0",
     "ruff>=0.13",
-    # Only the artifact tests use it: xarray is the one-line path a notebook
-    # takes to a `.qa.nc`, and the claim that it opens one cleanly is worth
-    # checking in the gate. It is dev tooling and never a distribution
-    # dependency — nothing either package ships imports it.
+    # Only the artifact tests use it. xarray is the one-line path from a
+    # notebook to a `.qa.nc`, so the gate checks that it opens one cleanly.
+    # Nothing either package ships imports it.
     "xarray>=2024.1",
 ]
 # The exploratory notebooks (DICOM conversion, BIDS, interactive viewers) need a
-# far heavier stack than either distribution ships. It is development tooling,
-# so it belongs to the workspace root as a group and not to a published extra —
-# whoever installs fmri-qa-core should never be offered JupyterLab. It is not in
-# the default sync; take it with `make sync-notebooks`.
+# far heavier stack than either distribution ships. It is a workspace group, not
+# a published extra, so whoever installs fmri-qa-core is never offered
+# JupyterLab. It is not in the default sync; take it with `make sync-notebooks`.
 notebooks = [
     "dcm2bids>=3.2.0",
     "dcm2niix>=1.0.20250506",
@@ -47,13 +45,12 @@ notebooks = [
     "pydicom>=3.0.1",
     "scikit-fem>=12.0.2",
 ]
-# The documentation (docs/) is built with Sphinx, and its figures are rendered
-# at build time by running the real pipeline over the synthetic phantom — so
-# the stack is Sphinx plus matplotlib, with numpydoc for the API reference, and
-# nothing in the gate needs it either.
-# Same reasoning as `notebooks`: it is development tooling, so it is a workspace
-# group rather than a published extra, and it is out of the default sync. Take
-# it with `make sync-docs`.
+# The documentation (docs/) is built with Sphinx. Its figures come from running
+# the real pipeline over the synthetic phantom at build time, so the stack is
+# Sphinx plus matplotlib, with numpydoc for the API reference. Like `notebooks`,
+# it is a workspace group, not a published extra, and is out of the default
+# sync. Take it with `make sync-docs`. `make docs` needs it, and `make check` runs
+# `make docs`.
 docs = [
     "sphinx>=8",
     "myst-parser>=4",
@@ -62,12 +59,10 @@ docs = [
     "numpydoc>=1.10",
 ]
 # PyInstaller, for the single-file `fmri-qa-run` (`make bundle`; see
-# packages/fmri-qa-launcher/bundle/fmri-qa-run.spec). A workspace group for the
-# reason `notebooks` and `docs` are: it builds a distribution and is never part
-# of one. It is also the only group the bundle is built with -- `make bundle`
+# packages/fmri-qa-launcher/bundle/fmri-qa-run.spec). Like `notebooks` and
+# `docs`, it builds a distribution and is never part of one. `make bundle`
 # resolves an isolated environment from the lock with `dev` left out, so the
-# executable carries what the three packages declare and nothing this shared
-# environment happens to have installed.
+# executable carries only what the three packages declare.
 bundle = [
     "pyinstaller>=6.11",
 ]
@@ -93,8 +88,8 @@ indent-style = "space"
 
 [tool.ruff.lint]
 # See style/tooling.md for the rationale behind each group. TC (type-only
-# imports under TYPE_CHECKING) is deliberately left out for now — the ruleset
-# is a living part of the style, tightened as needs recur.
+# imports under TYPE_CHECKING) is left out for now. The ruleset is tightened as
+# needs recur.
 select = [
     "E", "W", "F",   # pycodestyle + Pyflakes
     "I",             # import sorting (isort)
@@ -120,8 +115,8 @@ ignore = [
 convention = "numpy"
 
 [tool.ruff.lint.per-file-ignores]
-# Tests: assert is the assertion, magic values and unused fixture args are fine;
-# test names and bodies are their own documentation.
+# Tests: assert is the assertion, magic values and unused fixture args are fine,
+# and test names and bodies document themselves.
 "**/tests/**" = ["S101", "PLR2004", "ARG", "D"]
 # Output belongs to the binary (see style/logging.md).
 "**/cli.py" = ["T201"]
@@ -133,9 +128,9 @@ convention = "numpy"
 "packages/fmri-qa-report/**" = ["RUF001"]
 # Stubs mirror external library signatures verbatim, including names we would
 # not choose: scipy's `input` parameter (A002) and the dcm2niix wrapper's
-# module-level `bin` (A001). Renaming either would make the stub describe a
-# module that does not exist. Their docstrings state why the stub exists, not
-# what each mirrored signature does.
+# module-level `bin` (A001). Renaming either would describe a module that does
+# not exist. Their docstrings say why the stub exists, not what each signature
+# does.
 "stubs/**" = ["A001", "A002", "D"]
 
 [tool.ruff.lint.isort]
@@ -157,9 +152,8 @@ files = [
 mypy_path = "stubs"
 
 # Scientific stack whose shipped types we treat as untyped. `follow_imports =
-# skip` renders these installed-but-untyped packages as `Any` instead of
-# analyzing their internals, so calling their functions is not flagged as an
-# untyped call. nibabel and scipy are handled by the local stubs instead.
+# skip` renders these as `Any` instead of analyzing their internals, so calls
+# to them are not flagged as untyped. nibabel and scipy use the local stubs.
 [[tool.mypy.overrides]]
 module = [
     "skimage.*",
@@ -175,8 +169,8 @@ include = [
     "packages/fmri-qa-launcher/src",
     "scripts",
 ]
-# scripts/ is not a package: its tests import a script by its bare module name,
-# as pytest's `pythonpath` lets them at run time.
+# scripts/ is not a package. Its tests import a script by bare module name,
+# which pytest's `pythonpath` allows at run time.
 extraPaths = ["scripts"]
 stubPath = "stubs"
 pythonVersion = "3.13"
@@ -189,15 +183,14 @@ testpaths = [
     "packages/fmri-qa-launcher/tests",
     "scripts/tests",
 ]
-# The repository's own scripts are not a package, so their tests import one by
-# its bare module name from here.
+# The repository's scripts are not a package, so their tests import one by its
+# bare module name from here.
 pythonpath = ["scripts"]
 python_files = ["test_*.py"]
 python_functions = ["test_*"]
-# Coverage is opt-in (the `check` gate passes --cov) so a bare `pytest` on one
-# file stays fast and doesn't trip the package-wide floor. `importlib` import
-# mode lets both packages name a test file for what it tests (each has a
-# `test_cli.py`) without the rootdir-relative module names colliding.
+# Coverage is opt-in (the `check` gate passes --cov), so a bare `pytest` on one
+# file stays fast and skips the package-wide floor. `importlib` import mode
+# lets both packages have a `test_cli.py` without a module name collision.
 addopts = "-v --tb=short --import-mode=importlib"
 
 [tool.coverage.run]
@@ -207,27 +200,23 @@ source = [
     "packages/fmri-qa-launcher/src/fmriqc_launcher",
 ]
 branch = true
-# `panel.py` is Tk widget construction, layout, and the `after` pump: headless
-# CI has no display to build a `tk.Tk` root against at all. What decisions it
-# still owns -- destroy-on-close being unconditional, skipping auto-open
-# while closing, not resuming the `after` chain after a callback exception --
-# are lifecycle wiring that only exists once real widgets do; everything that
-# can be decided as a pure function of a value (where the bar sits, what a
-# finished run means, the stopping message, the exit code, the bar's `max(...,
-# 1)` guard) lives in `worker.py`/`panel_state.py`/`request.parse_form`
-# instead, which *are* covered. `tests/test_panel.py` exercises `panel.py`'s
-# lifecycle end to end (a real `Panel` on a real `tk.Tk` root, a fake
-# background run, no real pipeline) wherever a display exists -- gated on
-# whether `tk.Tk()` succeeds, not on `$DISPLAY`, so it runs on Windows/macOS
-# too; run it explicitly under Xvfb where CI has none:
+# `panel.py` is Tk widget construction, layout and the `after` pump, and
+# headless CI has no display to build a `tk.Tk` root. Its lifecycle decisions
+# (destroy-on-close is unconditional, no auto-open while closing, no resuming
+# the `after` chain after a callback exception) need real widgets. Anything
+# that is a pure function of a value (where the bar sits, what a finished run
+# means, the stopping message, the exit code, the bar's `max(..., 1)` guard)
+# lives in `worker.py`, `panel_state.py` and `request.parse_form`, which are
+# covered. `tests/test_panel.py` runs `panel.py` end to end (a real `Panel` on a
+# real `tk.Tk` root, a fake background run) wherever `tk.Tk()` succeeds, not on
+# `$DISPLAY`, so it also runs on Windows and macOS. Where CI has no display, run it under Xvfb:
 # `xvfb-run -a uv run pytest packages/fmri-qa-launcher/tests/test_panel.py`.
-# One greppable exemption here, rather than scattered `# pragma: no cover`
-# comments (this repo uses none), also keeps the pressure on `panel.py` to
-# stay decision-free.
+# One greppable exemption beats scattered `# pragma: no cover` comments (this
+# repo uses none) and keeps pressure on `panel.py` to stay decision-free.
 omit = ["packages/fmri-qa-launcher/src/fmriqc_launcher/panel.py"]
 
 [tool.coverage.report]
-# The numeric core carries the metrics; the untested lines that remain are
+# The numeric core carries the metrics. The untested lines that remain are
 # defensive branches and the `__main__`/`if __name__` shims.
 exclude_also = [
     "if TYPE_CHECKING:",

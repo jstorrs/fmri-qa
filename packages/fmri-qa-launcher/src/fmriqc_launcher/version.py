@@ -1,7 +1,7 @@
 """The installed distribution's version.
 
-Mirrors `fmriqc.version`: the answer comes from installed package metadata and
-needs nothing else this package will grow, so it stays its own leaf module.
+Mirrors `fmriqc.version`. It reads installed package metadata and needs
+nothing else, so it stays a leaf module.
 """
 
 from importlib.metadata import PackageNotFoundError, version
