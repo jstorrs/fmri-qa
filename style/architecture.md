@@ -381,7 +381,7 @@ types when a value genuinely has several stages with stage-specific operations.
 ## Module Structure
 
 Organize modules by **domain operation**, not by language construct. In the uv-workspace
-layout (`src/<package>/src/<package>/`), a typical package:
+layout (`packages/<distribution>/src/<package>/`), a typical package:
 
 ```
 mypackage/

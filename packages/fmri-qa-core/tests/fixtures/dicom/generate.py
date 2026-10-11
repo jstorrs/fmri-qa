@@ -1,4 +1,4 @@
-"""Regenerate the miniature DICOM study `test_convert.py` imports.
+"""Regenerate the miniature DICOM study `test_import_real_dicom.py` imports.
 
 Committed rather than generated at test time because pydicom is not a dependency
 of either distribution -- it lives in the workspace's `notebooks` group -- and a

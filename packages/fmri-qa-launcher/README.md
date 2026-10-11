@@ -19,7 +19,7 @@ fmri-qa-run DICOM_DIR OUTPUT_DIR [options]
 Imports every series it finds under `DICOM_DIR`, analyzes each, and writes
 one folder per series under `OUTPUT_DIR`, named for the series, holding four
 files: the converted scan, its sidecar (when dcm2niix produced one), the
-`.qa.nc` analysis archive, and a self-contained HTML report. `OUTPUT_DIR` is
+`.qa.nc` analysis artifact, and a self-contained HTML report. `OUTPUT_DIR` is
 created if it does not exist. A series whose folder already exists there is
 never overwritten -- it is refused and reported, at no cost beyond the import
 it shared with the rest of the run.
@@ -114,7 +114,7 @@ Start it with `fmri-qa-run` and no arguments, or directly with
 - `session.run_session` -- the pipeline itself: import a DICOM directory,
   then for each series analyze it, save its `.qa.nc` artifact, render a
   self-contained HTML report, and publish all four files (the converted scan,
-  its sidecar, the archive, the report) together under one directory named
+  its sidecar, the artifact, the report) together under one directory named
   for the series. Work happens in a staging directory under the system's
   temporary directory first, and a finished series is copied out and renamed
   into place, so a reader of the output directory only ever sees a series
@@ -137,10 +137,10 @@ Start it with `fmri-qa-run` and no arguments, or directly with
   few volumes to analyze) never stops the run -- it becomes a per-series
   failure outcome, and every other series is still attempted.
 - `cli.main` -- the `fmri-qa-run` command line above.
-- `results.open_results` -- what `--open` (and the panel's "Open when done" /
-  "Open results") calls: pick a single report or the output directory, and
-  open it. Imports only `outcome`, so it loads without `fmriqc`'s analysis stack or
-  `fmriqc_report`'s renderer.
+- `results.open_results` -- what `--open` (and the panel's "Open the report when
+  done" / "Open results") calls: pick a single report or the output directory,
+  and open it. Imports only `outcome`, so it loads without `fmriqc`'s analysis
+  stack or `fmriqc_report`'s renderer.
 - `worker.BackgroundRun` -- runs `session.run_session` on its own
   non-daemon thread, delivering `Progress` and `CleanupNotice` events before
   one terminal `Finished`/`Crashed` event through a queue a caller polls. No `tkinter`

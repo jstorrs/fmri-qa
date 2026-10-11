@@ -41,8 +41,9 @@ def test_load_rejects_a_damaged_npz(tmp_path, artifact, read_netcdf) -> None:
     """A zip that starts right and stops early is refused, not half-read.
 
     NumPy's loader answers a damaged archive with whichever of four libraries'
-    exceptions it reached -- `BadZipFile`, an inflate error, a truncated member
-    -- and the reader turns all of them into the one thing a caller can act on.
+    exceptions it reached -- `BadZipFile`, an inflate error, a header-parse
+    error, a truncated member -- and the reader turns all of them into the one
+    thing a caller can act on.
     """
     saved = q.save_artifact(artifact, tmp_path / "new.qa.nc")
     document, arrays = read_netcdf(saved)

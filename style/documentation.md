@@ -208,9 +208,9 @@ assumptions. Put short equations in `.. math::`. **References** are numbered
 `.. [1]` and cited as `[1]_` in Notes. Include a DOI where one exists, and never
 invent one; a source without a DOI is cited without it.
 
-**Examples** are doctests: self-contained, built from numpy or `fmriqc.data`,
-deterministic and quick. Print floats with format strings, never numpy scalar
-reprs. A plotting example ends with `plt.close(ax.figure)`.
+**Examples** are doctests: self-contained, built from numpy, deterministic and
+quick. Print floats with format strings, never numpy scalar reprs. A plotting
+example ends with `plt.close(ax.figure)`.
 
 **Markup**: single backticks are cross-references and parameter names (`roi`).
 Double backticks are literals and expressions (``np.nan``). Never a bare `|`; it is

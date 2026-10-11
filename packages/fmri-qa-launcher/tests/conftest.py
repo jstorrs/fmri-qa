@@ -11,12 +11,12 @@ test collection to another package's internal layout. Three small, literal
 copies are the plainer failure mode.
 
 `stub_dcm2niix` stands in for the real converter. `fmri-qa-core`'s own
-`fake_dcm2niix` (`test_convert.py`) writes NIfTI files that do not load --
-enough to test naming and staging, not enough to run `analyze` over. This one
-copies an already-analyzable `prepared_series` pair into the `-o` directory
-under dcm2niix-style stems instead, so `import_dicom`'s real staging, naming
-(`names="qa"`) and filing all run for real, and the series that comes out the
-other end is one `run_session` can actually analyze.
+`fake_dcm2niix` (in its `tests/conftest.py`) writes NIfTI files that do not
+load -- enough to test naming and staging, not enough to run `analyze` over.
+This one copies an already-analyzable `prepared_series` pair into the `-o`
+directory under dcm2niix-style stems instead, so `import_dicom`'s real staging,
+naming (`names="qa"`) and filing all run for real, and the series that comes
+out the other end is one `run_session` can actually analyze.
 
 `stub_series`, `fast_render` and `warn_during_analysis` are the setup that
 `test_session.py` and `test_cli.py` would otherwise each paste. They are

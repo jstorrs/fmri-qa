@@ -88,7 +88,7 @@ DICOM_DIR_PANEL_LABEL = "DICOM folder"
 OUTPUT_DIR_LABEL = "Output directory"
 OUTPUT_DIR_HELP = (
     "Where to write one folder per series -- the converted scan, its sidecar, "
-    "the QA archive, and the report. Created if missing; an existing series "
+    "the QA artifact, and the report. Created if missing; an existing series "
     "folder is never overwritten."
 )
 OUTPUT_DIR_PANEL_LABEL = "Output folder"

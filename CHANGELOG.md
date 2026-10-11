@@ -581,8 +581,8 @@ versioning when the first stable public interface is released.
   report. Artifact schema version 7; an artifact from schema ≤ 6 keeps its stored
   bool, which that build did measure. Previously a float-converted NIfTI of a
   genuinely saturated acquisition reported clean, silently. Every other metric
-  is unaffected. See the README's *Saturation* section for the conversion
-  policy this makes explicit.
+  is unaffected. See the user guide's *Saturation* page for the
+  conversion policy this makes explicit.
 
 - `Provenance.slice_index` / `n_slices` record which plane of the volume the
   artifact describes, and `Measurements.phantom_contrast` the mask's
