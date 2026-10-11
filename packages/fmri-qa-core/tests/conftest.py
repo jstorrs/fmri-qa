@@ -1,11 +1,8 @@
 """Shared fixtures for the calculation-half tests.
 
-`synthetic_series` builds the tiny phantom every test measures against, and
-`write_scan` writes one to disk as a NIfTI + BIDS sidecar, so the tests that need
-the real file-I/O path (`QAScan.from_nifti`, the CLI) get one without each of
-them rebuilding the phantom. `artifact` runs the whole pipeline over that
-phantom once per session, for the artifact and CLI tests that need a finished
-analysis rather than a scan.
+`synthetic_series` builds the phantom every test measures against. `write_scan`
+writes one to disk as a NIfTI + BIDS sidecar for tests that need real file I/O.
+`artifact` runs the whole pipeline over the phantom once per session.
 """
 
 import dataclasses
@@ -26,9 +23,8 @@ WriteScan = Callable[..., str]
 MakeScan = Callable[..., "q.QAScan"]
 
 # Background noise floor, as a fraction of phantom signal. Real magnitude images
-# have a Rician air background; an exactly-constant one is what makes the
-# intensity quantiles seeding `segment_phantom` degenerate, so the fixtures give
-# the background a floor and exercise the segmentation rather than a failure path.
+# have a Rician air background. A constant one makes the intensity quantiles
+# that seed `segment_phantom` degenerate.
 BACKGROUND_SCALE = 8.0
 PHANTOM_SIGNAL = 1000.0
 
@@ -36,9 +32,8 @@ PHANTOM_SIGNAL = 1000.0
 def synthetic_series(n: int = 32, z: int = 3, t: int = 40, seed: int = 0) -> np.ndarray:
     """A bright central disk over a noisy background: (n, n, z, t), float64.
 
-    The disk carries seeded temporal noise (the fluctuation the stability metrics
-    measure); the background carries a static magnitude floor (see
-    `BACKGROUND_SCALE`) so the phantom is separable from it.
+    The disk carries seeded temporal noise. The background has a static floor
+    (see `BACKGROUND_SCALE`) so the phantom is separable from it.
     """
     rng = np.random.default_rng(seed)
     yy, xx = np.mgrid[0:n, 0:n]
@@ -53,9 +48,8 @@ def synthetic_series(n: int = 32, z: int = 3, t: int = 40, seed: int = 0) -> np.
 def make_scan() -> MakeScan:
     """Return a factory building an in-memory `QAScan` over `synthetic_series`.
 
-    The in-code counterpart of `write_scan`, for the tests that exercise the pure
-    pipeline and need no file on disk. `pe_axis=1` is passed explicitly so the
-    ghost-estimate fallback (and its warning) stays out of the way.
+    The in-code counterpart of `write_scan`. `pe_axis=1` is passed explicitly to
+    skip the ghost-estimate fallback and its warning.
     """
 
     def factory(seed: int = 0, n: int = 32, z: int = 3, t: int = 40) -> q.QAScan:
@@ -77,22 +71,18 @@ def _write_phantom(
     """Write a synthetic phantom NIfTI + sidecar; return the NIfTI path.
 
     A bright central disk with seeded temporal noise, 3 mm isotropic voxels and
-    TR 2 s. The sidecar sets `PhaseEncodingDirection` so the PE axis resolves
-    from metadata (no ghost-estimate fallback warning).
+    TR 2 s. The sidecar sets `PhaseEncodingDirection`, so no ghost-estimate
+    fallback warning fires.
 
-    The background carries a Rician-like noise floor, as a real magnitude image
-    does. That matters: on an *exactly* constant background the intensity
-    quantiles that seed `segment_phantom` degenerate, so a zero-background
-    fixture would exercise a failure path instead of the segmentation.
+    The background has a Rician-like noise floor, as a real magnitude image
+    does. A constant background would make the quantiles that seed
+    `segment_phantom` degenerate.
 
-    Stored as `uint16`, as a properly converted acquisition is: the ADC rail the
-    saturation check looks for is an integer artifact, so a float image is one
-    the check declines to answer for (see `metrics.saturation`). Writing the
-    shared phantom as floats would put every file-based test on that declined
-    path and attach a storage warning to each. `PHANTOM_SIGNAL` is 1000, well
-    inside `uint16`, so nibabel stores these values directly rather than
-    rescaling them onto the type's own maximum -- which would be a `2**16 - 1`
-    rail, and would have the fixture report clipping it does not have.
+    Stored as `uint16`, like a properly converted acquisition. The saturation
+    check needs integer data (see `metrics.saturation`), and floats would add a
+    storage warning to every file-based test. `PHANTOM_SIGNAL` is 1000, so
+    nibabel stores the values directly. Rescaling them onto the type's maximum
+    would create a false `2**16 - 1` rail.
     """
     data = synthetic_series(n=n, z=z, t=t, seed=seed)
 
@@ -129,9 +119,9 @@ def write_scan() -> WriteScan:
 def artifact(tmp_path_factory: pytest.TempPathFactory) -> q.QAArtifact:
     """An artifact from the synthetic phantom, at a small ROI.
 
-    Built once per session and shared: the artifact is a frozen dataclass whose
-    arrays are read-only, so no test can change it for another. The assertion
-    below checks that premise rather than assuming it.
+    Built once per session and shared. The artifact is frozen with read-only
+    arrays, so no test can change it for another. The assertion below checks
+    that.
     """
     nifti = _write_phantom(tmp_path_factory.mktemp("artifact"))
     scan = q.QAScan.from_nifti(nifti)
@@ -147,17 +137,16 @@ def artifact(tmp_path_factory: pytest.TempPathFactory) -> q.QAArtifact:
 def read_netcdf() -> Callable[[Path], tuple[dict, dict[str, np.ndarray]]]:
     """Return a reader of a stored artifact that drives `netCDF4` directly.
 
-    Tests that corrupt or inspect a stored artifact read it back through a plain
-    netCDF reader rather than the package's own `netcdf` module: reading the file
-    that way is itself the claim this container was chosen for.
+    Tests that corrupt or inspect a stored artifact use plain netCDF instead of
+    the package's `netcdf` module, since readability that way is why this
+    container was chosen.
     """
 
     def read(path: Path) -> tuple[dict, dict[str, np.ndarray]]:
         """The document and every array of a stored artifact, read with netCDF4 alone.
 
-        The coordinate variables are skipped -- a variable named for a dimension is
-        that axis, derived on the way out and not part of what the artifact
-        carries -- so what this returns is what `decompose` produced.
+        Coordinate variables are skipped. They are derived on the way out, so the
+        result is what `decompose` produced.
         """
         with netCDF4.Dataset(str(path)) as dataset:
             dataset.set_auto_mask(False)
@@ -191,10 +180,9 @@ def encode() -> Callable[[dict, dict[str, np.ndarray]], bytes]:
 def fake_dcm2niix(tmp_path):
     """Build a stub dcm2niix that writes the outputs a test asks for.
 
-    Takes `{stem: sidecar-or-None}` and writes a NIfTI containing the
-    encoded stem for each, plus `<stem>.json` where a sidecar was given, into
-    whatever directory the `-o` argument names. Prints dcm2niix's real banner
-    line so the version parser has something true to read.
+    For each stem, writes a NIfTI containing the stem, plus `<stem>.json` where
+    a sidecar was given, into the directory named by `-o`. Prints dcm2niix's real
+    banner line for the version parser.
     """
 
     def build(

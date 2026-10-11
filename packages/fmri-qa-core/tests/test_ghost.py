@@ -1,9 +1,9 @@
 """Nyquist-ghost ratios against a synthetically injected N/2 ghost.
 
-A ghost is placed by hand at the phantom's N/2-shifted location on a known axis,
-so the recovered ratios, the estimated PE axis, and the top-fraction/ACR variants
-have closed-form expected values. `radius=0` and an explicit all-valid mask keep
-the region-matched masks exactly the injected blocks (no erosion/edge trimming).
+A ghost is placed by hand at the phantom's N/2-shifted location on a known
+axis, so the ratios, estimated PE axis and top-fraction/ACR variants have
+closed-form values. `radius=0` and an all-valid mask keep the region-matched
+masks equal to the injected blocks.
 """
 
 import warnings
@@ -99,9 +99,9 @@ def test_estimate_pe_axis_resolves_a_strict_win_even_for_nearly_equal_ratios(
 def test_estimate_pe_axis_is_none_when_neither_axis_is_measurable() -> None:
     """A mask filling the frame leaves no ghost region on either axis.
 
-    Both ratios are then NaN -- no measurement, rather than a low one -- and
-    `max` over them silently answered with whichever axis it looked at first.
-    Nothing downstream could tell that from a real result.
+    Both ratios are then NaN (no measurement, not a low one). `max` used to
+    answer with whichever axis it saw first, indistinguishable from a real
+    result.
     """
     img = np.full((8, 8), 5.0)
     mask = np.ones((8, 8), dtype=bool)
@@ -116,12 +116,11 @@ def test_estimate_pe_axis_is_none_when_neither_axis_is_measurable() -> None:
 def test_estimate_pe_axis_ignores_an_unmeasurable_axis(
     expected_axis: PeAxis, ghost: float
 ) -> None:
-    """The one axis a ratio exists for wins, whichever order they come in.
+    """The one axis with a real ratio wins, in either order.
 
-    A phantom spanning the FOV along axis 0 has no clear ghost region there, so
-    that ratio is NaN while axis 1's is real. `ratios[1] > ratios[0]` is False
-    against a NaN, which used to hand the answer to axis 0 -- the axis nothing
-    was measured on.
+    A phantom spanning the FOV along axis 0 leaves that ratio NaN while axis 1's
+    is real. `ratios[1] > ratios[0]` is False against a NaN, which used to hand
+    the answer to axis 0.
     """
     img = np.zeros((8, 8))
     mask = np.zeros((8, 8), dtype=bool)
@@ -158,8 +157,8 @@ def test_acr_ratio_is_the_pe_minus_ro_difference() -> None:
 def test_the_masks_are_the_ones_the_ratios_were_measured_on() -> None:
     """The result carries its regions, so a report draws what was sampled.
 
-    Each ghost patch is its signal patch rolled half the FOV, so the two are the
-    same size; the PE pair is the injected 2x2 block and its source.
+    Each ghost patch is its signal patch rolled half the FOV, so they are the
+    same size. The PE pair is the injected 2x2 block and its source.
     """
     result = _ghost_on_axis0(np.full((2, 2), 5.0))
     assert result.pe_axis == 0
@@ -172,9 +171,9 @@ def test_the_masks_are_the_ones_the_ratios_were_measured_on() -> None:
 
 
 def test_ratios_are_nan_when_the_ghost_region_is_empty() -> None:
-    # A phantom filling the FOV leaves no clear ghost region on either axis. Every
-    # ratio must come back NaN via its explicit empty-region guard -- and without
-    # tripping a numpy empty-slice / invalid-divide warning (an error here).
+    # A phantom filling the FOV leaves no ghost region on either axis. Every ratio
+    # must be NaN via its empty-region guard, with no numpy empty-slice or
+    # invalid-divide warning (an error here).
     img = np.full((8, 8), 100.0)
     mask = np.ones((8, 8), dtype=bool)
     with warnings.catch_warnings():

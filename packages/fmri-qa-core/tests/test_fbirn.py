@@ -1,10 +1,9 @@
 """Core FBIRN ROI metrics against hand-computed known answers.
 
 Each test builds a `QAImages` directly from a constructed center slice and
-fluctuation field (no file I/O, no pipeline), over a full-image ROI, so the
-expected SNR/SFNR/drift/fluctuation/RDC follow in closed form from the Glover
-definitions and a regression in the formula (a wrong normalization, mean-vs-sum,
-or axis) changes the number.
+fluctuation field (no file I/O, no pipeline) over a full-image ROI. Expected
+SNR/SFNR/drift/fluctuation/RDC follow in closed form from the Glover
+definitions, so a formula regression changes the number.
 """
 
 import warnings
@@ -42,10 +41,10 @@ def _full_roi(n: int) -> ROI:
 
 
 def test_snr_matches_the_glover_static_noise_formula() -> None:
-    # 4x4 slice, 8 frames. Signal 100 everywhere; a static, per-voxel odd/even
-    # imbalance d = +/-2 (top half +2, bottom half -2) is the only structure.
-    # frame t = 100 + d on even t, 100 - d on odd t, so the temporal mean is 100
-    # and the (sum-odd - sum-even) difference image is exactly -8*d.
+    # 4x4 slice, 8 frames. Signal 100 everywhere, plus a static per-voxel odd/even
+    # imbalance d = +/-2 (top half +2, bottom half -2). Frame t = 100 + d on even
+    # t, 100 - d on odd t, so the temporal mean is 100 and the (sum-odd -
+    # sum-even) difference image is -8*d.
     m = np.full((4, 4), 100.0)
     d = np.where(np.arange(4)[:, None] < 2, 2.0, -2.0) * np.ones((4, 4))
     sign = np.where(np.arange(8) % 2 == 0, 1.0, -1.0)  # + on even t, - on odd t
@@ -59,11 +58,10 @@ def test_snr_matches_the_glover_static_noise_formula() -> None:
 def _shaded_snr_series(n_frames: int) -> np.ndarray:
     """The SNR test's series over a strongly shaded phantom, `n_frames` long.
 
-    Signal is a steep ramp across the FOV (a caricature of receive shading) with
-    ROI mean 100; the only temporal structure is the same static odd/even
-    imbalance `d = +/-2`. Over an even frame count the ramp cancels exactly out
-    of the (odd-sum - even-sum) difference, leaving -T*d, so the SNR is the same
-    100/sqrt(32) the unshaded case gives -- shading is signal, not noise.
+    Signal is a steep ramp across the FOV (receive shading) with ROI mean 100,
+    plus the same static odd/even imbalance `d = +/-2`. Over an even frame count
+    the ramp cancels out of the (odd-sum - even-sum) difference, so SNR is the
+    same 100/sqrt(32) as the unshaded case: shading is signal, not noise.
     """
     ramp = np.linspace(50.0, 150.0, 4)[:, None] * np.ones((4, 4))  # ROI mean 100
     d = np.where(np.arange(4)[:, None] < 2, 2.0, -2.0) * np.ones((4, 4))
@@ -74,11 +72,11 @@ def _shaded_snr_series(n_frames: int) -> np.ndarray:
 def test_snr_is_unchanged_by_an_odd_trailing_frame() -> None:
     """The static-noise difference is formed over balanced odd/even subsets.
 
-    An odd frame count leaves the two sums one frame apart, so the difference
-    carries a whole frame of *signal* -- and its spatial variation across the
-    ROI, not the noise, then sets the denominator. The shaded phantom here reads
-    ~35% low that way. Parity is a function of `--trim-sec`, so without this the
-    same series scores differently for a one-volume change in the warm-up trim.
+    An odd frame count leaves the sums one frame apart, so the difference carries
+    a whole frame of signal and its spatial variation, not the noise, sets the
+    denominator. The shaded phantom reads ~35% low that way. Parity depends on
+    `--trim-sec`, so without balancing a one-volume change in the warm-up trim
+    would change the score.
     """
     even = _shaded_snr_series(8)
     odd = _shaded_snr_series(9)  # one extra frame, same phantom
@@ -89,7 +87,7 @@ def test_snr_is_unchanged_by_an_odd_trailing_frame() -> None:
 
 
 def test_snr_is_undefined_without_a_complete_frame_pair() -> None:
-    """A single frame has no odd/even pair to difference: NaN, not a number."""
+    """A single frame has no odd/even pair to difference, so SNR is NaN."""
     one = np.full((4, 4, 1), 100.0)
     assert np.isnan(snr(_images(one, np.zeros_like(one)), _full_roi(4)))
 
@@ -97,10 +95,9 @@ def test_snr_is_undefined_without_a_complete_frame_pair() -> None:
 def test_snr_is_undefined_without_static_noise_to_measure_against() -> None:
     """A noiseless series has no static noise, so SNR is undefined, not infinite.
 
-    A constant phantom differences to exactly zero, and dividing the signal by
-    that would report a perfect scanner where the truth is that the measurement
-    had nothing to measure. NaN is the same answer the metric already gives for
-    a series too short to difference.
+    A constant phantom differences to zero, and dividing by that would report a
+    perfect scanner. NaN matches the answer for a series too short to
+    difference.
     """
     flat = np.full((4, 4, 8), 100.0)
     assert np.isnan(snr(_images(flat, np.zeros_like(flat)), _full_roi(4)))
@@ -109,9 +106,8 @@ def test_snr_is_undefined_without_static_noise_to_measure_against() -> None:
 def test_sfnr_is_undefined_when_a_roi_voxel_has_no_fluctuation() -> None:
     """One noiseless voxel makes the ROI average of the ratios undefined.
 
-    The voxelwise SFNR is signal over temporal noise, so a voxel with no
-    temporal noise has no ratio; an average cannot be better defined than the
-    values it averages.
+    The voxelwise SFNR is signal over temporal noise, so a voxel with none has no
+    ratio, and neither does the average.
     """
     m = np.full((4, 4), 100.0)
     sign = np.where(np.arange(8) % 2 == 0, 1.0, -1.0)
@@ -136,13 +132,12 @@ def test_sfnr_is_the_roi_mean_of_signal_over_fluctuation_noise() -> None:
 def test_sfnr_averages_voxelwise_ratios_rather_than_measuring_the_roi_mean() -> None:
     """With unequal voxel noise the two textbook forms of SFNR disagree.
 
-    Averaging the ROI first lets independent noise cancel spatially, so the
-    ratio of the ROI-mean series is not the mean of the voxelwise ratios. The
-    implementation is the latter (Glover 2006), and the report's methods text
-    says so; this pins the number the text describes. Two voxels with
-    orthogonal, zero-mean fluctuations: SDs 1 and 10 over a signal of 100 give
-    voxelwise ratios 100 and 10, whose mean is 55; the ROI-mean series has SD
-    sqrt((1 + 100) / 4), for a ratio near 19.9.
+    Averaging the ROI first lets independent noise cancel, so the ratio of the
+    ROI-mean series is not the mean of the voxelwise ratios. The implementation
+    uses the latter (Glover 2006), as the report's methods text says. Two voxels
+    with orthogonal, zero-mean fluctuations: SDs 1 and 10 over a signal of 100
+    give voxelwise ratios 100 and 10, mean 55. The ROI-mean series has SD
+    sqrt((1 + 100) / 4), a ratio near 19.9.
     """
     a = np.array([1.0, -1.0, 1.0, -1.0])
     b = 10.0 * np.array([1.0, 1.0, -1.0, -1.0])
@@ -186,12 +181,10 @@ def test_percent_fluctuation_is_residual_sd_over_signal() -> None:
 def test_drift_and_fluctuation_are_undefined_on_a_zero_signal_roi() -> None:
     """A zero-signal ROI (background, or suppressed reconstruction) is NaN.
 
-    And silently so: the divide-by-zero is a decision these estimators make,
-    not an accident numpy should warn about (see the same guard on `_roi_cv`/
-    `_roi_cv1` below). A batch run reprints every warning raised while
-    analyzing a scan, attributed to it, so a flood of uninformative numpy
-    warnings would bury the one warning that actually matters (a phantom
-    localization failure).
+    It is NaN silently. The divide-by-zero is handled on purpose (see the same
+    guard on `_roi_cv`/`_roi_cv1` below), and a batch run reprints every warning
+    raised while analyzing a scan, so numpy warnings would bury the one that
+    matters, a phantom localization failure.
     """
     zeros = np.zeros((3, 3, 8))
     images = _images(zeros, zeros)
@@ -210,9 +203,8 @@ def test_drift_and_fluctuation_are_undefined_on_a_zero_signal_roi() -> None:
 def test_weisskoff_is_undefined_on_a_zero_signal_roi_without_warning() -> None:
     """The same zero-signal guard applies to `_roi_cv`/`_roi_cv1` via `weisskoff`.
 
-    Every entry comes back NaN -- the estimator could not resolve a CV against
-    no signal -- and none of the divisions across every ROI size (`cv`, `cv1`,
-    and the pooled CV they feed) emits a warning.
+    Every entry is NaN, and none of the divisions at any ROI size (`cv`, `cv1`
+    and the pooled CV) emits a warning.
     """
     zeros = np.zeros((3, 3, 8))
     images = _images(zeros, zeros)

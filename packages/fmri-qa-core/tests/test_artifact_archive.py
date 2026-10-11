@@ -1,23 +1,19 @@
 """The artifact round trip: a saved artifact reads back as the one written.
 
-The other half of the artifact contract (`test_artifact.py` pins what goes into
-one): that `save_artifact`/`load_artifact` preserve every section, that the
-netCDF-4 file they agree on says what it holds, that a malformed or foreign
-file is refused rather than half-read, that the `.npz` container every earlier
-build wrote still opens, and that a file written under an older schema is
-migrated forward with the fields that schema did not carry marked unknown
-rather than invented.
+The other half of the artifact contract (`test_artifact.py` pins what goes in
+one). These tests check that `save_artifact`/`load_artifact` preserve every
+section, that the netCDF-4 file says what it holds, that a malformed or foreign
+file is refused instead of half-read, that the `.npz` container of earlier
+builds still opens, and that a file under an older schema is migrated forward
+with the fields that schema lacked marked unknown, not invented.
 
-Everything asserted about the stored bytes goes through `netCDF4` and `xarray`
-rather than the package's own reader: the reason for this container is that a
-reader which knows nothing about fmriqc can open it, so the tests read it as
-one. `netCDF4` is the Unidata C library itself -- what `ncdump`, MATLAB and R
-read through -- so a file it opens cleanly is a file those open too, and it is a
-dependency of this package rather than something to skip when absent. xarray is
-a dev dependency for the same claim one level up, and "opens cleanly" is
-asserted as *no warning at all*: a netCDF library warns about what a file gets
-subtly wrong, and those are exactly the defects that would reach a user as a
-puzzle rather than as an error.
+Stored bytes are read through `netCDF4` and `xarray`, not the package's own
+reader, since this container exists so that a reader that knows nothing about
+fmriqc can open it. `netCDF4` is the Unidata C library behind `ncdump`, MATLAB
+and R, so a file it opens cleanly opens in those too. It is a dependency, so
+tests must not skip without it. xarray is a dev dependency for the same claim
+one level up. "Opens cleanly" means no warning at all, since a netCDF library
+warns about subtle defects that would otherwise reach a user as a puzzle.
 """
 
 import json
@@ -27,11 +23,11 @@ import sys
 import warnings
 from dataclasses import asdict, replace
 
-# `netCDF4` is imported here and not in each test on purpose: the two "without a
-# warning" tests below run under `simplefilter("error")`, and importing the
-# wheel raises its own Cython `RuntimeWarning`. Taking the import at module
-# scope means every test enters that filter with the library already loaded, so
-# what the filter can catch is what opening the artifact does and nothing else.
+# `netCDF4` is imported here, not in each test. The two "without a warning"
+# tests below run under `simplefilter("error")`, and importing the wheel raises
+# its own Cython `RuntimeWarning`, so every test must enter that filter with the
+# library already loaded. What the filter can catch is what opening the artifact
+# does and nothing else.
 import netCDF4
 import numpy as np
 import pytest
@@ -79,7 +75,7 @@ def test_analysis_reexports_the_one_error_load_artifact_raises() -> None:
 
 
 def test_save_uses_the_exact_path_given(tmp_path, artifact) -> None:
-    """A caller's name is honored exactly, suffix or no suffix."""
+    """A caller's name is used as given, with or without a suffix."""
     path = q.save_artifact(artifact, tmp_path / "nested" / "run1.artifact")
     assert path.is_file() and path.name == "run1.artifact"
     assert q.load_artifact(path).measurements.snr == artifact.measurements.snr
@@ -103,9 +99,8 @@ def test_save_refuses_an_roi_box_that_is_square_but_off_the_image(
 ) -> None:
     """A legal box is still wrong if it is drawn where the image is not.
 
-    `RoiBox` holds itself to being square with a positive side, which it can see
-    on its own; that the box lies inside the image it annotates is a fact about
-    the image, so it is the archive boundary that holds it.
+    `RoiBox` checks that it is square with a positive side. Whether it lies inside
+    the image is a fact about the image, so the archive boundary checks that.
     """
     roi = artifact.images.roi
     offset = artifact.images.signal.shape[0]
@@ -149,14 +144,12 @@ def test_a_failed_save_leaves_neither_a_file_nor_a_temporary(
 ) -> None:
     """An interrupted write must not leave debris in a QA archive.
 
-    The archive a trend database reads is a directory of these files, and a
-    truncated one is indistinguishable from a whole one until it is opened. The
-    bytes go to a temporary beside the destination and are moved in only once
-    they are complete, so a failure leaves the directory exactly as it was.
+    A truncated archive looks whole until opened, and a trend database reads a
+    directory of them. The bytes go to a temporary beside the destination and
+    move in only once complete, so a failure leaves the directory as it was.
 
-    The failure is provoked at the fsync, which is the last thing to happen
-    before the rename and so the point at which a temporary full of bytes
-    already exists -- the case the cleanup is actually for.
+    The failure is provoked at the fsync, the last step before the rename, when
+    a temporary full of bytes exists. That is the case the cleanup is for.
     """
 
     def fails(*args, **kwargs):
@@ -207,9 +200,9 @@ def test_load_rejects_a_file_that_is_neither_container(
 ) -> None:
     """The container is decided by the leading bytes, and nothing else matches.
 
-    Including the case that matters most for an archive: a file that starts
-    with HDF5's signature because it really is an artifact, and stops in the
-    middle because the write that produced it did not finish.
+    This includes the key archive case: a file that starts with HDF5's signature
+    because it is an artifact, and stops mid-file because the write did not
+    finish.
     """
     path = tmp_path / name
     if content is not None:
@@ -227,8 +220,7 @@ def test_load_rejects_a_path_that_is_not_a_readable_file(tmp_path) -> None:
     """A name that is a directory, or nothing at all, is not an artifact either.
 
     Both fail at the open that sniffs the leading bytes, before any container
-    reader is chosen -- and a caller of `load_artifact` still has exactly one
-    exception type to catch.
+    reader is chosen. A caller of `load_artifact` still has one exception type.
     """
     (tmp_path / "archive").mkdir()
     for path in (tmp_path / "archive", tmp_path / "absent.qa.nc"):
@@ -301,10 +293,9 @@ def test_load_rejects_invalid_scalar_records(
 def test_load_rejects_inconsistent_arrays(tmp_path, artifact, read_netcdf) -> None:
     """An array whose shape contradicts the document is refused, not reshaped.
 
-    Each replacement is written with private dimensions rather than into the
-    shared one it no longer fits, so what the loader sees is a file that is
-    perfectly well-formed netCDF and a perfectly wrong artifact -- the shape
-    check in `validation` is the only thing standing between the two.
+    Each replacement gets private dimensions, not the shared one it no longer
+    fits, so the loader sees well-formed netCDF holding a wrong artifact. Only
+    the shape check in `validation` catches it.
     """
     edits = (
         ("curves.roi_signal", np.zeros(1)),
@@ -339,10 +330,9 @@ def test_load_rejects_inconsistent_arrays(tmp_path, artifact, read_netcdf) -> No
 def test_load_rejects_an_array_that_is_not_real_numbers() -> None:
     """A member of a kind no measurement can be is refused, not coerced.
 
-    Checked against `compose` directly rather than through a file, because the
-    layout stores float64 and flagged bytes and refuses every other dtype at
-    `encode` -- so the guard now answers only for a hand-built `.npz`, which is
-    exactly where a foreign array could still arrive.
+    Checked against `compose` directly. The layout stores only float64 and flagged
+    bytes and refuses every other dtype at `encode`, so this guard answers only
+    for a hand-built `.npz`, where a foreign array could still arrive.
     """
     for value in (np.full((2, 2), "1"), np.ones((2, 2), dtype=complex)):
         with pytest.raises(ValueError, match="real numeric array"):
@@ -397,8 +387,8 @@ def test_load_rejects_an_artifact_from_a_newer_build(
 ) -> None:
     """A future layout is refused by name, not misread field by field.
 
-    The one direction that cannot be migrated: this build does not know what a
-    later schema put in the file, so guessing would be worse than refusing.
+    This direction cannot be migrated: this build does not know what a later
+    schema put in the file, and guessing is worse than refusing.
     """
     path = q.save_artifact(artifact, tmp_path / "qa.nc")
     rewrite_document(path, lambda doc: doc | {"schema_version": 99})
@@ -409,7 +399,7 @@ def test_load_rejects_an_artifact_from_a_newer_build(
 def test_load_rejects_an_old_version_it_cannot_migrate_from(
     tmp_path, artifact, rewrite_document
 ) -> None:
-    """An older version with no route forward is named, not silently mangled."""
+    """An older version with no route forward is named, not mangled."""
     path = q.save_artifact(artifact, tmp_path / "qa.nc")
     rewrite_document(path, lambda doc: doc | {"schema_version": 0})
     with pytest.raises(q.InvalidArtifactError, match="no migration from 0"):
@@ -421,11 +411,10 @@ def test_load_migrates_a_schema_1_artifact(
 ) -> None:
     """An archive predating the localization diagnostics still reads back.
 
-    An artifact outlives the build that wrote it -- that is what saving one is
-    for -- so a schema bump must not orphan a QA archive a trend database has
-    been filling for months. Everything schema 1 did carry survives; the two
-    diagnostics it did not are unknown rather than invented, since a fabricated
-    pass would vouch for numbers nothing here can vouch for.
+    An artifact outlives the build that wrote it, so a schema bump must not orphan
+    an archive a trend database has been filling for months. Everything schema 1
+    carried survives. The two diagnostics it lacked are unknown, not invented,
+    since a fabricated pass would vouch for numbers nothing here can vouch for.
     """
     path = q.save_artifact(artifact, tmp_path / "qa.nc")
     rewrite_document(path, _as_schema(1))
@@ -449,8 +438,8 @@ def test_load_migrating_a_schema_2_artifact_keeps_what_it_recorded(
 ) -> None:
     """Only the field the older schema lacked comes back unknown.
 
-    Schema 2 measured the phantom fraction and the ROI fit; it just had no
-    verdict field. The migration must not throw away the two it does have.
+    Schema 2 measured the phantom fraction and the ROI fit but had no verdict
+    field. The migration must keep the two it has.
     """
     path = q.save_artifact(artifact, tmp_path / "qa.nc")
     rewrite_document(path, _as_schema(2))
@@ -469,10 +458,10 @@ def test_load_migrating_a_schema_3_artifact_leaves_the_trim_unrecorded(
 ) -> None:
     """Schema 3 trimmed warm-up volumes but never wrote down how many.
 
-    The count is not re-derived from the stored `trim_sec` and `tr`: that would
-    publish this build's rounding as the writing build's decision, and a frame
-    index mapped through a guess is worse than one a reader knows it cannot map.
-    Everything schema 3 did record survives.
+    The count is not re-derived from the stored `trim_sec` and `tr`, which would
+    publish this build's rounding as the writing build's decision. A frame index
+    mapped through a guess is worse than one a reader knows it cannot map.
+    Everything schema 3 recorded survives.
     """
     path = q.save_artifact(artifact, tmp_path / "qa.nc")
     rewrite_document(path, _as_schema(3))
@@ -491,10 +480,9 @@ def test_load_migrating_a_schema_4_artifact_leaves_slice_and_contrast_unrecorded
 ) -> None:
     """Schema 4 chose a slice and judged a mask without writing either down.
 
-    Neither is re-derived: the slice depends on a volume the artifact does not
-    carry, and a contrast recomputed from the stored images would be this
-    build's definition passed off as the writing build's measurement. The
-    verdict schema 4 did record is kept as it was made.
+    Neither is re-derived. The slice depends on a volume the artifact does not
+    carry, and a recomputed contrast would pass off this build's definition as
+    the writing build's measurement. The verdict schema 4 recorded is kept.
     """
     path = q.save_artifact(artifact, tmp_path / "qa.nc")
     rewrite_document(path, _as_schema(4))
@@ -514,11 +502,10 @@ def test_load_migrating_a_schema_5_artifact_reports_displacement_in_voxels(
 ) -> None:
     """Schema 5 always measured peak motion/COM displacement in voxels.
 
-    Unlike the other migrated fields, this is not "unknown": schema <= 5 never
-    converted these two peaks to mm even when the voxel size was known, so
-    "vox" is a fact about the old format, not a guess -- even though this
-    fixture's own `fwhm_unit` is "mm" (voxel size known), showing the two units
-    can disagree on a migrated artifact in a way they never do on a fresh one.
+    Unlike other migrated fields this is not "unknown". Schema <= 5 never
+    converted these two peaks to mm even when the voxel size was known, so "vox"
+    is a fact about the old format. This fixture's `fwhm_unit` is "mm", so the
+    two units can disagree on a migrated artifact, never on a fresh one.
     """
     path = q.save_artifact(artifact, tmp_path / "qa.nc")
     rewrite_document(path, _as_schema(5))
@@ -528,7 +515,7 @@ def test_load_migrating_a_schema_5_artifact_reports_displacement_in_voxels(
 
     assert loaded.measurements.displacement_unit == "vox"
     assert loaded.measurements.fwhm_unit == "mm"  # this fixture's voxel size is known
-    # The stored numbers themselves are untouched by the migration -- NaN on this
+    # The migration leaves the stored numbers untouched. They are NaN on this
     # fixture, whose motion fit does not converge for every frame (see
     # `_both_nan`: NaN != NaN, so a direct `==` would fail on a faithful copy).
     assert _both_nan(
@@ -544,13 +531,12 @@ def test_load_migrating_a_schema_6_artifact_keeps_its_clipping_answers(
 ) -> None:
     """Schema 6 always answered the clipping question, and its answers stand.
 
-    Schema 7 lets the block be None -- "the series did not arrive as integers,
-    so the rail test could not run" -- but no schema 6 document needs that: the
-    build that wrote it ran the test unconditionally and recorded a bool either
-    way. Rewriting them to unknown would condemn every genuinely clean scan
-    along with the ones that were never checkable, and the artifact does not
-    record the storage datatype to tell them apart. So the step carries them
-    through untouched, which is what this pins.
+    Schema 7 lets the block be None, meaning the series was not stored as integers
+    and the rail test could not run. No schema 6 document needs that, since that
+    build ran the test unconditionally and recorded a bool. Rewriting them to
+    unknown would condemn every clean scan along with the uncheckable ones, and
+    the artifact does not record the storage datatype to tell them apart. So the
+    step carries them through untouched, which this pins.
     """
     path = q.save_artifact(artifact, tmp_path / "qa.nc")
     rewrite_document(path, _as_schema(6))
@@ -569,9 +555,9 @@ def test_load_migrating_a_schema_6_artifact_keeps_its_clipping_answers(
 # document can be rewritten as the older one it grew out of (the reverse of
 # `serialize.migrate._MIGRATIONS`). Division of labor with
 # `test_artifact_fixtures.py`: this file's migration tests check each step in
-# isolation against this hand-maintained description of the schema history;
-# that file loads real `.npz` archives an old build actually wrote, which
-# this table cannot stand in for (see its module docstring). Keep both.
+# isolation against this hand-maintained description of the schema history.
+# That file loads real `.npz` archives an old build wrote, which this table
+# cannot stand in for (see its module docstring). Keep both.
 _ADDED_IN = {
     2: {"measurements": ("phantom_fraction", "roi_inside_phantom")},
     3: {"measurements": ("phantom_mask_ok",)},
@@ -581,8 +567,8 @@ _ADDED_IN = {
         "measurements": ("phantom_contrast",),
     },
     6: {"measurements": ("displacement_unit",)},
-    # 7 added no field: it widened four existing clipping fields to allow None,
-    # so a schema 6 document has exactly the same keys a current one does.
+    # 7 added no field. It widened four existing clipping fields to allow None,
+    # so a schema 6 document has the same keys as a current one.
     7: {},
 }
 
@@ -622,11 +608,10 @@ def test_load_rejects_a_closed_set_value_from_outside_the_set(
 ) -> None:
     """A stored string must be held to the set its field promises.
 
-    `fwhm_unit`, `displacement_unit`, `pe_label` and the PSF unit are closed
-    sets a reader switches on, and JSON carries none of that. Without the check
-    a hand-edited or foreign document hands the reader a value its own type
-    says cannot exist, and the mistake surfaces wherever that reader happens to
-    branch.
+    `fwhm_unit`, `displacement_unit`, `pe_label` and the PSF unit are closed sets
+    a reader switches on, and JSON enforces none of that. Without the check, a
+    hand-edited or foreign document hands the reader a value its type says
+    cannot exist, and the error surfaces wherever that reader branches.
     """
     for field, edit in (
         ("fwhm_unit", _with_measurement("fwhm_unit", "cm")),
@@ -646,7 +631,7 @@ def test_load_rejects_clipped_kept_disagreeing_with_its_count(
     """A document must not say the count is 5 but the flag is False.
 
     `clipped_kept` is a property of `n_clipped_kept` in the type that measures
-    it, not an independent fact -- storing both is only for the flat artifact.
+    it, not an independent fact. Only the flat artifact stores both.
     """
     path = q.save_artifact(artifact, tmp_path / "qa.nc")
     rewrite_document(path, _with_measurement("n_clipped_kept", 5))
@@ -667,7 +652,7 @@ def test_load_rejects_clipped_any_disagreeing_with_its_counts(
 def test_load_rejects_fwhm_pe_null_when_pe_axis_is_known(
     tmp_path, artifact, rewrite_document
 ) -> None:
-    """`fwhm_pe` is None exactly when `pe_axis` is None, never independently."""
+    """`fwhm_pe` is None when `pe_axis` is None, and only then."""
     assert artifact.measurements.pe_axis is not None
     path = q.save_artifact(artifact, tmp_path / "qa.nc")
     rewrite_document(path, _with_measurement("fwhm_pe", None))
@@ -689,9 +674,9 @@ def test_load_rejects_a_schema_1_archive_missing_its_measurements(
 ) -> None:
     """A migration reads the stored document, so its failures are read failures.
 
-    Bringing a v1 document forward assumes it carries the sections v1 carried.
-    One that does not is malformed, and must be refused as such rather than
-    raise the bare KeyError of whichever migration step reached for it.
+    Bringing a v1 document forward assumes it has the sections v1 had. One that
+    does not is malformed and must be refused as such, not raise the bare
+    KeyError of whichever migration step reached for it.
     """
     path = q.save_artifact(artifact, tmp_path / "qa.nc")
     rewrite_document(
@@ -725,34 +710,32 @@ def _both_nan(x: float, y: float) -> bool:
 
 
 # Every test above that corrupts a stored artifact does it through these two,
-# and they deliberately drive `netCDF4` directly rather than the package's own
-# `netcdf` module. Two reasons: a test that wrote through the writer could only
-# ever produce files the writer permits, which is the opposite of what a
-# rejection test needs; and reading the file back through a plain netCDF reader
-# is itself the claim this container was chosen for.
+# which drive `netCDF4` directly, not the package's own `netcdf` module. Writing
+# through the package's writer could only produce files it permits, which is no
+# use for a rejection test. Reading the file back through a plain netCDF reader
+# is also the claim this container was chosen for.
 
 
 # The CF marker the writer puts on a mask, and what tells one apart on the way
-# back in. Spelled out here rather than imported, so a change to the marker has
-# to be made in both places deliberately.
+# back in. Spelled out here, not imported, so changing the marker means editing
+# both places.
 _FLAG_VALUES = np.array([0, 1], dtype=np.uint8)
 
 
 def _write_netcdf(path, arrays, attributes) -> None:
     """A netCDF file holding exactly `arrays` and `attributes`, no layout rules.
 
-    Every array gets dimensions of its own, because a test's replacement array
-    generally no longer fits the axis the real one shared -- which is the point
-    of it. Booleans are stored as the flagged bytes the real writer uses;
-    anything else is stored as float64, so an "array" a document says is a mask
-    arrives as numbers and is refused for being numbers.
+    Every array gets its own dimensions, since a replacement array usually no
+    longer fits the axis the real one shared. Booleans are stored as the flagged
+    bytes the real writer uses. Anything else is float64, so a mask a document
+    declares arrives as numbers and is refused for it.
     """
     with (
         netCDF4.Dataset(str(path), "w", format="NETCDF4") as dataset,
         warnings.catch_warnings(),
     ):
         # netCDF4 1.7.4 trips NumPy 2.5's deprecation of setting `.shape` on
-        # every multi-dimensional write; `netcdf.write` drops the same warning,
+        # every multi-dimensional write. `netcdf.write` drops the same warning,
         # and its comment says why.
         warnings.filterwarnings(
             "ignore",

@@ -1,20 +1,19 @@
 """Regenerate the miniature DICOM study `test_import_real_dicom.py` imports.
 
-Committed rather than generated at test time because pydicom is not a dependency
-of either distribution -- it lives in the workspace's `notebooks` group -- and a
-test that skipped whenever it was absent would skip everywhere that matters. The
-files it writes are synthetic: a 16x16 disc phantom, two slices, two volumes,
-two series. Nothing here came from a scanner and no patient exists.
+Committed rather than generated at test time because pydicom is not a
+dependency of either distribution (it lives in the workspace's `notebooks`
+group), and a test that skipped without it would skip everywhere that matters.
+The files are synthetic: a 16x16 disc phantom, two slices, two volumes, two
+series. Nothing came from a scanner and no patient exists.
 
-The two series are chosen for what they make the importer prove:
+The two series make the importer prove:
 
-* series **2** and **11**, so a listing sorts them in the wrong order under
-  dcm2niix's unpadded `%s` and the right one under the zero-padded QA name;
-* descriptions `QA_EPI_ISO` and `QA EPI 32ch (rep)`, so one needs no
-  sanitizing and one has the spaces and parentheses a real protocol name
-  carries;
-* distinct `SeriesTime`s under one `StudyTime`, which is the difference
-  dcm2niix's `%t` cannot express (it is the study's time, the same for both).
+* series **2** and **11** sort wrongly under dcm2niix's unpadded `%s` and
+  rightly under the zero-padded QA name;
+* descriptions `QA_EPI_ISO` and `QA EPI 32ch (rep)`: one needs no sanitizing,
+  and one has the spaces and parentheses of a real protocol name;
+* distinct `SeriesTime`s under one `StudyTime`, which dcm2niix's `%t` cannot
+  express (it is the study's time, the same for both).
 
 Run from the workspace root, after `make sync-notebooks`:
 

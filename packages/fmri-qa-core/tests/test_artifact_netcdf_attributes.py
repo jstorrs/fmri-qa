@@ -1,17 +1,18 @@
-"""What the netCDF file says about itself: that it is netCDF-4, that the document
-rides as an ASCII global attribute, and that every measurement, provenance field,
-setting and scalar is also published as an attribute of its own, so a reader that
-never decodes the document can still answer the cheap questions.
+"""What the netCDF file says about itself.
+
+It is netCDF-4, the document rides as an ASCII global attribute, and every
+measurement, provenance field, setting and scalar is also its own attribute, so
+a reader that never decodes the document can answer the cheap questions.
 """
 
 import json
 from dataclasses import replace
 
-# `netCDF4` is imported here and not in each test on purpose: the "without a
-# warning" tests run under `simplefilter("error")`, and importing the wheel
-# raises its own Cython `RuntimeWarning`. Taking the import at module scope
-# means every test enters that filter with the library already loaded, so what
-# the filter can catch is what opening the artifact does and nothing else.
+# `netCDF4` is imported here, not in each test. The "without a warning" tests
+# run under `simplefilter("error")`, and importing the wheel raises its own
+# Cython `RuntimeWarning`, so every test must enter that filter with the library
+# already loaded. What the filter can catch is what opening the artifact does
+# and nothing else.
 import netCDF4
 import numpy as np
 import pytest
@@ -25,9 +26,9 @@ from fmriqc.analysis.serialize.decompose import decompose
 def test_the_file_is_netcdf4(tmp_path, artifact) -> None:
     """HDF5's signature: what a netCDF-4 file starts with, and what is sniffed.
 
-    Also what `load_artifact` dispatches on -- the container is decided by
-    these bytes and never by the file's name, because `--artifact` writes
-    whatever name the user asked for.
+    Also what `load_artifact` dispatches on: these bytes decide the container,
+    never the file's name, since `--artifact` writes whatever name the user
+    gave.
     """
     saved = q.save_artifact(artifact, tmp_path / "scan.qa.nc")
     assert saved.read_bytes()[:8] == b"\x89HDF\r\n\x1a\n"
@@ -65,9 +66,9 @@ def test_the_cheap_attributes_answer_without_decoding_the_document(
     assert attributes["source"].startswith("fmri-qa-core ")
 
 
-# How each JSON scalar is published as an attribute. `bool` before `int`
-# because a Python bool is an int, and a verdict stored as a number a reader
-# has to know is a verdict would be the guessing the flagged masks avoid.
+# How each JSON scalar is published as an attribute. `bool` comes before `int`
+# because a Python bool is an int, and a verdict stored as a number would make
+# the reader guess, which the flagged masks avoid.
 _ATTRIBUTE_DTYPES = ((bool, np.uint8), (int, np.int32), (float, np.float64))
 
 
@@ -87,9 +88,7 @@ def test_every_resolved_measurement_is_published_as_its_own_attribute(
     """`ncreadatt(f, '/', 'measurements.snr')`: a number without a JSON parser.
 
     The attribute is the document's own value in the netCDF type that holds it,
-    so a reader that never decodes the document still gets exactly what the
-    document says -- including a NaN, which means the estimator could not
-    resolve the value.
+    including NaN, which means the estimator could not resolve the value.
     """
     saved = q.save_artifact(artifact, tmp_path / "scan.qa.nc")
     document, _ = read_netcdf(saved)
@@ -115,11 +114,11 @@ def test_every_resolved_measurement_is_published_as_its_own_attribute(
 def test_a_measurement_the_document_calls_null_has_no_attribute(
     tmp_path, artifact, read_netcdf
 ) -> None:
-    """Absence is how "does not apply" is spelled, since NaN already means more.
+    """Absence means "does not apply", since NaN already means more.
 
-    The fixture's clipping check runs, so `clip_ceiling` is null because the
-    series has no rail -- not because nothing looked. An attribute cannot be
-    null, and publishing NaN for it would say the estimator tried and failed.
+    The clipping check runs on the fixture, so `clip_ceiling` is null because
+    the series has no rail, not because nothing looked. An attribute cannot be
+    null, and NaN would say the estimator tried and failed.
     """
     saved = q.save_artifact(artifact, tmp_path / "scan.qa.nc")
     document, _ = read_netcdf(saved)
@@ -151,10 +150,10 @@ def test_encode_refuses_an_empty_list(artifact, encode) -> None:
 def test_encode_refuses_a_value_no_attribute_can_hold(artifact, encode) -> None:
     """A list of objects: a JSON shape with no attribute form at all.
 
-    A nested object flattens into the name, and a list of ints, floats or
-    strings becomes a vector or a line of words. An object *inside* a list has
-    nowhere to go; `validate_document` refuses it before `save_artifact`
-    reaches this, so the fallthrough answers for `encode` called directly.
+    A nested object flattens into the name, and a list of ints, floats or strings
+    becomes a vector or a line of words. An object inside a list has nowhere to
+    go. `validate_document` refuses it before `save_artifact` gets here, so this
+    fallthrough covers `encode` called directly.
     """
     document, arrays = decompose(artifact)
     document["measurements"]["snr"] = [{"value": 1.0}]
@@ -167,10 +166,9 @@ def test_every_recorded_provenance_field_is_published_as_its_own_attribute(
 ) -> None:
     """`ncreadatt(f, '/', 'provenance.tr')`: the run's own record, un-decoded.
 
-    The rule the measurements follow, applied to the section that says where
-    the series came from -- with one shape the measurements never take. A JSON
-    list is a vector attribute of its element type, so `voxel_mm` is three
-    doubles and `matrix` two integers, each arriving in one call.
+    The measurements' rule applied to where the series came from, with one new
+    shape: a JSON list is a vector attribute of its element type, so `voxel_mm`
+    is three doubles and `matrix` two integers, each read in one call.
     """
     saved = q.save_artifact(artifact, tmp_path / "scan.qa.nc")
     document, _ = read_netcdf(saved)
@@ -202,11 +200,11 @@ def test_every_recorded_provenance_field_is_published_as_its_own_attribute(
 def test_a_provenance_field_the_document_calls_null_has_no_attribute(
     tmp_path, artifact, read_netcdf
 ) -> None:
-    """Absence is how "not recorded" is spelled, as it is for a measurement.
+    """Absence means "not recorded", as it does for a measurement.
 
-    The synthetic phantom's sidecar gives a flip angle and no echo time, and
-    nothing anywhere names a coil. A netCDF attribute cannot say "nobody wrote
-    this down", and a zero would say something else entirely.
+    The phantom's sidecar gives a flip angle but no echo time, and nothing names
+    a coil. An attribute cannot say "nobody wrote this down", and a zero would
+    mean something else.
     """
     saved = q.save_artifact(artifact, tmp_path / "scan.qa.nc")
     document, _ = read_netcdf(saved)
@@ -223,10 +221,10 @@ def test_every_setting_is_published_as_its_own_attribute(
 ) -> None:
     """`ncreadatt(f, '/', 'settings.roi_size')`: what the run was asked for.
 
-    The same rule as the measurements, applied to the knobs: a float is a
-    double, an integer an NC_INT, the method names are text, and an override
-    nobody gave -- `pe_axis_override` is None unless `--pe-axis` was passed --
-    is no attribute at all rather than a number that would read as an axis.
+    The measurements' rule applied to the settings: a float is a double, an
+    integer an NC_INT, method names are text, and an override nobody gave
+    (`pe_axis_override` is None unless `--pe-axis` was passed) is no attribute
+    at all, not a number that would read as an axis.
     """
     saved = q.save_artifact(artifact, tmp_path / "scan.qa.nc")
     document, _ = read_netcdf(saved)
@@ -252,10 +250,10 @@ def test_provenance_text_is_published_as_the_scanner_supplied_it(
 ) -> None:
     """Unlike a measurement, this text is not this package's to constrain.
 
-    A scan name comes from a file system and a manufacturer from a scanner
-    header, so neither is a closed vocabulary that could be held to ASCII.
-    netCDF4 writes a `str` attribute as UTF-8 NC_CHAR, and what a reader gets
-    back is the same string.
+    A scan name comes from a file system and a manufacturer from a scanner header,
+    so neither is a closed vocabulary that could be held to ASCII. netCDF4
+    writes a `str` attribute as UTF-8 NC_CHAR and a reader gets it back
+    unchanged.
     """
     prov = replace(
         artifact.provenance, scan="sujet_créé_Ω_頭部.nii.gz", manufacturer="Siemens™"
@@ -274,12 +272,12 @@ def test_provenance_text_is_published_as_the_scanner_supplied_it(
 def test_a_lone_surrogate_name_is_published_escaped_rather_than_refused(
     tmp_path, artifact
 ) -> None:
-    """The one string with no UTF-8 form: lossy but present beats no file.
+    """The one string with no UTF-8 form: a lossy attribute beats no file.
 
     A Windows file name with an undecodable byte reaches Python as an unpaired
     surrogate, which `str.encode` cannot render. The convenience attribute
-    carries the escape rather than failing the save; the document beside it
-    still spells the name exactly, and that is what `load_artifact` reads.
+    carries the escape instead of failing the save, and the document beside it
+    spells the name correctly for `load_artifact` to read.
     """
     name = "bad_\udcff_name.nii.gz"
     prov = replace(artifact.provenance, scan=name)
@@ -294,9 +292,9 @@ def test_save_refuses_a_provenance_integer_no_attribute_can_hold(
 ) -> None:
     """The NC_INT bound the measurements are held to, over a reachable field.
 
-    `n_trimmed` is only required to be non-negative, so a document can carry a
-    count past NC_INT and still be a valid artifact; publishing it wrapped
-    around would be a number a reader has no way to distrust.
+    `n_trimmed` is only required to be non-negative, so a valid artifact can carry
+    a count past NC_INT. Publishing it wrapped around would give a reader a
+    wrong number with no reason to distrust it.
     """
     prov = replace(artifact.provenance, n_trimmed=2**31)
     with pytest.raises(q.InvalidArtifactError, match="netCDF integer"):
@@ -332,11 +330,11 @@ def test_every_curve_and_image_scalar_is_published_as_its_own_attribute(
 ) -> None:
     """The last of the document: nothing in it now needs JSON to read.
 
-    These two sections nest -- the `psf` block, the `roi` box -- and the nest
-    flattens into the name, so `curves.psf.fwhm` is a two-double vector and
-    `images.roi.row0` an integer, by the same table as every other section. The
-    one new shape is a list of words: `curves.psf.labels` is one text, `PE RO`,
-    spelled the way CF spells `flag_meanings`.
+    These two sections nest (the `psf` block, the `roi` box), and the nest
+    flattens into the name: `curves.psf.fwhm` is a two-double vector and
+    `images.roi.row0` an integer. The one new shape is a list of words:
+    `curves.psf.labels` is one text, `PE RO`, spelled as CF spells
+    `flag_meanings`.
     """
     saved = q.save_artifact(artifact, tmp_path / "scan.qa.nc")
     document, _ = read_netcdf(saved)

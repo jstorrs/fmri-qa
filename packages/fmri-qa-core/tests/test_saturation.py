@@ -52,13 +52,12 @@ def test_detect_saturation_recovers_stored_integer_with_slope() -> None:
 
 
 def test_non_integer_storage_is_not_determinable_rather_than_clean() -> None:
-    """Floats cannot answer the question, and "clean" is the wrong answer to give.
+    """Float storage gives no answer, and "clean" would be the wrong one.
 
-    The rail is an integer artifact of the receiver's ADC. A converter that
-    wrote floats -- rescaling as it went -- destroyed the evidence of where it
-    was, so a genuinely saturated acquisition and a clean one look alike here.
-    Returning a result saying "no clipping" would hide exactly the runs this
-    check exists to catch, so there is no result at all.
+    The rail is an integer artifact of the receiver's ADC. A converter that wrote
+    floats and rescaled destroyed it, so saturated and clean acquisitions look
+    alike. A "no clipping" result would hide the runs this check exists to
+    catch, so there is no result.
     """
     saturated = np.zeros((2, 2, 1, 4))
     saturated[0, 0, 0, 1] = 4095.0  # would be found, on integer storage
@@ -71,9 +70,10 @@ def test_non_integer_storage_is_not_determinable_rather_than_clean() -> None:
 
 @pytest.mark.parametrize("slope", [0.0, float("nan"), float("inf")])
 def test_detect_saturation_refuses_an_unusable_slope(slope) -> None:
-    """A zero or non-finite slope cannot recover stored units, so the rail test
-    is meaningless -- reporting a clean series would be a wrong answer, not a
-    safe default, so this must raise rather than silently return `suspected=False`.
+    """A zero or non-finite slope cannot recover stored units.
+
+    The rail test is then meaningless, and a clean result would be wrong, not a
+    safe default. It must raise instead of returning `suspected=False`.
     """
     data = np.zeros((2, 2, 1, 3))
     with pytest.raises(InvalidScanError) as excinfo:

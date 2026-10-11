@@ -1,9 +1,9 @@
 """`rename.replace_patiently`: a rename that outwaits whatever holds the file open.
 
-The refusal it exists for is another process holding a just-written file open
-(a sync client, a scanner), which nothing here can provoke. What is tested is
-the policy: `Path.replace` is made to refuse a set number of times, and the
-delays and the sleep are injected, so no test waits.
+It exists for another process holding a just-written file open (a sync
+client, a scanner), which no test can provoke. The tests cover the policy:
+`Path.replace` refuses a set number of times, and the delays and sleep are
+injected, so no test waits.
 
 `rename.atomic_file`, the write-then-rename built on it, is tested at the end.
 """
@@ -90,12 +90,11 @@ def test_a_file_never_let_go_fails_with_the_last_attempts_error(
     calls = _refuse(monkeypatch, 99, PermissionError)
     slept: list[float] = []
 
-    # The last refusal is the one that describes the state the caller is left
-    # in, so it is the one that escapes -- not the first, saved and re-raised.
+    # The last refusal describes the state the caller is left in, so it escapes.
     with pytest.raises(PermissionError, match=f"attempt {len(DELAYS) + 1}$"):
         replace_patiently(source, target, delays=DELAYS, sleep=slept.append)
 
-    # One attempt per delay and a last one after them; every delay was spent.
+    # One attempt per delay, plus a last one after them. Every delay was spent.
     assert len(calls) == len(DELAYS) + 1
     assert slept == list(DELAYS)
     assert source.read_text() == "scan"
@@ -136,9 +135,8 @@ def test_with_no_delays_it_is_a_plain_replace(
 def test_the_default_is_the_ladder_on_every_platform() -> None:
     """Every test above injects `delays`; this pins what a real caller gets.
 
-    Bound to the constant, and the constant a real wait: long enough to outlast
-    a sync client hashing a scan, short enough that a destination that will
-    never let go is still reported in seconds.
+    Bound to the constant: long enough to outlast a sync client hashing a scan,
+    short enough that an unreleasable destination is reported in seconds.
     """
     defaults = replace_patiently.__kwdefaults__
     assert defaults["delays"] is rename._DELAYS

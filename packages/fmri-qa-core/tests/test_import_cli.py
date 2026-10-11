@@ -1,8 +1,8 @@
 """The `import` command: what it prints, what it exits with, and where it writes.
 
 Drives `cli.import_main` over the stub dcm2niix (the `fake_dcm2niix` fixture),
-checking the report it gives, its refusals without a traceback, its default
-output directory and its warnings.
+checking its report, its refusals without a traceback, its default output
+directory and its warnings.
 """
 
 import pytest
@@ -39,8 +39,7 @@ def test_import_main_names_the_series_that_kept_dcm2niix_s_name(
 ):
     """An unrenamed file in an otherwise uniform listing reads as a bug.
 
-    It is a decision `naming.plan` made, so the command says which files and
-    why rather than leaving the reader to notice.
+    It is a decision `naming.plan` made, so the command says which files and why.
     """
     binary = fake_dcm2niix({"2_QA": FULL_SIDECAR, "9_odd": {}})
 

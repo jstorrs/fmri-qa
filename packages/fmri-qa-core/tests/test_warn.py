@@ -1,8 +1,7 @@
 """A warning names the caller's line, not a line inside the package.
 
-`fmriqc.warn.warn` skips every frame in the package, so the attribution holds
-whichever public entry point reached the warning: the same ROI warning has to
-land on the test's own call through `run_qa` and through `analyze`.
+`fmriqc.warn.warn` skips every frame in the package, so the ROI warning must
+land on the test's own call through both `run_qa` and `analyze`.
 """
 
 import json

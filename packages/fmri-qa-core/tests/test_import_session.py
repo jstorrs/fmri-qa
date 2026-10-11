@@ -1,11 +1,10 @@
 """`convert.session`: staging, naming, filing and refusing.
 
-Runs against a *stub* dcm2niix -- the `fake_dcm2niix` fixture, a script that
-writes the files a real conversion would, named on demand. What the session has
-to get right is everything around the converter: staging, naming, refusing a
-destination it would damage, cleaning up after a failure and -- when a move
-starts and cannot finish -- undoing it or saying exactly what is left. Driving
-those cases through real DICOM would mean synthesizing a study per case.
+Runs against a stub dcm2niix (the `fake_dcm2niix` fixture), a script that
+writes the files a real conversion would. The session has to get everything
+around the converter right: staging, naming, refusing a destination it would
+damage, cleaning up after a failure, and, when a move cannot finish, undoing it
+or saying what is left. Real DICOM would mean synthesizing a study per case.
 """
 
 import json
@@ -228,11 +227,11 @@ def test_the_staging_directory_is_removed_when_the_converter_fails(
 def test_an_import_refuses_a_destination_it_would_overwrite(
     tmp_path, fake_dcm2niix
 ) -> None:
-    """And leaves every existing file exactly as it was.
+    """And leaves every existing file as it was.
 
-    The names come out of the DICOM, so they cannot be checked before
-    converting the way `cli.destinations` checks an `--artifact` path. Checking
-    them before the *move* is what keeps the destination all-or-nothing.
+    The names come from the DICOM, so unlike an `--artifact` path (see
+    `cli.destinations`) they cannot be checked before converting. Checking them
+    before the move keeps the destination all-or-nothing.
     """
     binary = fake_dcm2niix({"2_QA": FULL_SIDECAR})
     out = tmp_path / "nifti"
@@ -266,9 +265,9 @@ QA_JSON = "20260909_143012_s002_QA_EPI_ISO.json"
 def _refusing(monkeypatch, refuse) -> list[tuple[str, str]]:
     """Make the filing rename refuse whenever `refuse(source, target)` says so.
 
-    Stands in for `replace_patiently` where `convert.session` looks it up, so
-    no test waits out the real ladder; every rename asked for is logged as
-    `(source name, target name)`, refused or not.
+    Stands in for `replace_patiently` where `convert.session` looks it up, so no
+    test waits. Every rename asked for is logged as `(source name, target name)`,
+    refused or not.
     """
     asked: list[tuple[str, str]] = []
 
@@ -285,8 +284,7 @@ def _refusing(monkeypatch, refuse) -> list[tuple[str, str]]:
 def _listing(directory: Path) -> dict[str, bytes | None]:
     """Everything under `directory`, by relative name: bytes, or None for a directory.
 
-    Directories count, so that "as it was" notices an emptied set-aside
-    directory left behind as surely as a file.
+    Directories count, so "as it was" notices an emptied set-aside directory.
     """
     return {
         str(path.relative_to(directory)): path.read_bytes() if path.is_file() else None
@@ -357,7 +355,7 @@ def test_a_move_that_fails_part_way_is_undone(
     assert "held open by a sync client" in str(excinfo.value)
     assert "was undone" in str(excinfo.value)
     assert _listing(out) == before
-    # It really had been filed, and really was withdrawn -- not never moved.
+    # It was filed and then withdrawn, not left unmoved.
     assert ("2_QA.json", QA_JSON) in asked
     assert (QA_JSON, "2_QA.json") in asked
 
@@ -385,8 +383,8 @@ def test_a_forced_move_that_fails_puts_back_what_it_had_replaced(
     (out / QA_NIFTI).write_text("an earlier scan")
     (out / QA_JSON).write_text("an earlier sidecar")
     before = _listing(out)
-    # The earlier sidecar is set aside and the new one filed, the earlier scan
-    # is set aside -- and then the new scan is refused.
+    # The earlier sidecar is set aside and the new one filed, the earlier scan is
+    # set aside, and then the new scan is refused.
     _refusing(
         monkeypatch,
         lambda source, target: source.name == "2_QA.nii.gz" and target.parent == out,
@@ -401,12 +399,12 @@ def test_a_forced_move_that_fails_puts_back_what_it_had_replaced(
 def test_nothing_is_filed_until_everything_in_its_way_has_been_set_aside(
     tmp_path, fake_dcm2niix, monkeypatch
 ) -> None:
-    """The order is the safety: a refused set-aside must find nothing new filed.
+    """A refused set-aside must find nothing new filed.
 
-    Set one aside, file its replacement, go on to the next -- and the earlier
-    scan that will not move is left beside a new sidecar, which may then refuse
-    to come back out: a scan described by the wrong series, under final names,
-    with nothing to say so. Done in two passes there is nothing to withdraw.
+    If each file were set aside and replaced in turn, the earlier scan that will
+    not move would sit beside a new sidecar that may refuse to come back out: a
+    scan described by the wrong series, under final names, with nothing to say
+    so. In two passes there is nothing to withdraw.
     """
     binary = fake_dcm2niix({"2_QA": FULL_SIDECAR})
     out = tmp_path / "nifti"
@@ -483,7 +481,7 @@ def test_a_series_already_filed_is_withdrawn_when_a_later_one_is_refused(
 def test_a_set_aside_directory_that_will_not_go_does_not_hide_the_error(
     tmp_path, fake_dcm2niix, monkeypatch
 ) -> None:
-    """Removing it is cleanup; what the caller needs is the state of the import."""
+    """Removing it is cleanup. The caller needs the state of the import."""
     binary = fake_dcm2niix({"2_QA": FULL_SIDECAR})
     out = tmp_path / "nifti"
     out.mkdir()
@@ -510,7 +508,7 @@ def test_a_set_aside_directory_that_will_not_go_does_not_hide_the_error(
 def test_replaced_files_that_cannot_be_deleted_are_not_left_silently(
     tmp_path, fake_dcm2niix, monkeypatch
 ) -> None:
-    """The import succeeded, so this is a warning -- but it is not nothing."""
+    """The import succeeded, so this is a warning, but not a trivial one."""
     binary = fake_dcm2niix({"2_QA": FULL_SIDECAR})
     out = tmp_path / "nifti"
     out.mkdir()
@@ -553,11 +551,10 @@ def test_a_move_that_cannot_be_undone_says_exactly_what_is_left(
 ) -> None:
     """The holder that refused the scan now refuses to let the sidecar go back.
 
-    Nothing more is forced, and nothing is put back around it: the earlier scan
-    *could* be restored, and would then sit beside this import's sidecar looking
-    like a matching pair. So the new sidecar stays, named as this import's, and
-    both earlier files are kept, set aside, where nothing will read them as a
-    result.
+    Nothing more is forced and nothing is put back. Restoring the earlier scan
+    would leave it beside this import's sidecar, looking like a matching pair.
+    So the new sidecar stays, named as this import's, and both earlier files stay
+    set aside where nothing will read them.
     """
     binary = fake_dcm2niix({"2_QA": FULL_SIDECAR})
     out = tmp_path / "nifti"
@@ -593,7 +590,7 @@ def test_a_move_that_cannot_be_undone_says_exactly_what_is_left(
 def test_an_unforced_move_that_cannot_be_undone_names_what_it_left(
     tmp_path, fake_dcm2niix, monkeypatch
 ) -> None:
-    """Nothing was replaced, so nothing is set aside: only this import's file."""
+    """Nothing was replaced, so nothing is set aside, only this import's file."""
     binary = fake_dcm2niix({"2_QA": FULL_SIDECAR})
     out = tmp_path / "nifti"
     out.mkdir()
@@ -620,8 +617,8 @@ def test_a_replaced_file_that_cannot_be_put_back_is_kept_and_named(
 ) -> None:
     """Everything of this import is withdrawn; one earlier file will not go back.
 
-    The rest are restored -- there is no new file left for them to be mistaken
-    beside -- and the one that would not move is kept where it is, by name.
+    The rest are restored, since no new file is left for them to be mistaken
+    beside. The one that would not move is kept where it is, by name.
     """
     binary = fake_dcm2niix({"2_QA": FULL_SIDECAR})
     out = tmp_path / "nifti"

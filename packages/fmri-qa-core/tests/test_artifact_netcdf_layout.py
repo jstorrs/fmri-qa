@@ -1,14 +1,10 @@
-"""The netCDF layout before a file exists: that it declares every array the
-artifact publishes, and that `netcdf.encode` refuses an array the layout does
-not declare, of the wrong rank, disagreeing about an axis, or in a dtype the
-container would narrow.
+"""The netCDF layout before a file exists.
+
+It declares every array the artifact publishes, and `netcdf.encode` refuses an
+array the layout does not declare, of the wrong rank, disagreeing about an axis,
+or in a dtype the container would narrow.
 """
 
-# `netCDF4` is imported here and not in each test on purpose: the "without a
-# warning" tests run under `simplefilter("error")`, and importing the wheel
-# raises its own Cython `RuntimeWarning`. Taking the import at module scope
-# means every test enters that filter with the library already loaded, so what
-# the filter can catch is what opening the artifact does and nothing else.
 import numpy as np
 import pytest
 
@@ -21,7 +17,7 @@ def test_the_layout_declares_every_array_the_artifact_publishes(
     """`decompose` and the netCDF layout are one contract in two files.
 
     A field added to one and not the other would be an array with no declared
-    axes; `encode` refuses it, and this says so before a save has to.
+    axes. `encode` refuses it, and this says so before a save has to.
     """
     document, arrays = decompose(artifact)
     content = encode(document, arrays)

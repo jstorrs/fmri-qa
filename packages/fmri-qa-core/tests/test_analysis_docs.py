@@ -1,36 +1,33 @@
 """The analysis pages and the netCDF layout, checked against each other.
 
 `docs/user-guide/analyses/` documents what each analysis contributes to the
-artifact, under the exact names a reader sees in the file. That is a claim about
-the serializer, and a claim in prose rots silently: a variable added to
-`_LAYOUT` with no page to name it is undocumented, a page naming a variable that
-was renamed sends a reader looking for something that is not there, and the same
-name on two pages means neither owns it. `test_layering.py` makes the same
-argument for the import stack -- a rule that erodes one edit at a time has to be
-checked mechanically.
+artifact, under the names a reader sees in the file. A claim in prose rots
+silently: a variable added to `_LAYOUT` with no page is undocumented, a page
+naming a renamed variable misleads, and the same name on two pages means neither
+owns it. Like `test_layering.py`, this checks mechanically what would otherwise
+erode one edit at a time.
 
-So every variable in the serializer's `_LAYOUT`, every coordinate in
+Every variable in the serializer's `_LAYOUT`, every coordinate in
 `_COORDINATES`, and every `Measurements` field must appear in exactly one
 analysis page's contribution table, and every `Provenance` field must be named
 in `artifact.md`.
 
 Both tables are private to `analysis.serialize.netcdf`, and this imports them
-anyway. They are the layout itself -- the published claim these pages are
-checked against -- and a public accessor would exist only for this test, which
-is a worse trade than a test reaching one module deep into the package it
-tests. If a second consumer ever needs them, that is when they become public.
+anyway. They are the layout the pages are checked against, and a public accessor
+would exist only for this test. If a second consumer needs them, they become
+public then.
 
 Two spellings are checked, for two different mistakes:
 
 * **The contribution tables** (the first column of the table under "What it
   contributes to the artifact") are the ownership claim, so coverage and
   uniqueness are measured there. A dimension name like `frame` is an ordinary
-  English word that appears in half the prose on these pages; only the table
-  column can say which page *owns* it.
+  word that appears in half the prose, so only the table column can say which
+  page owns it.
 * **The whole page** is scanned for dotted names in backticks (`curves.x`,
-  `images.x`, `measurements.x`, `provenance.x`), which are unambiguous wherever
-  they appear, so a stale name in a sentence is caught too. Document-only
-  fields (the `roi` box, `outlier_qthr`, the `psf` block) are deliberately
+  `images.x`, `measurements.x`, `provenance.x`), which are unambiguous
+  wherever they appear, so a stale name in a sentence is caught too.
+  Document-only fields (the `roi` box, `outlier_qthr`, the `psf` block) are
   written without a dotted prefix, since they are not variables.
 """
 
@@ -99,10 +96,10 @@ def _owners() -> dict[str, list[str]]:
 def _document_scalars() -> set[str]:
     """The `curves.*` and `images.*` attributes, as the serializer names them.
 
-    Read off a real document rather than a table, because these are the leaves
-    of nested blocks and the flattening is the serializer's rule -- so the
-    newest committed fixture is loaded and decomposed, which is the same
-    document a fresh analysis writes and costs no pipeline run.
+    Read off a real document, since these are leaves of nested blocks whose
+    flattening is the serializer's rule. The newest committed fixture is loaded
+    and decomposed, which is the document a fresh analysis writes, at no
+    pipeline cost.
     """
     fixtures = Path(__file__).parent / "fixtures"
     newest = max(fixtures.glob("schema_v*.qa.npz"), key=lambda p: int(p.stem[8:-3]))

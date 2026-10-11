@@ -1,15 +1,13 @@
 """The NIfTI loader's contract: spatial/TR units, and the optional BIDS sidecar.
 
-Both concerns are file-I/O boundaries, so these go through real files on disk.
-The TR cases matter because pixdim[4] carries no unit of its own -- a scan whose
-header says milliseconds must still arrive in seconds, or the pipeline trims no
-warm-up and fits a detrend of absurd order. The sidecar cases pin the decision
-that a NIfTI exported straight off the scanner still analyzes, with a warning
-and empty acquisition metadata rather than a refusal.
+Both concerns are file-I/O boundaries, so these use real files. The TR cases
+matter because pixdim[4] has no unit of its own: a header in milliseconds must
+still arrive in seconds, or the pipeline trims no warm-up and fits an absurd
+detrend order. The sidecar cases pin that a NIfTI straight off the scanner still
+analyzes, with a warning and empty acquisition metadata.
 
-These build their own files rather than using conftest's `write_scan`: that
-fixture always writes a sidecar at a 2 s TR in unlabeled units, which is
-exactly what is under test here.
+These build their own files instead of conftest's `write_scan`, which always
+writes a sidecar at a 2 s TR in unlabeled units.
 """
 
 import json
@@ -34,10 +32,8 @@ def _write_scan(
 ) -> Path:
     """Write a minimal 4-D NIfTI; write a sidecar only when one is given.
 
-    Integer-stored, like the shared `write_scan` fixture and like a properly
-    converted acquisition: these tests are about TR and sidecar parsing, and a
-    float image would add the unrelated "storage cannot support the saturation
-    check" warning to every one of them.
+    Integer-stored, like `write_scan`, so a float image does not add an unrelated
+    "storage cannot support the saturation check" warning to each test.
     """
     data = np.ones((8, 8, 2, 6), dtype=np.uint16)
     img = nib.Nifti1Image(data, affine=np.eye(4))
@@ -71,8 +67,8 @@ def test_header_tr_converts_by_its_time_unit(
 
 
 def test_sidecar_repetition_time_wins_over_the_header(tmp_path) -> None:
-    # The header claims 3 s, the sidecar 2 s; BIDS fixes its unit, so it wins --
-    # loudly, because one of the two files describes a different acquisition.
+    # The header claims 3 s, the sidecar 2 s. BIDS fixes its unit, so the sidecar
+    # wins, with a warning that one file describes a different acquisition.
     nifti = _write_scan(tmp_path, {"RepetitionTime": 2.0}, pixdim_t=3.0)
     with pytest.warns(UserWarning, match="disagrees"):
         scan = q.QAScan.from_nifti(nifti)
@@ -91,7 +87,7 @@ def test_agreeing_sidecar_and_header_do_not_warn(tmp_path) -> None:
 
 def test_empty_header_tr_disagrees_with_nothing(tmp_path) -> None:
     # A zeroed pixdim[4] makes no claim about the acquisition, so the sidecar
-    # supplying the TR is not a disagreement worth warning about.
+    # supplying the TR is not a disagreement.
     nifti = _write_scan(tmp_path, {"RepetitionTime": 2.0}, pixdim_t=0.0)
     with warnings.catch_warnings():
         warnings.simplefilter("error")
@@ -146,8 +142,8 @@ def test_missing_sidecar_warns_and_still_loads(tmp_path) -> None:
 
 
 def test_missing_sidecar_and_dim_info_leaves_the_axis_unresolved(tmp_path) -> None:
-    # No sidecar and no dim_info: the loader has nothing to read, and says so
-    # twice -- the absent sidecar, and the axis it is leaving to the pipeline.
+    # No sidecar and no dim_info: the loader has nothing to read, and warns
+    # twice, for the absent sidecar and for the axis it leaves to the pipeline.
     nifti = _write_scan(tmp_path, sidecar=None, phase=None)
     with pytest.warns(UserWarning) as caught:
         scan = q.QAScan.from_nifti(nifti)
@@ -175,18 +171,18 @@ def test_a_malformed_sidecar_field_is_unknown_and_named(
     """A field of the wrong type is dropped with a warning naming it, at load.
 
     These fields only describe the acquisition, so a bad one must not stop the
-    analysis -- but it must not be copied through either: an artifact holding a
-    string where its schema promises a number saves fine and fails when the
-    report opens it, months later and far from the sidecar that caused it. The
-    value is not coerced ("0.03" may well be 30 ms, but deciding so is guessing).
+    analysis, but it must not be copied through either. A string where the
+    schema promises a number saves fine and fails when the report opens it,
+    months later and far from the sidecar. The value is not coerced: "0.03" may
+    be 30 ms, but deciding so is guessing.
     """
     nifti = _write_scan(tmp_path, {"PhaseEncodingDirection": "j", key: value})
     with pytest.warns(UserWarning, match=f"sidecar {key} .* recording it as unknown"):
         scan = q.QAScan.from_nifti(nifti)
     assert scan.meta is not None
     assert getattr(scan.meta, field) is None
-    # And what it produces reads back: the boundary check is what makes the
-    # producer's output the reader's input.
+    # And what it produces reads back. The boundary check makes the producer's
+    # output valid reader input.
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         artifact = q.analyze(scan, q.AnalysisSettings(trim_sec=0, roi_size=3))
@@ -195,7 +191,7 @@ def test_a_malformed_sidecar_field_is_unknown_and_named(
 
 
 def test_a_numeric_serial_number_is_kept_as_text(tmp_path) -> None:
-    """A serial written unquoted is still a serial; only structure is refused."""
+    """A serial written unquoted is still a serial. Only bad structure is refused."""
     nifti = _write_scan(tmp_path, {"DeviceSerialNumber": 12345, "EchoTime": 0.03})
     with warnings.catch_warnings():
         warnings.simplefilter("error")  # nothing here is malformed
@@ -358,11 +354,10 @@ def test_unknown_spatial_units_warn_and_assume_mm(tmp_path) -> None:
 def test_float_storage_warns_and_is_recorded_on_the_scan(tmp_path) -> None:
     """A float NIfTI loads, but says the ADC samples are gone.
 
-    The saturation check asks whether the acquisition piled up on a hardware
-    rail, which only integer samples can answer. A converter that rescaled into
-    floats has thrown that away, and the warning names the fix -- reconvert
-    preserving the datatype -- because the alternative is a receiver-gain
-    problem that never gets reported.
+    The saturation check needs integer samples to see whether the acquisition
+    piled up on a hardware rail. A converter that rescaled into floats threw
+    that away. The warning names the fix, reconverting with the datatype
+    preserved, since otherwise a receiver-gain problem goes unreported.
     """
     data = np.ones((8, 8, 2, 6), dtype=np.float32)
     img = nib.Nifti1Image(data, affine=np.eye(4))

@@ -35,12 +35,12 @@ def test_saturation_result_derived_flags() -> None:
 def test_saturation_ceiling_and_bits_are_present_or_absent_together() -> None:
     """The rail's level and its bit depth are one detection, not two fields.
 
-    A `ceiling` set beside a `bits` of None -- or the reverse -- was a state the
-    dataclass allowed and only `detect_saturation`, which always set both or
-    neither, kept from arising. Behind one optional `rail` the pair cannot come
-    apart, and the same holds for the worst-clipped volume, which has no meaning
-    without a rail either. The two convenience properties read off it, so the
-    artifact's flat `clip_ceiling`/`clip_bits` contract is unchanged.
+    A `ceiling` with a `bits` of None, or the reverse, was a state the dataclass
+    allowed and only `detect_saturation` kept from arising. Behind one optional
+    `rail` the pair cannot come apart, and neither can the worst-clipped volume,
+    which is meaningless without a rail. The convenience properties read off the
+    rail, so the artifact's flat `clip_ceiling`/`clip_bits` contract is
+    unchanged.
     """
     names = {f.name for f in fields(SaturationResult)}
     assert names == {"rail", "n_clipped_pre", "n_clipped_kept"}
@@ -102,9 +102,9 @@ def test_qaimages_finds_a_nulled_edge_under_a_nonzero_intercept() -> None:
     """A stored zero reads back as the intercept, and is still a dead line.
 
     `get_fdata` returns `stored * slope + inter`, so a Siemens-nulled row in a
-    scan with `scl_inter = 10` arrives as a row of exactly 10 -- not of zeros.
-    Testing the edge against 0.0 would let that constant line into every ROI
-    average and ghost statistic as if it were data.
+    scan with `scl_inter = 10` arrives as 10s, not zeros. Testing the edge
+    against 0.0 would let that constant line into every ROI average and ghost
+    statistic.
     """
     inter = 10.0
     center_slice = np.full((8, 8, 6), 100.0)

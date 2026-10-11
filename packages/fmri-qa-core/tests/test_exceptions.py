@@ -124,9 +124,8 @@ def test_run_qa_rejects_invalid_inputs(
     shape: tuple[int, int, int, int], settings_kwargs: dict[str, object], field: str
 ) -> None:
     scan = _flat_scan(shape=shape)
-    # Built outside the `raises` block so the refusal has to come from `run_qa`:
-    # a record that refused the value itself would satisfy `raises` without the
-    # pipeline ever having checked it.
+    # Built outside the `raises` block so the refusal has to come from `run_qa`.
+    # A record that refused the value itself would satisfy `raises` anyway.
     settings = q.AnalysisSettings(**settings_kwargs)  # type: ignore[arg-type]
     with pytest.raises(q.InvalidScanError) as info:
         q.run_qa(scan, settings)

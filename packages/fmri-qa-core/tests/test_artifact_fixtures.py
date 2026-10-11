@@ -1,30 +1,24 @@
 """Fixture archives: a real file an old build actually wrote still loads.
 
 `test_artifact_archive.py`'s migration tests (see its `_ADDED_IN`) take a
-*current* artifact, delete the fields that `_ADDED_IN` says a given version
-predates, and check that the matching `_vN_to_vN1` puts them back as unknown.
-That proves each migration step does what `_ADDED_IN` claims -- but `_ADDED_IN`
-is, by its own comment, the reverse of `serialize.migrate._MIGRATIONS`, so
-those tests check one hand-maintained description of the schema history
-against another. They cannot catch an array renamed, resized or changed
-dtype between versions; a field whose *meaning* changed rather than its
-presence; a document layout the current writer could no longer produce at
-all; or a key-ordering/encoding difference that only shows up in bytes an old
-build actually wrote.
+current artifact, delete the fields a given version predates, and check that
+the matching `_vN_to_vN1` restores them as unknown. But `_ADDED_IN` is, by its
+own comment, the reverse of `serialize.migrate._MIGRATIONS`, so those tests
+check one hand-maintained account of the schema history against another. They
+cannot catch an array renamed, resized or retyped between versions, a field
+whose meaning changed but not its presence, a layout the current writer cannot
+produce, or an ordering or encoding difference visible only in bytes an old
+build wrote.
 
-This module is the other half. The `tests/fixtures/schema_v*` archives are not
-synthesized: each is the literal file produced by checking out that
-schema version's own commit (the last commit before the next schema bump) and
-running *that build's* `save_artifact` over the same synthetic phantom the
-rest of this suite uses (`conftest.synthetic_series`, seed 0). Loading one
-here exercises real historical bytes, not today's writer's idea of what an
-old file looked like -- including the *container* those bytes are in, which is
-why the fixtures are discovered by either suffix: every committed one so far is
-a `.qa.npz`, because that is what the builds that wrote them wrote, and the
-next one will be a `.qa.nc`. Neither half of the suite replaces the other: a bug
-that broke a migration step and its exact inverse in the same commit could
-still pass a single fixture, and a fixture proves nothing about a step in
-isolation the way `test_artifact_archive.py` does.
+This module is the other half. Each `tests/fixtures/schema_v*` archive is the
+literal file produced by checking out that schema version's last commit before
+the next bump and running that build's `save_artifact` over the same synthetic
+phantom the rest of the suite uses (`conftest.synthetic_series`, seed 0). That
+exercises real historical bytes, including the container, which is why fixtures
+are discovered by either suffix: every committed one so far is a `.qa.npz`, and
+the next will be a `.qa.nc`. Neither half replaces the other. A bug breaking a
+migration step and its inverse in one commit could still pass a single fixture,
+and a fixture says nothing about a step in isolation.
 
 A schema bump is not finished until a fixture of the version it retired is
 committed here (see `serialize/migrate.py`'s module docstring) -- otherwise
@@ -61,10 +55,9 @@ _SECTION_OF = {
 }
 
 # What each version's own writer could not yet record, independent of
-# `serialize.migrate`'s `_MIGRATIONS`/docstrings -- this table is read off the
-# schema history in `analysis/artifact.py`'s `ARTIFACT_SCHEMA_VERSION` comment,
-# not copied from the migration code, so it does not just check that code
-# against its own account of itself.
+# `serialize.migrate`. Read off the schema history in `analysis/artifact.py`'s
+# `ARTIFACT_SCHEMA_VERSION` comment, not the migration code, so it does not
+# check that code against itself.
 _UNKNOWN_AT: dict[int, tuple[str, ...]] = {
     1: (
         "phantom_fraction",
@@ -79,18 +72,17 @@ _UNKNOWN_AT: dict[int, tuple[str, ...]] = {
     3: ("phantom_contrast", "n_trimmed", "slice_index", "n_slices"),
     4: ("phantom_contrast", "slice_index", "n_slices"),
     5: (),
-    # Schema 6 recorded every field above. The clipping block it *also* always
-    # answered is deliberately not listed: schema 7 lets it be unknown, but a
-    # schema 6 document carries a real bool, which migrates forward as the
-    # measurement that build made (see `serialize.migrate._v6_to_v7`).
+    # Schema 6 recorded every field above. Its clipping block is not listed:
+    # schema 7 lets it be unknown, but a schema 6 document carries a real bool,
+    # which migrates forward as that build's measurement (see
+    # `serialize.migrate._v6_to_v7`).
     6: (),
 }
 
-# What each fixture's own writer *did* measure on the shared synthetic
-# phantom, captured once from the real archives: not just "present", but
-# reading back the exact value that build recorded. `snr`/`sfnr` shift in the
-# last few digits from schema 4 onward -- real history (a numerical fix
-# landed between the schema-3 and schema-4 commits), not a fixture mistake.
+# What each fixture's own writer measured on the shared synthetic phantom,
+# captured once from the real archives. `snr`/`sfnr` shift in the last few digits
+# from schema 4 onward: a numerical fix landed between the schema-3 and schema-4
+# commits, not a fixture mistake.
 _KNOWN_AT: dict[int, dict[str, object]] = {
     1: {"snr": 154.80051191601368, "sfnr": 149.84960132655738},
     2: {
@@ -135,9 +127,9 @@ _KNOWN_AT: dict[int, dict[str, object]] = {
         "slice_index": 1,
         "n_slices": 3,
         "phantom_contrast": 52.71573552713314,
-        # Schema 6 ran the rail test unconditionally and found no pile-up on
-        # this phantom. Under schema 7 that False still means "no rail found",
-        # not "the storage was checked" -- it is the value that build reached.
+        # Schema 6 ran the rail test unconditionally and found no pile-up here.
+        # Under schema 7 that False still means "no rail found", not "the
+        # storage was checked".
         "clipped_any": False,
         "n_clipped_kept": 0,
     },
@@ -147,10 +139,10 @@ _KNOWN_AT: dict[int, dict[str, object]] = {
 def _discover_fixtures() -> dict[int, Path]:
     """Map schema version to its committed fixture, from what is on disk.
 
-    Driving the parametrization from the directory listing (rather than a
-    hard-coded version list) means a fixture removed by mistake shrinks the
-    test count silently; `test_fixture_directory_covers_every_migratable_version`
-    below is what turns that into a failure instead.
+    Parametrizing from the directory listing means a fixture removed by mistake
+    shrinks the test count silently.
+    `test_fixture_directory_covers_every_migratable_version` below turns that
+    into a failure instead.
     """
     found = {}
     for path in sorted(FIXTURES_DIR.glob("schema_v*")):
@@ -166,10 +158,9 @@ _FIXTURES = _discover_fixtures()
 def _is_unknown(value: object) -> bool:
     """True for the documented "not recorded" marker: `None` or NaN.
 
-    Not every NaN in the artifact means this -- `max_translation` is a
-    genuine NaN on this fixture because its motion fit did not converge, a
-    measurement outcome, not a migration gap -- so this is only applied to
-    the fields `_UNKNOWN_AT` names for a given version.
+    Not every NaN means this: `max_translation` is a genuine NaN on this fixture
+    because its motion fit did not converge. So this applies only to the fields
+    `_UNKNOWN_AT` names for a given version.
     """
     return value is None or (isinstance(value, float) and math.isnan(value))
 
@@ -178,10 +169,9 @@ def _is_unknown(value: object) -> bool:
 def test_a_real_archive_from_an_older_build_still_loads(version: int) -> None:
     """`load_artifact` reads a file an old build actually wrote.
 
-    If a future change silently made one of these unreadable -- an array
-    renamed or reshaped, a field repurposed, a document key no longer where
-    the reader expects it -- this is the test that notices; the migration
-    steps could still look correct against `test_artifact_archive.py`'s own
+    If a future change silently made one of these unreadable (an array renamed or
+    reshaped, a field repurposed, a document key moved), this test notices. The
+    migration steps could still pass against `test_artifact_archive.py`'s own
     synthesized documents.
     """
     path = _FIXTURES[version]
@@ -190,8 +180,7 @@ def test_a_real_archive_from_an_older_build_still_loads(version: int) -> None:
 
     assert loaded.schema_version == ARTIFACT_SCHEMA_VERSION
 
-    # Same phantom, same settings, same seed on every fixture -- these never
-    # depended on the schema version and so must never move.
+    # Same phantom, settings and seed on every fixture, so these must never move.
     assert loaded.provenance.scan == "scan.nii.gz"
     assert loaded.provenance.source == "scan.nii.gz"
     assert loaded.provenance.tr == 2.0
@@ -209,10 +198,9 @@ def test_a_real_archive_from_an_older_build_still_loads(version: int) -> None:
     assert loaded.curves.time[:3].tolist() == [0.0, 2.0, 4.0]
 
     # Schema <= 5 always measured peak motion in voxels regardless of the known
-    # voxel size (see `serialize.migrate._v5_to_v6`), so "vox" there is a
-    # recorded historical fact rather than a placeholder. Schema 6 onward
-    # records the unit it actually used, which on this phantom -- 3 mm isotropic
-    # in the header -- is mm.
+    # voxel size (see `serialize.migrate._v5_to_v6`), so "vox" is a recorded
+    # fact, not a placeholder. Schema 6 on records the unit it used, mm on this
+    # phantom (3 mm isotropic).
     expected_unit = "vox" if version <= 5 else "mm"
     assert loaded.measurements.displacement_unit == expected_unit
 

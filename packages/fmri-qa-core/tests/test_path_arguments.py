@@ -1,8 +1,8 @@
 """Path arguments as a command line delivers them.
 
-`same_file` is what stands between an output flag and the input it would
-replace, so its cases are the spellings a shell produces: a relative form, a
-symlink, a hard link, and a destination that does not exist yet.
+`same_file` stops an output flag from replacing its input. The cases are the
+spellings a shell produces: a relative path, a symlink, a hard link, and a
+destination that does not exist yet.
 """
 
 import os
@@ -28,7 +28,7 @@ def test_same_file_sees_through_links(tmp_path) -> None:
 
 
 def test_same_file_compares_a_destination_that_does_not_exist_yet(tmp_path) -> None:
-    """A future output has no identity yet; where it would land is what counts."""
+    """A future output has no identity yet, so compare where it would land."""
     (tmp_path / "in").write_bytes(b"x")
     assert same_file(tmp_path / "sub" / ".." / "in", tmp_path / "in")
     assert not same_file(tmp_path / "out", tmp_path / "in")

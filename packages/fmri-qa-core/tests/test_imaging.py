@@ -29,7 +29,7 @@ def _disk(n: int = 32, radius: float | None = None) -> np.ndarray:
 
 
 def _air(shape: tuple[int, ...], seed: int = 0, scale: float = 8.0) -> np.ndarray:
-    """A magnitude noise floor -- one frame's worth of air, holding no phantom."""
+    """A magnitude noise floor: one frame of air, with no phantom."""
     rng = np.random.default_rng(seed)
     return np.abs(rng.normal(scale=scale, size=shape))
 
@@ -106,9 +106,9 @@ def test_segment_phantom_separates_a_disk_over_an_exactly_zero_background() -> N
     A vendor that background-suppresses or mask-multiplies its reconstruction
     leaves the air at exactly 0. More than a tenth of the frame then sits on the
     minimum, so a strict `image < quantile(image, 0.1)` selects no background
-    seed at all and the watershed floods the whole frame as phantom -- which
-    passes `roi_fits` vacuously, erodes the N/2 ghost region to nothing, and
-    divides SFNR by a noiseless floor, all without raising anything.
+    seed and the watershed floods the whole frame as phantom. That passes
+    `roi_fits` vacuously, erodes the N/2 ghost region to nothing, and divides
+    SFNR by a noiseless floor, all without raising.
     """
     disk = _disk()
     image = np.where(disk, 1000.0, 0.0)  # air is exactly zero
@@ -169,11 +169,10 @@ def test_detect_phantom_is_quiet_on_a_separable_phantom() -> None:
 def test_detect_phantom_rejects_a_partition_of_noise() -> None:
     """A frame of air segments to a middling share of the frame, and still fails.
 
-    The fraction test alone passed it: the watershed labels roughly half of the
-    noise, which is a share a real phantom could cover. What gives it away is
-    contrast -- the labeled half stands barely above the rest -- and the
-    verdict has to apply the same test slice selection does, or a run warns
-    that no slice holds a phantom and then records the one it segmented as good.
+    The fraction test alone passed it, since the watershed labels about half of
+    the noise, a share a real phantom could cover. Contrast gives it away, and
+    the verdict must apply the same test as slice selection. Otherwise a run
+    warns that no slice holds a phantom, then records the segmented one as good.
     """
     series = _air((32, 32, 8))
     images = q.QAImages(center_slice=series, fluctuations=np.zeros_like(series), tr=2.0)
@@ -221,10 +220,9 @@ def test_phantom_plausible_needs_both_share_and_contrast(
 def test_phantom_area_scores_a_frame_of_air_as_no_phantom() -> None:
     """Segmenting noise yields a mask; it must not count as a cross-section.
 
-    The watershed seeds one quantile of the noise against the other and labels
-    roughly half the frame, which is *larger* than a real phantom's share -- so
-    area alone would rank an empty slice above the phantom. What separates them
-    is contrast: the labeled half of the air stands barely above the rest.
+    The watershed labels roughly half the frame, more than a real phantom's
+    share, so area alone would rank an empty slice above the phantom. Contrast
+    separates them: the labeled half of the air barely stands above the rest.
     """
     air = _air((64, 64))
     assert 0.3 < segment_phantom(air).mean() < 0.6  # a mask, and a big one
@@ -241,8 +239,8 @@ def test_select_slice_prefers_the_phantom_over_a_larger_air_mask() -> None:
     """A prescription running off the end of the phantom must not win the argmax.
 
     Slices past the phantom hold only air, which segments to ~45% of the frame
-    against the cross-section's ~20%: ranking slices by segmented area alone
-    selects one of them, and every metric is then measured on background.
+    against the cross-section's ~20%. Ranking by area alone would pick one and
+    measure every metric on background.
     """
     disk = _disk(64)
     air = np.stack([_air((64, 64), seed=s) for s in (1, 2)], axis=-1)
@@ -268,9 +266,8 @@ def test_select_slice_prefers_a_sparse_phantom_over_empty_slices() -> None:
 def test_select_slice_falls_back_when_no_slice_holds_a_phantom() -> None:
     """An all-air volume has no cross-section to find, and says so.
 
-    Silently returning the largest patch of segmented noise would be the old
-    behavior wearing a different mask; the middle slice is the honest answer and
-    matches what center='image' would have given.
+    Returning the largest patch of segmented noise would repeat the old behavior.
+    The middle slice matches what center='image' would give.
     """
     data = _air((32, 32, 3, 4))
     with pytest.warns(UserWarning, match="no slice holds a recognizable phantom"):

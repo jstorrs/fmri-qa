@@ -1,14 +1,12 @@
 """`ArrayValue`: every array-holding value object copies in and freezes.
 
-Pins the policy `_arrays.py` documents -- every frozen dataclass in this
-package that holds an `ndarray` field inherits `ArrayValue`, not only the ones
-published across the `analysis` seam -- against every current subclass, so a
-class that quietly stops inheriting (or a new array field added to one that
-does) fails a test rather than surfacing as a caller mutating a value out from
-under a metric three calls later. `test_pipeline.py`'s
-`test_preprocess_discards_the_full_volume` already covers `QAImages` from the
-angle that matters there (detachment from the full 4-D series); this file
-covers the rest of the family, plus the base contract in isolation.
+Pins the policy `_arrays.py` documents (every frozen dataclass holding an
+`ndarray` field inherits `ArrayValue`, not only those published across the
+`analysis` seam) against every current subclass. A class that stops inheriting,
+or a new array field on one that does, then fails a test instead of letting a
+caller mutate a value under a metric. `test_pipeline.py`'s
+`test_preprocess_discards_the_full_volume` covers `QAImages`; this file covers
+the rest of the family, plus the base contract in isolation.
 """
 
 from dataclasses import dataclass, fields
@@ -52,11 +50,10 @@ def test_array_value_copies_and_freezes_array_fields_in_place() -> None:
     assert sample.values[0] == 1.0  # ...does not reach the stored copy
 
 
-# One minimal, directly-constructed instance per `ArrayValue` subclass outside
-# `QAImages` (covered above), paired with the array field to probe. Builds
-# each straight from its dataclass constructor -- not through the estimator
-# that normally produces it -- so this stays a test of `ArrayValue`, not a
-# second copy of each metric's own tests.
+# One minimal instance per `ArrayValue` subclass outside `QAImages` (covered
+# above), with the array field to probe. Each is built from its dataclass
+# constructor, not its estimator, so this tests `ArrayValue` and not a second
+# copy of each metric's tests.
 def _sample_instances() -> list[tuple[ArrayValue, str]]:
     return [
         (
@@ -138,11 +135,10 @@ def test_every_array_field_on_every_sample_is_readonly() -> None:
 def test_motion_result_equality_no_longer_raises_on_its_array_field() -> None:
     """Regression: `eq=True` on an array-holding dataclass raises, not compares.
 
-    `MotionResult` inherited `ArrayValue` (which copies `params`) without also
-    setting `eq=False`, so its generated `__eq__` tried `params == params` and
-    then the truth value of the resulting array -- exactly the trap every other
-    array-holding class here avoids with `eq=False`. Equality now falls back to
-    identity, like its siblings.
+    `MotionResult` inherited `ArrayValue` (which copies `params`) without setting
+    `eq=False`, so its generated `__eq__` evaluated the truth value of an array
+    comparison. Every other array-holding class avoids this with `eq=False`;
+    equality now falls back to identity like theirs.
     """
     a = MotionResult(params=np.zeros((2, 5)))
     b = MotionResult(params=np.zeros((2, 5)))

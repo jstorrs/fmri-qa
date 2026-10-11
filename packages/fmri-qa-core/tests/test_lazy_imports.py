@@ -1,11 +1,10 @@
 """The lazy `fmriqc/__init__.py` re-export: every name resolves, nothing heavy loads.
 
 `fmriqc/__init__.py` replaced ~90 eager `from .x import Y` statements with a
-PEP 562 `__getattr__` keyed off `_EXPORTS`, precisely so that reaching for
-`argparse` (`--version`, `--help`) does not pay for scipy and scikit-image.
-That guarantee only holds if two things stay true: `_EXPORTS` never drifts
-from `__all__`, and a bare `import fmriqc` genuinely never imports the heavy
-stack. Both are asserted here rather than trusted to code review.
+PEP 562 `__getattr__` keyed off `_EXPORTS`, so `argparse` (`--version`,
+`--help`) does not pay for scipy and scikit-image. That holds only if
+`_EXPORTS` never drifts from `__all__` and a bare `import fmriqc` never imports
+the heavy stack. Both are asserted here.
 """
 
 import subprocess
@@ -15,17 +14,16 @@ import pytest
 
 import fmriqc
 
-# The modules `import fmriqc` alone must never pull in -- each is expensive and
-# each has exactly one call site in the package (see `analysis/build.py`,
-# `metrics/artifacts.py`, `analysis/serialize/netcdf.py`), or is a real
-# dependency (`nibabel`, `skimage`) that a name access, not a bare import,
-# should trigger. `netCDF4` loads libhdf5 and libnetcdf behind it, which is why
-# the artifact writer defers it the way the pipeline defers `scipy.spatial`.
+# Modules a bare `import fmriqc` must never pull in. Each is expensive with one
+# call site in the package (see `analysis/build.py`, `metrics/artifacts.py`,
+# `analysis/serialize/netcdf.py`), or is a real dependency (`nibabel`, `skimage`)
+# that a name access should trigger. `netCDF4` loads libhdf5 and libnetcdf, so
+# the artifact writer defers it as the pipeline defers `scipy.spatial`.
 _HEAVY_MODULES = ("skimage", "scipy.special", "scipy.spatial", "nibabel", "netCDF4")
 
-# Probe run in a fresh interpreter (see test_bare_import_does_not_load_the_heavy_stack):
-# only `sys.modules` after a bare `import fmriqc` speaks to the claim, not this
-# process's, which already has half of scipy loaded from other tests.
+# Probe run in a fresh interpreter (see
+# test_bare_import_does_not_load_the_heavy_stack). This process already has half
+# of scipy loaded from other tests.
 _PROBE = f"""
 import sys
 import fmriqc
@@ -56,7 +54,7 @@ def test_every_exported_name_is_reachable() -> None:
 def test_exports_map_covers_all_and_nothing_else() -> None:
     flattened = {name for names in fmriqc._EXPORTS.values() for name in names}
     assert flattened == set(fmriqc.__all__)
-    # No name claimed by two modules -- a duplicate would silently shadow.
+    # No name claimed by two modules; a duplicate would silently shadow.
     assert sum(len(names) for names in fmriqc._EXPORTS.values()) == len(flattened)
 
 

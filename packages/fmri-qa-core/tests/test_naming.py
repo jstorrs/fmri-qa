@@ -29,11 +29,10 @@ def test_a_full_sidecar_names_all_four_fields() -> None:
 
 
 def test_the_padded_series_number_is_what_makes_a_listing_sort() -> None:
-    """Series 2 before series 11 -- which dcm2niix's own `%s` gets backwards.
+    """Series 2 sorts before series 11, which dcm2niix's own `%s` gets backwards.
 
-    This is the whole reason the name is rebuilt rather than templated: `%s` is
-    not padded, so a directory listing puts series 11 first and looks ordered
-    while being wrong.
+    This is why the name is rebuilt instead of templated: `%s` is not padded, so
+    a listing puts series 11 first.
     """
     second = naming.qa_stem({**FULL_SIDECAR, "SeriesNumber": 2})
     eleventh = naming.qa_stem({**FULL_SIDECAR, "SeriesNumber": 11})
@@ -57,9 +56,8 @@ def test_a_long_description_is_truncated_without_a_trailing_underscore() -> None
 def test_a_partial_sidecar_gives_a_shorter_name_rather_than_no_name() -> None:
     """Every field is a DICOM tag some export omits, so each one is optional.
 
-    `AcquisitionTime` without `AcquisitionDateTime` is the case `--anonymize
-    all` produces: the date is stripped but the series' own time survives, so
-    the series still sorts chronologically within its session.
+    `AcquisitionTime` without `AcquisitionDateTime` is what `--anonymize all`
+    produces: the date is stripped, but the series still sorts by its own time.
     """
     no_date = {k: v for k, v in FULL_SIDECAR.items() if k != "AcquisitionDateTime"}
     assert naming.qa_stem(no_date) == "143012_s002_QA_EPI_ISO"
@@ -74,7 +72,7 @@ def test_the_protocol_name_stands_in_for_a_missing_description() -> None:
 
 
 def test_a_sidecar_that_names_nothing_yields_no_stem() -> None:
-    """None, not an empty string -- the caller falls back to dcm2niix's name."""
+    """Returns None, not "", so the caller falls back to dcm2niix's name."""
     assert naming.qa_stem({}) is None
     assert naming.qa_stem({"SeriesDescription": "!!!"}) is None  # sanitizes to nothing
 
@@ -82,8 +80,8 @@ def test_a_sidecar_that_names_nothing_yields_no_stem() -> None:
 def test_a_sidecar_field_of_the_wrong_type_is_ignored_not_trusted() -> None:
     """The sidecar is written by an external tool; nothing assumes its types.
 
-    `True` is the sharp case: it is an `int` to `isinstance`, and would format
-    as series `s001` if the check did not exclude it.
+    `True` is the tricky case: it is an `int` to `isinstance` and would format as
+    series `s001` if not excluded.
     """
     assert naming.qa_stem({"SeriesNumber": "2", "AcquisitionTime": 143012}) is None
     assert naming.qa_stem({"SeriesNumber": True}) is None
@@ -100,9 +98,8 @@ def test_plan_renames_what_it_can_and_leaves_alone_what_it_cannot() -> None:
 def test_two_series_that_would_share_a_name_both_keep_dcm2niix_s() -> None:
     """A multi-echo series is one series number, one description, several files.
 
-    Renaming both to the one name they agree on would leave whichever moved
-    last and silently drop the other, so the colliding group keeps the names
-    dcm2niix already guaranteed unique. Nothing is invented; nothing is lost.
+    Renaming both to the one name they agree on would silently drop one, so the
+    colliding group keeps the names dcm2niix already made unique.
     """
     chosen = naming.plan({"2_QA_e1": FULL_SIDECAR, "2_QA_e2": dict(FULL_SIDECAR)})
 

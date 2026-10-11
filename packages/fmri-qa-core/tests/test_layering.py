@@ -1,11 +1,10 @@
 """The stack: `load < prep < metrics < pipeline < analysis`, checked mechanically.
 
-`style/architecture.md` ("Layered Subpackages") states the rule -- dependencies
-point down the stack, a lower layer never imports a higher one -- and warns that
-such a rule "erodes one convenient import at a time," so it has to be checked
-mechanically rather than trusted to code review. `fmri-qa-report/tests/
-test_layering.py` checks the *outer* seam, that presentation never reaches back
-into calculation; this is its sibling for the seams *inside* calculation.
+`style/architecture.md` ("Layered Subpackages") says dependencies point down
+the stack and warns that such a rule "erodes one convenient import at a time",
+so this checks it mechanically. `fmri-qa-report/tests/test_layering.py` covers
+the outer seam (presentation never reaches back into calculation). This covers
+the seams inside calculation.
 """
 
 import ast
@@ -14,8 +13,7 @@ from pathlib import Path
 import fmriqc
 
 # Rank of each top-level module/subpackage in the stack, low to high. A module
-# may import anything at its own rank or below; importing a strictly higher
-# rank is the violation this test exists to catch.
+# may import its own rank or below; importing a higher rank is the violation.
 RANKS = {
     "types": 0,
     "exceptions": 0,
@@ -30,9 +28,9 @@ RANKS = {
     # A leaf over the standard library only, shared with the report command.
     "path_arguments": 0,
     "load": 1,
-    # `convert` sits beside `load`, not under it: both are the tier that gets
-    # data in, and convert produces exactly the files load reads. It borrows
-    # load's path conventions, which a rank below load would forbid.
+    # `convert` sits beside `load`: both get data in, and convert produces the files
+    # load reads. It borrows load's path conventions, which a rank below load
+    # would forbid.
     "convert": 1,
     "prep": 2,
     "validation": 2,
@@ -54,11 +52,10 @@ def _modules() -> list[Path]:
 def _rel_parts(path: Path) -> tuple[str, ...]:
     """A file's module path below the package root, as a tuple of parts.
 
-    `__init__` is kept as a literal trailing part rather than collapsed away.
-    That is what makes `node.level` resolve the same way (`rel[:-level]`) for
-    a package's `__init__.py` as for an ordinary module: Python itself treats
-    one dot in an `__init__.py` as "this package," which is exactly what a
-    trailing `__init__` component produces once it is sliced off.
+    `__init__` is kept as a trailing part so `node.level` resolves the same way
+    (`rel[:-level]`) for a package's `__init__.py` as for any module. Python
+    treats one dot in an `__init__.py` as "this package", which is what the
+    trailing component gives once sliced off.
     """
     return path.relative_to(_SOURCE_ROOT).with_suffix("").parts
 
@@ -71,10 +68,9 @@ def _layer(parts: tuple[str, ...]) -> int | None:
 def _import_targets(tree: ast.Module, rel: tuple[str, ...]) -> set[tuple[str, ...]]:
     """Every module `tree` (the source file at `rel`) imports, as resolved parts.
 
-    Covers both forms the core sources use: the relative imports (`node.level >
-    0`) everything but `cli/` writes internally, and the absolute `fmriqc...`
-    imports `cli/` uses instead (`import fmriqc as q`, `from fmriqc.load.paths
-    import ...`).
+    Covers relative imports (`node.level > 0`) everywhere but `cli/`, and the
+    absolute `fmriqc...` imports `cli/` uses (`import fmriqc as q`,
+    `from fmriqc.load.paths import ...`).
     """
     targets: set[tuple[str, ...]] = set()
     for node in ast.walk(tree):
@@ -95,7 +91,7 @@ def _import_targets(tree: ast.Module, rel: tuple[str, ...]) -> set[tuple[str, ..
 
 
 def test_the_core_package_has_source_to_check() -> None:
-    """Guard the guard: an empty scan must not pass silently."""
+    """An empty scan must not pass silently."""
     assert len(_modules()) >= 20
 
 
@@ -119,12 +115,11 @@ def test_layers_never_import_upward() -> None:
 
 
 def test_every_top_level_module_is_ranked() -> None:
-    """Guard the guard again: an unranked module is an unchecked one.
+    """An unranked module is an unchecked one.
 
-    `_layer` answers `None` for anything outside `RANKS`, and the scan skips
-    what it cannot rank -- so a new top-level module added without an entry
-    here would be exempt from the rule rather than held to it, silently. Only
-    the package aggregators are legitimately unranked.
+    `_layer` answers `None` outside `RANKS`, and the scan skips what it cannot
+    rank, so a new top-level module without an entry would silently escape the
+    rule. Only the package aggregators are legitimately unranked.
     """
     exempt = {"__init__", "__main__"}
     top_level = {
@@ -141,7 +136,7 @@ def test_every_top_level_module_is_ranked() -> None:
 
 
 def test_the_check_would_catch_an_upward_import() -> None:
-    """A negative control, so the scan cannot pass by failing to see anything."""
+    """Negative control: the scan must not pass by seeing nothing."""
     tree = ast.parse("from ..metrics.ghost import GHOST_RADIUS\n")
     rel = ("load", "paths")  # load/paths.py, rank 1
     assert _import_targets(tree, rel) == {("metrics", "ghost")}

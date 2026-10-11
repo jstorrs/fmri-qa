@@ -1,8 +1,8 @@
 """In-plane phantom registration (estimate_motion).
 
-Checks the estimator on a static series (no hallucinated motion) and on a series
-with one deliberately shifted frame (the recovered translation magnitude matches
-the injected shift, and that frame is flagged as the worst).
+Checks the estimator on a static series (no spurious motion) and on a series
+with one shifted frame (the recovered translation magnitude matches the
+injected shift, and that frame is flagged as the worst).
 """
 
 import numpy as np

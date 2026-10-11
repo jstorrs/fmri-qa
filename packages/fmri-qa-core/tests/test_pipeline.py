@@ -1,7 +1,7 @@
 """End-to-end pipeline through the public `fmriqc` import surface.
 
-Exercises `run_qa` as a caller sees it, on the synthetic phantom the `make_scan`
-fixture builds (no file I/O), so the whole functional core runs deterministically.
+Exercises `run_qa` as a caller sees it, on the `make_scan` phantom (no file
+I/O).
 """
 
 import gc
@@ -24,8 +24,8 @@ GHOST_FRACTION = 0.08
 def _scan_with_ghost_on_axis1(seed: int = 0) -> q.QAScan:
     """A synthetic phantom carrying an injected N/2 ghost along axis 1.
 
-    No `pe_axis`: this is the scan the loader hands over when neither the sidecar
-    nor `dim_info` names an axis, so `run_qa` has to find it.
+    No `pe_axis`: the scan the loader hands over when neither the sidecar nor
+    `dim_info` names an axis, so `run_qa` has to find it.
     """
     data = synthetic_series(seed=seed)
     ghosted = data + GHOST_FRACTION * np.roll(data, data.shape[1] // 2, axis=1)
@@ -45,10 +45,9 @@ def test_run_qa_returns_finite_core_metrics(make_scan: MakeScan) -> None:
 def test_run_qa_resolves_the_ghost_on_a_separable_phantom(make_scan: MakeScan) -> None:
     """The phantom occupies part of the FOV, so the N/2 ghost region is real.
 
-    A guard on the segmentation as much as on the ghost: a collapsed phantom mask
-    (see `detect_phantom`) erodes the rolled ghost region to nothing and turns
-    every ghost percentage into a silent NaN, so finite values here say the mask
-    separated phantom from background.
+    A collapsed phantom mask (see `detect_phantom`) erodes the rolled ghost
+    region to nothing and turns every ghost percentage into a silent NaN.
+    Finite values mean the mask separated phantom from background.
     """
     ghost = q.run_qa(make_scan(), q.AnalysisSettings(roi_size=9)).metrics.ghost
     assert ghost is not None
@@ -61,9 +60,9 @@ def test_run_qa_resolves_the_ghost_on_a_separable_phantom(make_scan: MakeScan) -
 def test_the_ghost_masks_are_built_once_for_both_axes(make_scan: MakeScan) -> None:
     """One `GhostResult` per run carries the regions every ghost number came from.
 
-    The percentages and the masks a report draws are the same measurement, so
-    they cannot drift apart: each ghost patch is its signal patch rolled half the
-    FOV, and the axis it names is the axis the run resolved.
+    The percentages and the masks a report draws are one measurement. Each ghost
+    patch is its signal patch rolled half the FOV, and its axis is the one the
+    run resolved.
     """
     m = q.run_qa(make_scan(), q.AnalysisSettings(roi_size=9)).metrics
     ghost = m.ghost
@@ -77,10 +76,9 @@ def test_the_ghost_masks_are_built_once_for_both_axes(make_scan: MakeScan) -> No
 def test_run_qa_estimates_the_pe_axis_from_the_ghost() -> None:
     """With no axis in the metadata, the pipeline reads it off the analyzed slice.
 
-    This is the only place the estimate is made -- the loader no longer guesses
-    on the full volume -- so an injected axis-1 ghost has to resolve here or
-    nowhere. Everything downstream (the masks, the four percentages, the PE/RO
-    smoothness labels) hangs off the answer.
+    This is the only place the estimate is made, since the loader no longer
+    guesses on the full volume. The masks, percentages and PE/RO smoothness
+    labels all depend on it.
     """
     m = q.run_qa(_scan_with_ghost_on_axis1(), q.AnalysisSettings(roi_size=9)).metrics
     assert m.pe_axis == 1
@@ -116,8 +114,8 @@ def test_preprocess_discards_the_full_volume(make_scan: MakeScan) -> None:
 def test_run_qa_records_the_request_it_answered(make_scan: MakeScan) -> None:
     """The result carries its own settings, so a later projection cannot guess.
 
-    `pe_axis_override` is the argument as given, not the axis the run resolved:
-    the two differ exactly when the override was left to the metadata.
+    `pe_axis_override` is the argument as given, not the resolved axis. They
+    differ when the override was left to the metadata.
     """
     result = q.run_qa(
         make_scan(), q.AnalysisSettings(trim_sec=0, center="phantom", roi_size=9)
@@ -141,9 +139,8 @@ def test_a_request_carrying_a_stale_detrend_order_is_re_resolved(
 def test_an_explicit_pe_axis_overrides_the_header(make_scan: MakeScan) -> None:
     """An explicit override wins over a header axis that names a different one.
 
-    `make_scan` sets the header's own axis to 1 (see `conftest.make_scan`), so
-    passing `pe_axis_override=0` only proves the override took if the resolved
-    axis is 0, not 1.
+    `make_scan` sets the header's axis to 1 (see `conftest.make_scan`), so the
+    override only shows if the resolved axis is 0.
     """
     result = q.run_qa(make_scan(), q.AnalysisSettings(roi_size=9, pe_axis_override=0))
     assert result.settings.pe_axis_override == 0
@@ -156,10 +153,10 @@ def test_preprocess_records_which_plane_it_cut(make_scan: MakeScan) -> None:
 
 
 def test_the_images_do_not_carry_a_phase_encode_axis() -> None:
-    """The axis has one home, and the preprocessed images are not it.
+    """The axis lives in `QAMetrics`, not in the preprocessed images.
 
-    A run resolves it and publishes it off the ghost it measured
-    (`QAMetrics.pe_axis`); a copy here could only agree with that or be a bug.
+    A run resolves it and publishes it from the ghost it measured
+    (`QAMetrics.pe_axis`). A copy here could only agree or be a bug.
     """
     assert "pe_axis" not in {f.name for f in fields(q.QAImages)}
 
@@ -172,10 +169,8 @@ def test_weisskoff_rdc_matches_the_metric(make_scan: MakeScan) -> None:
 def test_phantom_centering_localizes_slice_and_roi(make_scan: MakeScan) -> None:
     """`center="phantom"` runs end to end and lands the ROI inside the phantom.
 
-    The alternative localization mode is a documented CLI option, so it is walked
-    here: it selects the largest phantom cross-section rather than the middle
-    slice, and centers the ROI on the detected phantom center rather than the
-    image center.
+    This documented CLI option picks the largest phantom cross-section instead of
+    the middle slice, and centers the ROI on the detected phantom center.
     """
     result = q.run_qa(make_scan(), q.AnalysisSettings(roi_size=9, center="phantom"))
     assert result.roi.size == 9
@@ -186,8 +181,7 @@ def test_phantom_centering_localizes_slice_and_roi(make_scan: MakeScan) -> None:
 def test_both_centering_modes_agree_on_a_centered_phantom(make_scan: MakeScan) -> None:
     """The fixture's disk is image-centered, so the two modes must coincide.
 
-    That makes this a real check on the "phantom" path rather than a tautology:
-    an off-by-one in the detected-center or largest-slice selection would move
+    An off-by-one in the detected-center or largest-slice selection would move
     the ROI and show up as a mismatch.
     """
     scan = make_scan()
@@ -198,12 +192,11 @@ def test_both_centering_modes_agree_on_a_centered_phantom(make_scan: MakeScan) -
 
 
 def test_the_roi_warning_suggests_the_other_centering_mode(make_scan: MakeScan) -> None:
-    """Advice the run has already taken is no advice at all.
+    """Advice never recommends the setting that just failed.
 
-    An ROI that will not fit leaves two ways out, and which of them is worth
-    trying depends on the mode in use: recommending `center='image'` to a run
-    that is already image-centered spends the operator's next attempt on the
-    setting that just failed.
+    An ROI that will not fit leaves two ways out, and which one is worth trying
+    depends on the mode in use. Recommending `center='image'` to a run that is already
+    image-centered wastes the operator's next attempt.
     """
     scan = make_scan()
     for center, suggested in (("image", "phantom"), ("phantom", "image")):
@@ -218,13 +211,11 @@ def test_unknown_centering_mode_is_rejected(make_scan: MakeScan) -> None:
 
 
 def test_an_unresolvable_pe_axis_leaves_the_ghost_metrics_undefined() -> None:
-    """Every ghost statistic is defined relative to an axis; with none, none.
+    """With no PE axis there is no ghost result.
 
-    A constant volume has no ghost to locate on either axis, so the estimate
-    declines. The run continues -- the ROI stability metrics do not need a PE
-    axis -- but there is no ghost result at all, rather than the run naming an
-    axis nothing measured and publishing four numbers sampled from wherever it
-    pointed.
+    A constant volume has no ghost on either axis, so the estimate declines. The
+    run continues, since the ROI metrics need no PE axis, but must not name an
+    axis nothing measured or publish four numbers sampled from it.
     """
     flat = q.QAScan(data=np.ones((16, 16, 3, 8)), tr=2.0)
 
@@ -238,15 +229,12 @@ def test_an_unresolvable_pe_axis_leaves_the_ghost_metrics_undefined() -> None:
 def test_metrics_pe_axis_is_read_off_the_ghost_it_was_measured_with(
     make_scan: MakeScan,
 ) -> None:
-    """The axis and the ghost family are one fact, so they cannot disagree.
+    """The axis and the ghost family cannot disagree.
 
-    `QAMetrics.pe_axis` is a property over `ghost`, not a field beside it: there
-    is no ghost result without an axis, and `estimate_ghost` already records the
-    axis it built its masks on. A stored second copy could only ever agree or be
-    a bug -- and "resolved an axis but measured no ghost" would be a state the
-    dataclass allowed and nothing forbade. Pinned here because the guarantee is
-    structural, and a later edit re-adding the field would pass every other test
-    in this module.
+    `QAMetrics.pe_axis` is a property over `ghost`, not a field beside it. A
+    stored copy could only agree or be a bug, and would allow "resolved an axis
+    but measured no ghost". Re-adding the field would pass every other test in
+    this module, so this one catches it.
     """
     assert "pe_axis" not in {f.name for f in fields(q.QAMetrics)}
 

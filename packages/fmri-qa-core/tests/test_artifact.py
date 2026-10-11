@@ -1,10 +1,10 @@
 """What `analyze` puts in an artifact: every value a consumer needs, resolved.
 
 The artifact is the contract between the calculation half and every consumer,
-so these pin that everything a report needs is settled at build time — derived
-properties into plain fields, curves extracted, masks and outlines materialized
-— with no metric object left for a reader to walk. The artifact round trip that
-carries it to disk is `test_artifact_archive.py`.
+so these pin that everything a report needs is settled at build time: derived
+properties as plain fields, curves extracted, masks and outlines materialized,
+and no metric object left for a reader to walk. The round trip to disk is
+`test_artifact_archive.py`.
 """
 
 import warnings
@@ -35,10 +35,10 @@ def test_build_artifact_publishes_the_settings_the_result_was_computed_with(
 ) -> None:
     """A result built from `run_qa` carries its own request; nothing is filled in.
 
-    `build_artifact` used to accept settings separately and default them when
+    `build_artifact` used to take settings separately and default them when
     omitted, so a result computed with no trim, phantom centering and a forced
-    PE axis was published as a 5 s trim, image centering and no override --
-    while `n_trimmed` in the same file said 0.
+    PE axis was published as a 5 s trim, image centering and no override, while
+    `n_trimmed` in the same file said 0.
     """
     result = q.run_qa(
         make_scan(),
@@ -71,10 +71,10 @@ def test_settings_keep_the_requested_roi_size_and_the_images_the_resolved_one(
 def test_provenance_records_the_plane_analyzed(make_scan) -> None:
     """Which slice of the volume the numbers describe survives into the artifact.
 
-    Under `center="image"` it is the middle plane, under `center="phantom"`
-    the largest cross-section; the fixture's disk is the same in every slice,
-    so the two modes name the same plane and the count is what tells them apart
-    from a single-slice acquisition.
+    Under `center="image"` it is the middle plane, under `center="phantom"` the
+    largest cross-section. The fixture's disk is the same in every slice, so the
+    two modes name the same plane, and the count tells them apart from a
+    single-slice acquisition.
     """
     scan = make_scan(z=5)
     by_image = q.build_artifact(
@@ -109,9 +109,9 @@ def test_analyze_records_provenance_from_the_sidecar(artifact) -> None:
 def test_provenance_records_the_trim_that_frame_indices_count_from(artifact) -> None:
     """`n_trimmed` + `n_frames` accounts for every acquired volume.
 
-    Without the trim count the artifact's frame indices -- the worst outlier
-    frame, the seconds in `Curves.time` -- are unmappable: they count from the
-    first volume kept, and nothing else in the file says which volume that was.
+    Without the trim count, the artifact's frame indices (the worst outlier frame,
+    the seconds in `Curves.time`) are unmappable: they count from the first
+    volume kept, and nothing else in the file says which that was.
     """
     prov = artifact.provenance
     assert prov.n_trimmed == 2  # 5 s of warm-up at TR 2 s
@@ -134,10 +134,10 @@ def test_measurements_are_flat_scalars(artifact) -> None:
 def test_measurements_record_the_localization_diagnostics(artifact) -> None:
     """A reader can tell a declined estimate from an analysis of background.
 
-    Both localizations can fail quietly -- a collapsed segmentation still yields
-    a mask and an off-phantom ROI still yields an average -- so the artifact
-    carries whether they held. On the fixture phantom the mask covers a middling
-    share of the frame and the small ROI sits inside it.
+    Both localizations can fail quietly (a collapsed segmentation still yields a
+    mask, an off-phantom ROI still yields an average), so the artifact records
+    whether they held. On the fixture the mask covers a middling share of the
+    frame and the small ROI sits inside it.
     """
     m = artifact.measurements
     assert 0.0 < m.phantom_fraction < 0.95
@@ -150,11 +150,9 @@ def test_displacement_reports_mm_with_a_known_voxel_size_else_voxels(
 ) -> None:
     """Motion/COM peak displacement follows the header's voxel size, like FWHM.
 
-    `artifact` is built from a NIfTI with a 3 mm header, so both peaks -- and
-    the combined FWHM -- report in mm. `make_scan` builds a scan with no header
-    metadata at all, so the same numbers fall back to voxels; `displacement_unit`
-    says which happened rather than leaving a reader to guess from the value
-    alone.
+    `artifact` is built from a NIfTI with a 3 mm header, so both peaks and the
+    combined FWHM report in mm. `make_scan` has no header metadata, so the same
+    numbers fall back to voxels. `displacement_unit` says which happened.
     """
     known = artifact.measurements
     assert known.displacement_unit == "mm"
@@ -171,9 +169,9 @@ def test_a_noise_only_scan_keeps_its_failed_mask_verdict(tmp_path) -> None:
     """Analyzing background must not save a passing localization.
 
     Slice selection says no slice holds a phantom, but that warning is gone once
-    the run ends; the artifact's verdict is what a report and a trend database
-    read. The noise segments to a middling share of the frame, so the verdict
-    has to fail on contrast, as the slice test did, and stay failed through the
+    the run ends, and reports and trend databases read the artifact's verdict.
+    The noise segments to a middling share of the frame, so the verdict must
+    fail on contrast, as the slice test did, and stay failed through the
     archive.
     """
     noise = np.abs(np.random.default_rng(0).normal(size=(32, 32, 1, 40)))
@@ -191,9 +189,8 @@ def test_an_oversized_roi_is_recorded_as_outside_the_phantom(
 ) -> None:
     """The ROI-fit warning is transient; the artifact must keep the verdict.
 
-    Analysis still completes (the metrics are simply measured over background at
-    the ROI corners), so nothing else in the stored result says the numbers are
-    unusable.
+    Analysis still completes, with the metrics measured over background at the ROI
+    corners, so nothing else in the stored result says the numbers are unusable.
     """
     scan = q.QAScan.from_nifti(write_scan(tmp_path))
     with pytest.warns(UserWarning, match="not fully inside the phantom"):
@@ -204,11 +201,10 @@ def test_an_oversized_roi_is_recorded_as_outside_the_phantom(
 def test_the_direction_and_the_label_are_the_same_axis(tmp_path, write_scan) -> None:
     """`provenance.pe_dir` and `measurements.pe_label` cannot name two axes.
 
-    They answer different questions -- what the metadata resolved, and what the
-    run measured on -- so an override may legitimately separate them, and that
-    is the *only* thing that may. Both are now derived from an axis rather than
-    one of them from a sidecar word, so a reader comparing the acquisition block
-    against the measurements block sees one story.
+    They answer different questions (what the metadata resolved, and what the run
+    measured on), so an override may separate them, and nothing else may. Both
+    are derived from an axis, so the acquisition and measurements blocks tell
+    one story.
     """
     scan = q.QAScan.from_nifti(write_scan(tmp_path))
 
@@ -272,10 +268,10 @@ def test_images_carry_the_fbirn_quartet_and_its_annotations(artifact) -> None:
 def test_a_collinear_mask_has_no_hull_rather_than_no_artifact() -> None:
     """A one-row mask has pixels but no area, and Qhull refuses to hull it.
 
-    The outline is built after the whole analysis has run, so letting the
-    geometry library error out would throw away a completed scan over an
-    annotation nothing can draw anyway. The empty polygon the docstring promises
-    for a mask too small to have a hull covers this case too.
+    The outline is built after the analysis has run, so letting the geometry
+    library error out would throw away a completed scan over an annotation
+    nothing can draw. The empty polygon the docstring promises for a mask too
+    small to hull covers this case.
     """
     mask = np.zeros((8, 8), dtype=bool)
     mask[3, 2:7] = True
@@ -285,9 +281,9 @@ def test_a_collinear_mask_has_no_hull_rather_than_no_artifact() -> None:
 def test_ghost_regions_are_region_matched(artifact) -> None:
     """Each ghost patch and its source are the same patch, rolled half the FOV.
 
-    The synthetic disk is small enough that erosion leaves the patches empty --
-    which is exactly why its ghost% is undefined -- but the pairing must hold
-    either way, since the ratio compares a patch against the tissue that made it.
+    The synthetic disk is small enough that erosion leaves the patches empty,
+    which is why its ghost% is undefined, but the pairing must hold either way:
+    the ratio compares a patch against the tissue that made it.
     """
     ghost = artifact.images.ghost
     assert ghost is not None  # the PE axis resolved, so the masks were built
@@ -301,9 +297,8 @@ def test_an_unresolved_pe_axis_is_published_as_unknown() -> None:
     """The artifact says "?", draws no ghost regions, and labels the raw axes.
 
     A run whose phase-encode axis could not be resolved (see `run_qa`) has no
-    ghost regions to sample or draw, and no PE/RO direction to name. Each of
-    those degradations is a branch a reader depends on, so they are walked here
-    rather than left to a scan that happens to trigger them.
+    ghost regions to sample or draw and no PE/RO direction to name. Each
+    degradation is a branch a reader depends on, so they are walked here.
     """
     flat = q.QAScan(data=np.ones((16, 16, 3, 8)), tr=2.0)
     with pytest.warns(UserWarning, match="no phase-encode axis"):
@@ -323,11 +318,11 @@ def test_the_default_roi_size_is_the_shared_fbirn_constant() -> None:
 def test_undeterminable_clipping_survives_the_archive(tmp_path, make_scan) -> None:
     """ "Not determinable" is a third answer, and it round-trips as one.
 
-    A scan whose storage cannot support the rail test publishes the whole
-    clipping block as None -- not as zero counts and a False verdict, which
-    would report a scanner verified against a check that never ran. The
-    distinction is only worth having if it survives to the reader, so it is
-    pinned through `save_artifact`/`load_artifact` rather than in memory alone.
+    A scan whose storage cannot support the rail test publishes the whole clipping
+    block as None, not zero counts and a False verdict, which would report a
+    scanner verified against a check that never ran. The distinction only helps
+    if it survives to the reader, so it is pinned through
+    `save_artifact`/`load_artifact`.
     """
     scan = replace(make_scan(), stored_integer=False)
     with warnings.catch_warnings():
@@ -506,9 +501,9 @@ def _holds_floats(annotation: Any) -> bool:
 def _float_fields(record: object) -> Iterator[tuple[object, str]]:
     """Every (record, field) below `record` that is annotated to hold floats.
 
-    Walks the values, not the classes, so a section the fixture does not carry
-    (an absent `images.ghost`) is skipped, and so is a float field it leaves
-    None: replacing None with a number is a different record, not a test.
+    Walks the values, not the classes, so a section the fixture lacks (an absent
+    `images.ghost`) is skipped, as is a float field left None: replacing None
+    with a number is a different record.
     """
     annotations = resolved_annotations(type(record))
     for field in fields(record):  # type: ignore[arg-type]
@@ -522,8 +517,8 @@ def _float_fields(record: object) -> Iterator[tuple[object, str]]:
 def test_every_float_field_stores_a_whole_number_as_a_float(artifact) -> None:
     """`trim_sec=5` is 5.0: an int in a float field would be published as NC_INT.
 
-    Walked from the artifact down rather than listed, so a record or a float
-    field added later is held to the same rule without anyone remembering to.
+    Walked from the artifact down, so a record or float field added later is held
+    to the same rule automatically.
     """
     checked = list(_float_fields(artifact))
     assert {name for _, name in checked} >= {"trim_sec", "snr", "voxel_mm", "xmax"}

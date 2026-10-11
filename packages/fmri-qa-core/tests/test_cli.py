@@ -1,10 +1,9 @@
 """End-to-end smoke tests for the calculation command-line entry points.
 
-These exercise the layers unit tests skip: argument wiring, the batch loop and
-its error handling, the JSON document and saving artifacts to disk. A tiny
-synthetic phantom is written as a NIfTI + BIDS sidecar (see `conftest`) so
-`QAScan.from_nifti` runs its real file-I/O path. Rendering those artifacts into
-a report is `fmri-qa-report`'s job and is tested there.
+These exercise what unit tests skip: argument wiring, the batch loop and its
+error handling, the JSON document and saving artifacts to disk. A tiny phantom
+is written as a NIfTI + BIDS sidecar (see `conftest`) so `QAScan.from_nifti`
+runs its real file-I/O path. Rendering reports is `fmri-qa-report`'s job.
 """
 
 import json
@@ -60,8 +59,8 @@ def test_main_files_one_scan_into_an_existing_artifact_directory(
     """`mkdir results` then `--artifact results` files the scan, not fails.
 
     Taking the base literally made the run finish the analysis and then fail
-    renaming the finished file onto the directory, which reports as a bare
-    permission error on Windows and names nothing the user did wrong.
+    renaming the result onto the directory, a bare permission error on Windows
+    that names nothing the user did wrong.
     """
     out = tmp_path / "results"
     out.mkdir()
@@ -102,9 +101,8 @@ def test_main_refuses_a_batch_whose_artifacts_would_collide(
     """Same-named scans from different directories must not overwrite silently.
 
     A batch names each artifact after the scan's stem, so `a/scan.nii.gz` and
-    `b/scan.nii.gz` land on one file: the second analysis replaces the first and
-    nothing downstream can tell that a scan went missing.
-    The run is refused up front instead, before any analysis is done.
+    `b/scan.nii.gz` land on one file, the second silently replacing the first.
+    The run is refused up front, before any analysis.
     """
     (tmp_path / "a").mkdir()
     (tmp_path / "b").mkdir()
@@ -125,8 +123,8 @@ def test_main_refuses_the_same_scan_named_twice_with_an_artifact_directory(
 ) -> None:
     """One scan named twice is two requests for one destination, and is refused.
 
-    It is the collision a batch of same-named scans makes, reached by a shorter
-    road, so it gets the same answer rather than being analyzed twice over.
+    It is the same collision as a batch of same-named scans, so it gets the same
+    refusal instead of being analyzed twice.
     """
     scan = write_scan(tmp_path)
     out = tmp_path / "artifacts"
@@ -144,10 +142,10 @@ def test_main_refuses_an_artifact_that_would_overwrite_the_scan(
 ) -> None:
     """`--artifact` naming the input must fail before anything is read or written.
 
-    The scan is loaded first and the archive is moved over its destination last,
-    so without the guard the run succeeds and leaves an artifact where the NIfTI
-    was. The relative spelling is the one a shell produces, and it must not
-    slip past a comparison of the literal strings.
+    The scan is loaded first and the archive moved over its destination last, so
+    without the guard the run succeeds and leaves an artifact where the NIfTI
+    was. The relative spelling a shell produces must not slip past a comparison
+    of the literal strings.
     """
     scan = Path(write_scan(tmp_path))
     before = scan.read_bytes()
@@ -180,9 +178,9 @@ def test_main_refuses_a_batch_destination_that_is_another_input(
 ) -> None:
     """Every destination is checked against every input, not only its own scan.
 
-    A batch names `a.nii.gz`'s artifact `BASE/a.qa.nc`; if that file is itself
-    one of the inputs, analyzing `a.nii.gz` would replace it. The whole run is
-    refused, so the other input is never analyzed either.
+    A batch names `a.nii.gz`'s artifact `BASE/a.qa.nc`. If that file is itself an
+    input, analyzing `a.nii.gz` would replace it, so the whole run is refused
+    and the other input is never analyzed either.
     """
     scan = write_scan(tmp_path, name="a")
     other = tmp_path / "a.qa.nc"  # named like the batch's output for `a`
@@ -235,8 +233,8 @@ def test_main_reports_a_refused_artifact_without_a_traceback(
     """An artifact the reader would refuse is a per-scan error, and the run says so.
 
     Nothing the CLI computes should trip this, so the analysis is stubbed to
-    hand back an artifact with a text echo time; what is under test is that the
-    refusal is reported like any other write failure and the batch goes on.
+    return an artifact with a text echo time. The refusal must be reported like
+    any other write failure, and the batch goes on.
     """
     real = q.analyze
 
@@ -275,10 +273,10 @@ def test_json_record_says_what_series_the_numbers_describe(
 ) -> None:
     """A stored row must be identifiable and its frame indices mappable.
 
-    `outlier_worst_frame` counts from the analyzed series, so on its own it
-    names a volume nobody can find in the acquisition again; `n_trimmed` is what
-    turns it back into an acquired volume number. The source path and TR/frame
-    count let a trend database key and interpret the row without the artifact.
+    `outlier_worst_frame` counts from the analyzed series, so alone it names a
+    volume nobody can find in the acquisition. `n_trimmed` turns it back into an
+    acquired volume number. The source path and TR/frame count let a trend
+    database key and interpret the row without the artifact.
     """
     rc = cli.main([write_scan(tmp_path), "--roi-size", "9", "--json"])
     assert rc == 0
@@ -298,8 +296,8 @@ def test_json_record_carries_the_localization_verdicts(
 ) -> None:
     """A consumer must be able to tell measurements from measurements of air.
 
-    The report says so on the page; a trend database reading `--json` had no way
-    to know, and would file a scan whose phantom mask collapsed alongside good
+    The report says so on the page, but a trend database reading `--json` could
+    not tell, and would file a scan with a collapsed phantom mask alongside good
     ones. The measured fraction rides along with the verdicts so a consumer can
     set its own bar.
     """
@@ -314,9 +312,9 @@ def test_json_record_carries_the_localization_verdicts(
 def test_table_flags_a_localization_failure(tmp_path, write_scan, capsys) -> None:
     """The `loc` column names what failed, ahead of the numbers it invalidates.
 
-    An oversized ROI still produces a full row of plausible-looking metrics --
-    measured, at the corners, on background. The warning that says so is
-    transient; the row must carry it.
+    An oversized ROI still yields a full row of plausible metrics, measured at the
+    corners on background. The warning that says so is transient, so the row
+    must carry it.
     """
     rc = cli.main([write_scan(tmp_path), "--roi-size", "31"])
     captured = capsys.readouterr()
@@ -335,8 +333,8 @@ def test_batch_warnings_name_the_scan_that_raised_them(
     """A batch's warnings are useless unless they say which scan they are about.
 
     Python's default formatter prints the `warnings.warn` call site inside this
-    package and the category, so two scans warning about the same thing produce
-    two identical lines naming a source file the operator does not have. Each is
+    package and the category, so two scans warning about the same thing give two
+    identical lines naming a source file the operator does not have. Each is
     reprinted on stderr against the scan's name instead.
     """
     first = write_scan(tmp_path, name="first")
@@ -409,10 +407,9 @@ def test_json_document_is_strict_json(tmp_path, write_scan, capsys) -> None:
 def test_json_record_maps_undefined_metrics_to_null(artifact) -> None:
     """A NaN measurement becomes `null`, not Python's non-standard `NaN` token.
 
-    Driven by injecting the NaN rather than by finding a phantom that produces
-    one: an undefined metric is an estimator outcome the record has to survive,
-    and pinning it to whichever metric happens to be NaN on the fixture would
-    make this test a hostage to the fixture's geometry.
+    The NaN is injected, since an undefined metric is an estimator outcome the
+    record has to survive, and relying on whichever metric happens to be NaN on
+    the fixture would tie the test to its geometry.
     """
     undefined = replace(
         artifact.measurements, ghost_pct=float("nan"), sfnr=float("inf")
@@ -426,10 +423,9 @@ def test_json_record_maps_undefined_metrics_to_null(artifact) -> None:
 def test_json_record_leaves_an_unnamed_direction_null(artifact) -> None:
     """No phase-encode axis means no PE or RO number -- not the combined one.
 
-    `fwhm` is the geometric mean of both axes; publishing it as `fw_pe` would
-    file a different quantity under that name, and a trend database would never
-    see the substitution. The combined value rides along under its own key, so
-    nothing is lost by refusing to rename it.
+    `fwhm` is the geometric mean of both axes. Publishing it as `fw_pe` would file
+    a different quantity under that name, unnoticed by a trend database. The
+    combined value rides along under its own key.
     """
     unnamed = replace(
         artifact.measurements,
@@ -449,9 +445,9 @@ def test_json_record_carries_the_displacement_unit(artifact) -> None:
     """`motn`/`com` carry their unit the same way `fwhm`/`fwhm_unit` do.
 
     `motn` is left loose against NaN-as-null (see
-    `test_json_record_maps_undefined_metrics_to_null`): on this fixture the
-    motion fit does not converge for every frame, so `max_translation` is
-    itself NaN and the record maps it to `null` rather than the raw float.
+    `test_json_record_maps_undefined_metrics_to_null`): the motion fit does not
+    converge for every frame on this fixture, so `max_translation` is NaN and the
+    record maps it to `null`.
     """
     m = artifact.measurements
     record = metric_record(artifact)
@@ -478,8 +474,8 @@ def test_table_marks_an_unnamed_direction_unknown(artifact) -> None:
 def test_the_table_header_is_the_one_operators_read() -> None:
     """The header is printed output, so its every character is an interface.
 
-    Pinned as a literal: a column renamed, resized or reordered has to be
-    changed here too, on purpose, rather than drifting in unnoticed.
+    Pinned as a literal, so a column renamed, resized or reordered must be changed
+    here on purpose, not drift in unnoticed.
     """
     header, rule = table.header_lines()
     assert header == (
@@ -494,7 +490,7 @@ def test_the_table_header_is_the_one_operators_read() -> None:
 def test_a_table_row_lines_up_under_the_header(artifact) -> None:
     """The column widths are spelled in the header and again in the row.
 
-    Nothing else holds the two together: a column added or resized in one and
+    Nothing else holds the two together, so a column added or resized in one but
     not the other would misalign the table without failing anything.
     """
     header, _ = table.header_lines()
@@ -524,10 +520,10 @@ def test_json_lists_failed_scans_in_an_error_inventory(
 ) -> None:
     """A document must account for every input it was asked about.
 
-    `scans` holds only the analyses that ran; a consumer holding nothing but
-    the JSON could not otherwise tell a scan that failed from one that was
-    never requested. So the document also carries what was requested and,
-    per failure, which input and why -- and the terminal gets a one-line tally.
+    `scans` holds only the analyses that ran, so a consumer with only the JSON
+    could not tell a failed scan from one never requested. The document also
+    carries what was requested and, per failure, which input and why, and the
+    terminal gets a one-line tally.
     """
     missing = str(tmp_path / "missing.nii.gz")
     good = write_scan(tmp_path, name="good")
@@ -557,8 +553,8 @@ def test_main_rejects_invalid_numeric_options(args: list[str], capsys) -> None:
 def test_a_bare_command_line_asks_for_the_records_defaults() -> None:
     """`fmri-qa scan` and `q.analyze(scan)` are the same run.
 
-    The parser reads its defaults off `AnalysisSettings`; a literal spelled
-    beside a flag instead would let the two drift apart unnoticed.
+    The parser reads its defaults off `AnalysisSettings`, so a literal beside a
+    flag cannot drift from them.
     """
     args = qa._parser().parse_args(["scan.nii.gz"])
     asked = (args.trim_sec, args.detrend, args.center, args.roi_size, args.pe_axis)
@@ -620,9 +616,9 @@ def test_version_flag_prints_and_exits(entry, prog, capsys) -> None:
 def test_help_renders(entry, capsys) -> None:
     """`-h` on every command.
 
-    argparse %-formats each help string only when it renders one, so a stray
-    format code in a default sits there until someone asks for help; the rest
-    of the suite never asks.
+    argparse %-formats each help string only when rendering it, so a stray format
+    code in a default sits unnoticed until someone asks for help, which the rest
+    of the suite never does.
     """
     with pytest.raises(SystemExit) as info:
         entry(["-h"])
@@ -650,8 +646,8 @@ def test_a_wildcard_matching_one_scan_is_not_a_batch(
 ) -> None:
     """The pattern the user actually typed: one scan, so `--artifact` is a file.
 
-    Expansion happens before the scan count is taken, so a pattern matching a
-    single file behaves exactly as naming that file does.
+    Expansion happens before the scan count is taken, so a pattern matching one
+    file behaves as naming that file does.
     """
     write_scan(tmp_path, name="only")
     out = tmp_path / "one.nc"

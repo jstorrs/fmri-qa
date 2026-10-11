@@ -40,9 +40,8 @@ def test_spline_residuals_removes_constant() -> None:
 def test_detrender_carries_its_method_and_order_and_applies_them() -> None:
     """The operator and the two facts describing it are one value.
 
-    A `Detrender` that reports "poly, degree n" is the one that fits a degree-n
-    Legendre polynomial: `__call__` re-reads the same fields, so the record a
-    run publishes cannot describe a different fit from the one it ran.
+    A `Detrender` that reports "poly, degree n" fits a degree-n Legendre
+    polynomial, so the published record cannot describe a different fit.
     """
     cs = np.random.default_rng(0).normal(size=(4, 4, 80))
     detrender = Detrender.for_series(cs, tr=2.0, method="poly")
@@ -56,10 +55,9 @@ def test_detrend_fn_refuses_an_order_the_frames_cannot_determine() -> None:
     """A TR in the wrong unit inflates the fit until it absorbs the whole signal.
 
     The order follows from the run duration, so a header reporting 2000 for a
-    2 s TR asks for a degree-400 fit of 40 frames. `lstsq` obliges without
-    complaint and returns a residual of nothing, which every stability metric
-    downstream would read as a perfectly stable scanner -- so the fit is refused
-    and the message names the TR as the thing to check.
+    2 s TR asks for a degree-400 fit of 40 frames. `lstsq` accepts that and
+    returns a near-zero residual, which downstream metrics would read as a
+    perfectly stable scanner. The fit is refused and the message names the TR.
     """
     series = np.zeros((2, 2, 40))
     for method in ("poly", "spline"):

@@ -125,10 +125,9 @@ def test_deviation_and_displacement_are_zero_for_a_static_centroid() -> None:
 
 
 def test_max_displacement_is_mm_when_the_voxel_size_is_known() -> None:
-    # Symmetric about the axis-0 wrap period's midpoint (8 of 16), so the
-    # circular reference lands exactly on 8.0 and each frame's deviation is
-    # exactly the offset it was placed at -- a clean 1-voxel peak deviation,
-    # 2 mm at 2 mm/voxel.
+    # Symmetric about the axis-0 wrap period's midpoint (8 of 16), so the circular
+    # reference lands on 8.0 and each frame's deviation equals its offset: a
+    # 1-voxel peak deviation, 2 mm at 2 mm/voxel.
     com = np.array([[7.0, 8.0], [9.0, 8.0]])
     res = CenterOfMassResult(com=com, shape=(16, 16), voxel=VoxelSize((2.0, 2.0)))
     assert np.isclose(res.max_displacement, 2.0)

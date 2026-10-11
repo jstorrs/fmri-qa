@@ -70,11 +70,11 @@ def test_estimate_smoothness_recovers_the_smoothed_direction() -> None:
 def test_smoothness_of_a_constant_series_declines_quietly() -> None:
     """No temporal variation leaves no working mask, and nothing to correlate.
 
-    `estimate_smoothness` drops voxels that are constant over time, so a
-    constant series leaves the working mask empty and the autocorrelation has
-    neither an in-mask mean nor a variance to normalize by. The estimator must
-    answer NaN rather than reduce an empty selection and let numpy's warning out
-    of a library that is only being asked a question it can decline.
+    `estimate_smoothness` drops voxels that are constant over time, so a constant
+    series leaves the working mask empty, with no in-mask mean or variance to
+    normalize by. The estimator must answer NaN, not reduce an empty selection
+    and let numpy's warning escape from a library only asked a question it can
+    decline.
     """
     with warnings.catch_warnings():
         warnings.simplefilter("error", RuntimeWarning)

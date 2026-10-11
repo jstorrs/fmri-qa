@@ -1,8 +1,8 @@
 """The real converter, on real DICOM.
 
-The one place the stub dcm2niix cannot answer: whether the pinned flags actually
-produce a series the saturation check can read, and whether the names come from
-each series' own times. Needs the bundled binary and the committed fixture study.
+The stub dcm2niix cannot show that the pinned flags produce a series the
+saturation check can read, or that names come from each series' own times.
+Needs the bundled binary and the committed fixture study.
 """
 
 from pathlib import Path
@@ -19,17 +19,15 @@ FIXTURE_STUDY = Path(__file__).parent / "fixtures" / "dicom"
 def test_a_real_study_converts_to_the_integer_nifti_the_metrics_need(
     tmp_path,
 ) -> None:
-    """The end the stub cannot reach: does the pinned `-l o` actually hold?
+    """The pinned `-l o` keeps the scanner's integers.
 
-    `detect_saturation` can only find an ADC rail in a series that still carries
-    the scanner's integers, and `QAScan.stored_integer` decides that from the
-    NIfTI datatype. If a future dcm2niix, or a stray `~/.dcm2nii.ini`, made the
-    conversion write floats or rescale, every imported series would silently
-    become one the saturation check declines to answer -- so the datatype is
-    asserted here rather than assumed.
+    `detect_saturation` needs the scanner's integers, and `QAScan.stored_integer`
+    reads that from the NIfTI datatype. A future dcm2niix or a stray
+    `~/.dcm2nii.ini` could write floats or rescale, silently disabling the
+    saturation check for every import.
 
     See `fixtures/dicom/generate.py` for the synthetic study: two series
-    numbered 2 and 11, one of them with a description that needs sanitizing.
+    numbered 2 and 11, one with a description that needs sanitizing.
     """
     nibabel = pytest.importorskip("nibabel")
     out = tmp_path / "nifti"
@@ -53,9 +51,8 @@ def test_the_real_study_is_named_by_its_own_series_times_not_the_study_s(
     """dcm2niix's `%t` is the study's time, identical for both series.
 
     The fixture gives the two series distinct `SeriesTime`s under one
-    `StudyTime`, so a name templated on `%t` cannot tell them apart in time and
-    a name built from the sidecar can. That difference is the reason
-    `convert.naming` exists, so it is checked against the real converter.
+    `StudyTime`. A name templated on `%t` cannot tell them apart, but one built
+    from the sidecar can. That is why `convert.naming` exists.
     """
     templated = import_dicom(
         FIXTURE_STUDY, tmp_path / "raw", binary=find_dcm2niix(), names="dcm2niix"
@@ -73,5 +70,5 @@ def _stems(result: q.ImportResult) -> list[str]:
 
 
 def test_the_committed_fixture_study_is_still_there() -> None:
-    """Guard the guard: a vanished fixture must not read as a passing import."""
+    """A missing fixture must fail, not read as a passing import."""
     assert len(list(FIXTURE_STUDY.rglob("*.dcm"))) == 8

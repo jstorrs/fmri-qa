@@ -1,9 +1,9 @@
 """Outlier fractions and MAD-normalized spike scores.
 
 The `_spike_ratio` kernel is pinned against hand-computed peak/robust-spread
-values; `outlier_fraction` is checked on a clean run, a single injected spike,
-and the constant-voxel exclusion rule; `spike_scores` is checked for correct
-wiring onto the ROI-mean residual and its DC-dropped spectrum.
+values. `outlier_fraction` is checked on a clean run, a single injected spike,
+and the constant-voxel exclusion rule. `spike_scores` is checked for wiring onto
+the ROI-mean residual and its DC-dropped spectrum.
 """
 
 import numpy as np
