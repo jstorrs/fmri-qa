@@ -515,11 +515,9 @@ def test_load_migrating_a_schema_5_artifact_reports_displacement_in_voxels(
 
     assert loaded.measurements.displacement_unit == "vox"
     assert loaded.measurements.fwhm_unit == "mm"  # this fixture's voxel size is known
-    # The migration leaves the stored numbers untouched. They are NaN on this
-    # fixture, whose motion fit does not converge for every frame (see
-    # `_both_nan`: NaN != NaN, so a direct `==` would fail on a faithful copy).
-    assert _both_nan(
-        loaded.measurements.max_translation, artifact.measurements.max_translation
+    # The migration leaves the stored numbers untouched.
+    assert loaded.measurements.max_translation == (
+        artifact.measurements.max_translation
     )
     assert loaded.measurements.max_com_displacement == (
         artifact.measurements.max_com_displacement

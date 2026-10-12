@@ -6,6 +6,7 @@ a reader that never decodes the document can answer the cheap questions.
 """
 
 import json
+import math
 from dataclasses import replace
 
 # `netCDF4` is imported here, not in each test. The "without a warning" tests
@@ -120,7 +121,11 @@ def test_a_measurement_the_document_calls_null_has_no_attribute(
     the series has no rail, not because nothing looked. An attribute cannot be
     null, and NaN would say the estimator tried and failed.
     """
-    saved = q.save_artifact(artifact, tmp_path / "scan.qa.nc")
+    # A failed motion fit, the usual source of a NaN measurement.
+    failed = replace(artifact.measurements, max_translation=math.nan)
+    saved = q.save_artifact(
+        replace(artifact, measurements=failed), tmp_path / "scan.qa.nc"
+    )
     document, _ = read_netcdf(saved)
     published = _section_attributes(saved, "measurements")
 

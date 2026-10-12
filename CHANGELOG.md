@@ -8,6 +8,14 @@ versioning when the first stable public interface is released.
 
 ### Changed
 
+- **The motion registration covers the whole phantom edge.** The watershed
+  phantom mask ends at the steepest point of the phantom boundary, so the fit
+  saw only the inner half of the edge, about half the gradient it runs on. It
+  now runs over that mask dilated by two voxels (`MOTION_MASK_DILATION`),
+  limited to `valid_mask`. Every other metric still uses the undilated mask.
+  Motion traces and peak motion metrics are less noisy: on an FBIRN scan the
+  frame-to-frame jitter drops by about a third. A scan whose fit used to fail
+  on some frames may now converge.
 - **The documentation builds as one Sphinx project, `docs/`.** The landing page
   and the three packages' pages are one site with one navigation tree, built by
   one `sphinx-build` into `build/site`; the pages themselves are unchanged. The

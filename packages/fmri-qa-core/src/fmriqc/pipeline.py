@@ -12,6 +12,8 @@ without loading this module.
 
 from dataclasses import dataclass, replace
 
+from skimage.morphology import isotropic_dilation
+
 from .load.metadata import ScanMeta
 from .load.scan import QAScan
 from .metrics.artifacts import (
@@ -30,7 +32,7 @@ from .metrics.fbirn import (
     weisskoff,
 )
 from .metrics.ghost import GhostResult, estimate_ghost, estimate_pe_axis
-from .metrics.motion import MotionResult, estimate_motion
+from .metrics.motion import MOTION_MASK_DILATION, MotionResult, estimate_motion
 from .metrics.saturation import SaturationResult, detect_saturation
 from .metrics.smoothness import SmoothnessResult, estimate_smoothness
 from .prep.detrend import Detrender
@@ -252,9 +254,14 @@ def _estimate_phantom_motion(
     The model has no rotation (translation, scale and shear only) and is a
     diagnostic of gradient-heating deformation. The analyzed series is NOT
     resampled from this fit, so the FBIRN metrics stay measured on the acquired
-    data.
+    data. The fit runs over the phantom mask dilated by `MOTION_MASK_DILATION`,
+    so it sees the whole phantom edge, kept off nulled image edges by
+    `valid_mask`.
     """
-    return estimate_motion(images.center_slice, geom.phantom_mask, voxel=voxel)
+    mask = (
+        isotropic_dilation(geom.phantom_mask, MOTION_MASK_DILATION) & images.valid_mask
+    )
+    return estimate_motion(images.center_slice, mask, voxel=voxel)
 
 
 def _estimate_intensity_centroid(

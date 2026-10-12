@@ -17,6 +17,7 @@ from ..types import BoolArray, FloatArray
 from ..warn import warn
 
 __all__ = [
+    "MOTION_MASK_DILATION",
     "MOTION_MAX_ITER",
     "MOTION_TOL",
     "MotionResult",
@@ -30,6 +31,14 @@ MOTION_MAX_ITER = 12
 #: Convergence tolerance on the largest per-step parameter update (voxels for
 #: translation, fraction for strain).
 MOTION_TOL = 1e-4
+
+# The watershed phantom mask ends at the steepest point of the phantom edge, so
+# it holds only the inner half of the intensity falloff, about half of the
+# gradient the registration runs on. Two voxels of dilation take in the rest. On
+# an FBIRN scan the frame-to-frame jitter of the fit drops by about a third, and
+# more dilation changes nothing.
+#: Radius (voxels) the phantom mask is dilated by for the motion registration.
+MOTION_MASK_DILATION = 2
 
 
 @dataclass(frozen=True, eq=False, slots=True)
