@@ -18,8 +18,8 @@ import nibabel as nib
 import numpy as np
 import pytest
 
-import fmriqc as q
-from fmriqc.hilo.compatibility import require_compatible_scans
+import fmriqa as q
+from fmriqa.hilo.compatibility import require_compatible_scans
 
 
 def _write_scan(

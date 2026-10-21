@@ -10,15 +10,15 @@ import warnings
 
 import numpy as np
 
-from fmriqc.metrics.fbirn import (
+from fmriqa.metrics.fbirn import (
     drift_percent,
     percent_fluctuation,
     sfnr,
     snr,
     weisskoff,
 )
-from fmriqc.prep.geometry import ROI
-from fmriqc.prep.images import QAImages
+from fmriqa.prep.geometry import ROI
+from fmriqa.prep.images import QAImages
 
 
 def _images(center_slice: np.ndarray, fluctuations: np.ndarray) -> QAImages:

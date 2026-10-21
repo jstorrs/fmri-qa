@@ -8,7 +8,7 @@ or in a dtype the container would narrow.
 import numpy as np
 import pytest
 
-from fmriqc.analysis.serialize.decompose import decompose
+from fmriqa.analysis.serialize.decompose import decompose
 
 
 def test_the_layout_declares_every_array_the_artifact_publishes(

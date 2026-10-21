@@ -409,10 +409,10 @@ half of the codec. A `codec/write_u16.py` would not. Split along topic seams.
 
 Once a package grows past a handful of operation modules, group them into subpackages by
 **domain layer**: a stage in the data's life (load, prepare, compute, aggregate, present).
-This is the one-topic rule a level up. The shape `fmriqc` uses:
+This is the one-topic rule a level up. The shape `fmriqa` uses:
 
 ```
-fmriqc/
+fmriqa/
     types.py            # shared vocabulary: array dtypes + closed-set Literals
     exceptions.py       # the package exception hierarchy
     load/               # I/O boundary: file + sidecar -> value objects
@@ -458,9 +458,9 @@ passes between them.
 
 ```
 packages/
-    fmri-qa-core/       # fmriqc          -- metrics, pipeline, and the artifact
-    fmri-qa-report/     # fmriqc_report   -- plots and an HTML report, from an artifact
-    fmri-qa-launcher/   # fmriqc_launcher -- the application shell over the two above
+    fmri-qa-core/       # fmriqa          -- metrics, pipeline, and the artifact
+    fmri-qa-report/     # fmriqa_report   -- plots and an HTML report, from an artifact
+    fmri-qa-launcher/   # fmriqa_launcher -- the application shell over the two above
 ```
 
 Three rules make such a split hold:
@@ -490,7 +490,7 @@ The content (numbers, strings, and figures from an artifact) doesn't depend on t
 format. A per-format **driver** composes it into a document.
 
 ```
-fmriqc_report/
+fmriqa_report/
     summary.py          # format-agnostic text/tiles from an artifact
     panels/             # format-agnostic figures from an artifact
     formats/

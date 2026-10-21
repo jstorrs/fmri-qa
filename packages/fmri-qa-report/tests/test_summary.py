@@ -5,8 +5,8 @@ from dataclasses import replace
 
 import numpy as np
 
-import fmriqc as q
-from fmriqc_report import summary
+import fmriqa as q
+from fmriqa_report import summary
 
 
 def _clipped(artifact: q.QAArtifact, **changes) -> q.QAArtifact:

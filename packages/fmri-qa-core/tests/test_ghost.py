@@ -11,13 +11,13 @@ import warnings
 import numpy as np
 import pytest
 
-from fmriqc.metrics.ghost import (
+from fmriqa.metrics.ghost import (
     GhostResult,
     estimate_ghost,
     estimate_pe_axis,
     ghost_ratios,
 )
-from fmriqc.types import PeAxis, readout_axis
+from fmriqa.types import PeAxis, readout_axis
 
 ALL_VALID = np.ones((8, 8), dtype=bool)
 

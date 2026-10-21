@@ -11,11 +11,11 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-import fmriqc as q
-from fmriqc_report.content import METRIC_DOCS
-from fmriqc_report.formats.html import resources
-from fmriqc_report.formats.html.figures import FIGURE_ASSETS, RenderedFigure
-from fmriqc_report.formats.html.run import render_run_page, write_run_page
+import fmriqa as q
+from fmriqa_report.content import METRIC_DOCS
+from fmriqa_report.formats.html import resources
+from fmriqa_report.formats.html.figures import FIGURE_ASSETS, RenderedFigure
+from fmriqa_report.formats.html.run import render_run_page, write_run_page
 
 _ID = re.compile(r"^[A-Za-z][A-Za-z0-9_-]*\Z")
 
@@ -209,7 +209,7 @@ def test_run_page_marks_nonfinite_values_and_analysis_warnings(
     artifact, monkeypatch
 ) -> None:
     monkeypatch.setattr(
-        "fmriqc_report.formats.html.run.render_figures",
+        "fmriqa_report.formats.html.run.render_figures",
         lambda _artifact, **_kwargs: _tiny_rendered_figures(),
     )
     measurements = replace(
@@ -259,7 +259,7 @@ def test_run_page_handles_missing_metadata_without_inventing_acquisition_time(
     bare_artifact, monkeypatch
 ) -> None:
     monkeypatch.setattr(
-        "fmriqc_report.formats.html.run.render_figures",
+        "fmriqa_report.formats.html.run.render_figures",
         lambda _artifact, **_kwargs: _tiny_rendered_figures(),
     )
     page = render_run_page(bare_artifact)
@@ -277,7 +277,7 @@ def test_run_page_handles_missing_metadata_without_inventing_acquisition_time(
 
 def test_run_page_escapes_hostile_metadata_and_long_text(artifact, monkeypatch) -> None:
     monkeypatch.setattr(
-        "fmriqc_report.formats.html.run.render_figures",
+        "fmriqa_report.formats.html.run.render_figures",
         lambda _artifact, **_kwargs: _tiny_rendered_figures(),
     )
     hostile = '<script>alert("x")</script>'
@@ -300,7 +300,7 @@ def test_write_run_page_writes_exactly_one_file(
     tmp_path, artifact, monkeypatch
 ) -> None:
     monkeypatch.setattr(
-        "fmriqc_report.formats.html.run.render_figures",
+        "fmriqa_report.formats.html.run.render_figures",
         lambda _artifact, **_kwargs: _tiny_rendered_figures(),
     )
     destination = tmp_path / "out" / "report.html"
@@ -317,7 +317,7 @@ def test_write_run_page_output_respects_the_umask(
     tmp_path, artifact, monkeypatch
 ) -> None:
     monkeypatch.setattr(
-        "fmriqc_report.formats.html.run.render_figures",
+        "fmriqa_report.formats.html.run.render_figures",
         lambda _artifact, **_kwargs: _tiny_rendered_figures(),
     )
     destination = tmp_path / "out" / "report.html"
@@ -336,7 +336,7 @@ def test_write_run_page_leaves_no_file_when_a_figure_fails(
     def fail(*_args, **_kwargs):
         raise RuntimeError("figure failure")
 
-    monkeypatch.setattr("fmriqc_report.formats.html.run.render_figures", fail)
+    monkeypatch.setattr("fmriqa_report.formats.html.run.render_figures", fail)
     destination = tmp_path / "out" / "report.html"
 
     with pytest.raises(RuntimeError, match="figure failure"):
@@ -351,7 +351,7 @@ def test_write_run_page_leaves_an_existing_destination_unchanged_when_rendering_
     def fail(*_args, **_kwargs):
         raise RuntimeError("figure failure")
 
-    monkeypatch.setattr("fmriqc_report.formats.html.run.render_figures", fail)
+    monkeypatch.setattr("fmriqa_report.formats.html.run.render_figures", fail)
     destination = tmp_path / "out"
     destination.mkdir()
     target = destination / "report.html"
@@ -368,7 +368,7 @@ def test_write_run_page_is_atomic_when_the_write_step_itself_fails(
     tmp_path, artifact, monkeypatch
 ) -> None:
     monkeypatch.setattr(
-        "fmriqc_report.formats.html.run.render_figures",
+        "fmriqa_report.formats.html.run.render_figures",
         lambda _artifact, **_kwargs: _tiny_rendered_figures(),
     )
     destination = tmp_path / "out"
@@ -401,7 +401,7 @@ def test_run_page_refuses_a_stylesheet_that_could_break_out_of_its_style_block(
     artifact, monkeypatch
 ) -> None:
     monkeypatch.setattr(
-        "fmriqc_report.formats.html.run.render_figures",
+        "fmriqa_report.formats.html.run.render_figures",
         lambda _artifact, **_kwargs: _tiny_rendered_figures(),
     )
 
@@ -413,7 +413,7 @@ def test_run_page_refuses_a_stylesheet_that_could_break_out_of_its_style_block(
         return original_read_resource(name)
 
     monkeypatch.setattr(
-        "fmriqc_report.formats.html.resources.read_resource", hostile_resource
+        "fmriqa_report.formats.html.resources.read_resource", hostile_resource
     )
 
     with pytest.raises(ValueError, match="style"):

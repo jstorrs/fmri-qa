@@ -7,9 +7,9 @@ directory and its warnings.
 
 import pytest
 
-import fmriqc as q
-from fmriqc import cli
-from fmriqc.convert.session import import_dicom
+import fmriqa as q
+from fmriqa import cli
+from fmriqa.convert.session import import_dicom
 
 # A sidecar with every field the name is built from, as dcm2niix writes them.
 FULL_SIDECAR = {

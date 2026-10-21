@@ -1,13 +1,13 @@
 # From Python
 
 The command is a thin shell over `write_run_page`. Import it and `render_run_page`
-from `fmriqc_report`. Both take a loaded `QAArtifact`. Load one with
-`fmriqc.analysis.load_artifact`, which reads any file the command would (see
+from `fmriqa_report`. Both take a loaded `QAArtifact`. Load one with
+`fmriqa.analysis.load_artifact`, which reads any file the command would (see
 {doc}`/user-guide/artifact`).
 
 ```python
-from fmriqc.analysis import load_artifact
-from fmriqc_report import Theme, write_run_page
+from fmriqa.analysis import load_artifact
+from fmriqa_report import Theme, write_run_page
 
 artifact = load_artifact("qa.nc")
 write_run_page(
@@ -37,7 +37,7 @@ The keyword arguments are the same for both:
   footer. Without one, the installed `fmri-qa-report` version.
 - `theme`: how the figures are drawn (below).
 
-`load_artifact` raises `fmriqc.analysis.InvalidArtifactError` for a file it
+`load_artifact` raises `fmriqa.analysis.InvalidArtifactError` for a file it
 cannot read, and a caller catches that, as the command does.
 
 ## Themes
@@ -60,10 +60,10 @@ page's colors come from its stylesheet.
 
 ## Importing
 
-Importing `fmriqc_report`, `Theme` or `DEFAULT_THEME` does not import matplotlib.
+Importing `fmriqa_report`, `Theme` or `DEFAULT_THEME` does not import matplotlib.
 The renderer, and with it matplotlib, loads when `render_run_page` or
 `write_run_page` is first looked up on the package, including by
-`from fmriqc_report import write_run_page`. Figures are built as
+`from fmriqa_report import write_run_page`. Figures are built as
 `matplotlib.figure.Figure` objects and saved straight to SVG under a local
 `rc_context` for the theme. Rendering needs no `pyplot`, selects no backend, and
 leaves the process's matplotlib settings unchanged.

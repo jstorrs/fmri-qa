@@ -20,9 +20,9 @@ from PyInstaller.utils.hooks import (
 import dcm2niix
 
 FIRST_PARTY = {
-    "fmri-qa-core": "fmriqc",
-    "fmri-qa-report": "fmriqc_report",
-    "fmri-qa-launcher": "fmriqc_launcher",
+    "fmri-qa-core": "fmriqa",
+    "fmri-qa-report": "fmriqa_report",
+    "fmri-qa-launcher": "fmriqa_launcher",
 }
 
 # All three packages resolve names lazily through `import_module` (PEP 562
@@ -34,7 +34,7 @@ hiddenimports = [
 
 # The report reads its templates and stylesheet through `importlib.resources`
 # (`formats/html/resources.py`), so they must be files in the bundle.
-datas = collect_data_files("fmriqc_report")
+datas = collect_data_files("fmriqa_report")
 
 # `--version` and the artifact's provenance come from `importlib.metadata`,
 # which needs each distribution's dist-info. Without it `version()` raises

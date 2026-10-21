@@ -8,6 +8,13 @@ versioning when the first stable public interface is released.
 
 ### Changed
 
+- **The import packages are renamed to match the project: `fmriqc` is now
+  `fmriqa`, `fmriqc_report` is `fmriqa_report`, and `fmriqc_launcher` is
+  `fmriqa_launcher`.** `FmriqcError` is `FmriqaError`. The distribution and
+  command names are unchanged, and saved artifacts still load. The SVG element
+  ids in rendered reports change with the name, so a report re-rendered from an
+  old artifact differs from the original in those ids only.
+
 - **The motion registration covers the whole phantom edge.** The watershed
   phantom mask ends at the steepest point of the phantom boundary, so the fit
   saw only the inner half of the edge, about half the gradient it runs on. It
@@ -27,23 +34,23 @@ versioning when the first stable public interface is released.
   `report/` and `launcher/` subdirectories, so a bookmark into one must be
   updated, and the `make docs-core`, `docs-report` and `docs-launcher`
   targets are gone; `make docs` builds everything.
-- **`resolve_roi` is exported from `fmriqc`; prep/metrics/load modules declare
-  `__all__`; the helpers listed were made private.** `fmriqc.resolve_roi` is
+- **`resolve_roi` is exported from `fmriqa`; prep/metrics/load modules declare
+  `__all__`; the helpers listed were made private.** `fmriqa.resolve_roi` is
   the summary ROI the ROI metrics take, so calling them yourself no longer
-  reaches into `fmriqc.prep.geometry`. Every `fmriqc.prep`, `fmriqc.metrics`
-  and `fmriqc.load` module, and `fmriqc.types`, now lists its building blocks
-  and tuning constants in `__all__`, and `fmriqc.hilo.__all__` gains
+  reaches into `fmriqa.prep.geometry`. Every `fmriqa.prep`, `fmriqa.metrics`
+  and `fmriqa.load` module, and `fmriqa.types`, now lists its building blocks
+  and tuning constants in `__all__`, and `fmriqa.hilo.__all__` gains
   `hilo_stats`. Helpers used in only one module are private. Moved:
-  `fmriqc.prep.imaging.roi_indexes`, `image_center`, `clamp_center` and
-  `find_phantom_center` become `fmriqc.prep.geometry._roi_indexes`,
+  `fmriqa.prep.imaging.roi_indexes`, `image_center`, `clamp_center` and
+  `find_phantom_center` become `fmriqa.prep.geometry._roi_indexes`,
   `_image_center`, `_clamp_center` and `_find_phantom_center` (`ROI.index` is
-  the public form of `roi_indexes`), and `fmriqc.prep.imaging.geomean`
-  becomes `fmriqc.metrics.smoothness._geomean`. Renamed in place with a
-  leading underscore: `fmriqc.prep.imaging.phantom_area`,
-  `fmriqc.prep.detrend.poly_degree` and `spline_nodes`,
-  `fmriqc.metrics.ghost.ghost_ratio`, `fmriqc.validation.validate_scan`,
-  `fmriqc.convert.naming.sanitize` and
-  `fmriqc.analysis.serialize.netcdf.NetcdfContent`. Code importing any of
+  the public form of `roi_indexes`), and `fmriqa.prep.imaging.geomean`
+  becomes `fmriqa.metrics.smoothness._geomean`. Renamed in place with a
+  leading underscore: `fmriqa.prep.imaging.phantom_area`,
+  `fmriqa.prep.detrend.poly_degree` and `spline_nodes`,
+  `fmriqa.metrics.ghost.ghost_ratio`, `fmriqa.validation.validate_scan`,
+  `fmriqa.convert.naming.sanitize` and
+  `fmriqa.analysis.serialize.netcdf.NetcdfContent`. Code importing any of
   these by their old names must change; no computed value changes.
 - **Clicking a figure in the HTML report enlarges it, and clicking the enlarged
   figure closes it.** The separate Enlarge and Close links are gone, and
@@ -133,12 +140,12 @@ versioning when the first stable public interface is released.
   and the header triple is sliced exactly once, by the new
   `VoxelSize.in_plane(voxel_mm)` classmethod, and threaded through from there.
 - **Reading or rendering an artifact no longer loads the calculation stack.**
-  `fmriqc.analysis` re-exported `analyze` and `build_artifact` eagerly, so
+  `fmriqa.analysis` re-exported `analyze` and `build_artifact` eagerly, so
   importing anything from the artifact facade — `load_artifact`, or any of the
   value objects the `fmri-qa-report` package reads — executed the pipeline and
   behind it scikit-image, scipy, nibabel and the metrics. Those two names are
   now resolved on first access instead, and nothing else about the facade
-  changes: `import fmriqc_report.cli` in a fresh interpreter fell from 3.7 s to
+  changes: `import fmriqa_report.cli` in a fresh interpreter fell from 3.7 s to
   2.1 s, and a runtime probe beside the layering scan now holds the seam to
   what actually loads rather than to what the imports say.
 - **`spline_nodes`, `poly_degree` and `spline_residuals` drop the `cutoff_s` and
@@ -343,7 +350,7 @@ versioning when the first stable public interface is released.
   `tool.coverage.run.omit`, the one exemption from the coverage floor, since
   everything it decides that can be a pure function already lives in
   `worker.py`/`panel_state.py`/`request.parse_form` and is covered there.
-- Every frozen value object in `fmriqc` now declares `slots=True`, as the
+- Every frozen value object in `fmriqa` now declares `slots=True`, as the
   artifact-side ones already did — an attribute a typo invents is rejected
   rather than silently created. `QAImages` is the one exception and now says so
   at its decorator: its summary images are `cached_property`, which needs a real
@@ -364,7 +371,7 @@ versioning when the first stable public interface is released.
   detrender that actually ran. Applying a detrender dispatches on `method` as
   exhaustively as choosing one does, so a new `DetrendMethod` member is a type
   error at both ends. Detrended output is unchanged, bit for bit.
-  `Detrender` is exported from `fmriqc` in place of `detrend_fn`.
+  `Detrender` is exported from `fmriqa` in place of `detrend_fn`.
 
 - **Adding an option to a closed set is now a type error at every place that
   dispatches on it.** The three functions that switch on an option `Literal`
@@ -389,7 +396,7 @@ versioning when the first stable public interface is released.
   `suspected`, `clipped`, `clipped_kept` and the two trim-split counts --
   those stay on the result because zero is a true answer for them, where
   "which volume was worst" has none without a rail. `ClipRail` is exported
-  from `fmriqc`.
+  from `fmriqa`.
 
 - **The in-plane voxel size is a value object that carries its own unit.**
   `prep.scale.VoxelSize` holds the in-plane mm/voxel pair (or None when the
@@ -410,7 +417,7 @@ versioning when the first stable public interface is released.
 
 - **The phase-encode axis is a closed type, not a bare `int`.** `PeAxis`
   (`Literal[0, 1]`) and its derived `PE_AXES` tuple join the option `Literal`s
-  already in `fmriqc.types`, and everything from `preprocess` inward is
+  already in `fmriqa.types`, and everything from `preprocess` inward is
   annotated with it: the ghost family, the smoothness result, the pipeline's
   resolution, and the artifact's `settings.pe_axis_override` /
   `measurements.pe_axis`. The loader still reads a plain `int | None`, because
@@ -433,28 +440,28 @@ versioning when the first stable public interface is released.
   (or accepts) a `pe_axis=` argument.
 
 - **Two files that had grown into several topics are now subpackages**, by
-  the one-file-one-topic rule in `style/architecture.md`. `fmriqc.cli` splits
+  the one-file-one-topic rule in `style/architecture.md`. `fmriqa.cli` splits
   into a module per command (`qa`, `hilo`) plus the pieces they report through
   (`table`, `record`, `destinations`, `arguments`);
-  and `fmriqc.analysis.serialize` splits at its own section banners into
+  and `fmriqa.analysis.serialize` splits at its own section banners into
   `decompose` / `compose` / `migrate`. Every import path a caller uses is
-  unchanged — `fmriqc.cli:main`, `fmriqc.cli:hilo_main`,
-  `fmriqc.save_artifact`/`load_artifact` — and no rendered output changed.
-- `fmriqc.hilo` (307 lines) is now a subpackage by the same rule: `result`
+  unchanged — `fmriqa.cli:main`, `fmriqa.cli:hilo_main`,
+  `fmriqa.save_artifact`/`load_artifact` — and no rendered output changed.
+- `fmriqa.hilo` (307 lines) is now a subpackage by the same rule: `result`
   holds `HiLoResult` and the pure `separate_noise` algebra that fills it,
   `mask` holds `phantom_core_mask` and its `HILO_ERODE` tuning constant,
   `stats` holds the per-scan mean/SD reduction, and `compatibility` holds the
   geometry/acquisition checks; `__init__` keeps the `run_hilo` orchestration.
-  `fmriqc.hilo`, `run_hilo`, `HiLoResult`, `separate_noise`, `phantom_core_mask`,
-  and `HILO_ERODE` all still import from `fmriqc` exactly as before, and
-  `fmriqc.__all__` is unchanged. The two helpers `run_hilo` calls across the
+  `fmriqa.hilo`, `run_hilo`, `HiLoResult`, `separate_noise`, `phantom_core_mask`,
+  and `HILO_ERODE` all still import from `fmriqa` exactly as before, and
+  `fmriqa.__all__` is unchanged. The two helpers `run_hilo` calls across the
   new module boundary are now public (`hilo_stats`, `require_compatible_scans`)
   rather than underscore-prefixed, for the same reason as below.
 - The report's format-agnostic content API is spelled public, since the
   format drivers in `formats/` are documented to consume it: `panels.timeseries`
   exports `plot_*`, `panels.images` exports `panel_figs`, and `summary` exports
   `acquisition_line` / `device_line` / `provenance_line`.
-  `fmriqc_report.__all__` is unchanged, so the distribution's public surface
+  `fmriqa_report.__all__` is unchanged, so the distribution's public surface
   is the same. Likewise `prep.imaging.clamp_center` / `geomean`, which the
   geometry and smoothness modules already imported across module lines.
 - `run_qa` writes the settings it was called with onto `QAResult.settings`
@@ -462,7 +469,7 @@ versioning when the first stable public interface is released.
   those; its `settings` parameter is gone. It used to fill in defaults when
   none were passed, so a result computed with no trim, phantom centering, or
   a forced PE axis could be published as the default run. `AnalysisSettings`
-  lives in `fmriqc.pipeline` (still exported from `fmriqc`), and its
+  lives in `fmriqa.pipeline` (still exported from `fmriqa`), and its
   `roi_size` is now the side *requested*; the side analyzed is
   `images.roi.size`, as it always was.
 - The phase-encode axis is estimated from the Nyquist ghost in one place, the
@@ -470,9 +477,9 @@ versioning when the first stable public interface is released.
   parameter is gone) and only reports what the sidecar and header say, so the
   load layer no longer depends on the metrics layer.
 - `Measurements.fwhm_unit`, `Measurements.pe_label`, and `PsfCurves.unit` are
-  closed sets (`LengthUnit`, `PeLabel` in `fmriqc.types`), and `load_artifact`
+  closed sets (`LengthUnit`, `PeLabel` in `fmriqa.types`), and `load_artifact`
   refuses a stored value outside them. `FBIRN_ROI_SIZE` lives in
-  `fmriqc.types`, shared by the ROI resolver and the artifact's default.
+  `fmriqa.types`, shared by the ROI resolver and the artifact's default.
 - `QAImages` caches its derived summary images instead of recomputing each
   full-slice reduction on every access.
 - The `notebooks` extra is no longer published with `fmri-qa-core`; the
@@ -481,9 +488,9 @@ versioning when the first stable public interface is released.
   `make check` cannot disagree on formatting. The style guides describe the
   tooling this repository actually has.
 
-- **The project is now two distributions.** `fmri-qa-core` (import `fmriqc`)
+- **The project is now two distributions.** `fmri-qa-core` (import `fmriqa`)
   holds the calculation half and depends on nothing that draws; `fmri-qa-report`
-  (import `fmriqc_report`) holds the plots and the HTML report and consumes only a
+  (import `fmriqa_report`) holds the plots and the HTML report and consumes only a
   `QAArtifact`. Installing `fmri-qa-report` brings both. The single `fmri-qa`
   distribution is gone; see `notes/analysis_report_split.md`.
 - A report header now shows the phase-encode direction that was actually used.
@@ -515,7 +522,7 @@ versioning when the first stable public interface is released.
   HTML report — with the four appearing together only once every one of them
   is written. A series whose folder already exists is refused, never
   replaced; a failure in one series is reported and every other series is
-  still attempted. Analysis defaults are `fmriqc`'s own, so the numbers match
+  still attempted. Analysis defaults are `fmriqa`'s own, so the numbers match
   a `fmri-qa` run by hand — a test pins the equality. `--trim-sec`,
   `--detrend`, `--center`, `--roi-size`, `--anonymize`, and `--dcm2niix` cover
   the same ground `fmri-qa`/`fmri-qa-import` do; `--open` opens the report
@@ -550,10 +557,10 @@ versioning when the first stable public interface is released.
   destination. From Python, `render_run_page` returns the document and
   `write_run_page` writes it; `render_figures` and `RenderedFigure` are the
   in-memory figures every page builds on.
-- **`InvalidArtifactError` is now reachable from `fmriqc.analysis`.** It is the
+- **`InvalidArtifactError` is now reachable from `fmriqa.analysis`.** It is the
   one error `load_artifact` raises, and it was previously only reachable
-  through `fmriqc.exceptions` — off limits to `fmri-qa-report`, which may
-  import only `fmriqc.analysis` and `fmriqc.types`. A reader of an artifact can
+  through `fmriqa.exceptions` — off limits to `fmri-qa-report`, which may
+  import only `fmriqa.analysis` and `fmriqa.types`. A reader of an artifact can
   now catch it by name instead of a blanket `except Exception`.
 - **`fmri-qa-hilo --version` now works.** `fmri-qa` and `fmri-qa-import` each
   carried their own copy of the flag and `fmri-qa-hilo` had none, so asking it
@@ -573,7 +580,7 @@ versioning when the first stable public interface is released.
   any template; `--dcm2niix-arg` passes anything else through, warning if it
   would undo `-l o`. The converter is the optional `fmri-qa-core[dicom]` extra,
   which carries a bundled binary; a dcm2niix on `PATH` or named with
-  `--dcm2niix` works instead. New `fmriqc.convert` subpackage
+  `--dcm2niix` works instead. New `fmriqa.convert` subpackage
   (`import_dicom`, `ImportResult`, `ImportedSeries`, `ConversionError`). See the
   README's *Importing DICOM* section.
 
@@ -653,7 +660,7 @@ versioning when the first stable public interface is released.
   for the localization verdicts, which `fmri-qa` shows as `loc ?` and a report
   as a quiet note — never as a fabricated pass. Only an artifact from a *newer*
   build, whose layout this one cannot know, is still refused.
-- `python -m fmriqc_report`, matching `python -m fmriqc`.
+- `python -m fmriqa_report`, matching `python -m fmriqa`.
 
 ### Fixed
 
@@ -711,7 +718,7 @@ versioning when the first stable public interface is released.
   loading. The date is now converted the same way its neighbour already is;
   a sidecar value that comes through unquoted is still parsed, the same
   latitude `_optional_text` already gives a numeric serial number.
-- **Importing `fmriqc_report` no longer switches the matplotlib backend to
+- **Importing `fmriqa_report` no longer switches the matplotlib backend to
   `Agg`.** The package called `matplotlib.use("Agg")` at import time, silently
   overriding whatever backend the importing process — a notebook's inline
   backend, say — had already chosen. Rendering never needed it: panels build
@@ -722,7 +729,7 @@ versioning when the first stable public interface is released.
   took closed-set string options with no guard of its own — a bad `names`
   reached `assert_never` and came back as a bare `AssertionError`, and a bad
   `anonymize` reached `dcm2niix._BA` and came back as a bare `KeyError`,
-  either way escaping `except FmriqcError`. Both are now checked before
+  either way escaping `except FmriqaError`. Both are now checked before
   anything is staged or dcm2niix is even looked up. The CLI was never
   affected — `--names`/`--anonymize` already restrict both flags with
   `choices=`.

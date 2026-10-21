@@ -18,7 +18,7 @@ from dataclasses import asdict
 import numpy as np
 import pytest
 
-import fmriqc as q
+import fmriqa as q
 
 # Nothing writes one any more, and every artifact written before this one does
 # -- so the reader stays, and these build the two forms by hand rather than

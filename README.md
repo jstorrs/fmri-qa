@@ -13,9 +13,9 @@ a result from presenting it. The third is an application shell built on both.
 
 | Package | Import | Does | Needs |
 | --- | --- | --- | --- |
-| **`fmri-qa-core`** | `fmriqc` | the metrics, the pipeline, and the **analysis artifact** they are published as | numpy, scipy, nibabel, scikit-image, netCDF4 |
-| **`fmri-qa-report`** | `fmriqc_report` | plots and a self-contained offline HTML report, built from an artifact | matplotlib (+ core) |
-| **`fmri-qa-launcher`** | `fmriqc_launcher` | one-step DICOM-directory-in, report-directory-out pipeline: a command line and a desktop panel | core + report; stdlib `tkinter` for the panel |
+| **`fmri-qa-core`** | `fmriqa` | the metrics, the pipeline, and the **analysis artifact** they are published as | numpy, scipy, nibabel, scikit-image, netCDF4 |
+| **`fmri-qa-report`** | `fmriqa_report` | plots and a self-contained offline HTML report, built from an artifact | matplotlib (+ core) |
+| **`fmri-qa-launcher`** | `fmriqa_launcher` | one-step DICOM-directory-in, report-directory-out pipeline: a command line and a desktop panel | core + report; stdlib `tkinter` for the panel |
 
 Only a `QAArtifact` passes between the first two. It holds the run's settings,
 provenance, scalar measurements, stability curves, and the four FBIRN summary
@@ -396,7 +396,7 @@ data keeps its colors. The page is print-ready.
 ### Calculating
 
 ```python
-import fmriqc as q
+import fmriqa as q
 
 scan = q.QAScan.from_nifti("scan.nii.gz")
 artifact = q.analyze(scan, name="scan.nii.gz")
@@ -431,8 +431,8 @@ consumer never recomputes a metric.
 ### Reporting
 
 ```python
-import fmriqc as q
-import fmriqc_report as report
+import fmriqa as q
+import fmriqa_report as report
 
 artifact = q.load_artifact("qa.nc")
 
@@ -441,7 +441,7 @@ report.write_run_page(
 )
 ```
 
-Inside `fmriqc_report`, content is separate from format. `summary` (metadata
+Inside `fmriqa_report`, content is separate from format. `summary` (metadata
 text), `content` (the per-metric catalog), and `panels` (the figures) know nothing
 about HTML. `theme` supplies the `Theme` that drives the matplotlib panels, and
 `formats.html` composes everything into the self-contained page.

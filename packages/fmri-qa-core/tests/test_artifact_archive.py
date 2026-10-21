@@ -9,7 +9,7 @@ with the fields that schema lacked marked unknown, not invented.
 
 Stored bytes are read through `netCDF4` and `xarray`, not the package's own
 reader, since this container exists so that a reader that knows nothing about
-fmriqc can open it. `netCDF4` is the Unidata C library behind `ncdump`, MATLAB
+fmriqa can open it. `netCDF4` is the Unidata C library behind `ncdump`, MATLAB
 and R, so a file it opens cleanly opens in those too. It is a dependency, so
 tests must not skip without it. xarray is a dev dependency for the same claim
 one level up. "Opens cleanly" means no warning at all, since a netCDF library
@@ -32,9 +32,9 @@ import netCDF4
 import numpy as np
 import pytest
 
-import fmriqc as q
-from fmriqc.analysis import ARTIFACT_SCHEMA_VERSION
-from fmriqc.analysis.serialize.compose import _floats
+import fmriqa as q
+from fmriqa.analysis import ARTIFACT_SCHEMA_VERSION
+from fmriqa.analysis.serialize.compose import _floats
 
 
 def test_save_load_round_trips_every_section(tmp_path, artifact) -> None:
@@ -64,12 +64,12 @@ def test_save_load_round_trips_every_section(tmp_path, artifact) -> None:
 
 
 def test_analysis_reexports_the_one_error_load_artifact_raises() -> None:
-    """`fmriqc.analysis.InvalidArtifactError` is the same object as `q`'s.
+    """`fmriqa.analysis.InvalidArtifactError` is the same object as `q`'s.
 
     A reader that may only cross the published-artifact seam (`fmri-qa-report`)
     still needs to catch the one error `load_artifact` raises by name.
     """
-    from fmriqc.analysis import InvalidArtifactError
+    from fmriqa.analysis import InvalidArtifactError
 
     assert InvalidArtifactError is q.InvalidArtifactError
 
@@ -166,14 +166,14 @@ def test_load_rejects_a_netcdf_file_that_is_not_an_artifact(tmp_path) -> None:
     """A well-formed netCDF carrying no document is a file, not an artifact."""
     path = tmp_path / "weather.nc"
     _write_netcdf(path, {"temperature": np.arange(3.0)}, attributes={})
-    with pytest.raises(q.InvalidArtifactError, match="not an fmriqc artifact"):
+    with pytest.raises(q.InvalidArtifactError, match="not an fmri-qa artifact"):
         q.load_artifact(path)
 
 
 def test_load_rejects_an_npz_that_is_not_an_artifact(tmp_path) -> None:
     plain = tmp_path / "plain.npz"
     np.savez_compressed(plain, values=np.arange(3))
-    with pytest.raises(q.InvalidArtifactError, match="not an fmriqc artifact"):
+    with pytest.raises(q.InvalidArtifactError, match="not an fmri-qa artifact"):
         q.load_artifact(plain)
 
 

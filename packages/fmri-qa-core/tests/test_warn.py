@@ -1,6 +1,6 @@
 """A warning names the caller's line, not a line inside the package.
 
-`fmriqc.warn.warn` skips every frame in the package, so the ROI warning must
+`fmriqa.warn.warn` skips every frame in the package, so the ROI warning must
 land on the test's own call through both `run_qa` and `analyze`.
 """
 
@@ -11,7 +11,7 @@ from pathlib import Path
 import nibabel as nib
 import numpy as np
 
-import fmriqc as q
+import fmriqa as q
 
 _ROI_TOO_BIG = 31  # does not fit the phantom of the 32-voxel conftest scan
 

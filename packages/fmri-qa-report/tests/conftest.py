@@ -8,7 +8,7 @@ is needed. `QAScan` is constructed directly, which also shows the seam holds.
 import numpy as np
 import pytest
 
-import fmriqc as q
+import fmriqa as q
 
 
 def _phantom(n: int = 32, z: int = 3, t: int = 40, seed: int = 0) -> q.QAScan:

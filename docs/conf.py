@@ -62,7 +62,7 @@ plot_working_directory = str(Path(__file__).parent)
 # A single-backtick name in a docstring (`roi`, `Theme`) links when it resolves
 # and does not warn when it cannot. Resolution runs in the defining module, so
 # a name imported from elsewhere links only when written fully qualified
-# (`~fmriqc.AnalysisSettings`). A name that does not import renders as
+# (`~fmriqa.AnalysisSettings`). A name that does not import renders as
 # emphasis. The house style uses single backticks for both cross-references and
 # parameter names, so the default role must tolerate the latter.
 default_role = "autolink"

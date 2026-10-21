@@ -6,8 +6,8 @@ import numpy as np
 import pytest
 from scipy import ndimage
 
-from fmriqc.hilo import separate_noise
-from fmriqc.hilo.mask import HILO_ERODE, phantom_core_mask
+from fmriqa.hilo import separate_noise
+from fmriqa.hilo.mask import HILO_ERODE, phantom_core_mask
 
 
 @pytest.mark.parametrize(("radius", "noisy"), [(8, False), (8, True), (12, True)])

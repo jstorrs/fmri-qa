@@ -96,7 +96,7 @@ window. The panel is one window, titled "fMRI QA":
 - `outcome.Published` / `Refused` / `Failed` / `RunResult`: one outcome per
   series, plus the run's result. They are plain frozen values using only the
   standard library, so code that presents a run can import them without
-  `fmriqc`'s analysis stack.
+  `fmriqa`'s analysis stack.
 - `session.run_session`: the pipeline. It imports a DICOM directory, then for each
   series analyzes it, saves its `.qa.nc` artifact, renders a self-contained HTML
   report, and publishes all four files together under a directory named for the
@@ -119,8 +119,8 @@ window. The panel is one window, titled "fMRI QA":
 - `cli.main`: the `fmri-qa-run` command line above.
 - `results.open_results`: what `--open` (and the panel's "Open the report when
   done" / "Open results") calls. It picks a single report or the output directory
-  and opens it. It imports only `outcome`, so it loads without `fmriqc`'s analysis
-  stack or `fmriqc_report`'s renderer.
+  and opens it. It imports only `outcome`, so it loads without `fmriqa`'s analysis
+  stack or `fmriqa_report`'s renderer.
 - `worker.BackgroundRun`: runs `session.run_session` on its own non-daemon thread
   and delivers `Progress` and `CleanupNotice` events, then one terminal
   `Finished`/`Crashed` event, through a queue a caller polls. Running on a background thread is what keeps

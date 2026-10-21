@@ -6,16 +6,16 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-import fmriqc as q
-from fmriqc.exceptions import (
-    FmriqcError,
+import fmriqa as q
+from fmriqa.exceptions import (
+    FmriqaError,
     IncompatibleScansError,
     InvalidChoiceError,
 )
-from fmriqc.hilo.compatibility import require_compatible_scans
-from fmriqc.prep.detrend import Detrender
-from fmriqc.prep.geometry import resolve_roi
-from fmriqc.prep.imaging import select_slice
+from fmriqa.hilo.compatibility import require_compatible_scans
+from fmriqa.prep.detrend import Detrender
+from fmriqa.prep.geometry import resolve_roi
+from fmriqa.prep.imaging import select_slice
 
 
 def test_detrender_rejects_unknown_method() -> None:
@@ -49,8 +49,8 @@ def test_import_dicom_rejects_unknown_anonymize_mode(tmp_path: Path) -> None:
     assert not destination.exists()
 
 
-def test_invalid_choice_is_fmriqc_error_and_value_error() -> None:
-    with pytest.raises(FmriqcError) as info:
+def test_invalid_choice_is_fmriqa_error_and_value_error() -> None:
+    with pytest.raises(FmriqaError) as info:
         Detrender.for_series(np.zeros((2, 2, 10)), 2.0, "bogus")  # type: ignore[arg-type]
     assert isinstance(info.value, ValueError)
 

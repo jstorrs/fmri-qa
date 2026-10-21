@@ -32,7 +32,7 @@ Keeping them apart pays on every axis:
 ## The seam: `QAArtifact`
 
 One value object crosses the boundary. It is produced by
-`fmriqc.analysis.analyze(scan, settings)` and it is the *only* thing the report
+`fmriqa.analysis.analyze(scan, settings)` and it is the *only* thing the report
 half accepts.
 
 | Section | What it holds |
@@ -70,17 +70,17 @@ convention are in
 
 | Distribution | Import | Role | Dependencies |
 |---|---|---|---|
-| `fmri-qa-core` | `fmriqc` | Calculation: load, prep, metrics, pipeline, the artifact and its file format, DICOM conversion. No drawing stack. | numpy, scipy, nibabel, scikit-image, netCDF4, dcm2niix |
-| `fmri-qa-report` | `fmriqc_report` | One artifact rendered as one self-contained HTML page. | fmri-qa-core, numpy, matplotlib, cycler |
-| `fmri-qa-launcher` | `fmriqc_launcher` | The one-step DICOM-to-report command (`fmri-qa-run`) and the desktop panel (`fmri-qa-panel`). | fmri-qa-core, fmri-qa-report; tkinter from the standard library |
+| `fmri-qa-core` | `fmriqa` | Calculation: load, prep, metrics, pipeline, the artifact and its file format, DICOM conversion. No drawing stack. | numpy, scipy, nibabel, scikit-image, netCDF4, dcm2niix |
+| `fmri-qa-report` | `fmriqa_report` | One artifact rendered as one self-contained HTML page. | fmri-qa-core, numpy, matplotlib, cycler |
+| `fmri-qa-launcher` | `fmriqa_launcher` | The one-step DICOM-to-report command (`fmri-qa-run`) and the desktop panel (`fmri-qa-panel`). | fmri-qa-core, fmri-qa-report; tkinter from the standard library |
 
 The dependency points one way: report depends on core, core knows nothing of
 report, and the launcher sits on top of both. Within that, the report half may
-import only `fmriqc.analysis` (the artifact), `fmriqc.types` (the shared
+import only `fmriqa.analysis` (the artifact), `fmriqa.types` (the shared
 array/option vocabulary), and two standard-library leaves it shares with core
-(`fmriqc.rename` for the atomic write, `fmriqc.path_arguments` for command-line
+(`fmriqa.rename` for the atomic write, `fmriqa.path_arguments` for command-line
 paths) -- never `load`, `prep`, `metrics`, or `pipeline`, and never the
-`fmriqc` package as a whole, which would pull all of them.
+`fmriqa` package as a whole, which would pull all of them.
 
 A rule like that erodes one convenient import at a time, so layering tests check
 it mechanically:

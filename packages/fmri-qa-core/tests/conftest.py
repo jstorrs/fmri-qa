@@ -16,8 +16,8 @@ import nibabel as nib
 import numpy as np
 import pytest
 
-import fmriqc as q
-from fmriqc.analysis.serialize import netcdf
+import fmriqa as q
+from fmriqa.analysis.serialize import netcdf
 
 WriteScan = Callable[..., str]
 MakeScan = Callable[..., "q.QAScan"]

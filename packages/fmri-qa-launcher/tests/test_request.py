@@ -4,10 +4,10 @@ from pathlib import Path
 
 import pytest
 
-from fmriqc.exceptions import InvalidScanError
-from fmriqc.settings import AnalysisSettings
-from fmriqc_launcher.exceptions import RequestError
-from fmriqc_launcher.request import (
+from fmriqa.exceptions import InvalidScanError
+from fmriqa.settings import AnalysisSettings
+from fmriqa_launcher.exceptions import RequestError
+from fmriqa_launcher.request import (
     DEFAULT_SETTINGS,
     FormValues,
     RunRequest,

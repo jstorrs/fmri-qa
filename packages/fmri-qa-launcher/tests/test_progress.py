@@ -1,6 +1,6 @@
 """`describe`: one line per stage, and the one thing import must never say."""
 
-from fmriqc_launcher.progress import Progress, Stage, describe
+from fmriqa_launcher.progress import Progress, Stage, describe
 
 
 def test_import_mentions_no_series_name_even_if_one_is_set() -> None:

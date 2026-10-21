@@ -1,6 +1,6 @@
 # Implementation status vs. `notes/`
 
-How the `fmriqc` pipeline (`packages/fmri-qa-core/src/fmriqc/`) lines up with
+How the `fmriqa` pipeline (`packages/fmri-qa-core/src/fmriqa/`) lines up with
 the methods described in the other `notes/` files. Read this alongside
 `fMRI_QA_Implementation_Guide.md` (the Glover 2005 / Friedman & Glover 2006
 GSQAP rubric the rest are measured against).
@@ -100,7 +100,7 @@ Ranked by value for phantom QA.
 2. **Background/air QA** (cran `max_bg_perc`) and **`@radial_correlate`**
    structured-artifact detection — future directions.
 3. **FFT spectrum normalization.** The report's `plot_spectrum`
-   (`fmriqc_report.panels.timeseries`) plots raw magnitude; `bxh` normalizes to
+   (`fmriqa_report.panels.timeseries`) plots raw magnitude; `bxh` normalizes to
    percent-of-mean (`·100/m`) for cross-scan comparability. Cosmetic.
 4. **Acceptance thresholds.** The report is descriptive: metric tiles show
    measured values only, with no pass/warn/fail colouring, and the report states

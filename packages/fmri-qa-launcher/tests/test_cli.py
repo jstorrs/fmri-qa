@@ -1,7 +1,7 @@
 """`fmri-qa-run`, exercised over a stub converter and a fast fake render.
 
 Only `test_the_published_run_matches_a_direct_analyze` runs a real analysis.
-The other end-to-end tests patch `fmriqc_launcher.session.write_run_page` with
+The other end-to-end tests patch `fmriqa_launcher.session.write_run_page` with
 the `fast_render` fixture, as `tests/test_session.py` does. Printed output per
 outcome is pinned by calling `_print_outcomes` on a hand-built `RunResult`.
 """
@@ -14,14 +14,14 @@ from pathlib import Path
 
 import pytest
 
-import fmriqc
-import fmriqc_launcher.session as session_module
-from fmriqc.convert.dcm2niix import find_dcm2niix
-from fmriqc.settings import AnalysisSettings
-from fmriqc_launcher import cli
-from fmriqc_launcher.exceptions import SessionError
-from fmriqc_launcher.outcome import Failed, Published, Refused, RunResult
-from fmriqc_launcher.results import open_results
+import fmriqa
+import fmriqa_launcher.session as session_module
+from fmriqa.convert.dcm2niix import find_dcm2niix
+from fmriqa.settings import AnalysisSettings
+from fmriqa_launcher import cli
+from fmriqa_launcher.exceptions import SessionError
+from fmriqa_launcher.outcome import Failed, Published, Refused, RunResult
+from fmriqa_launcher.results import open_results
 
 StubSeries = Callable[..., tuple[Path, list[str]]]
 
@@ -79,7 +79,7 @@ def test_a_flag_with_no_directories_is_a_usage_error(
 def test_no_flags_builds_the_default_analysis_settings(
     tmp_path: Path, fake_run_session: dict[str, object]
 ) -> None:
-    """Structural pin: no flags builds exactly `fmriqc.AnalysisSettings()`."""
+    """Structural pin: no flags builds exactly `fmriqa.AnalysisSettings()`."""
     dicom_dir = tmp_path / "dicom"
     dicom_dir.mkdir()
     output_dir = tmp_path / "output"
@@ -88,7 +88,7 @@ def test_no_flags_builds_the_default_analysis_settings(
 
     assert rc == 1  # no series at all is not a complete run
     request = fake_run_session["request"]
-    assert request.settings == fmriqc.AnalysisSettings()  # type: ignore[attr-defined]
+    assert request.settings == fmriqa.AnalysisSettings()  # type: ignore[attr-defined]
     assert request.anonymize == "pii"  # type: ignore[attr-defined]
     assert request.dcm2niix is None  # type: ignore[attr-defined]
     assert request.open_report is False  # type: ignore[attr-defined]
@@ -183,7 +183,7 @@ def test_the_published_run_matches_a_direct_analyze(
     dicom_dir: Path,
     stub_series: StubSeries,
 ) -> None:
-    """`fmri-qa-run` matches a direct `fmriqc.analyze`."""
+    """`fmri-qa-run` matches a direct `fmriqa.analyze`."""
     converter, (name,) = stub_series()
     output_dir = tmp_path / "output"
 
@@ -193,9 +193,9 @@ def test_the_published_run_matches_a_direct_analyze(
     published_nifti = output_dir / name / f"{name}.nii.gz"
     published_artifact = output_dir / name / f"{name}.qa.nc"
 
-    reloaded = fmriqc.load_artifact(published_artifact)
-    direct = fmriqc.analyze(
-        fmriqc.QAScan.from_nifti(published_nifti), fmriqc.AnalysisSettings()
+    reloaded = fmriqa.load_artifact(published_artifact)
+    direct = fmriqa.analyze(
+        fmriqa.QAScan.from_nifti(published_nifti), fmriqa.AnalysisSettings()
     )
 
     assert reloaded.settings == direct.settings
@@ -282,10 +282,10 @@ def test_open_flag_opens_the_report_and_exits_zero_for_a_complete_run(
     output_dir = tmp_path / "output"
     result = RunResult(output_dir, (_published(output_dir, "a"),))
     monkeypatch.setattr(
-        "fmriqc_launcher.session.run_session", lambda _request, progress, notice: result
+        "fmriqa_launcher.session.run_session", lambda _request, progress, notice: result
     )
     opened: list[RunResult] = []
-    monkeypatch.setattr("fmriqc_launcher.cli.open_results", opened.append)
+    monkeypatch.setattr("fmriqa_launcher.cli.open_results", opened.append)
 
     rc = cli.main([str(tmp_path), str(output_dir), "--open"])
 
@@ -299,10 +299,10 @@ def test_a_refused_series_exits_one_and_is_not_opened_without_the_flag(
     output_dir = tmp_path / "output"
     result = RunResult(output_dir, (Refused(name="a", existing=output_dir / "a"),))
     monkeypatch.setattr(
-        "fmriqc_launcher.session.run_session", lambda _request, progress, notice: result
+        "fmriqa_launcher.session.run_session", lambda _request, progress, notice: result
     )
     opened: list[RunResult] = []
-    monkeypatch.setattr("fmriqc_launcher.cli.open_results", opened.append)
+    monkeypatch.setattr("fmriqa_launcher.cli.open_results", opened.append)
 
     rc = cli.main([str(tmp_path), str(output_dir)])
 
@@ -489,7 +489,7 @@ def test_launch_panel_runs_the_panels_run_panel_when_importable(
         def run_panel() -> int:
             return 0
 
-    monkeypatch.setattr("fmriqc_launcher.cli.import_module", lambda _name: _FakePanel())
+    monkeypatch.setattr("fmriqa_launcher.cli.import_module", lambda _name: _FakePanel())
     assert cli._launch_panel() == 0
 
 
@@ -504,7 +504,7 @@ def test_zero_arguments_reports_the_missing_panel_by_a_failed_tkinter_import(
     def _raise(_name: str) -> None:
         raise ImportError("no such module", name=missing_name)
 
-    monkeypatch.setattr("fmriqc_launcher.cli.import_module", _raise)
+    monkeypatch.setattr("fmriqa_launcher.cli.import_module", _raise)
     rc = cli.main([])
     captured = capsys.readouterr()
     assert rc == 2
@@ -524,7 +524,7 @@ def test_an_import_error_unrelated_to_tkinter_is_a_real_bug_and_propagates(
     def _raise(_name: str) -> None:
         raise ImportError("no module named 'numpy'", name="numpy")
 
-    monkeypatch.setattr("fmriqc_launcher.cli.import_module", _raise)
+    monkeypatch.setattr("fmriqa_launcher.cli.import_module", _raise)
     with pytest.raises(ImportError, match="numpy"):
         cli._launch_panel()
 
@@ -537,7 +537,7 @@ def test_an_import_error_with_no_name_at_all_propagates(
     def _raise(_name: str) -> None:
         raise ImportError("something else broke")
 
-    monkeypatch.setattr("fmriqc_launcher.cli.import_module", _raise)
+    monkeypatch.setattr("fmriqa_launcher.cli.import_module", _raise)
     with pytest.raises(ImportError, match="something else broke"):
         cli._launch_panel()
 
@@ -546,7 +546,7 @@ def test_zero_arguments_with_no_display_reports_the_display_message(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """`run_panel` raising `PanelUnavailableError` (no display) is reported plainly."""
-    from fmriqc_launcher.exceptions import PanelUnavailableError
+    from fmriqa_launcher.exceptions import PanelUnavailableError
 
     class _FakePanel:
         @staticmethod
@@ -555,7 +555,7 @@ def test_zero_arguments_with_no_display_reports_the_display_message(
                 "no display name and no $DISPLAY environment variable"
             )
 
-    monkeypatch.setattr("fmriqc_launcher.cli.import_module", lambda _name: _FakePanel())
+    monkeypatch.setattr("fmriqa_launcher.cli.import_module", lambda _name: _FakePanel())
     rc = cli.main([])
     captured = capsys.readouterr()
     assert rc == 2
@@ -575,7 +575,7 @@ _LOADED = (
 
 _IMPORT_PROBE = f"""
 import sys
-import fmriqc_launcher.cli
+import fmriqa_launcher.cli
 forbidden = {_FORBIDDEN!r}
 {_LOADED}"""
 
@@ -583,10 +583,10 @@ _HELP_PROBE = f"""
 import contextlib
 import io
 import sys
-import fmriqc_launcher.cli
+import fmriqa_launcher.cli
 try:
     with contextlib.redirect_stdout(io.StringIO()):
-        fmriqc_launcher.cli.main(["-h"])
+        fmriqa_launcher.cli.main(["-h"])
 except SystemExit:
     pass
 forbidden = {_FORBIDDEN!r}
@@ -615,7 +615,7 @@ def test_running_help_does_not_load_the_heavy_stack() -> None:
 
 def test_module_entry_point_version_works() -> None:
     result = subprocess.run(
-        [sys.executable, "-m", "fmriqc_launcher", "--version"],
+        [sys.executable, "-m", "fmriqa_launcher", "--version"],
         capture_output=True,
         text=True,
         check=True,

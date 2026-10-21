@@ -15,8 +15,8 @@ from pathlib import Path
 
 import pytest
 
-from fmriqc import rename
-from fmriqc.rename import atomic_file, replace_patiently
+from fmriqa import rename
+from fmriqa.rename import atomic_file, replace_patiently
 
 DELAYS = (0.1, 0.2, 0.4)
 

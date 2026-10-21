@@ -15,9 +15,9 @@ from typing import Any, get_args, get_origin
 import numpy as np
 import pytest
 
-import fmriqc as q
-from fmriqc._records import UNIONS, resolved_annotations
-from fmriqc.analysis.build import _convex_hull
+import fmriqa as q
+from fmriqa._records import UNIONS, resolved_annotations
+from fmriqa.analysis.build import _convex_hull
 
 
 def test_analyze_records_the_requested_and_resolved_settings(artifact) -> None:

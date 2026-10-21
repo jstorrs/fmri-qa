@@ -3,8 +3,8 @@
 import numpy as np
 import pytest
 
-from fmriqc.exceptions import InvalidScanError
-from fmriqc.metrics.saturation import _saturation_bits, detect_saturation
+from fmriqa.exceptions import InvalidScanError
+from fmriqa.metrics.saturation import _saturation_bits, detect_saturation
 
 
 def test_saturation_bits_recognizes_hardware_rails() -> None:

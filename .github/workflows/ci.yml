@@ -53,7 +53,7 @@ jobs:
           uv pip install --python .venv-core-smoke/bin/python "${core[0]}"
           .venv-core-smoke/bin/fmri-qa --version
           .venv-core-smoke/bin/fmri-qa-hilo --help > /dev/null
-          .venv-core-smoke/bin/python -c "from importlib.resources import files; assert files('fmriqc').joinpath('py.typed').is_file()"
+          .venv-core-smoke/bin/python -c "from importlib.resources import files; assert files('fmriqa').joinpath('py.typed').is_file()"
           # The seam, checked against the installed artifact: no drawing stack.
           .venv-core-smoke/bin/python -c "import importlib.util as u; assert u.find_spec('matplotlib') is None"
           # The MIT text has to reach whoever installs the wheel. hatchling puts
@@ -68,13 +68,13 @@ jobs:
           uv venv --python 3.13 .venv-report-smoke
           uv pip install --python .venv-report-smoke/bin/python "${core[0]}" "${report[0]}"
           .venv-report-smoke/bin/fmri-qa-report --version
-          .venv-report-smoke/bin/python -c "from importlib.resources import files; assert files('fmriqc_report').joinpath('py.typed').is_file()"
-          .venv-report-smoke/bin/python -c "from importlib.resources import files; root = files('fmriqc_report.formats.html'); assert root.joinpath('templates/run.html').is_file() and root.joinpath('assets/report.css').is_file(), 'the report wheel ships no HTML resources'"
-          .venv-report-smoke/bin/python -c "import sys; import fmriqc_report; assert 'matplotlib' not in sys.modules, 'importing the report package loaded matplotlib'"
-          .venv-report-smoke/bin/python -c "import fmriqc_report.formats.html.run"
-          .venv-report-smoke/bin/python -c "import sys; import fmriqc_report.cli; assert not any(name == 'fmriqc.pipeline' or name.startswith('fmriqc.pipeline.') for name in sys.modules), 'the report CLI imported the pipeline'"
+          .venv-report-smoke/bin/python -c "from importlib.resources import files; assert files('fmriqa_report').joinpath('py.typed').is_file()"
+          .venv-report-smoke/bin/python -c "from importlib.resources import files; root = files('fmriqa_report.formats.html'); assert root.joinpath('templates/run.html').is_file() and root.joinpath('assets/report.css').is_file(), 'the report wheel ships no HTML resources'"
+          .venv-report-smoke/bin/python -c "import sys; import fmriqa_report; assert 'matplotlib' not in sys.modules, 'importing the report package loaded matplotlib'"
+          .venv-report-smoke/bin/python -c "import fmriqa_report.formats.html.run"
+          .venv-report-smoke/bin/python -c "import sys; import fmriqa_report.cli; assert not any(name == 'fmriqa.pipeline' or name.startswith('fmriqa.pipeline.') for name in sys.modules), 'the report CLI imported the pipeline'"
           .venv-report-smoke/bin/python -c "from importlib.metadata import distribution; text = distribution('fmri-qa-report').read_text('licenses/LICENSE'); assert text and 'MIT License' in text, 'the report wheel ships no license text'"
-          .venv-report-smoke/bin/python -c "import tarfile; archive = next(__import__('pathlib').Path('dist').glob('fmri_qa_report-*.tar.gz')); names = tarfile.open(archive).getnames(); assert any(name.endswith('src/fmriqc_report/formats/html/templates/run.html') for name in names) and any(name.endswith('src/fmriqc_report/formats/html/assets/report.css') for name in names), 'the report sdist ships no HTML resources'"
+          .venv-report-smoke/bin/python -c "import tarfile; archive = next(__import__('pathlib').Path('dist').glob('fmri_qa_report-*.tar.gz')); names = tarfile.open(archive).getnames(); assert any(name.endswith('src/fmriqa_report/formats/html/templates/run.html') for name in names) and any(name.endswith('src/fmriqa_report/formats/html/assets/report.css') for name in names), 'the report sdist ships no HTML resources'"
 
       - name: Smoke-test the launcher wheel against the core and report wheels
         run: |
@@ -86,5 +86,5 @@ jobs:
           uv pip install --python .venv-launcher-smoke/bin/python "${core[0]}" "${report[0]}" "${launcher[0]}"
           .venv-launcher-smoke/bin/fmri-qa-run --version
           .venv-launcher-smoke/bin/fmri-qa-run -h > /dev/null
-          .venv-launcher-smoke/bin/python -c "from importlib.resources import files; assert files('fmriqc_launcher').joinpath('py.typed').is_file()"
+          .venv-launcher-smoke/bin/python -c "from importlib.resources import files; assert files('fmriqa_launcher').joinpath('py.typed').is_file()"
           .venv-launcher-smoke/bin/python -c "from importlib.metadata import distribution; text = distribution('fmri-qa-launcher').read_text('licenses/LICENSE'); assert text and 'MIT License' in text, 'the launcher wheel ships no license text'"

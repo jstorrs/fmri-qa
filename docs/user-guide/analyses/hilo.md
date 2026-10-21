@@ -114,11 +114,11 @@ home in that layout. It also stays out of the per-scan batch table, where a
 pair-level number would repeat on both rows or attach to neither.
 
 A consumer that wants these numbers in a database should parse the command's
-stdout, or call `fmriqc.run_hilo` and read the `HiLoResult` directly.
+stdout, or call `fmriqa.run_hilo` and read the `HiLoResult` directly.
 
 ## References
 
-- Greve DN. The high/low flip-angle separation, as implemented in bxh's
-  `fmriqa` tooling. See `notes/bxh-fmriqa-hilo.md` in this repository for the
+- Greve DN. The high/low flip-angle separation, as implemented in the
+  bxh `fmriqa` tools. See `notes/bxh-fmriqa-hilo.md` in this repository for the
   derivation this follows step by step.
 - AFNI `3dAutomask -q -erode 5`. The core mask the statistics are pooled over.

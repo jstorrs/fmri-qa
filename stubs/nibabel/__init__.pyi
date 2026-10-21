@@ -1,4 +1,4 @@
-"""Local partial stub for nibabel — only the surface `fmriqc.load.scan` uses.
+"""Local partial stub for nibabel — only the surface `fmriqa.load.scan` uses.
 
 nibabel ships type information, but `load` is annotated to return the
 `FileBasedImage` base class, which lacks the NIfTI accessors (`get_fdata`,

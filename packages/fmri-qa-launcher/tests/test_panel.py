@@ -17,13 +17,13 @@ from pathlib import Path
 
 import pytest
 
-from fmriqc_launcher import panel as panel_module
-from fmriqc_launcher.outcome import Published, Refused, RunResult
-from fmriqc_launcher.panel import Panel
-from fmriqc_launcher.progress import CleanupNotice, Progress, Stage
-from fmriqc_launcher.request import FormValues, RunRequest
-from fmriqc_launcher.results import Opener
-from fmriqc_launcher.worker import Crashed, Event, Finished
+from fmriqa_launcher import panel as panel_module
+from fmriqa_launcher.outcome import Published, Refused, RunResult
+from fmriqa_launcher.panel import Panel
+from fmriqa_launcher.progress import CleanupNotice, Progress, Stage
+from fmriqa_launcher.request import FormValues, RunRequest
+from fmriqa_launcher.results import Opener
+from fmriqa_launcher.worker import Crashed, Event, Finished
 
 
 def _recording_opener(sink: list[str]) -> Opener:

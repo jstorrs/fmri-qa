@@ -4,9 +4,9 @@ from importlib.metadata import PackageNotFoundError
 
 import pytest
 
-from fmriqc_launcher import version as version_module
-from fmriqc_launcher.exceptions import LauncherError, RequestError, SessionError
-from fmriqc_launcher.version import launcher_version
+from fmriqa_launcher import version as version_module
+from fmriqa_launcher.exceptions import LauncherError, RequestError, SessionError
+from fmriqa_launcher.version import launcher_version
 
 
 def test_request_error_keeps_its_problems_and_renders_them_joined() -> None:

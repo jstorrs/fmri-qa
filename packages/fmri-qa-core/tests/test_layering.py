@@ -10,7 +10,7 @@ the seams inside calculation.
 import ast
 from pathlib import Path
 
-import fmriqc
+import fmriqa
 
 # Rank of each top-level module/subpackage in the stack, low to high. A module
 # may import its own rank or below; importing a higher rank is the violation.
@@ -41,7 +41,7 @@ RANKS = {
     "cli": 6,
 }
 
-_SOURCE_ROOT = Path(fmriqc.__file__).parent
+_SOURCE_ROOT = Path(fmriqa.__file__).parent
 
 
 def _modules() -> list[Path]:
@@ -69,14 +69,14 @@ def _import_targets(tree: ast.Module, rel: tuple[str, ...]) -> set[tuple[str, ..
     """Every module `tree` (the source file at `rel`) imports, as resolved parts.
 
     Covers relative imports (`node.level > 0`) everywhere but `cli/`, and the
-    absolute `fmriqc...` imports `cli/` uses (`import fmriqc as q`,
-    `from fmriqc.load.paths import ...`).
+    absolute `fmriqa...` imports `cli/` uses (`import fmriqa as q`,
+    `from fmriqa.load.paths import ...`).
     """
     targets: set[tuple[str, ...]] = set()
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
             for alias in node.names:
-                if alias.name == "fmriqc" or alias.name.startswith("fmriqc."):
+                if alias.name == "fmriqa" or alias.name.startswith("fmriqa."):
                     targets.add(tuple(alias.name.split(".")[1:]))
         elif isinstance(node, ast.ImportFrom):
             if node.level > 0:
@@ -84,7 +84,7 @@ def _import_targets(tree: ast.Module, rel: tuple[str, ...]) -> set[tuple[str, ..
                 module_parts = node.module.split(".") if node.module else ()
                 targets.add(base + tuple(module_parts))
             elif node.module and (
-                node.module == "fmriqc" or node.module.startswith("fmriqc.")
+                node.module == "fmriqa" or node.module.startswith("fmriqa.")
             ):
                 targets.add(tuple(node.module.split(".")[1:]))
     return targets
@@ -108,7 +108,7 @@ def test_layers_never_import_upward() -> None:
             if target_layer is None or target_layer <= source_layer:
                 continue
             offenders.setdefault(path.relative_to(_SOURCE_ROOT).as_posix(), []).append(
-                f"fmriqc.{'.'.join(target)} (rank {target_layer}) "
+                f"fmriqa.{'.'.join(target)} (rank {target_layer}) "
                 f"from rank {source_layer}"
             )
     assert not offenders, f"a lower layer must never import a higher one: {offenders}"
@@ -144,12 +144,12 @@ def test_the_check_would_catch_an_upward_import() -> None:
 
 
 def test_calculation_never_imports_the_launcher() -> None:
-    """The application shell depends on `fmriqc`, never the other way around."""
+    """The application shell depends on `fmriqa`, never the other way around."""
     offenders = [
         path.relative_to(_SOURCE_ROOT).as_posix()
         for path in _modules()
-        if "fmriqc_launcher" in path.read_text()
+        if "fmriqa_launcher" in path.read_text()
     ]
     assert not offenders, (
-        f"the calculation half must never import fmriqc_launcher: {offenders}"
+        f"the calculation half must never import fmriqa_launcher: {offenders}"
     )

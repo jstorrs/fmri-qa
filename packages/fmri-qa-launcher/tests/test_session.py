@@ -18,13 +18,13 @@ from pathlib import Path
 
 import pytest
 
-import fmriqc
-from fmriqc.settings import AnalysisSettings
-from fmriqc_launcher.exceptions import SessionError
-from fmriqc_launcher.outcome import Failed, Published, Refused
-from fmriqc_launcher.progress import CleanupNotice, Progress, Stage
-from fmriqc_launcher.request import RunRequest
-from fmriqc_launcher.session import _copy_durably, _publish, run_session
+import fmriqa
+from fmriqa.settings import AnalysisSettings
+from fmriqa_launcher.exceptions import SessionError
+from fmriqa_launcher.outcome import Failed, Published, Refused
+from fmriqa_launcher.progress import CleanupNotice, Progress, Stage
+from fmriqa_launcher.request import RunRequest
+from fmriqa_launcher.session import _copy_durably, _publish, run_session
 
 PreparedSeries = Callable[..., tuple[Path, dict[str, object]]]
 StubDcm2niix = Callable[..., Path]
@@ -129,7 +129,7 @@ def test_one_series_is_imported_analyzed_and_published(
     assert [p.name for p in output_dir.iterdir()] == [name]
     assert list(staging_root.iterdir()) == []
 
-    reloaded = fmriqc.load_artifact(published.artifact)
+    reloaded = fmriqa.load_artifact(published.artifact)
     assert reloaded.provenance.source == str(series_dir / f"{name}.nii.gz")
     assert ".fmri-qa-run." not in reloaded.provenance.source
     assert Path(reloaded.provenance.source).is_absolute()
@@ -302,7 +302,7 @@ def test_an_output_directory_that_cannot_be_written_to_stops_the_run_at_once(
 ) -> None:
     """Before any work: staging is elsewhere, so publishing would find out last."""
 
-    monkeypatch.setattr("fmriqc_launcher.session._run_in_staging", _never)
+    monkeypatch.setattr("fmriqa_launcher.session._run_in_staging", _never)
     output_dir = tmp_path / "output"
     output_dir.mkdir()
     output_dir.chmod(0o555)  # exists already, so the first mkdir is a no-op
@@ -317,7 +317,7 @@ def test_an_output_directory_that_cannot_be_written_to_stops_the_run_at_once(
 def test_the_writability_probe_leaves_nothing_behind(
     tmp_path: Path, dicom_dir: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setattr("fmriqc_launcher.session._run_in_staging", _stop)
+    monkeypatch.setattr("fmriqa_launcher.session._run_in_staging", _stop)
     request = RunRequest(dicom_dir=dicom_dir, output_dir=tmp_path / "output")
 
     with pytest.raises(SessionError, match="stopped before any series"):
@@ -335,18 +335,18 @@ def test_a_probe_that_cannot_be_removed_is_logged_and_does_not_stop_the_run(
     """Making the probe proved the directory writable; failing to remove it cannot.
 
     A sync client opens what was just made and the removal is refused, the
-    race `fmriqc.rename` exists for. Treating it as "cannot write" would
+    race `fmriqa.rename` exists for. Treating it as "cannot write" would
     refuse every run into a watched directory.
     """
     monkeypatch.setattr(
-        "fmriqc_launcher.session.shutil.rmtree", _rmtree_except(".fmri-qa-probe.")
+        "fmriqa_launcher.session.shutil.rmtree", _rmtree_except(".fmri-qa-probe.")
     )
-    monkeypatch.setattr("fmriqc_launcher.session._run_in_staging", _stop)
+    monkeypatch.setattr("fmriqa_launcher.session._run_in_staging", _stop)
     request = RunRequest(dicom_dir=dicom_dir, output_dir=tmp_path / "output")
 
     notices: list[CleanupNotice] = []
     with (
-        caplog.at_level(logging.WARNING, logger="fmriqc_launcher.session"),
+        caplog.at_level(logging.WARNING, logger="fmriqa_launcher.session"),
         pytest.raises(SessionError, match="stopped before any series"),
     ):
         run_session(request, notice=notices.append)
@@ -365,7 +365,7 @@ def test_a_staging_directory_that_cannot_be_created_is_a_session_error(
     def _full(*_args: object, **_kwargs: object) -> str:
         raise OSError(28, "No space left on device")
 
-    monkeypatch.setattr("fmriqc_launcher.session.tempfile.mkdtemp", _full)
+    monkeypatch.setattr("fmriqa_launcher.session.tempfile.mkdtemp", _full)
     request = RunRequest(dicom_dir=dicom_dir, output_dir=tmp_path / "output")
 
     with pytest.raises(SessionError, match="cannot create a staging directory"):
@@ -388,7 +388,7 @@ def test_a_target_that_appears_mid_run_fails_that_series(
         (output_dir / name).mkdir(parents=True)
         return target
 
-    monkeypatch.setattr("fmriqc_launcher.session.write_run_page", _render_then_collide)
+    monkeypatch.setattr("fmriqa_launcher.session.write_run_page", _render_then_collide)
     request = RunRequest(
         dicom_dir=dicom_dir,
         output_dir=output_dir,
@@ -465,7 +465,7 @@ def test_a_series_whose_directory_appears_mid_run_is_refused_not_analyzed(
         (output_dir / second_name).mkdir()
         return fast_render(artifact, path, **kwargs)
 
-    monkeypatch.setattr("fmriqc_launcher.session.write_run_page", render_then_race)
+    monkeypatch.setattr("fmriqa_launcher.session.write_run_page", render_then_race)
     request = RunRequest(
         dicom_dir=dicom_dir,
         output_dir=output_dir,
@@ -570,7 +570,7 @@ def test_a_warning_during_render_is_not_captured(
     stub_series: StubSeries,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Only analysis is captured, as in `fmriqc.cli.qa`.
+    """Only analysis is captured, as in `fmriqa.cli.qa`.
 
     `simplefilter("always")` over save/render used to revive warnings a
     library silences on purpose, such as netCDF4's first-import numpy notice,
@@ -582,7 +582,7 @@ def test_a_warning_during_render_is_not_captured(
         warnings.warn("a stub warning from the render step", stacklevel=2)
         return fast_render(artifact, path)
 
-    monkeypatch.setattr("fmriqc_launcher.session.write_run_page", _warn_then_render)
+    monkeypatch.setattr("fmriqa_launcher.session.write_run_page", _warn_then_render)
     converter, _ = stub_series()
 
     request = RunRequest(
@@ -612,7 +612,7 @@ def test_a_failure_staging_a_series_is_a_failed_outcome(
     def _raise(*_args: object, **_kwargs: object) -> None:
         raise OSError("disk full while staging")
 
-    monkeypatch.setattr("fmriqc_launcher.session._move_files", _raise)
+    monkeypatch.setattr("fmriqa_launcher.session._move_files", _raise)
     converter, _ = stub_series()
 
     request = RunRequest(
@@ -636,7 +636,7 @@ def test_a_warning_during_analysis_lands_on_the_failed_outcome(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """A warning during analysis, then a *later* stage (render) fails: both survive."""
-    monkeypatch.setattr("fmriqc_launcher.session.write_run_page", _fail_render)
+    monkeypatch.setattr("fmriqa_launcher.session.write_run_page", _fail_render)
     converter, _ = stub_series()
 
     request = RunRequest(
@@ -668,7 +668,7 @@ def test_a_failure_saving_the_artifact_is_a_failed_outcome_with_its_warnings(
     def _failing_save(*_args: object, **_kwargs: object) -> None:
         raise OSError("disk full while saving the artifact")
 
-    monkeypatch.setattr(fmriqc, "save_artifact", _failing_save)
+    monkeypatch.setattr(fmriqa, "save_artifact", _failing_save)
     converter, _ = stub_series()
 
     output_dir = tmp_path / "output"
@@ -711,7 +711,7 @@ def test_the_output_directory_holds_no_intermediates_while_a_series_is_worked_on
         seen["staging"] = sorted(p.name for p in staging_root.rglob("*") if p.is_file())
         return fast_render(artifact, path, **kwargs)
 
-    monkeypatch.setattr("fmriqc_launcher.session.write_run_page", _look_then_render)
+    monkeypatch.setattr("fmriqa_launcher.session.write_run_page", _look_then_render)
     converter, (name,) = stub_series()
     request = RunRequest(
         dicom_dir=dicom_dir,
@@ -750,7 +750,7 @@ def test_a_published_series_is_dropped_from_staging_before_the_next_one_starts(
         staged_at_each_render.append({p.name for p in staging_root.rglob("*.qa.nc")})
         return fast_render(artifact, path, **kwargs)
 
-    monkeypatch.setattr("fmriqc_launcher.session.write_run_page", _look_then_render)
+    monkeypatch.setattr("fmriqa_launcher.session.write_run_page", _look_then_render)
     converter, (first_name, second_name) = stub_series(frames=(40, 40))
     request = RunRequest(
         dicom_dir=dicom_dir,
@@ -801,7 +801,7 @@ def test_a_series_is_never_visible_under_its_name_until_it_is_whole(
         copied_into.add(destination.parent.name)
         _copy_durably(source, destination)
 
-    monkeypatch.setattr("fmriqc_launcher.session._copy_durably", _watching)
+    monkeypatch.setattr("fmriqa_launcher.session._copy_durably", _watching)
 
     _publish(work, output / "series")
 
@@ -829,7 +829,7 @@ def test_a_copy_that_fails_leaves_nothing_in_the_output_directory(
             raise OSError(28, "No space left on device")
         _copy_durably(source, destination)
 
-    monkeypatch.setattr("fmriqc_launcher.session._copy_durably", _fill_the_disk)
+    monkeypatch.setattr("fmriqa_launcher.session._copy_durably", _fill_the_disk)
 
     with pytest.raises(OSError, match="No space left"):
         _publish(work, output / "series")
@@ -847,7 +847,7 @@ def test_a_rename_that_is_refused_leaves_nothing_in_the_output_directory(
     output.mkdir()
     (work / "a").write_bytes(b"x")
 
-    monkeypatch.setattr("fmriqc_launcher.session.replace_patiently", _held)
+    monkeypatch.setattr("fmriqa_launcher.session.replace_patiently", _held)
 
     with pytest.raises(PermissionError, match="held open"):
         _publish(work, output / "series")
@@ -879,7 +879,7 @@ def test_copying_durably_syncs_before_it_returns(
         synced.append(destination.stat().st_size)
         real(descriptor)
 
-    monkeypatch.setattr("fmriqc_launcher.session.os.fsync", _fsync)
+    monkeypatch.setattr("fmriqa_launcher.session.os.fsync", _fsync)
 
     _copy_durably(source, destination)
 
@@ -894,7 +894,7 @@ def test_publishing_onto_an_existing_series_is_refused_before_any_rename(
     work.mkdir()
     target.mkdir()
 
-    monkeypatch.setattr("fmriqc_launcher.session.replace_patiently", _never)
+    monkeypatch.setattr("fmriqa_launcher.session.replace_patiently", _never)
 
     with pytest.raises(SessionError, match="created while this run was in progress"):
         _publish(work, target)
@@ -917,7 +917,7 @@ def test_a_series_published_by_another_run_mid_rename_is_named_as_that(
         destination.mkdir()
         raise refusal(13, "Access is denied")
 
-    monkeypatch.setattr("fmriqc_launcher.session.replace_patiently", _lose_the_race)
+    monkeypatch.setattr("fmriqa_launcher.session.replace_patiently", _lose_the_race)
 
     with pytest.raises(SessionError, match="created while this run was in progress"):
         _publish(work, target)
@@ -933,9 +933,9 @@ def test_a_staging_directory_that_cannot_be_removed_is_logged_by_name(
 ) -> None:
     """`ignore_errors=True` must not mean a silent residue beside the reports."""
 
-    monkeypatch.setattr("fmriqc_launcher.session._run_in_staging", _stop)
+    monkeypatch.setattr("fmriqa_launcher.session._run_in_staging", _stop)
     monkeypatch.setattr(
-        "fmriqc_launcher.session.shutil.rmtree", _rmtree_except("fmri-qa-run.")
+        "fmriqa_launcher.session.shutil.rmtree", _rmtree_except("fmri-qa-run.")
     )
     request = RunRequest(
         dicom_dir=dicom_dir, output_dir=tmp_path / "output", settings=_SETTINGS
@@ -943,7 +943,7 @@ def test_a_staging_directory_that_cannot_be_removed_is_logged_by_name(
 
     notices: list[CleanupNotice] = []
     with (
-        caplog.at_level(logging.WARNING, logger="fmriqc_launcher.session"),
+        caplog.at_level(logging.WARNING, logger="fmriqa_launcher.session"),
         pytest.raises(SessionError, match="stopped before any series"),
     ):
         run_session(request, notice=notices.append)
@@ -965,14 +965,14 @@ def test_a_staging_directory_that_was_removed_is_not_mentioned(
     monkeypatch: pytest.MonkeyPatch,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    monkeypatch.setattr("fmriqc_launcher.session._run_in_staging", _stop)
+    monkeypatch.setattr("fmriqa_launcher.session._run_in_staging", _stop)
     request = RunRequest(
         dicom_dir=dicom_dir, output_dir=tmp_path / "output", settings=_SETTINGS
     )
 
     notices: list[CleanupNotice] = []
     with (
-        caplog.at_level(logging.WARNING, logger="fmriqc_launcher.session"),
+        caplog.at_level(logging.WARNING, logger="fmriqa_launcher.session"),
         pytest.raises(SessionError),
     ):
         run_session(request, notice=notices.append)
@@ -1000,9 +1000,9 @@ def test_series_cleanup_notices_reach_the_session_caller(
         dcm2niix=converter,
     )
     prefix = f".{name}." if partial else name
-    monkeypatch.setattr("fmriqc_launcher.session.shutil.rmtree", _rmtree_except(prefix))
+    monkeypatch.setattr("fmriqa_launcher.session.shutil.rmtree", _rmtree_except(prefix))
     if partial:
-        monkeypatch.setattr("fmriqc_launcher.session._copy_durably", _held)
+        monkeypatch.setattr("fmriqa_launcher.session._copy_durably", _held)
     notices: list[CleanupNotice] = []
     result = run_session(request, notice=notices.append)
 
@@ -1031,9 +1031,9 @@ def test_a_broken_cleanup_callback_preserves_the_original_session_error(
     monkeypatch: pytest.MonkeyPatch,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    monkeypatch.setattr("fmriqc_launcher.session._run_in_staging", _stop)
+    monkeypatch.setattr("fmriqa_launcher.session._run_in_staging", _stop)
     monkeypatch.setattr(
-        "fmriqc_launcher.session.shutil.rmtree", _rmtree_except("fmri-qa-run.")
+        "fmriqa_launcher.session.shutil.rmtree", _rmtree_except("fmri-qa-run.")
     )
 
     def broken(_notice: CleanupNotice) -> None:
@@ -1054,9 +1054,9 @@ def test_cleanup_callbacks_do_not_swallow_base_exceptions(
     monkeypatch: pytest.MonkeyPatch,
     exception: type[BaseException],
 ) -> None:
-    monkeypatch.setattr("fmriqc_launcher.session._run_in_staging", _stop)
+    monkeypatch.setattr("fmriqa_launcher.session._run_in_staging", _stop)
     monkeypatch.setattr(
-        "fmriqc_launcher.session.shutil.rmtree", _rmtree_except("fmri-qa-run.")
+        "fmriqa_launcher.session.shutil.rmtree", _rmtree_except("fmri-qa-run.")
     )
 
     def interrupted(_notice: CleanupNotice) -> None:
@@ -1074,9 +1074,9 @@ def test_cleanup_leftovers_are_silent_without_a_notice_callback(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    monkeypatch.setattr("fmriqc_launcher.session._run_in_staging", _stop)
+    monkeypatch.setattr("fmriqa_launcher.session._run_in_staging", _stop)
     monkeypatch.setattr(
-        "fmriqc_launcher.session.shutil.rmtree", _rmtree_except("fmri-qa-run.")
+        "fmriqa_launcher.session.shutil.rmtree", _rmtree_except("fmri-qa-run.")
     )
     request = RunRequest(dicom_dir=dicom_dir, output_dir=tmp_path / "output")
     with pytest.raises(SessionError, match="stopped before any series"):

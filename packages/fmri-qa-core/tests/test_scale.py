@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from fmriqc.prep.scale import UNKNOWN_VOXEL_SIZE, VoxelSize
+from fmriqa.prep.scale import UNKNOWN_VOXEL_SIZE, VoxelSize
 
 
 def test_unit_follows_from_whether_the_size_is_known() -> None:

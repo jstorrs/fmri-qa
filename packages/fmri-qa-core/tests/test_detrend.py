@@ -5,9 +5,9 @@ import pytest
 from hypothesis import given
 from hypothesis import strategies as st
 
-from fmriqc.exceptions import InvalidScanError
-from fmriqc.prep.detrend import Detrender, poly_residuals, spline_residuals
-from fmriqc.prep.imaging import trim_count
+from fmriqa.exceptions import InvalidScanError
+from fmriqa.prep.detrend import Detrender, poly_residuals, spline_residuals
+from fmriqa.prep.imaging import trim_count
 
 
 def test_poly_residuals_removes_constant() -> None:

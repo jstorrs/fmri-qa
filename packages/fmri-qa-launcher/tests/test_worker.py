@@ -11,16 +11,16 @@ from pathlib import Path
 
 import pytest
 
-from fmriqc_launcher.exceptions import RequestError, SessionError
-from fmriqc_launcher.outcome import RunResult
-from fmriqc_launcher.progress import (
+from fmriqa_launcher.exceptions import RequestError, SessionError
+from fmriqa_launcher.outcome import RunResult
+from fmriqa_launcher.progress import (
     CleanupNotice,
     CleanupNoticeCallback,
     Progress,
     Stage,
 )
-from fmriqc_launcher.request import RunRequest
-from fmriqc_launcher.worker import BackgroundRun, Crashed, Finished
+from fmriqa_launcher.request import RunRequest
+from fmriqa_launcher.worker import BackgroundRun, Crashed, Finished
 
 _JOIN_TIMEOUT = 5.0
 
@@ -264,10 +264,10 @@ def test_the_default_run_calls_the_real_session_lazily(
 ) -> None:
     """No injected `run`: the default wrapper reaches `session.run_session` itself.
 
-    Monkeypatches `fmriqc_launcher.session.run_session` to test the wiring
+    Monkeypatches `fmriqa_launcher.session.run_session` to test the wiring
     without the real pipeline; `session.py` has its own suite.
     """
-    import fmriqc_launcher.session as session_module
+    import fmriqa_launcher.session as session_module
 
     called: dict[str, object] = {}
 
@@ -314,7 +314,7 @@ def test_real_session_cleanup_notices_precede_the_only_terminal_event(
     monkeypatch: pytest.MonkeyPatch,
     crashes: bool,
 ) -> None:
-    import fmriqc_launcher.session as session_module
+    import fmriqa_launcher.session as session_module
 
     def run_in_staging(*_args: object, **_kwargs: object) -> RunResult:
         if crashes:

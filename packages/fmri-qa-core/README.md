@@ -5,7 +5,7 @@ metrics (SNR, SFNR, RDC/Weisskoff, Nyquist ghost, spikes, motion, smoothness) an
 the **analysis artifact** they are published in.
 
 ```python
-import fmriqc as q
+import fmriqa as q
 
 scan = q.QAScan.from_nifti("qa.nii.gz")
 artifact = q.analyze(scan, name="qa.nii.gz")

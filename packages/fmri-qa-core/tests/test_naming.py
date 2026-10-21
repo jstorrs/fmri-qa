@@ -10,8 +10,8 @@ from itertools import permutations
 
 import pytest
 
-from fmriqc.convert import naming
-from fmriqc.types import Sidecar
+from fmriqa.convert import naming
+from fmriqa.types import Sidecar
 
 # A sidecar with every field the name is built from, as dcm2niix writes them.
 FULL_SIDECAR = {

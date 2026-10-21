@@ -1,120 +1,120 @@
 # Building blocks
 
-## `fmriqc.load.paths`
+## `fmriqa.load.paths`
 
 ```{eval-rst}
-.. automodule:: fmriqc.load.paths
+.. automodule:: fmriqa.load.paths
 ```
 
-## `fmriqc.metrics.artifacts`
+## `fmriqa.metrics.artifacts`
 
 ```{eval-rst}
-.. automodule:: fmriqc.metrics.artifacts
+.. automodule:: fmriqa.metrics.artifacts
    :exclude-members: OutlierResult, SpikeResult, outlier_fraction, spike_scores
 ```
 
-## `fmriqc.metrics.ghost`
+## `fmriqa.metrics.ghost`
 
 ```{eval-rst}
-.. automodule:: fmriqc.metrics.ghost
+.. automodule:: fmriqa.metrics.ghost
    :exclude-members: GHOST_RADIUS, GhostResult, estimate_ghost, estimate_pe_axis
 ```
 
-## `fmriqc.metrics.motion`
+## `fmriqa.metrics.motion`
 
 ```{eval-rst}
-.. automodule:: fmriqc.metrics.motion
+.. automodule:: fmriqa.metrics.motion
    :exclude-members: MotionResult, estimate_motion
 ```
 
-## `fmriqc.metrics.saturation`
+## `fmriqa.metrics.saturation`
 
 ```{eval-rst}
-.. automodule:: fmriqc.metrics.saturation
+.. automodule:: fmriqa.metrics.saturation
    :exclude-members: ClipRail, SaturationResult, detect_saturation
 ```
 
-## `fmriqc.metrics.smoothness`
+## `fmriqa.metrics.smoothness`
 
 ```{eval-rst}
-.. automodule:: fmriqc.metrics.smoothness
+.. automodule:: fmriqa.metrics.smoothness
    :exclude-members: SmoothnessResult, estimate_smoothness
 ```
 
-## `fmriqc.prep.detrend`
+## `fmriqa.prep.detrend`
 
 ```{eval-rst}
-.. automodule:: fmriqc.prep.detrend
+.. automodule:: fmriqa.prep.detrend
    :exclude-members: Detrender
 ```
 
-## `fmriqc.prep.geometry`
+## `fmriqa.prep.geometry`
 
 ```{eval-rst}
-.. automodule:: fmriqc.prep.geometry
+.. automodule:: fmriqa.prep.geometry
    :exclude-members: ROI, PhantomGeometry, detect_phantom, resolve_roi
 ```
 
-## `fmriqc.prep.imaging`
+## `fmriqa.prep.imaging`
 
 ```{eval-rst}
-.. automodule:: fmriqc.prep.imaging
+.. automodule:: fmriqa.prep.imaging
 ```
 
-## `fmriqc.prep.scale`
+## `fmriqa.prep.scale`
 
 ```{eval-rst}
-.. automodule:: fmriqc.prep.scale
+.. automodule:: fmriqa.prep.scale
    :exclude-members: VoxelSize
 ```
 
-## `fmriqc.rename`
+## `fmriqa.rename`
 
 ```{eval-rst}
-.. automodule:: fmriqc.rename
+.. automodule:: fmriqa.rename
 ```
 
-## `fmriqc.types`
+## `fmriqa.types`
 
 ```{eval-rst}
-.. autofunction:: fmriqc.types.readout_axis
+.. autofunction:: fmriqa.types.readout_axis
 ```
 
-## `fmriqc_report.formats.html.resources`
+## `fmriqa_report.formats.html.resources`
 
 ```{eval-rst}
-.. automodule:: fmriqc_report.formats.html.resources
+.. automodule:: fmriqa_report.formats.html.resources
 ```
 
-## `fmriqc_launcher.panel_state`
+## `fmriqa_launcher.panel_state`
 
 ```{eval-rst}
-.. automodule:: fmriqc_launcher.panel_state
+.. automodule:: fmriqa_launcher.panel_state
 ```
 
-## `fmriqc_launcher.request`
+## `fmriqa_launcher.request`
 
 ```{eval-rst}
-.. automodule:: fmriqc_launcher.request
+.. automodule:: fmriqa_launcher.request
    :exclude-members: FormValues, RunRequest, parse_form
-.. autodata:: fmriqc.convert.dcm2niix.DEFAULT_ANONYMIZE
+.. autodata:: fmriqa.convert.dcm2niix.DEFAULT_ANONYMIZE
 ```
 
-## `fmriqc_launcher.results`
+## `fmriqa_launcher.results`
 
 ```{eval-rst}
-.. automodule:: fmriqc_launcher.results
+.. automodule:: fmriqa_launcher.results
 ```
 
-## `fmriqc_launcher.worker`
+## `fmriqa_launcher.worker`
 
 ```{eval-rst}
-.. automodule:: fmriqc_launcher.worker
+.. automodule:: fmriqa_launcher.worker
 ```
 
-## `fmriqc_launcher.panel`
+## `fmriqa_launcher.panel`
 
 ```{eval-rst}
-.. automodule:: fmriqc_launcher.panel
+.. automodule:: fmriqa_launcher.panel
    :exclude-members: main
 ```

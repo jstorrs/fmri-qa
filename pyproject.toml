@@ -134,7 +134,7 @@ convention = "numpy"
 "stubs/**" = ["A001", "A002", "D"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["fmriqc", "fmriqc_report", "fmriqc_launcher"]
+known-first-party = ["fmriqa", "fmriqa_report", "fmriqa_launcher"]
 
 [tool.mypy]
 python_version = "3.13"
@@ -195,9 +195,9 @@ addopts = "-v --tb=short --import-mode=importlib"
 
 [tool.coverage.run]
 source = [
-    "packages/fmri-qa-core/src/fmriqc",
-    "packages/fmri-qa-report/src/fmriqc_report",
-    "packages/fmri-qa-launcher/src/fmriqc_launcher",
+    "packages/fmri-qa-core/src/fmriqa",
+    "packages/fmri-qa-report/src/fmriqa_report",
+    "packages/fmri-qa-launcher/src/fmriqa_launcher",
 ]
 branch = true
 # `panel.py` is Tk widget construction, layout and the `after` pump, and
@@ -213,7 +213,7 @@ branch = true
 # `xvfb-run -a uv run pytest packages/fmri-qa-launcher/tests/test_panel.py`.
 # One greppable exemption beats scattered `# pragma: no cover` comments (this
 # repo uses none) and keeps pressure on `panel.py` to stay decision-free.
-omit = ["packages/fmri-qa-launcher/src/fmriqc_launcher/panel.py"]
+omit = ["packages/fmri-qa-launcher/src/fmriqa_launcher/panel.py"]
 
 [tool.coverage.report]
 # The numeric core carries the metrics. The untested lines that remain are

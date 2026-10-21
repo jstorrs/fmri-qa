@@ -4,8 +4,8 @@ from pathlib import Path
 
 import pytest
 
-import fmriqc as q
-from fmriqc_report import cli
+import fmriqa as q
+from fmriqa_report import cli
 
 
 @pytest.fixture

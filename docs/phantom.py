@@ -32,7 +32,7 @@ import nibabel as nib
 import numpy as np
 from scipy.ndimage import gaussian_filter
 
-import fmriqc as q
+import fmriqa as q
 
 # Background noise floor, as a fraction of phantom signal. A real magnitude
 # image has a Rician air background, so the figures include a realistic floor.
@@ -91,7 +91,7 @@ def _written() -> Path:
     the pages describe reading voxel size and phase-encode direction from a
     header.
     """
-    directory = Path(tempfile.mkdtemp(prefix="fmriqc-docs-"))
+    directory = Path(tempfile.mkdtemp(prefix="fmriqa-docs-"))
     atexit.register(shutil.rmtree, directory, ignore_errors=True)
 
     data = synthetic_series()

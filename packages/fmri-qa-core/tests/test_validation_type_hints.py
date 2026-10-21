@@ -4,7 +4,7 @@ With `from __future__ import annotations` (PEP 563), `dataclasses.fields(cls).ty
 is a string, so reading it raw would make `_matches` compare a value against
 `"int"` instead of `int` and reject everything. This module uses the future
 import to reproduce that for `_Example` without touching the real artifact
-records. It pins `resolved_annotations` (`fmriqc._records`, built on
+records. It pins `resolved_annotations` (`fmriqa._records`, built on
 `typing.get_type_hints`) against a stylistic change reintroducing the bug.
 """
 
@@ -12,9 +12,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from fmriqc._records import resolved_annotations
-from fmriqc.analysis.validation import _matches
-from fmriqc.types import PeAxis
+from fmriqa._records import resolved_annotations
+from fmriqa.analysis.validation import _matches
+from fmriqa.types import PeAxis
 
 
 @dataclass(frozen=True, slots=True)

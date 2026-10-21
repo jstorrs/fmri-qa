@@ -9,14 +9,14 @@ the ROI-mean residual and its DC-dropped spectrum.
 import numpy as np
 import pytest
 
-from fmriqc.metrics.artifacts import (
+from fmriqa.metrics.artifacts import (
     MAD_SCALE,
     _spike_ratio,
     outlier_fraction,
     spike_scores,
 )
-from fmriqc.prep.geometry import ROI
-from fmriqc.prep.images import QAImages
+from fmriqa.prep.geometry import ROI
+from fmriqa.prep.images import QAImages
 
 
 def test_spike_ratio_is_peak_over_robust_spread() -> None:

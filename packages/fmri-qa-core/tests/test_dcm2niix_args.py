@@ -12,8 +12,8 @@ from pathlib import Path
 
 import pytest
 
-import fmriqc as q
-from fmriqc.convert.dcm2niix import PINNED, build_args, find_dcm2niix, run, version
+import fmriqa as q
+from fmriqa.convert.dcm2niix import PINNED, build_args, find_dcm2niix, run, version
 
 
 def test_every_conversion_pins_the_flags_that_keep_a_series_checkable() -> None:

@@ -9,9 +9,9 @@ from pathlib import Path
 
 import pytest
 
-import fmriqc as q
-from fmriqc.convert.dcm2niix import find_dcm2niix
-from fmriqc.convert.session import import_dicom
+import fmriqa as q
+from fmriqa.convert.dcm2niix import find_dcm2niix
+from fmriqa.convert.session import import_dicom
 
 FIXTURE_STUDY = Path(__file__).parent / "fixtures" / "dicom"
 

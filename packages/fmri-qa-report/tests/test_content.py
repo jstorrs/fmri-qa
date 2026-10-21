@@ -4,8 +4,8 @@ import dataclasses
 import math
 from dataclasses import replace
 
-from fmriqc.analysis import Measurements
-from fmriqc_report import content
+from fmriqa.analysis import Measurements
+from fmriqa_report import content
 
 
 def test_metric_docs_keep_their_existing_labels_order_and_formatting(artifact) -> None:

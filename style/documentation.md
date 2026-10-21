@@ -139,7 +139,7 @@ If someone runs `ls` on this directory, will they understand what's here?
 
 ```
 # Passes the ls test - clear purpose for each file
-$ ls packages/fmri-qa-core/src/fmriqc/
+$ ls packages/fmri-qa-core/src/fmriqa/
 __init__.py  analysis/  cli/  convert/  exceptions.py  hilo/  load/  metrics/
 path_arguments.py  pipeline.py  prep/  rename.py  settings.py  types.py
 validation.py  version.py  warn.py
@@ -270,7 +270,7 @@ def compute_snr(
 
     See Also
     --------
-    fmriqc.metrics.fbirn.sfnr : Fluctuation noise over a full time series.
+    fmriqa.metrics.fbirn.sfnr : Fluctuation noise over a full time series.
 
     Notes
     -----

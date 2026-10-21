@@ -1,22 +1,22 @@
 # fmri-qa-core
 
 ```{eval-rst}
-.. automodule:: fmriqc
+.. automodule:: fmriqa
 ```
 
 ## Options and constants
 
 ```{eval-rst}
-.. automodule:: fmriqc.types
+.. automodule:: fmriqa.types
    :exclude-members: readout_axis
-.. autodata:: fmriqc.analysis.artifact.ARTIFACT_SCHEMA_VERSION
-.. autodata:: fmriqc.metrics.ghost.GHOST_RADIUS
-.. autodata:: fmriqc.hilo.mask.HILO_ERODE
+.. autodata:: fmriqa.analysis.artifact.ARTIFACT_SCHEMA_VERSION
+.. autodata:: fmriqa.metrics.ghost.GHOST_RADIUS
+.. autodata:: fmriqa.hilo.mask.HILO_ERODE
 ```
 
 ## High/low flip angle
 
 ```{eval-rst}
-.. automodule:: fmriqc.hilo
+.. automodule:: fmriqa.hilo
    :exclude-members: HiLoResult, run_hilo
 ```

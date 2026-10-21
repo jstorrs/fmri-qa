@@ -1,4 +1,4 @@
-"""End-to-end pipeline through the public `fmriqc` import surface.
+"""End-to-end pipeline through the public `fmriqa` import surface.
 
 Exercises `run_qa` as a caller sees it, on the `make_scan` phantom (no file
 I/O).
@@ -11,8 +11,8 @@ from dataclasses import fields, replace
 import numpy as np
 import pytest
 
-import fmriqc as q
-from fmriqc.prep.geometry import roi_fits
+import fmriqa as q
+from fmriqa.prep.geometry import roi_fits
 
 from .conftest import MakeScan, synthetic_series
 

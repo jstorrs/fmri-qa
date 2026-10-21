@@ -2,12 +2,12 @@
 
 Presentation depends on the *published artifact*, not on the pipeline that
 produced it. That is easy to erode one convenient import at a time, so this
-file checks it mechanically. Every `fmriqc` import in the report package must
-land in `fmriqc.analysis` (the artifact), `fmriqc.types` (the shared
-array/option vocabulary), `fmriqc.rename` (how a finished file is moved into
-place) or `fmriqc.path_arguments` (wildcards and same-file checks on path
-arguments). An import of `fmriqc.metrics`, `fmriqc.pipeline`, `fmriqc.prep` or
-`fmriqc.load`, or of the `fmriqc` package as a whole (which pulls all of them),
+file checks it mechanically. Every `fmriqa` import in the report package must
+land in `fmriqa.analysis` (the artifact), `fmriqa.types` (the shared
+array/option vocabulary), `fmriqa.rename` (how a finished file is moved into
+place) or `fmriqa.path_arguments` (wildcards and same-file checks on path
+arguments). An import of `fmriqa.metrics`, `fmriqa.pipeline`, `fmriqa.prep` or
+`fmriqa.load`, or of the `fmriqa` package as a whole (which pulls all of them),
 fails this test.
 
 That scan reads import *text*, which is necessary but not sufficient. An
@@ -24,35 +24,35 @@ from pathlib import Path
 
 import pytest
 
-import fmriqc_report
+import fmriqa_report
 
 # The only calculation-side modules presentation is allowed to reach for.
 #
-# `fmriqc.rename` has nothing to do with the artifact, but it is a leaf over the
+# `fmriqa.rename` has nothing to do with the artifact, but it is a leaf over the
 # standard library, so it cannot bring any calculation code in behind it (the
 # runtime half of this test would catch it if that changed). It carries a
 # policy, how long to outwait a sync client holding a just-written file, that
 # the artifact's writer and the page's writer must agree on. A second copy kept
 # in step by hand is worse.
 #
-# `fmriqc.path_arguments` is the same kind of leaf: standard library only. It
+# `fmriqa.path_arguments` is the same kind of leaf: standard library only. It
 # carries a shell quirk (an unexpanded wildcard) and an overwrite guard that the
 # report must apply the same way as the other commands.
 ALLOWED = frozenset(
-    {"fmriqc.analysis", "fmriqc.types", "fmriqc.rename", "fmriqc.path_arguments"}
+    {"fmriqa.analysis", "fmriqa.types", "fmriqa.rename", "fmriqa.path_arguments"}
 )
 
-_SOURCE_ROOT = Path(fmriqc_report.__file__).parent
+_SOURCE_ROOT = Path(fmriqa_report.__file__).parent
 
 # The calculation stack, and the third-party libraries only it needs. Rendering
-# a report reaches none of these. `fmriqc.load` and `fmriqc.prep` are listed
+# a report reaches none of these. `fmriqa.load` and `fmriqa.prep` are listed
 # too: the artifact carries everything a reader wants already resolved, so
 # reading touches none of those layers.
 _CALCULATION_ONLY = (
-    "fmriqc.pipeline",
-    "fmriqc.metrics",
-    "fmriqc.prep",
-    "fmriqc.load",
+    "fmriqa.pipeline",
+    "fmriqa.metrics",
+    "fmriqa.prep",
+    "fmriqa.load",
     "skimage",
     "scipy",
     "nibabel",
@@ -60,24 +60,24 @@ _CALCULATION_ONLY = (
 )
 
 # The format-agnostic public surface must stay importable without the drawing
-# stack. The package resolves its driver lazily so that `import fmriqc_report`
+# stack. The package resolves its driver lazily so that `import fmriqa_report`
 # never pays for unused matplotlib. Each target runs in its own new interpreter
 # so a previous probe cannot hide a dependency imported by another target.
 _DRIVER_ONLY = ("matplotlib",)
 _REPORT_IMPORT_TARGETS = (
-    "fmriqc_report",
-    "fmriqc_report.content",
-    "fmriqc_report.theme",
-    "fmriqc_report.summary",
-    "fmriqc_report.panels",
+    "fmriqa_report",
+    "fmriqa_report.content",
+    "fmriqa_report.theme",
+    "fmriqa_report.summary",
+    "fmriqa_report.panels",
 )
 
 # Run in a fresh interpreter. Only a process that has imported nothing else can
-# say what `import fmriqc_report.cli` costs; this one already has the whole
+# say what `import fmriqa_report.cli` costs; this one already has the whole
 # stack loaded by other tests.
 _PROBE = f"""
 import sys
-import fmriqc_report.cli
+import fmriqa_report.cli
 calculation = {_CALCULATION_ONLY!r}
 loaded = sorted(
     m for m in sys.modules if any(m == c or m.startswith(c + ".") for c in calculation)
@@ -102,23 +102,23 @@ def _modules() -> list[Path]:
     return sorted(_SOURCE_ROOT.rglob("*.py"))
 
 
-def _from_fmriqc(module: str) -> bool:
+def _from_fmriqa(module: str) -> bool:
     """Return True if a dotted module name names the calculation package."""
-    return module.split(".", maxsplit=1)[0] == "fmriqc"
+    return module.split(".", maxsplit=1)[0] == "fmriqa"
 
 
-def _fmriqc_imports(tree: ast.Module) -> set[str]:
-    """Return the `fmriqc*` modules a parsed source file imports."""
+def _fmriqa_imports(tree: ast.Module) -> set[str]:
+    """Return the `fmriqa*` modules a parsed source file imports."""
     found: set[str] = set()
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
-            found |= {a.name for a in node.names if _from_fmriqc(a.name)}
-        # `level > 0` is a relative import inside fmriqc_report itself.
+            found |= {a.name for a in node.names if _from_fmriqa(a.name)}
+        # `level > 0` is a relative import inside fmriqa_report itself.
         elif (
             isinstance(node, ast.ImportFrom)
             and node.level == 0
             and node.module
-            and _from_fmriqc(node.module)
+            and _from_fmriqa(node.module)
         ):
             found.add(node.module)
     return found
@@ -132,7 +132,7 @@ def test_the_report_package_has_source_to_check() -> None:
 def test_report_imports_only_the_artifact_and_the_shared_vocabulary() -> None:
     offenders = {}
     for path in _modules():
-        imported = _fmriqc_imports(ast.parse(path.read_text()))
+        imported = _fmriqa_imports(ast.parse(path.read_text()))
         if extra := imported - ALLOWED:
             offenders[path.relative_to(_SOURCE_ROOT).as_posix()] = sorted(extra)
     assert not offenders, (
@@ -142,8 +142,8 @@ def test_report_imports_only_the_artifact_and_the_shared_vocabulary() -> None:
 
 def test_the_check_would_catch_a_pipeline_import() -> None:
     """A negative control, so the scan cannot pass by failing to see anything."""
-    tree = ast.parse("import fmriqc\nfrom fmriqc.pipeline import run_qa\n")
-    assert _fmriqc_imports(tree) - ALLOWED == {"fmriqc", "fmriqc.pipeline"}
+    tree = ast.parse("import fmriqa\nfrom fmriqa.pipeline import run_qa\n")
+    assert _fmriqa_imports(tree) - ALLOWED == {"fmriqa", "fmriqa.pipeline"}
 
 
 def test_presentation_never_imports_the_launcher() -> None:
@@ -151,17 +151,17 @@ def test_presentation_never_imports_the_launcher() -> None:
     offenders = [
         path.relative_to(_SOURCE_ROOT).as_posix()
         for path in _modules()
-        if "fmriqc_launcher" in path.read_text()
+        if "fmriqa_launcher" in path.read_text()
     ]
     assert not offenders, (
-        f"the report half must never import fmriqc_launcher: {offenders}"
+        f"the report half must never import fmriqa_launcher: {offenders}"
     )
 
 
 def test_importing_the_report_cli_does_not_load_the_calculation_stack() -> None:
     """The seam at runtime, which the static scan above cannot see.
 
-    `fmriqc.analysis` is an allowed import, but what it *executes* is another
+    `fmriqa.analysis` is an allowed import, but what it *executes* is another
     question. Its `__init__` could pull the pipeline in behind the artifact and
     the scan would still pass. Only a fresh interpreter's `sys.modules` settles
     it.

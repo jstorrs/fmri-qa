@@ -13,8 +13,8 @@ from pathlib import Path
 
 import pytest
 
-import fmriqc as q
-from fmriqc.convert.session import import_dicom
+import fmriqa as q
+from fmriqa.convert.session import import_dicom
 
 # A sidecar with every field the name is built from, as dcm2niix writes them.
 FULL_SIDECAR = {
@@ -277,7 +277,7 @@ def _refusing(monkeypatch, refuse) -> list[tuple[str, str]]:
             raise PermissionError(13, "held open by a sync client")
         source.replace(target)
 
-    monkeypatch.setattr("fmriqc.convert.session.replace_patiently", replace)
+    monkeypatch.setattr("fmriqa.convert.session.replace_patiently", replace)
     return asked
 
 
@@ -519,7 +519,7 @@ def test_replaced_files_that_cannot_be_deleted_are_not_left_silently(
         if not Path(path).name.startswith(".fmri-qa-replaced-"):
             real(path, **kwargs)
 
-    monkeypatch.setattr("fmriqc.convert.session.shutil.rmtree", rmtree)
+    monkeypatch.setattr("fmriqa.convert.session.shutil.rmtree", rmtree)
 
     with pytest.warns(UserWarning, match="holds the files this import replaced"):
         result = import_dicom(tmp_path, out, binary=binary, force=True)

@@ -14,14 +14,14 @@ from dataclasses import dataclass, fields
 import numpy as np
 import pytest
 
-from fmriqc._arrays import ArrayValue, readonly
-from fmriqc.metrics.artifacts import OutlierResult
-from fmriqc.metrics.center_of_mass import CenterOfMassResult
-from fmriqc.metrics.fbirn import WeisskoffResult
-from fmriqc.metrics.ghost import GhostResult
-from fmriqc.metrics.motion import MotionResult
-from fmriqc.metrics.smoothness import SmoothnessResult
-from fmriqc.prep.geometry import ROI, PhantomGeometry
+from fmriqa._arrays import ArrayValue, readonly
+from fmriqa.metrics.artifacts import OutlierResult
+from fmriqa.metrics.center_of_mass import CenterOfMassResult
+from fmriqa.metrics.fbirn import WeisskoffResult
+from fmriqa.metrics.ghost import GhostResult
+from fmriqa.metrics.motion import MotionResult
+from fmriqa.metrics.smoothness import SmoothnessResult
+from fmriqa.prep.geometry import ROI, PhantomGeometry
 
 
 def test_readonly_marks_the_given_array_and_returns_it() -> None:

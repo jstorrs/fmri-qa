@@ -20,9 +20,9 @@ import netCDF4
 import numpy as np
 import pytest
 
-import fmriqc as q
-from fmriqc.analysis.serialize import netcdf
-from fmriqc.analysis.serialize.decompose import decompose
+import fmriqa as q
+from fmriqa.analysis.serialize import netcdf
+from fmriqa.analysis.serialize.decompose import decompose
 
 # The CF marker the writer puts on a mask. Spelled out, not imported, so
 # changing it means editing both places.
@@ -392,7 +392,7 @@ def test_every_axis_the_layout_uses_has_a_coordinate_declared() -> None:
 def test_masks_are_stored_as_cf_flagged_bytes(tmp_path, artifact) -> None:
     """netCDF has no boolean, so a mask is 0/1 bytes that say what they mean.
 
-    The flags let a reader with no fmriqc knowledge rebuild a `bool` array and
+    The flags let a reader with no fmriqa knowledge rebuild a `bool` array and
     learn that 1 is inside the phantom.
     """
     saved = q.save_artifact(artifact, tmp_path / "scan.qa.nc")
@@ -653,7 +653,7 @@ def test_the_unidata_library_opens_the_artifact_without_a_warning(
 ) -> None:
     """The C library itself: what `ncdump`, MATLAB and R read through.
 
-    The container's main claim: a reader that has never heard of fmriqc can open
+    The container's main claim: a reader that has never heard of fmriqa can open
     the file, find the axes named, and turn the flagged bytes back into a mask.
     """
     saved = str(q.save_artifact(artifact, tmp_path / "scan.qa.nc"))

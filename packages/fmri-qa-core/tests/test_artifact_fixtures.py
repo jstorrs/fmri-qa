@@ -31,9 +31,9 @@ from pathlib import Path
 
 import pytest
 
-import fmriqc as q
-from fmriqc.analysis import ARTIFACT_SCHEMA_VERSION
-from fmriqc.analysis.serialize.migrate import _MIGRATIONS
+import fmriqa as q
+from fmriqa.analysis import ARTIFACT_SCHEMA_VERSION
+from fmriqa.analysis.serialize.migrate import _MIGRATIONS
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
 _FIXTURE_NAME = re.compile(r"schema_v(\d+)\.qa\.(?:npz|nc)$")

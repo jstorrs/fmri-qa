@@ -5,8 +5,8 @@ Covers `bar_state`, `final_bar`, `summarize`, `stopping_message` and `exit_code`
 
 from pathlib import Path
 
-from fmriqc_launcher.outcome import Failed, Published, Refused, RunResult
-from fmriqc_launcher.panel_state import (
+from fmriqa_launcher.outcome import Failed, Published, Refused, RunResult
+from fmriqa_launcher.panel_state import (
     CRASHED_BAR,
     Determinate,
     Indeterminate,
@@ -16,8 +16,8 @@ from fmriqc_launcher.panel_state import (
     stopping_message,
     summarize,
 )
-from fmriqc_launcher.progress import Progress, Stage
-from fmriqc_launcher.worker import Crashed, Finished
+from fmriqa_launcher.progress import Progress, Stage
+from fmriqa_launcher.worker import Crashed, Finished
 
 # -- bar_state ------------------------------------------------------------
 

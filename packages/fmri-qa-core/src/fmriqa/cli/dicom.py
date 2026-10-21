@@ -1,0 +1,189 @@
+"""`fmri-qa-import`: convert a DICOM directory into QA-ready NIfTI.
+
+This is a separate command, like `fmri-qa-hilo`, because `fmri-qa` takes scan
+paths as positional arguments and a subcommand parser would change every
+existing invocation.
+
+It adds two things that are easy to get wrong running dcm2niix by hand: the
+flags that keep a series checkable (`convert.dcm2niix`, where `-l o` decides
+whether the saturation check can see an ADC rail at all) and names that sort and
+read (`convert.naming`). `--filename` keeps dcm2niix's template language, and
+`--dcm2niix-arg` passes anything through.
+"""
+
+import argparse
+import sys
+from collections.abc import Sequence
+from pathlib import Path
+
+import fmriqa as q
+from fmriqa.convert.dcm2niix import DEFAULT_ANONYMIZE, DEFAULT_DEPTH, DEFAULT_TEMPLATE
+from fmriqa.convert.session import DEFAULT_NAMES, ImportResult, import_dicom
+from fmriqa.load.paths import NIFTI_SUFFIXES
+
+from .arguments import PrintVersion, attributed_warnings, positive_int
+
+
+def _parser() -> argparse.ArgumentParser:
+    """Build the parser for the command line this command accepts."""
+    parser = argparse.ArgumentParser(
+        prog="fmri-qa-import",
+        description="Convert a DICOM directory to QA-ready NIfTI with dcm2niix, "
+        "keeping the scanner's stored integers (which the saturation check "
+        "needs) and naming each series by date, time, series number and "
+        "description.",
+    )
+    parser.add_argument(
+        "source", help="Directory of DICOM files (searched recursively)"
+    )
+    parser.add_argument(
+        "-o",
+        "--out",
+        metavar="DIR",
+        default=None,
+        help="Where to write the NIfTI (default: ./<source name>_nifti). "
+        "Created if missing; an existing file it would overwrite stops the "
+        "import unless --force.",
+    )
+    parser.add_argument(
+        "--names",
+        choices=q.NAME_STYLES,
+        default=DEFAULT_NAMES,
+        help="'qa': <date>_<time>_s<NNN>_<description>, which sorts "
+        "chronologically and pads the series number. 'dcm2niix': whatever "
+        "--filename produced. "
+        f"Default: {DEFAULT_NAMES}.",
+    )
+    # argparse %-formats every help string, and the template is all %-codes,
+    # so it has to reach the help already escaped.
+    shown_template = DEFAULT_TEMPLATE.replace("%", "%%")
+    parser.add_argument(
+        "--filename",
+        metavar="TEMPLATE",
+        default=DEFAULT_TEMPLATE,
+        help=f"dcm2niix -f template (default: {shown_template}). With "
+        "--names qa this is only the fallback for a series whose sidecar "
+        "cannot name it; with --names dcm2niix it is the name.",
+    )
+    parser.add_argument(
+        "--anonymize",
+        choices=q.ANONYMIZE_MODES,
+        default=DEFAULT_ANONYMIZE,
+        help="Sidecar content: 'pii' strips the patient and keeps the dates "
+        "(default, and what 'qa' names need), 'all' strips the dates too, "
+        "'none' keeps everything.",
+    )
+    parser.add_argument(
+        "--no-compress",
+        action="store_true",
+        help="Write .nii instead of .nii.gz.",
+    )
+    parser.add_argument(
+        "--depth",
+        type=positive_int,
+        default=DEFAULT_DEPTH,
+        help=f"Sub-directory levels of SOURCE to search (default: {DEFAULT_DEPTH}).",
+    )
+    parser.add_argument(
+        "--dcm2niix",
+        metavar="PATH",
+        default=None,
+        help="dcm2niix to run (default: the bundled binary, else the first on "
+        "PATH). Name your own build here; the bundled one wins over PATH.",
+    )
+    parser.add_argument(
+        "--dcm2niix-arg",
+        metavar="ARG",
+        action="append",
+        default=[],
+        dest="passthrough",
+        help="Extra argument for dcm2niix, repeatable and passed last so it "
+        "wins. A value starting with '-' needs the '=' form, which is most of "
+        "them: --dcm2niix-arg=-i --dcm2niix-arg=y",
+    )
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Overwrite files already in the output directory.",
+    )
+    parser.add_argument(
+        "--log",
+        action="store_true",
+        help="Print everything dcm2niix said, not just the summary.",
+    )
+    parser.add_argument("--version", action=PrintVersion, nargs=0)
+    return parser
+
+
+def _destination(source: str, out: str | None) -> Path:
+    """Resolve where the NIfTI goes: `--out`, else `<source name>_nifti` here.
+
+    Derived from the source, not the working directory, so the common
+    one-argument call puts a session's series together in a directory named
+    after it instead of scattering them where the command was run.
+    """
+    if out is not None:
+        return Path(out)
+    return Path(f"{Path(source).resolve().name}_nifti")
+
+
+def _print_listing(result: ImportResult, destination: Path, *, renaming: bool) -> None:
+    """Print one row per series: number, when it ran and the file it is now in."""
+    print(f"{'series':>6}  {'acquired':<19}  file")
+    for entry in result.series:
+        acquired = (entry.acquired or "").replace("T", " ")[:19]
+        number = "?" if entry.series is None else str(entry.series)
+        print(f"{number:>6}  {acquired:<19}  {entry.path.name}")
+    # `renamed_from` is None for series that kept dcm2niix's stem. Only report
+    # those under --names qa, where `naming.plan` makes that exception for a
+    # reason the reader can act on (an uninformative sidecar, or two series that
+    # would have shared a name). Under --names dcm2niix it is by request.
+    kept = [entry for entry in result.series if entry.renamed_from is None]
+    if renaming and kept:
+        print(
+            f"# {len(kept)} of {len(result.series)} series kept dcm2niix's name: "
+            f"{', '.join(entry.path.name for entry in kept)}",
+            file=sys.stderr,
+        )
+    print(f"# {len(result.series)} series -> {destination}")
+    # The glob uses the suffix actually written, so the line can be pasted
+    # whether or not --no-compress was used.
+    name = result.series[0].path.name
+    suffix = next(s for s in NIFTI_SUFFIXES if name.endswith(s))
+    print(f"# analyze with:  fmri-qa {destination}/*{suffix}")
+
+
+def import_main(argv: Sequence[str] | None = None) -> int:
+    """Run `fmri-qa-import`; return the process exit status."""
+    args = _parser().parse_args(argv)
+    destination = _destination(args.source, args.out)
+
+    result: ImportResult | None = None
+    with attributed_warnings(Path(args.source).name):
+        try:
+            result = import_dicom(
+                args.source,
+                destination,
+                binary=args.dcm2niix,
+                names=args.names,
+                template=args.filename,
+                compress=not args.no_compress,
+                anonymize=args.anonymize,
+                depth=args.depth,
+                extra=args.passthrough,
+                force=args.force,
+            )
+        except Exception as exc:  # noqa: BLE001 - report cleanly and exit non-zero
+            print(f"ERROR: {exc}", file=sys.stderr)
+    if result is None:
+        return 1
+
+    if args.log:
+        print(result.log, file=sys.stderr)
+    tool = result.tool_version or "version unknown"
+    print(f"# dcm2niix {tool} ({result.binary})")
+    if not result.series:
+        print(f"ERROR: no DICOM series converted from {args.source}", file=sys.stderr)
+        return 1
+    _print_listing(result, destination, renaming=args.names == "qa")
+    return 0

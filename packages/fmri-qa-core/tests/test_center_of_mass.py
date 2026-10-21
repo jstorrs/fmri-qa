@@ -3,8 +3,8 @@
 import numpy as np
 import pytest
 
-from fmriqc.metrics.center_of_mass import CenterOfMassResult, estimate_center_of_mass
-from fmriqc.prep.scale import VoxelSize
+from fmriqa.metrics.center_of_mass import CenterOfMassResult, estimate_center_of_mass
+from fmriqa.prep.scale import VoxelSize
 
 ALL_VALID = np.ones((16, 16), dtype=bool)
 

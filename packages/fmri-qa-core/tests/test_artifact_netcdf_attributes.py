@@ -18,10 +18,10 @@ import netCDF4
 import numpy as np
 import pytest
 
-import fmriqc as q
-from fmriqc.analysis import ARTIFACT_SCHEMA_VERSION
-from fmriqc.analysis.serialize import netcdf
-from fmriqc.analysis.serialize.decompose import decompose
+import fmriqa as q
+from fmriqa.analysis import ARTIFACT_SCHEMA_VERSION
+from fmriqa.analysis.serialize import netcdf
+from fmriqa.analysis.serialize.decompose import decompose
 
 
 def test_the_file_is_netcdf4(tmp_path, artifact) -> None:

@@ -5,9 +5,9 @@ from dataclasses import fields
 import numpy as np
 import pytest
 
-from fmriqc import ROI, ClipRail, MotionResult, QAImages, SaturationResult
-from fmriqc.prep.geometry import _roi_indexes
-from fmriqc.prep.scale import VoxelSize
+from fmriqa import ROI, ClipRail, MotionResult, QAImages, SaturationResult
+from fmriqa.prep.geometry import _roi_indexes
+from fmriqa.prep.scale import VoxelSize
 
 
 def test_roi_index_matches_roi_indexes() -> None:

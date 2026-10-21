@@ -12,7 +12,7 @@ import pytest
 def test_importing_the_package_leaves_the_matplotlib_backend_alone() -> None:
     """A library must not change a process-global its importer chose.
 
-    `fmriqc_report` used to call `matplotlib.use("Agg")` at import time,
+    `fmriqa_report` used to call `matplotlib.use("Agg")` at import time,
     overriding the backend the importing process had selected (e.g. a
     notebook's inline backend). This runs in a fresh interpreter with a
     non-default, display-free backend set via `MPLBACKEND`, so the probe is
@@ -21,7 +21,7 @@ def test_importing_the_package_leaves_the_matplotlib_backend_alone() -> None:
     code = (
         "import matplotlib\n"
         "before = matplotlib.get_backend()\n"
-        "import fmriqc_report\n"
+        "import fmriqa_report\n"
         "after = matplotlib.get_backend()\n"
         "print(before)\n"
         "print(after)\n"
@@ -51,8 +51,8 @@ def test_importing_the_package_leaves_the_matplotlib_backend_alone() -> None:
 def test_rdc_panel_uses_finite_limits(values, maximum, upper, unresolved) -> None:
     from matplotlib.figure import Figure
 
-    from fmriqc.analysis import WeisskoffCurve
-    from fmriqc_report.panels.timeseries import plot_rdc
+    from fmriqa.analysis import WeisskoffCurve
+    from fmriqa_report.panels.timeseries import plot_rdc
 
     widths = np.arange(1.0, 4.0)
     rdc = np.array(values)
@@ -77,7 +77,7 @@ def test_rdc_panel_uses_finite_limits(values, maximum, upper, unresolved) -> Non
 def test_motion_panel_marks_unresolved_frames(artifact, failed) -> None:
     from matplotlib.figure import Figure
 
-    from fmriqc_report.panels.timeseries import plot_motion
+    from fmriqa_report.panels.timeseries import plot_motion
 
     translation = np.zeros_like(artifact.curves.translation)
     translation[:failed] = np.nan
@@ -99,7 +99,7 @@ def test_outlier_panel_shows_measured_percentages_without_a_chance_line(
 ) -> None:
     from matplotlib.figure import Figure
 
-    from fmriqc_report.panels.timeseries import plot_outliers
+    from fmriqa_report.panels.timeseries import plot_outliers
 
     fractions = np.linspace(0.0, 0.02, artifact.curves.time.size)
     curves = replace(artifact.curves, outlier_fraction=fractions)

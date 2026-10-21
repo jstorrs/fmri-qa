@@ -1,7 +1,7 @@
 # fmri-qa-report
 
 The presentation half of [fmri-qa](../../README.md): a single self-contained
-offline HTML report rendered from a `fmriqc.analysis.QAArtifact`.
+offline HTML report rendered from a `fmriqa.analysis.QAArtifact`.
 
 ```console
 $ fmri-qa scan.nii.gz --artifact qa.nc

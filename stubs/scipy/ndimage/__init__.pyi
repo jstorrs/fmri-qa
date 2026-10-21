@@ -1,4 +1,4 @@
-"""Local partial stub for scipy.ndimage — only the functions fmriqc calls.
+"""Local partial stub for scipy.ndimage — only the functions fmriqa calls.
 
 scipy's shipped types are correct but conservative: the transforms are
 overloaded on flags that change the return type, so `distance_transform_edt`

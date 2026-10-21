@@ -16,8 +16,8 @@ import nibabel as nib
 import numpy as np
 import pytest
 
-import fmriqc as q
-from fmriqc.load.pe_axis import _pe_axis_from_header, _pe_axis_from_sidecar
+import fmriqa as q
+from fmriqa.load.pe_axis import _pe_axis_from_header, _pe_axis_from_sidecar
 
 
 @pytest.mark.parametrize(

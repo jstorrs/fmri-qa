@@ -31,8 +31,8 @@ import nibabel as nib
 import numpy as np
 import pytest
 
-import fmriqc
-from fmriqc.convert import naming
+import fmriqa
+from fmriqa.convert import naming
 
 # Mirrors `fmri-qa-core/tests/conftest.py::BACKGROUND_SCALE`/`PHANTOM_SIGNAL`.
 _BACKGROUND_SCALE = 8.0
@@ -191,25 +191,25 @@ def fast_render(monkeypatch: pytest.MonkeyPatch) -> Callable[..., Path]:
         target.write_text("<html><body>stub report</body></html>", encoding="utf-8")
         return target
 
-    monkeypatch.setattr("fmriqc_launcher.session.write_run_page", render)
+    monkeypatch.setattr("fmriqa_launcher.session.write_run_page", render)
     return render
 
 
 @pytest.fixture
 def warn_during_analysis(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Make `fmriqc.analyze` warn "a stub warning from the analysis" first.
+    """Make `fmriqa.analyze` warn "a stub warning from the analysis" first.
 
-    `session.py` calls `fmriqc.analyze(...)` as a module attribute, so the
+    `session.py` calls `fmriqa.analyze(...)` as a module attribute, so the
     warning has to come from there. Only warnings around `from_nifti`/`analyze`
-    are captured, as in `fmriqc.cli.qa`.
+    are captured, as in `fmriqa.cli.qa`.
     """
-    real = fmriqc.analyze
+    real = fmriqa.analyze
 
     def analyze(*args: object, **kwargs: object) -> object:
         warnings.warn("a stub warning from the analysis", stacklevel=2)
         return real(*args, **kwargs)  # type: ignore[arg-type]
 
-    monkeypatch.setattr(fmriqc, "analyze", analyze)
+    monkeypatch.setattr(fmriqa, "analyze", analyze)
 
 
 @pytest.fixture

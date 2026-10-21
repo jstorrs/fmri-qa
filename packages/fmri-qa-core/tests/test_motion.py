@@ -10,8 +10,8 @@ import pytest
 from scipy.ndimage import affine_transform
 from scipy.ndimage import shift as ndi_shift
 
-from fmriqc.metrics.motion import estimate_motion
-from fmriqc.prep.scale import VoxelSize
+from fmriqa.metrics.motion import estimate_motion
+from fmriqa.prep.scale import VoxelSize
 
 
 def _blob(n: int = 24) -> np.ndarray:

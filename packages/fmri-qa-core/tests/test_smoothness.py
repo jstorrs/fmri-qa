@@ -11,8 +11,8 @@ import warnings
 import numpy as np
 from scipy.ndimage import gaussian_filter1d
 
-from fmriqc.metrics.smoothness import SmoothnessResult, estimate_smoothness
-from fmriqc.prep.scale import VoxelSize
+from fmriqa.metrics.smoothness import SmoothnessResult, estimate_smoothness
+from fmriqa.prep.scale import VoxelSize
 
 
 def test_smoothness_result_converts_voxels_to_mm_and_labels_axes() -> None:

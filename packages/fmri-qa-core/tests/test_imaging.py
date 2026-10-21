@@ -5,9 +5,9 @@ import warnings
 import numpy as np
 import pytest
 
-import fmriqc as q
-from fmriqc.prep.geometry import _clamp_center, _image_center, _roi_indexes
-from fmriqc.prep.imaging import (
+import fmriqa as q
+from fmriqa.prep.geometry import _clamp_center, _image_center, _roi_indexes
+from fmriqa.prep.imaging import (
     _phantom_area,
     edge_valid_mask,
     fluctuation_noise,

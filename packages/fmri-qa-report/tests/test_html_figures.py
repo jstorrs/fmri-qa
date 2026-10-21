@@ -7,7 +7,7 @@ import matplotlib
 import numpy as np
 import pytest
 
-from fmriqc_report.formats.html import figures
+from fmriqa_report.formats.html import figures
 
 
 def _hrefs_bytes(svg: bytes) -> list[str]:
@@ -133,7 +133,7 @@ def test_render_figures_forces_inline_images_without_leaking_configuration(
 
 
 def test_a_theme_font_family_reaches_the_rc_params() -> None:
-    from fmriqc_report.theme import Theme
+    from fmriqa_report.theme import Theme
 
     assert "font.family" not in Theme().rc_params()
     assert Theme(panel_font_family="serif").rc_params()["font.family"] == "serif"
