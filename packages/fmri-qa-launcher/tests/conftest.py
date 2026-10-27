@@ -174,7 +174,7 @@ def warn_during_analysis(monkeypatch: pytest.MonkeyPatch) -> None:
 
     `session.py` calls `fmriqa.analyze(...)` as a module attribute, so the
     warning has to come from there. Only warnings around `from_nifti`/`analyze`
-    are captured, as in `fmriqa.cli.qa`.
+    are captured, as in `fmriqa_cli.qa`.
     """
     real = fmriqa.analyze
 

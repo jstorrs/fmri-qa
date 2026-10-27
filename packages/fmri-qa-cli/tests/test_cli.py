@@ -16,10 +16,10 @@ from pathlib import Path
 import pytest
 
 import fmriqa as q
-from fmriqa import cli
-from fmriqa.cli import qa, table
-from fmriqa.cli.arguments import attributed_warnings
-from fmriqa.cli.record import metric_record
+import fmriqa_cli as cli
+from fmriqa_cli import qa, table
+from fmriqa_cli.arguments import attributed_warnings
+from fmriqa_cli.record import metric_record
 
 
 def test_main_prints_table_and_succeeds(tmp_path, write_scan, capsys) -> None:

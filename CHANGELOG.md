@@ -6,8 +6,22 @@ versioning when the first stable public interface is released.
 
 ## Unreleased
 
+### Added
+
+- **`fmri-qa-io`, a new distribution for file formats and filesystem IO.**
+  Code that reads or writes files moves into it from `fmri-qa-core` over the
+  following changes, so core is left with the calculation alone and can run in
+  the browser under Pyodide.
+- **`fmriqa.testing`, the synthetic phantom the tests and docs measure
+  against.** `synthetic_series` builds the array and `phantom_scan` the scan;
+  `fmriqa_io.testing.write_phantom` writes it as a NIfTI + sidecar.
+
 ### Changed
 
+- **The commands moved to a new distribution, `fmri-qa-cli`.** `fmri-qa`,
+  `fmri-qa-import` and `fmri-qa-hilo` are no longer installed by
+  `fmri-qa-core`; install `fmri-qa-cli`. `python -m fmriqa` is now
+  `python -m fmriqa_cli`. The commands themselves are unchanged.
 - **The import packages are renamed to match the project: `fmriqc` is now
   `fmriqa`, `fmriqc_report` is `fmriqa_report`, and `fmriqc_launcher` is
   `fmriqa_launcher`.** `FmriqcError` is `FmriqaError`. The distribution and

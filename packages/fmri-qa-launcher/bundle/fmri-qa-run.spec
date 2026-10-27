@@ -1,5 +1,5 @@
 # -*- mode: python -*-
-# PyInstaller spec for the single-file `fmri-qa-run`: the launcher, both
+# PyInstaller spec for the single-file `fmri-qa-run`: the launcher, the
 # distributions under it, the interpreter and dcm2niix in one executable that
 # needs nothing installed. `make bundle` builds it from an isolated environment
 # resolved from uv.lock, because the shared .venv's extra tooling would get
@@ -21,11 +21,13 @@ import dcm2niix
 
 FIRST_PARTY = {
     "fmri-qa-core": "fmriqa",
+    "fmri-qa-io": "fmriqa_io",
+    "fmri-qa-cli": "fmriqa_cli",
     "fmri-qa-report": "fmriqa_report",
     "fmri-qa-launcher": "fmriqa_launcher",
 }
 
-# All three packages resolve names lazily through `import_module` (PEP 562
+# Every package resolves names lazily through `import_module` (PEP 562
 # `__getattr__` maps, and `cli._launch_panel` for the Tk panel), which the
 # import graph cannot see. Collecting every submodule avoids maintaining a list.
 hiddenimports = [

@@ -59,19 +59,18 @@ from the docstrings into `build/site`.
 ## Install
 
 The project uses [uv](https://docs.astral.sh/uv/) and Python 3.13. The repo is a
-uv workspace holding all three packages. Syncing it gives the full development
+uv workspace holding all the packages. Syncing it gives the full development
 environment:
 
 ```bash
 uv sync --all-packages
 ```
 
-Downstream, install the package you need. `fmri-qa-launcher` pulls in
-`fmri-qa-core` and `fmri-qa-report`, and `fmri-qa-report` pulls in
-`fmri-qa-core`:
+Downstream, install the package you need. Each pulls in the ones it builds on:
 
 ```bash
 pip install fmri-qa-core      # metrics and artifacts only
+pip install fmri-qa-cli       # + fmri-qa, fmri-qa-import and fmri-qa-hilo
 pip install fmri-qa-report    # + plots and self-contained HTML reports
 pip install fmri-qa-launcher  # + fmri-qa-run and the desktop panel
 ```

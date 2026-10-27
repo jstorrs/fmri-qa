@@ -17,8 +17,8 @@ from importlib import import_module
 from pathlib import Path
 from typing import assert_never
 
-from fmriqa.cli.arguments import nonnegative_float, positive_int
 from fmriqa.settings import AnalysisSettings
+from fmriqa_cli.arguments import nonnegative_float, positive_int
 
 from .exceptions import LauncherError, PanelUnavailableError, RequestError
 from .outcome import Failed, Published, Refused, RunResult

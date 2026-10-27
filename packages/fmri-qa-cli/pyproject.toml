@@ -1,0 +1,49 @@
+[project]
+name = "fmri-qa-cli"
+version = "0.1.0"
+description = "Command-line shell for fmri-qa: fmri-qa, fmri-qa-hilo and fmri-qa-import"
+readme = "README.md"
+requires-python = ">=3.13"
+license = "MIT"
+# A per-package copy of the root LICENSE. A path outside the package
+# (../../LICENSE) is not portable: hatchling drops it from the wheel and writes
+# an unusable `../../` member into the sdist. `make check` verifies the copy is
+# byte-identical to the root LICENSE.
+license-files = ["LICENSE"]
+authors = [
+    { name = "Judd Storrs", email = "jstorrs@gmail.com" },
+]
+keywords = ["fMRI", "MRI", "phantom", "quality assurance", "command line"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Healthcare Industry",
+    "Intended Audience :: Science/Research",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.13",
+    "Typing :: Typed",
+]
+# The commands analyze with fmri-qa-core and read and write files through
+# fmri-qa-io. Neither pulls in the drawing stack: rendering is fmri-qa-report.
+dependencies = [
+    "fmri-qa-core==0.1.0",
+    "fmri-qa-io==0.1.0",
+]
+
+# The entry points name `fmriqa_cli`. It reaches core only through the lazy
+# `fmriqa` root, so `--help` and `--version` never import scipy or scikit-image.
+[project.scripts]
+fmri-qa = "fmriqa_cli:main"
+fmri-qa-hilo = "fmriqa_cli:hilo_main"
+fmri-qa-import = "fmriqa_cli:import_main"
+
+[tool.uv.sources]
+fmri-qa-core = { workspace = true }
+fmri-qa-io = { workspace = true }
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/fmriqa_cli"]

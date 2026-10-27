@@ -158,6 +158,8 @@ def encode() -> Callable[[dict, dict[str, np.ndarray]], bytes]:
     return run
 
 
+# Mirrors `fmriqa_io.testing.fake_dcm2niix_script`. Goes away when the import
+# session tests move to fmri-qa-io.
 @pytest.fixture
 def fake_dcm2niix(tmp_path):
     """Build a stub dcm2niix that writes the outputs a test asks for.

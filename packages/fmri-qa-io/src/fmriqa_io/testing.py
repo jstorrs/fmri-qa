@@ -1,11 +1,14 @@
-"""Write the synthetic phantom to disk as a NIfTI + BIDS sidecar.
+"""Helpers for tests, docs and spikes that need real file IO.
 
-The file counterpart of `fmriqa.testing.phantom_scan`, for tests, docs and
-spikes that need real file IO. Import it as `fmriqa_io.testing`. It is not part
-of the `fmriqa_io` public surface.
+`write_phantom` writes the synthetic phantom to disk as a NIfTI + BIDS sidecar,
+the file counterpart of `fmriqa.testing.phantom_scan`. `fake_dcm2niix_script`
+writes a stub converter. Import this module as `fmriqa_io.testing`. It is not
+part of the `fmriqa_io` public surface.
 """
 
 import json
+import stat
+from collections.abc import Mapping
 from pathlib import Path
 
 import nibabel as nib
@@ -13,7 +16,7 @@ import numpy as np
 
 from fmriqa.testing import TR_SEC, VOXEL_MM, synthetic_series
 
-__all__ = ["write_phantom"]
+__all__ = ["fake_dcm2niix_script", "write_phantom"]
 
 
 def write_phantom(
@@ -57,3 +60,42 @@ def write_phantom(
         json.dumps({"PhaseEncodingDirection": "j", "FlipAngle": flip})
     )
     return nifti
+
+
+def fake_dcm2niix_script(
+    directory: Path,
+    outputs: Mapping[str, Mapping[str, object] | None],
+    returncode: int = 0,
+    name: str = "dcm2niix",
+    *,
+    suffix: str = ".nii.gz",
+    companions: Mapping[str, bytes] | None = None,
+) -> Path:
+    """Write a stub dcm2niix into `directory`; return the executable's path.
+
+    For each stem in `outputs`, the stub writes a NIfTI containing the stem, plus
+    `<stem>.json` where a sidecar was given, into the directory named by `-o`.
+    `companions` maps extra file names to their bytes. The stub prints dcm2niix's
+    real banner line for the version parser and exits with `returncode`.
+    """
+    script = directory / name
+    script.write_text(
+        "#!/usr/bin/env python3\n"
+        "import json, sys\n"
+        "from pathlib import Path\n"
+        f"outputs = {dict(outputs)!r}\n"
+        f"companions = {dict(companions or {})!r}\n"
+        f"suffix = {suffix!r}\n"
+        "args = sys.argv[1:]\n"
+        "out = Path(args[args.index('-o') + 1])\n"
+        'print("Chris Rorden\'s dcm2niiX version v1.0.20260724 (JP2:OpenJPEG)")\n'
+        "for stem, sidecar in outputs.items():\n"
+        "    (out / f'{stem}{suffix}').write_bytes(stem.encode())\n"
+        "    if sidecar is not None:\n"
+        "        (out / f'{stem}.json').write_text(json.dumps(sidecar))\n"
+        "for filename, content in companions.items():\n"
+        "    (out / filename).write_bytes(content)\n"
+        f"sys.exit({returncode})\n"
+    )
+    script.chmod(script.stat().st_mode | stat.S_IXUSR)
+    return script

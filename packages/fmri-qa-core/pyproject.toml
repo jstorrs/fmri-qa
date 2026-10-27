@@ -46,11 +46,6 @@ dependencies = [
     "dcm2niix>=1.0.20250506",
 ]
 
-[project.scripts]
-fmri-qa = "fmriqa.cli:main"
-fmri-qa-hilo = "fmriqa.cli:hilo_main"
-fmri-qa-import = "fmriqa.cli:import_main"
-
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"

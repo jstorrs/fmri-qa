@@ -275,7 +275,7 @@ def _publish_series(
     unreadable sidecar, a motion fit that did not converge) are captured, not
     printed, and carried on whichever outcome this returns. The core stays
     silent and a shell decides how to show them. Only loading and analyzing
-    are captured, as in `fmriqa.cli.qa`: `simplefilter("always")` revives
+    are captured, as in `fmriqa_cli.qa`: `simplefilter("always")` revives
     warnings a library silences on purpose, so saving or rendering under it
     would present, say, netCDF4's first-import numpy notice as a finding about
     the scan. `warnings.catch_warnings` is process-global, not thread-local,

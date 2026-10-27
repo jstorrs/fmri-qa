@@ -34,7 +34,5 @@ site lands in `build/site`.
 
 ## Commands
 
-- `fmri-qa SCAN... [--artifact PATH]`: the metrics table (or `--json`), and
-  optionally the saved artifact.
-- `fmri-qa-import SOURCE [-o DIR]`: DICOM directory to QA-ready NIfTI with dcm2niix.
-- `fmri-qa-hilo HIGH LOW`: high/low flip-angle thermal/instability separation.
+This package ships no commands. `fmri-qa`, `fmri-qa-import` and `fmri-qa-hilo`
+are in [`fmri-qa-cli`](../fmri-qa-cli).

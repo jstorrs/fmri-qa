@@ -41,7 +41,6 @@ RANKS = {
     "pipeline": 4,
     "hilo": 4,
     "analysis": 5,
-    "cli": 6,
 }
 
 _SOURCE_ROOT = Path(fmriqa.__file__).parent
@@ -71,9 +70,8 @@ def _layer(parts: tuple[str, ...]) -> int | None:
 def _import_targets(tree: ast.Module, rel: tuple[str, ...]) -> set[tuple[str, ...]]:
     """Every module `tree` (the source file at `rel`) imports, as resolved parts.
 
-    Covers relative imports (`node.level > 0`) everywhere but `cli/`, and the
-    absolute `fmriqa...` imports `cli/` uses (`import fmriqa as q`,
-    `from fmriqa.load.paths import ...`).
+    Covers relative imports (`node.level > 0`) and absolute `fmriqa...` imports
+    (`import fmriqa as q`, `from fmriqa.load.paths import ...`).
     """
     targets: set[tuple[str, ...]] = set()
     for node in ast.walk(tree):

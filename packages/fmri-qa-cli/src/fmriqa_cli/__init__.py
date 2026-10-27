@@ -1,4 +1,4 @@
-"""Command-line entry points for the calculation half.
+"""Command-line entry points: the shell over core and io.
 
 Three commands, one module each: `qa` (`fmri-qa`) analyzes one or more series
 and reports the metrics; `hilo` (`fmri-qa-hilo`) runs the high/low flip-angle
@@ -7,7 +7,7 @@ NIfTI the other two read. Helpers: `table` and `record` are the two output forms
 of a QA run, `destinations` decides where `--artifact` writes, and `arguments`
 holds what all three commands parse and warn with, plus `--version`. Rendering
 an artifact is the separate `fmri-qa-report` distribution's job, so nothing here
-imports matplotlib.
+imports matplotlib. `python -m fmriqa_cli` runs `fmri-qa`.
 """
 
 from .dicom import import_main

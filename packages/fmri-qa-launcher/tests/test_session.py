@@ -570,7 +570,7 @@ def test_a_warning_during_render_is_not_captured(
     stub_series: StubSeries,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Only analysis is captured, as in `fmriqa.cli.qa`.
+    """Only analysis is captured, as in `fmriqa_cli.qa`.
 
     `simplefilter("always")` over save/render used to revive warnings a
     library silences on purpose, such as netCDF4's first-import numpy notice,

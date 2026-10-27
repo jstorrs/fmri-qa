@@ -1,8 +1,8 @@
 # Standard development loop for fmri-qa. See style/tooling.md.
 #
-# The repo is a uv workspace of four distributions (fmri-qa-core,
-# fmri-qa-io, fmri-qa-report and fmri-qa-launcher). Every target runs against the whole
-# workspace, so a change to the analysis artifact is checked on every side.
+# The repo is a uv workspace of five distributions (fmri-qa-core, fmri-qa-io,
+# fmri-qa-cli, fmri-qa-report and fmri-qa-launcher). Every target runs against
+# the whole workspace, so a change to the analysis artifact is checked on every side.
 # Sync the workspace once first (see style/tooling.md). The heavy notebook
 # stack is a separate group, `make sync-notebooks`.
 
@@ -76,6 +76,7 @@ test-cov:
 license:
 	cmp LICENSE packages/fmri-qa-core/LICENSE
 	cmp LICENSE packages/fmri-qa-io/LICENSE
+	cmp LICENSE packages/fmri-qa-cli/LICENSE
 	cmp LICENSE packages/fmri-qa-report/LICENSE
 	cmp LICENSE packages/fmri-qa-launcher/LICENSE
 

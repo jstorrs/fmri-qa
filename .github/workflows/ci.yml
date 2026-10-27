@@ -51,8 +51,6 @@ jobs:
           test -f "${core[0]}"
           uv venv --python 3.13 .venv-core-smoke
           uv pip install --python .venv-core-smoke/bin/python "${core[0]}"
-          .venv-core-smoke/bin/fmri-qa --version
-          .venv-core-smoke/bin/fmri-qa-hilo --help > /dev/null
           .venv-core-smoke/bin/python -c "from importlib.resources import files; assert files('fmriqa').joinpath('py.typed').is_file()"
           # The seam, checked against the installed artifact: no drawing stack.
           .venv-core-smoke/bin/python -c "import importlib.util as u; assert u.find_spec('matplotlib') is None"
@@ -71,6 +69,23 @@ jobs:
           .venv-io-smoke/bin/python -c "from importlib.resources import files; assert files('fmriqa_io').joinpath('py.typed').is_file()"
           .venv-io-smoke/bin/python -c "from importlib.metadata import distribution; text = distribution('fmri-qa-io').read_text('licenses/LICENSE'); assert text and 'MIT License' in text, 'the io wheel ships no license text'"
 
+      - name: Smoke-test the cli wheel against the core and io wheels
+        run: |
+          core=(dist/fmri_qa_core-*.whl)
+          io=(dist/fmri_qa_io-*.whl)
+          cli=(dist/fmri_qa_cli-*.whl)
+          test -f "${cli[0]}"
+          uv venv --python 3.13 .venv-cli-smoke
+          uv pip install --python .venv-cli-smoke/bin/python "${core[0]}" "${io[0]}" "${cli[0]}"
+          .venv-cli-smoke/bin/fmri-qa --version
+          .venv-cli-smoke/bin/fmri-qa-hilo --help > /dev/null
+          .venv-cli-smoke/bin/fmri-qa-import --help > /dev/null
+          .venv-cli-smoke/bin/python -m fmriqa_cli --version
+          .venv-cli-smoke/bin/python -c "from importlib.resources import files; assert files('fmriqa_cli').joinpath('py.typed').is_file()"
+          .venv-cli-smoke/bin/python -c "from importlib.metadata import distribution; text = distribution('fmri-qa-cli').read_text('licenses/LICENSE'); assert text and 'MIT License' in text, 'the cli wheel ships no license text'"
+          # Core ships no commands: only the cli wheel owns the entry points.
+          .venv-cli-smoke/bin/python -c "from importlib.metadata import distribution; assert not distribution('fmri-qa-core').entry_points, 'the core wheel ships console scripts'"
+
       - name: Smoke-test the report wheel against the core wheel
         run: |
           core=(dist/fmri_qa_core-*.whl)
@@ -87,14 +102,16 @@ jobs:
           .venv-report-smoke/bin/python -c "from importlib.metadata import distribution; text = distribution('fmri-qa-report').read_text('licenses/LICENSE'); assert text and 'MIT License' in text, 'the report wheel ships no license text'"
           .venv-report-smoke/bin/python -c "import tarfile; archive = next(__import__('pathlib').Path('dist').glob('fmri_qa_report-*.tar.gz')); names = tarfile.open(archive).getnames(); assert any(name.endswith('src/fmriqa_report/formats/html/templates/run.html') for name in names) and any(name.endswith('src/fmriqa_report/formats/html/assets/report.css') for name in names), 'the report sdist ships no HTML resources'"
 
-      - name: Smoke-test the launcher wheel against the core and report wheels
+      - name: Smoke-test the launcher wheel against the other wheels
         run: |
           core=(dist/fmri_qa_core-*.whl)
+          io=(dist/fmri_qa_io-*.whl)
+          cli=(dist/fmri_qa_cli-*.whl)
           report=(dist/fmri_qa_report-*.whl)
           launcher=(dist/fmri_qa_launcher-*.whl)
           test -f "${launcher[0]}"
           uv venv --python 3.13 .venv-launcher-smoke
-          uv pip install --python .venv-launcher-smoke/bin/python "${core[0]}" "${report[0]}" "${launcher[0]}"
+          uv pip install --python .venv-launcher-smoke/bin/python "${core[0]}" "${io[0]}" "${cli[0]}" "${report[0]}" "${launcher[0]}"
           .venv-launcher-smoke/bin/fmri-qa-run --version
           .venv-launcher-smoke/bin/fmri-qa-run -h > /dev/null
           .venv-launcher-smoke/bin/python -c "from importlib.resources import files; assert files('fmriqa_launcher').joinpath('py.typed').is_file()"
