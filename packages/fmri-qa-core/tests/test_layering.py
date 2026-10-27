@@ -28,6 +28,9 @@ RANKS = {
     # A leaf over the standard library only, shared with the report command.
     "path_arguments": 0,
     "load": 1,
+    # The shipped phantom builds a `QAScan`, so it sits on `load`. It is for
+    # tests and docs; no module in the package should import it.
+    "testing": 1,
     # `convert` sits beside `load`: both get data in, and convert produces the files
     # load reads. It borrows load's path conventions, which a rank below load
     # would forbid.

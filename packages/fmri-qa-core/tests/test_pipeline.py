@@ -13,8 +13,9 @@ import pytest
 
 import fmriqa as q
 from fmriqa.prep.geometry import roi_fits
+from fmriqa.testing import synthetic_series
 
-from .conftest import MakeScan, synthetic_series
+from .conftest import MakeScan
 
 # Fraction of the phantom injected at its N/2-shifted location, big enough for
 # the ghost estimate to separate the two candidate axes on a noisy series.

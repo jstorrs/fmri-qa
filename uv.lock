@@ -874,12 +874,14 @@ version = "0.1.0"
 source = { editable = "packages/fmri-qa-io" }
 dependencies = [
     { name = "fmri-qa-core" },
+    { name = "nibabel" },
     { name = "numpy" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "fmri-qa-core", editable = "packages/fmri-qa-core" },
+    { name = "nibabel", specifier = ">=5.3.2" },
     { name = "numpy", specifier = ">=2.3.4" },
 ]
 
@@ -889,12 +891,14 @@ version = "0.1.0"
 source = { editable = "packages/fmri-qa-launcher" }
 dependencies = [
     { name = "fmri-qa-core" },
+    { name = "fmri-qa-io" },
     { name = "fmri-qa-report" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "fmri-qa-core", editable = "packages/fmri-qa-core" },
+    { name = "fmri-qa-io", editable = "packages/fmri-qa-io" },
     { name = "fmri-qa-report", editable = "packages/fmri-qa-report" },
 ]
 

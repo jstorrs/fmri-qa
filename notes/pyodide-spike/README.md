@@ -59,7 +59,7 @@ has this `tools/` in it:
     uv run python $SPIKE/tools/native.py $SPIKE/data $SPIKE/dist/native.json
     (cd $SPIKE/tools && npm ci) && node $SPIKE/tools/run_test.mjs chrome
 
-`make_data.py` imports the core test `conftest`, and `native.py` calls
-`QAScan.from_nifti`. Both will need updating once IO moves to fmri-qa-io;
-check out 34ff19d to rerun them as they are. Snap Firefox cannot read `/tmp`;
+`make_data.py` uses `fmriqa_io.testing.write_phantom`, and `native.py` calls
+`QAScan.from_nifti`, which will need updating once IO moves to fmri-qa-io;
+check out 34ff19d to rerun it as it is. Snap Firefox cannot read `/tmp`;
 `run_test.mjs firefox` needs `FFPROFILE` and `DATA_DIR` set to paths outside it.

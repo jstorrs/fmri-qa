@@ -13,7 +13,7 @@ build wrote.
 This module is the other half. Each `tests/fixtures/schema_v*` archive is the
 literal file produced by checking out that schema version's last commit before
 the next bump and running that build's `save_artifact` over the same synthetic
-phantom the rest of the suite uses (`conftest.synthetic_series`, seed 0). That
+phantom the rest of the suite uses (`fmriqa.testing.synthetic_series`, seed 0). That
 exercises real historical bytes, including the container, which is why fixtures
 are discovered by either suffix: every committed one so far is a `.qa.npz`, and
 the next will be a `.qa.nc`. Neither half replaces the other. A bug breaking a

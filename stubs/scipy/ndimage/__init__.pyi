@@ -32,3 +32,9 @@ def binary_erosion(
     structure: npt.ArrayLike | None = ...,
     iterations: int = ...,
 ) -> npt.NDArray[np.bool_]: ...
+def gaussian_filter(
+    input: npt.ArrayLike,
+    sigma: float | tuple[float, ...],
+    *,
+    mode: str = ...,
+) -> npt.NDArray[np.float64]: ...

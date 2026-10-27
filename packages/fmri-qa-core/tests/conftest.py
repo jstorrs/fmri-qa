@@ -1,8 +1,9 @@
 """Shared fixtures for the calculation-half tests.
 
-`synthetic_series` builds the phantom every test measures against. `write_scan`
-writes one to disk as a NIfTI + BIDS sidecar for tests that need real file I/O.
-`artifact` runs the whole pipeline over the phantom once per session.
+The phantom every test measures against is `fmriqa.testing.synthetic_series`.
+`write_scan` writes one to disk as a NIfTI + BIDS sidecar for tests that need
+real file I/O. `artifact` runs the whole pipeline over the phantom once per
+session.
 """
 
 import dataclasses
@@ -18,30 +19,10 @@ import pytest
 
 import fmriqa as q
 from fmriqa.analysis.serialize import netcdf
+from fmriqa.testing import phantom_scan, synthetic_series
 
 WriteScan = Callable[..., str]
 MakeScan = Callable[..., "q.QAScan"]
-
-# Background noise floor, as a fraction of phantom signal. Real magnitude images
-# have a Rician air background. A constant one makes the intensity quantiles
-# that seed `segment_phantom` degenerate.
-BACKGROUND_SCALE = 8.0
-PHANTOM_SIGNAL = 1000.0
-
-
-def synthetic_series(n: int = 32, z: int = 3, t: int = 40, seed: int = 0) -> np.ndarray:
-    """A bright central disk over a noisy background: (n, n, z, t), float64.
-
-    The disk carries seeded temporal noise. The background has a static floor
-    (see `BACKGROUND_SCALE`) so the phantom is separable from it.
-    """
-    rng = np.random.default_rng(seed)
-    yy, xx = np.mgrid[0:n, 0:n]
-    disk = ((xx - n / 2) ** 2 + (yy - n / 2) ** 2) < (n / 4) ** 2
-    base = np.where(disk, PHANTOM_SIGNAL, 0.0)
-    floor = np.abs(rng.normal(scale=BACKGROUND_SCALE, size=(n, n, z, t)))
-    noise = rng.normal(scale=5.0, size=(n, n, z, t)) * disk[:, :, None, None]
-    return np.asarray(base[:, :, None, None] + noise + floor, dtype=np.float64)
 
 
 @pytest.fixture
@@ -84,6 +65,8 @@ def _write_phantom(
     nibabel stores the values directly. Rescaling them onto the type's maximum
     would create a false `2**16 - 1` rail.
     """
+    # Mirrors `fmriqa_io.testing.write_phantom`. Goes away when the file-based
+    # tests move to fmri-qa-io.
     data = synthetic_series(n=n, z=z, t=t, seed=seed)
 
     img = nib.Nifti1Image(data.astype(np.uint16), affine=np.eye(4))
@@ -116,15 +99,14 @@ def write_scan() -> WriteScan:
 
 
 @pytest.fixture(scope="session")
-def artifact(tmp_path_factory: pytest.TempPathFactory) -> q.QAArtifact:
+def artifact() -> q.QAArtifact:
     """An artifact from the synthetic phantom, at a small ROI.
 
     Built once per session and shared. The artifact is frozen with read-only
     arrays, so no test can change it for another. The assertion below checks
     that.
     """
-    nifti = _write_phantom(tmp_path_factory.mktemp("artifact"))
-    scan = q.QAScan.from_nifti(nifti)
+    scan = phantom_scan()
     settings = q.AnalysisSettings(roi_size=9)
     result = q.analyze(scan, settings, name="scan.nii.gz", source="scan.nii.gz")
     assert not any(a.flags.writeable for a in _arrays(result)), (

@@ -1,10 +1,8 @@
 """Shared fixtures for the launcher tests.
 
-`prepared_series` builds an analyzable synthetic phantom NIfTI + BIDS sidecar
-pair with nibabel. It is a third copy of `write_scan` in
-`fmri-qa-core/tests/conftest.py` and `_phantom` in
-`fmri-qa-report/tests/conftest.py`. One package can't import another's
-`tests/`, and a path hack would tie test collection to that package's layout.
+`prepared_series` writes an analyzable synthetic phantom NIfTI + BIDS sidecar
+pair with `fmriqa_io.testing.write_phantom`. The phantom itself is
+`fmriqa.testing`'s, the one core and io test against.
 
 `stub_dcm2niix` stands in for the real converter. `fmri-qa-core`'s
 `fake_dcm2niix` writes NIfTI files that don't load, which is enough for naming
@@ -27,34 +25,16 @@ import warnings
 from collections.abc import Callable, Sequence
 from pathlib import Path
 
-import nibabel as nib
-import numpy as np
 import pytest
 
 import fmriqa
 from fmriqa.convert import naming
-
-# Mirrors `fmri-qa-core/tests/conftest.py::BACKGROUND_SCALE`/`PHANTOM_SIGNAL`.
-_BACKGROUND_SCALE = 8.0
-_PHANTOM_SIGNAL = 1000.0
+from fmriqa_io.testing import write_phantom
 
 PreparedSeries = Callable[..., tuple[Path, dict[str, object]]]
 StubDcm2niix = Callable[..., Path]
 SeriesSidecar = Callable[[dict[str, object], int, str], dict[str, object]]
 StubSeries = Callable[..., tuple[Path, list[str]]]
-
-
-def _synthetic_series(
-    n: int = 32, z: int = 3, t: int = 40, seed: int = 0
-) -> np.ndarray:
-    """A bright central disk over a noisy background: (n, n, z, t), float64."""
-    rng = np.random.default_rng(seed)
-    yy, xx = np.mgrid[0:n, 0:n]
-    disk = ((xx - n / 2) ** 2 + (yy - n / 2) ** 2) < (n / 4) ** 2
-    base = np.where(disk, _PHANTOM_SIGNAL, 0.0)
-    floor = np.abs(rng.normal(scale=_BACKGROUND_SCALE, size=(n, n, z, t)))
-    noise = rng.normal(scale=5.0, size=(n, n, z, t)) * disk[:, :, None, None]
-    return np.asarray(base[:, :, None, None] + noise + floor, dtype=np.float64)
 
 
 @pytest.fixture
@@ -73,18 +53,11 @@ def prepared_series(tmp_path: Path) -> PreparedSeries:
     ) -> tuple[Path, dict[str, object]]:
         directory = tmp_path / f"prepared-{next(counter)}"
         directory.mkdir()
-        data = _synthetic_series(t=t, seed=seed)
-        img = nib.Nifti1Image(data.astype(np.uint16), affine=np.eye(4))
-        img.header.set_zooms((3.0, 3.0, 3.0, 2.0))
-        img.header.set_xyzt_units("mm", "sec")
-        nifti_path = directory / f"{name}.nii.gz"
-        nib.save(img, str(nifti_path))
-        sidecar: dict[str, object] = {
-            "PhaseEncodingDirection": "j",
-            "FlipAngle": flip,
-        }
-        (directory / f"{name}.json").write_text(json.dumps(sidecar))
-        return nifti_path, sidecar
+        nifti = write_phantom(directory, name, t=t, seed=seed, flip=flip)
+        sidecar: dict[str, object] = json.loads(
+            (directory / f"{name}.json").read_text()
+        )
+        return nifti, sidecar
 
     return factory
 
