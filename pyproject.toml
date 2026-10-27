@@ -79,8 +79,9 @@ src = [
     "packages/fmri-qa-report/src",
     "packages/fmri-qa-launcher/src",
 ]
-# Reference notebooks are exploratory scratch, not maintained code — skip them.
-extend-exclude = ["notebooks"]
+# Reference notebooks and the Pyodide spike are exploratory scratch, not maintained
+# code — skip them.
+extend-exclude = ["notebooks", "notes/pyodide-spike"]
 
 [tool.ruff.format]
 quote-style = "double"

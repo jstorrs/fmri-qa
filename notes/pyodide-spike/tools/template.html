@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>fmriqa Pyodide spike</title>
+<style>
+:root{--bg:#fff;--fg:#1a1a1a;--mut:#666;--bd:#ccc;--acc:#0b5fff}
+@media (prefers-color-scheme:dark){:root{--bg:#161616;--fg:#e8e8e8;--mut:#999;--bd:#444;--acc:#6aa0ff}}
+body{background:var(--bg);color:var(--fg);font:14px/1.4 system-ui,sans-serif;max-width:56rem;margin:1rem auto;padding:0 16px}
+h1{font-size:1.2rem}
+#drop{border:2px dashed var(--bd);padding:1.5rem;text-align:center;margin:1rem 0}
+#drop.over{border-color:var(--acc)}
+table{border-collapse:collapse;width:100%}
+td,th{border:1px solid var(--bd);padding:2px 8px;text-align:left;font-family:ui-monospace,monospace;font-size:12px}
+pre{background:transparent;border:1px solid var(--bd);padding:8px;overflow:auto;white-space:pre-wrap}
+.mut{color:var(--mut)}
+</style></head><body>
+<h1>fmriqa in Pyodide (offline spike)</h1>
+<table id="phases"><tr><th>Phase</th><th>Status</th><th>Elapsed</th></tr>
+<tr id="ph-assets"><td>decode embedded assets</td><td>-</td><td>-</td></tr>
+<tr id="ph-boot"><td>runtime boot</td><td>-</td><td>-</td></tr>
+<tr id="ph-pkgs"><td>package load</td><td>-</td><td>-</td></tr>
+<tr id="ph-import"><td>fmriqa import</td><td>-</td><td>-</td></tr>
+<tr id="ph-analyze"><td>analysis</td><td>-</td><td>-</td></tr></table>
+<div id="drop"><p>Drop a <code>.nii</code>/<code>.nii.gz</code> and optional <code>.json</code> sidecar here, or</p>
+<button id="open" disabled>Open</button>
+<input id="file" type="file" multiple accept=".nii,.gz,.json" hidden></div>
+<h2>Measurements</h2><table id="meas"></table>
+<h2>Warnings</h2><pre id="warn" class="mut">-</pre>
+<h2>Errors</h2><pre id="err" class="mut">-</pre>
+<h2>Log</h2><pre id="log" class="mut"></pre>
+
+__ASSETS__
+
+<script>__PYODIDE_JS__</script>
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+const log = m => { $("log").textContent += m + "\n"; };
+window.__spike = { ready: false, phases: {}, results: [], requests: [], error: null };
+const setPhase = (id, status, ms) => {
+  const r = $("ph-" + id).children; r[1].textContent = status;
+  if (ms != null) { r[2].textContent = (ms / 1000).toFixed(2) + " s"; window.__spike.phases[id] = ms; }
+};
+const timed = async (id, fn) => {
+  setPhase(id, "running..."); const t0 = performance.now();
+  try { const v = await fn(); setPhase(id, "done", performance.now() - t0); return v; }
+  catch (e) { setPhase(id, "FAILED", performance.now() - t0); throw e; }
+};
+
+// ---- embedded assets -> Uint8Arrays --------------------------------------
+const ASSETS = {};
+async function gunzip(u8) {
+  const s = new Blob([u8]).stream().pipeThrough(new DecompressionStream("gzip"));
+  return new Uint8Array(await new Response(s).arrayBuffer());
+}
+function b64decode(s) {
+  if (Uint8Array.fromBase64) return Uint8Array.fromBase64(s);
+  const bin = atob(s), n = bin.length, out = new Uint8Array(n);
+  for (let i = 0; i < n; i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
+async function decodeAssets() {
+  for (const el of document.querySelectorAll('script[type="application/octet-stream"]')) {
+    let u8 = b64decode(el.textContent);
+    if (el.dataset.gz) u8 = await gunzip(u8);
+    ASSETS[el.dataset.name] = u8;
+    el.textContent = ""; // free the base64 text
+  }
+}
+
+// ---- fetch: serve only embedded assets, refuse everything else ------------
+const MIME = { wasm: "application/wasm", json: "application/json", zip: "application/zip", whl: "application/zip" };
+const realFetch = window.fetch ? window.fetch.bind(window) : null;
+window.fetch = async function (input, init) {
+  const url = typeof input === "string" ? input : (input.url || String(input));
+  if (!url.startsWith("data:") && !url.startsWith("blob:")) {
+    const name = decodeURIComponent(new URL(url, "http://x/").pathname.split("/").pop());
+    const bytes = ASSETS[name];
+    if (bytes) {
+      window.__spike.requests.push({ url, served: name });
+      const ext = name.split(".").pop();
+      return new Response(bytes, { status: 200, headers: { "Content-Type": MIME[ext] || "application/octet-stream" } });
+    }
+    window.__spike.requests.push({ url, refused: true });
+    throw new TypeError("offline spike: refusing fetch of " + url);
+  }
+  return realFetch(input, init);
+};
+
+// ---- boot ------------------------------------------------------------------
+let py;
+const PY_RUN = `
+import json, time, warnings, dataclasses, traceback
+import fmriqa
+
+def run(path, name):
+    with warnings.catch_warnings(record=True) as w:
+        warnings.simplefilter("always")
+        t0 = time.perf_counter()
+        try:
+            scan = fmriqa.QAScan.from_nifti(path)
+            art = fmriqa.analyze(scan, name=name, source=name)
+            out = {"ok": True, "measurements": dataclasses.asdict(art.measurements)}
+        except BaseException:
+            out = {"ok": False, "traceback": traceback.format_exc()}
+        out["seconds"] = time.perf_counter() - t0
+        out["warnings"] = [f"{x.category.__name__}: {x.message}" for x in w]
+    return json.dumps(out, default=str)
+`;
+async function boot() {
+  await timed("assets", decodeAssets);
+  const lock = JSON.parse(new TextDecoder().decode(ASSETS["pyodide-lock.json"]));
+  const asmUrl = URL.createObjectURL(new Blob([ASSETS["pyodide.asm.mjs"]], { type: "text/javascript" }));
+  py = await timed("boot", async () => {
+    const factory = (await import(asmUrl)).default;
+    return await loadPyodide({ indexURL: "https://pyodide.invalid/", lockFileContents: lock, packageBaseUrl: "https://pyodide.invalid/", createPyodideModule: factory });
+  });
+  await timed("pkgs", async () => {
+    await py.loadPackage(["numpy", "scipy", "scikit-image", "packaging"]);
+    py.unpackArchive(ASSETS["nibabel.whl"], "whl");
+    py.unpackArchive(ASSETS["fmriqa.whl"], "whl");
+  });
+  await timed("import", async () => {
+    py.runPython(PY_RUN);
+    // fmriqa's root is lazy: touch the names so scipy/skimage load now.
+    py.runPython("import nibabel; fmriqa.QAScan; fmriqa.analyze");
+  });
+  py.FS.mkdirTree("/data");
+  window.__spike.ready = true;
+  $("open").disabled = false;
+}
+
+// ---- analysis ----------------------------------------------------------------
+const esc = s => String(s).replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+async function analyse(files) {
+  $("err").textContent = "-"; $("warn").textContent = "-"; $("meas").innerHTML = "";
+  const nii = files.find(f => /\.nii(\.gz)?$/i.test(f.name));
+  if (!nii) { $("err").textContent = "No .nii/.nii.gz among the files."; return; }
+  const t0 = performance.now();
+  try {
+    for (const f of files) py.FS.writeFile("/data/" + f.name, new Uint8Array(await f.arrayBuffer()));
+    setPhase("analyze", "running...");
+    await new Promise(r => setTimeout(r, 20)); // let the UI paint
+    const res = JSON.parse(py.globals.get("run")("/data/" + nii.name, nii.name));
+    const total = performance.now() - t0;
+    setPhase("analyze", res.ok ? "done (python " + res.seconds.toFixed(2) + " s)" : "FAILED", total);
+    $("warn").textContent = res.warnings.length ? res.warnings.join("\n") : "(none)";
+    if (!res.ok) { $("err").textContent = res.traceback; window.__spike.error = res.traceback; }
+    else $("meas").innerHTML = "<tr><th>field</th><th>value</th></tr>" +
+      Object.entries(res.measurements).map(([k, v]) => `<tr><td>${esc(k)}</td><td>${esc(JSON.stringify(v))}</td></tr>`).join("");
+    window.__spike.results.push({ file: nii.name, total_ms: total, ...res });
+  } catch (e) {
+    $("err").textContent = String(e.stack || e); window.__spike.error = String(e.stack || e);
+    window.__spike.results.push({ file: nii.name, ok: false, error: String(e) });
+  }
+  window.__spike.lastDone = window.__spike.results.length;
+}
+$("open").onclick = () => $("file").click();
+$("file").onchange = e => analyse([...e.target.files]);
+const drop = $("drop");
+drop.ondragover = e => { e.preventDefault(); drop.classList.add("over"); };
+drop.ondragleave = () => drop.classList.remove("over");
+drop.ondrop = e => { e.preventDefault(); drop.classList.remove("over"); if (py) analyse([...e.dataTransfer.files]); };
+
+boot().catch(e => { $("err").textContent = String(e.stack || e); window.__spike.error = String(e.stack || e); window.__spike.bootFailed = true; });
+</script></body></html>
