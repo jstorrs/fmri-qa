@@ -335,7 +335,7 @@ def test_a_probe_that_cannot_be_removed_is_logged_and_does_not_stop_the_run(
     """Making the probe proved the directory writable; failing to remove it cannot.
 
     A sync client opens what was just made and the removal is refused, the
-    race `fmriqa.rename` exists for. Treating it as "cannot write" would
+    race `fmriqa_io.rename` exists for. Treating it as "cannot write" would
     refuse every run into a watched directory.
     """
     monkeypatch.setattr(

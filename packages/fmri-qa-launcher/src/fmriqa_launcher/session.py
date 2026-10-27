@@ -11,7 +11,7 @@ Staging is the system's temporary directory, not `output_dir`, which is often
 watched (OneDrive, a lab share with a sync client). A watcher uploads
 everything written there: dcm2niix's raw output, a scan under its pre-filing
 name, every `.tmp` before its rename. None of that is a result, and a busy
-watcher also refuses the next rename (see `fmriqa.rename`). So `output_dir`
+watcher also refuses the next rename (see `fmriqa_io.rename`). So `output_dir`
 receives finished files only, once each. Staging is on another filesystem, so
 they arrive by copy, which is not atomic. The copy goes into a hidden sibling
 of the series directory, and that is renamed into place. This keeps the
@@ -37,8 +37,8 @@ from pathlib import Path
 import fmriqa
 import fmriqa_io
 from fmriqa.load.paths import nifti_stem
-from fmriqa.rename import replace_patiently
 from fmriqa_io import ConversionError, ImportedSeries
+from fmriqa_io.rename import replace_patiently
 from fmriqa_report.formats.html import write_run_page
 
 from .exceptions import SessionError
@@ -150,7 +150,7 @@ def _require_writable(output_dir: Path, notice: CleanupNoticeCallback | None) ->
     front with the operation publishing will use.
 
     Only the `mkdir` decides. In a watched directory removing the probe can be
-    refused for the reason a rename can (see `fmriqa.rename`), but the `mkdir`
+    refused for the reason a rename can (see `fmriqa_io.rename`), but the `mkdir`
     already proved the directory writable, so that must not stop the run. It
     is logged by name like any other leftover.
     """
@@ -167,7 +167,7 @@ def _discard(directory: Path, notice: CleanupNoticeCallback | None) -> None:
 
     `ignore_errors` lets this run while an exception unwinds but would make a
     failure silent. Whatever holds a file open refuses an unlink as it refuses
-    a rename (see `fmriqa.rename`), leaving a randomly named directory that
+    a rename (see `fmriqa_io.rename`), leaving a randomly named directory that
     nothing removes, holding a scan if it is staging. Nothing finished is ever
     in one, so the notice says it is safe to delete.
     """

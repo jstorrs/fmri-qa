@@ -11,8 +11,8 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from fmriqa.analysis import InvalidArtifactError, QAArtifact
-from fmriqa.path_arguments import expand_globs, same_file
 from fmriqa_io.artifact import load_artifact
+from fmriqa_io.path_arguments import expand_globs, same_file
 
 from .summary import package_version
 

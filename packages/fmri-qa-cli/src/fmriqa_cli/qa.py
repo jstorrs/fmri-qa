@@ -13,7 +13,7 @@ from collections.abc import Sequence
 from pathlib import Path
 
 import fmriqa as q
-from fmriqa.path_arguments import expand_globs
+from fmriqa_io.path_arguments import expand_globs
 
 from .arguments import (
     PrintVersion,

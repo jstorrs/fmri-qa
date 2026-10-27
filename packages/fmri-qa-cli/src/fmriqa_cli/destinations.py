@@ -19,7 +19,7 @@ from typing import TextIO
 import fmriqa as q
 import fmriqa_io
 from fmriqa.load.paths import nifti_stem, sidecar_path
-from fmriqa.path_arguments import same_file
+from fmriqa_io.path_arguments import same_file
 
 # Suffix for a saved artifact, so a batch's files are recognizable at a glance.
 ARTIFACT_SUFFIX = ".qa.nc"

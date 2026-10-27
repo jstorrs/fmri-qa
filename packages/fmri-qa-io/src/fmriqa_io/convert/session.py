@@ -42,11 +42,11 @@ from fmriqa.convert.dcm2niix import (
 )
 from fmriqa.exceptions import InvalidChoiceError
 from fmriqa.load.paths import NIFTI_SUFFIXES, nifti_stem, sidecar_path
-from fmriqa.rename import replace_patiently
 from fmriqa.types import ANONYMIZE_MODES, NAME_STYLES, Anonymize, NameStyle, Sidecar
 from fmriqa.warn import warn
 
 from ..exceptions import ConversionError
+from ..rename import replace_patiently
 from .dcm2niix import find_dcm2niix, run
 
 # How `import_dicom` and `fmri-qa-import` name files unless told otherwise.

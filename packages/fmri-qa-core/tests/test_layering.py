@@ -22,11 +22,6 @@ RANKS = {
     "warn": 0,
     "_records": 0,
     "settings": 0,
-    # A leaf over the standard library only. fmri-qa-io's import files its
-    # series with it, and so does the launcher, from outside this package.
-    "rename": 0,
-    # A leaf over the standard library only, shared with the report command.
-    "path_arguments": 0,
     "load": 1,
     # The shipped phantom builds a `QAScan`, so it sits on `load`. It is for
     # tests and docs; no module in the package should import it.

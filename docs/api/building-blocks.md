@@ -68,16 +68,16 @@
    :exclude-members: VoxelSize
 ```
 
-## `fmriqa.rename`
-
-```{eval-rst}
-.. automodule:: fmriqa.rename
-```
-
 ## `fmriqa.types`
 
 ```{eval-rst}
 .. autofunction:: fmriqa.types.readout_axis
+```
+
+## `fmriqa_io.rename`
+
+```{eval-rst}
+.. automodule:: fmriqa_io.rename
 ```
 
 ## `fmriqa_report.formats.html.resources`

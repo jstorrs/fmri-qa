@@ -8,7 +8,7 @@ destination that does not exist yet.
 import os
 from pathlib import Path
 
-from fmriqa.path_arguments import same_file
+from fmriqa_io.path_arguments import same_file
 
 
 def test_same_file_sees_through_a_relative_spelling(tmp_path, monkeypatch) -> None:

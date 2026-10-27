@@ -4,10 +4,10 @@ Presentation depends on the *published artifact*, not on the pipeline that
 produced it. That is easy to erode one convenient import at a time, so this
 file checks it mechanically. Every `fmriqa` import in the report package must
 land in `fmriqa.analysis` (the artifact), `fmriqa.types` (the shared
-array/option vocabulary), `fmriqa.rename` (how a finished file is moved into
-place) or `fmriqa.path_arguments` (wildcards and same-file checks on path
-arguments), and every `fmriqa_io` import in `fmriqa_io.artifact` (the artifact
-file) or the lazy `fmriqa_io` root, for a name it re-exports. An import of
+array/option vocabulary), and every `fmriqa_io` import in `fmriqa_io.artifact`
+(the artifact file), `fmriqa_io.rename` (how a finished file is moved into
+place), `fmriqa_io.path_arguments` (wildcards and same-file checks on path
+arguments) or the lazy `fmriqa_io` root, for a name it re-exports. An import of
 `fmriqa.metrics`, `fmriqa.pipeline`, `fmriqa.prep` or `fmriqa.load`, of the
 `fmriqa` package as a whole (which pulls all of them), or of any other
 `fmriqa_io` submodule fails this test.
@@ -31,14 +31,14 @@ import fmriqa_report
 
 # The only calculation-side modules presentation is allowed to reach for.
 #
-# `fmriqa.rename` has nothing to do with the artifact, but it is a leaf over the
+# `fmriqa_io.rename` has nothing to do with the artifact, but it is a leaf over the
 # standard library, so it cannot bring any calculation code in behind it (the
 # runtime half of this test would catch it if that changed). It carries a
 # policy, how long to outwait a sync client holding a just-written file, that
 # the artifact's writer and the page's writer must agree on. A second copy kept
 # in step by hand is worse.
 #
-# `fmriqa.path_arguments` is the same kind of leaf: standard library only. It
+# `fmriqa_io.path_arguments` is the same kind of leaf: standard library only. It
 # carries a shell quirk (an unexpanded wildcard) and an overwrite guard that the
 # report must apply the same way as the other commands.
 #
@@ -50,17 +50,22 @@ ALLOWED = frozenset(
     {
         "fmriqa.analysis",
         "fmriqa.types",
-        "fmriqa.rename",
-        "fmriqa.path_arguments",
         "fmriqa_io",
         "fmriqa_io.artifact",
+        "fmriqa_io.rename",
+        "fmriqa_io.path_arguments",
     }
 )
 
 # The `fmriqa_io` submodules importing the report CLI may load: the artifact
-# file. Any other (NIfTI decoding, DICOM import) is the calculation side's input,
-# not the report's. The root is allowed too; the probe never looks at it.
-_IO_ALLOWED = ("fmriqa_io.artifact",)
+# file and the two stdlib-only leaves described above. Any other (NIfTI
+# decoding, DICOM import) is the calculation side's input, not the report's.
+# The root is allowed too; the probe never looks at it.
+_IO_ALLOWED = (
+    "fmriqa_io.artifact",
+    "fmriqa_io.rename",
+    "fmriqa_io.path_arguments",
+)
 
 _SOURCE_ROOT = Path(fmriqa_report.__file__).parent
 
@@ -264,7 +269,7 @@ def _io_probe(extra: str = "") -> str:
 
 
 def test_importing_the_report_cli_loads_only_the_artifact_file_from_io() -> None:
-    """Of `fmriqa_io`, the report CLI loads the artifact file and nothing else."""
+    """Of `fmriqa_io`, the report CLI loads the artifact file and two leaves."""
     output = _io_probe()
     assert output == "[]", (
         f"importing the report CLI loaded more of fmriqa_io: {output}"

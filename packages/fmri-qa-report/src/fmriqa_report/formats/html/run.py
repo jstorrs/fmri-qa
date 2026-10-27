@@ -13,7 +13,7 @@ from string import Template
 from typing import Literal
 
 from fmriqa.analysis import Measurements, QAArtifact
-from fmriqa.rename import atomic_file
+from fmriqa_io.rename import atomic_file
 
 from ...content import METRIC_DOCS, MetricDoc
 from ...summary import (
@@ -82,7 +82,7 @@ def write_run_page(
 
     The write is atomic: the page is rendered in memory, written to a sibling
     temporary file, then moved into place by
-    :func:`fmriqa.rename.replace_patiently`. A reader never sees a partial file,
+    :func:`fmriqa_io.rename.replace_patiently`. A reader never sees a partial file,
     and a failed render or write leaves an existing destination alone.
     """
     target = Path(path)

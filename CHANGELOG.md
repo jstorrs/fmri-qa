@@ -35,6 +35,8 @@ versioning when the first stable public interface is released.
   `fmri-qa-core` no longer depends on dcm2niix; `fmri-qa-io` does, except under
   Pyodide. Core keeps the converter flags as `fmriqa.convert.dcm2niix.flags`,
   for another converter to mirror.
+- **`fmriqa.rename` and `fmriqa.path_arguments` are now `fmriqa_io.rename` and
+  `fmriqa_io.path_arguments`.** Their contents are unchanged.
 - **The import packages are renamed to match the project: `fmriqc` is now
   `fmriqa`, `fmriqc_report` is `fmriqa_report`, and `fmriqc_launcher` is
   `fmriqa_launcher`.** `FmriqcError` is `FmriqaError`. The distribution and

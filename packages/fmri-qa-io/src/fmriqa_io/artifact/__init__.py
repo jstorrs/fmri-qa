@@ -42,8 +42,8 @@ from fmriqa.analysis.serialize.decompose import decompose
 from fmriqa.analysis.serialize.migrate import migrated
 from fmriqa.analysis.validation import validate_artifact, validate_document
 from fmriqa.exceptions import InvalidArtifactError
-from fmriqa.rename import atomic_file
 
+from ..rename import atomic_file
 from . import netcdf, npz
 
 __all__ = ["load_artifact", "save_artifact"]

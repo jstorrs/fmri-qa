@@ -2,8 +2,8 @@
 
 Wildcard expansion for shells that do not expand their own, and the check that
 an output flag does not name a file the command reads. A leaf module over the
-standard library, outside `cli` and `load`, so the report command can use it
-without importing the calculation stack or every command behind `cli`.
+standard library, so the report command can use it without importing the
+calculation stack or every command behind `fmriqa_cli`.
 """
 
 import glob
