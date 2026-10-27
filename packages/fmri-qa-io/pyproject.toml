@@ -27,6 +27,16 @@ classifiers = [
 dependencies = [
     "fmri-qa-core==0.1.0",
     "nibabel>=5.3.2",
+    # The artifact's container. It is worth a ~10 MB wheel carrying libhdf5 and
+    # libnetcdf: this is the Unidata C library that MATLAB's `ncread`, R's
+    # `ncdf4`, `ncdump` and xarray read through, so a file it writes is a file
+    # those were tested against. Writing netCDF-4 by hand or with a pure-Python
+    # encoder would claim compatibility with a format whose only reference
+    # implementation we declined to link.
+    # Pyodide reports sys_platform "emscripten" and micropip evaluates markers,
+    # so a browser install of this package skips the native netCDF library and
+    # only the artifact container is unavailable there.
+    "netCDF4>=1.7; sys_platform != 'emscripten'",
     "numpy>=2.3.4",
 ]
 

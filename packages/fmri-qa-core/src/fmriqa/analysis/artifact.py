@@ -434,8 +434,9 @@ class QAArtifact:
 
     The output of the calculation half (`analyze`) and the only input the report
     half accepts. Immutable, self-describing and round-trippable through
-    `save_artifact`/`load_artifact`. The class constant `schema_version` is the
-    layout those two agree on (loading migrates every file up to it).
+    `fmriqa_io.save_artifact`/`load_artifact`. The class constant
+    `schema_version` is the layout those two agree on (loading migrates every
+    file up to it).
     """
 
     settings: AnalysisSettings

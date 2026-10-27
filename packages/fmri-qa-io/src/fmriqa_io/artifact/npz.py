@@ -9,8 +9,8 @@ because an artifact outlives the build that wrote it. A trend database filled
 over months is a directory of these files, and they must keep opening.
 
 A file's container is decided by its leading bytes, not its name (see
-`serialize`), so a renamed `.qa.npz` still reads here, and a file written under
-any name reads as what it is.
+`fmriqa_io.artifact`), so a renamed `.qa.npz` still reads here, and a file
+written under any name reads as what it is.
 """
 
 from pathlib import Path
@@ -19,9 +19,9 @@ from typing import Any, Final
 import numpy as np
 from numpy.typing import NDArray
 
-from ...exceptions import InvalidArtifactError
+from fmriqa.exceptions import InvalidArtifactError
 
-# What an `.npz` starts with, and so how `serialize` recognizes one. The archive
+# What an `.npz` starts with, and so how `artifact` recognizes one. The archive
 # is a zip, and a zip opens on its local file header's signature.
 MAGIC: Final = b"PK\x03\x04"
 

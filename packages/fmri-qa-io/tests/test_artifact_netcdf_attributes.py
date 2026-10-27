@@ -19,9 +19,10 @@ import numpy as np
 import pytest
 
 import fmriqa as q
+import fmriqa_io
 from fmriqa.analysis import ARTIFACT_SCHEMA_VERSION
-from fmriqa.analysis.serialize import netcdf
 from fmriqa.analysis.serialize.decompose import decompose
+from fmriqa_io.artifact import netcdf
 
 
 def test_the_file_is_netcdf4(tmp_path, artifact) -> None:
@@ -31,7 +32,7 @@ def test_the_file_is_netcdf4(tmp_path, artifact) -> None:
     never the file's name, since `--artifact` writes whatever name the user
     gave.
     """
-    saved = q.save_artifact(artifact, tmp_path / "scan.qa.nc")
+    saved = fmriqa_io.save_artifact(artifact, tmp_path / "scan.qa.nc")
     assert saved.read_bytes()[:8] == b"\x89HDF\r\n\x1a\n"
     with netCDF4.Dataset(str(saved)) as dataset:
         assert dataset.data_model == "NETCDF4"
@@ -47,7 +48,7 @@ def test_the_document_rides_as_an_ascii_global_attribute(tmp_path, artifact) -> 
     and R as `ncatt_get(f, 0, "document")`, so it has to be text a reader can
     take without being told an encoding.
     """
-    saved = q.save_artifact(artifact, tmp_path / "scan.qa.nc")
+    saved = fmriqa_io.save_artifact(artifact, tmp_path / "scan.qa.nc")
     with netCDF4.Dataset(str(saved)) as dataset:
         stored = dataset.getncattr("document")
     assert isinstance(stored, str) and stored.isascii()
@@ -58,7 +59,7 @@ def test_the_cheap_attributes_answer_without_decoding_the_document(
     tmp_path, artifact
 ) -> None:
     """A reader that never touches JSON can still tell what the file is."""
-    saved = q.save_artifact(artifact, tmp_path / "scan.qa.nc")
+    saved = fmriqa_io.save_artifact(artifact, tmp_path / "scan.qa.nc")
     with netCDF4.Dataset(str(saved)) as dataset:
         attributes = {name: dataset.getncattr(name) for name in dataset.ncattrs()}
     assert attributes["schema_version"] == ARTIFACT_SCHEMA_VERSION
@@ -91,7 +92,7 @@ def test_every_resolved_measurement_is_published_as_its_own_attribute(
     The attribute is the document's own value in the netCDF type that holds it,
     including NaN, which means the estimator could not resolve the value.
     """
-    saved = q.save_artifact(artifact, tmp_path / "scan.qa.nc")
+    saved = fmriqa_io.save_artifact(artifact, tmp_path / "scan.qa.nc")
     document, _ = read_netcdf(saved)
     measured = document["measurements"]
     published = _section_attributes(saved, "measurements")
@@ -123,7 +124,7 @@ def test_a_measurement_the_document_calls_null_has_no_attribute(
     """
     # A failed motion fit, the usual source of a NaN measurement.
     failed = replace(artifact.measurements, max_translation=math.nan)
-    saved = q.save_artifact(
+    saved = fmriqa_io.save_artifact(
         replace(artifact, measurements=failed), tmp_path / "scan.qa.nc"
     )
     document, _ = read_netcdf(saved)
@@ -140,7 +141,9 @@ def test_save_refuses_a_measurement_no_attribute_can_hold(tmp_path, artifact) ->
     """An integer past NC_INT is refused rather than published wrapped around."""
     counts = replace(artifact.measurements, n_clipped_pre=2**31, clipped_any=True)
     with pytest.raises(q.InvalidArtifactError, match="netCDF integer"):
-        q.save_artifact(replace(artifact, measurements=counts), tmp_path / "qa.nc")
+        fmriqa_io.save_artifact(
+            replace(artifact, measurements=counts), tmp_path / "qa.nc"
+        )
     assert not (tmp_path / "qa.nc").exists()
 
 
@@ -175,7 +178,7 @@ def test_every_recorded_provenance_field_is_published_as_its_own_attribute(
     shape: a JSON list is a vector attribute of its element type, so `voxel_mm`
     is three doubles and `matrix` two integers, each read in one call.
     """
-    saved = q.save_artifact(artifact, tmp_path / "scan.qa.nc")
+    saved = fmriqa_io.save_artifact(artifact, tmp_path / "scan.qa.nc")
     document, _ = read_netcdf(saved)
     recorded = document["provenance"]
     published = _section_attributes(saved, "provenance")
@@ -211,7 +214,7 @@ def test_a_provenance_field_the_document_calls_null_has_no_attribute(
     a coil. An attribute cannot say "nobody wrote this down", and a zero would
     mean something else.
     """
-    saved = q.save_artifact(artifact, tmp_path / "scan.qa.nc")
+    saved = fmriqa_io.save_artifact(artifact, tmp_path / "scan.qa.nc")
     document, _ = read_netcdf(saved)
     published = _section_attributes(saved, "provenance")
 
@@ -231,7 +234,7 @@ def test_every_setting_is_published_as_its_own_attribute(
     (`pe_axis_override` is None unless `--pe-axis` was passed) is no attribute
     at all, not a number that would read as an axis.
     """
-    saved = q.save_artifact(artifact, tmp_path / "scan.qa.nc")
+    saved = fmriqa_io.save_artifact(artifact, tmp_path / "scan.qa.nc")
     document, _ = read_netcdf(saved)
     asked = document["settings"]
     published = _section_attributes(saved, "settings")
@@ -263,7 +266,9 @@ def test_provenance_text_is_published_as_the_scanner_supplied_it(
     prov = replace(
         artifact.provenance, scan="sujet_créé_Ω_頭部.nii.gz", manufacturer="Siemens™"
     )
-    saved = q.save_artifact(replace(artifact, provenance=prov), tmp_path / "u.qa.nc")
+    saved = fmriqa_io.save_artifact(
+        replace(artifact, provenance=prov), tmp_path / "u.qa.nc"
+    )
     published = _section_attributes(saved, "provenance")
     with netCDF4.Dataset(str(saved)) as dataset:
         # The document beside the convenience attributes still rides as ASCII.
@@ -271,7 +276,7 @@ def test_provenance_text_is_published_as_the_scanner_supplied_it(
 
     assert published["scan"] == "sujet_créé_Ω_頭部.nii.gz"
     assert published["manufacturer"] == "Siemens™"
-    assert q.load_artifact(saved).provenance == prov
+    assert fmriqa_io.load_artifact(saved).provenance == prov
 
 
 def test_a_lone_surrogate_name_is_published_escaped_rather_than_refused(
@@ -286,10 +291,12 @@ def test_a_lone_surrogate_name_is_published_escaped_rather_than_refused(
     """
     name = "bad_\udcff_name.nii.gz"
     prov = replace(artifact.provenance, scan=name)
-    saved = q.save_artifact(replace(artifact, provenance=prov), tmp_path / "s.qa.nc")
+    saved = fmriqa_io.save_artifact(
+        replace(artifact, provenance=prov), tmp_path / "s.qa.nc"
+    )
 
     assert _section_attributes(saved, "provenance")["scan"] == "bad_\\udcff_name.nii.gz"
-    assert q.load_artifact(saved).provenance.scan == name
+    assert fmriqa_io.load_artifact(saved).provenance.scan == name
 
 
 def test_save_refuses_a_provenance_integer_no_attribute_can_hold(
@@ -303,14 +310,14 @@ def test_save_refuses_a_provenance_integer_no_attribute_can_hold(
     """
     prov = replace(artifact.provenance, n_trimmed=2**31)
     with pytest.raises(q.InvalidArtifactError, match="netCDF integer"):
-        q.save_artifact(replace(artifact, provenance=prov), tmp_path / "qa.nc")
+        fmriqa_io.save_artifact(replace(artifact, provenance=prov), tmp_path / "qa.nc")
     assert not (tmp_path / "qa.nc").exists()
 
 
 def test_a_whole_number_setting_is_published_as_a_double(tmp_path, artifact) -> None:
     """`trim_sec=5` is a float field given an int: NC_DOUBLE, not NC_INT."""
     settings = q.AnalysisSettings(trim_sec=5, roi_size=9)
-    saved = q.save_artifact(
+    saved = fmriqa_io.save_artifact(
         replace(artifact, settings=settings), tmp_path / "scan.qa.nc"
     )
     trim = np.asarray(_section_attributes(saved, "settings")["trim_sec"])
@@ -323,11 +330,13 @@ def test_a_voxel_size_mixing_ints_and_floats_saves_as_doubles(
 ) -> None:
     """`(3.0, 3, 3.0)` is one vector of doubles, not a list of two kinds."""
     prov = replace(artifact.provenance, voxel_mm=(3.0, 3, 3.0))
-    saved = q.save_artifact(replace(artifact, provenance=prov), tmp_path / "v.qa.nc")
+    saved = fmriqa_io.save_artifact(
+        replace(artifact, provenance=prov), tmp_path / "v.qa.nc"
+    )
     voxel = np.asarray(_section_attributes(saved, "provenance")["voxel_mm"])
     assert voxel.dtype == np.float64
     assert voxel.shape == (3,)
-    assert q.load_artifact(saved).provenance.voxel_mm == (3.0, 3.0, 3.0)
+    assert fmriqa_io.load_artifact(saved).provenance.voxel_mm == (3.0, 3.0, 3.0)
 
 
 def test_every_curve_and_image_scalar_is_published_as_its_own_attribute(
@@ -341,7 +350,7 @@ def test_every_curve_and_image_scalar_is_published_as_its_own_attribute(
     `curves.psf.labels` is one text, `PE RO`, spelled as CF spells
     `flag_meanings`.
     """
-    saved = q.save_artifact(artifact, tmp_path / "scan.qa.nc")
+    saved = fmriqa_io.save_artifact(artifact, tmp_path / "scan.qa.nc")
     document, _ = read_netcdf(saved)
 
     for section in ("curves", "images"):

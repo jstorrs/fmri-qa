@@ -12,7 +12,7 @@ Every variable in the serializer's `_LAYOUT`, every coordinate in
 analysis page's contribution table, and every `Provenance` field must be named
 in `artifact.md`.
 
-Both tables are private to `analysis.serialize.netcdf`, and this imports them
+Both tables are private to `fmriqa_io.artifact.netcdf`, and this imports them
 anyway. They are the layout the pages are checked against, and a public accessor
 would exist only for this test. If a second consumer needs them, they become
 public then.
@@ -37,12 +37,12 @@ from dataclasses import fields
 from functools import cache
 from pathlib import Path
 
-import fmriqa
+import fmriqa_io
 from fmriqa.analysis.artifact import AnalysisSettings, Measurements, Provenance
 from fmriqa.analysis.serialize.decompose import decompose
-from fmriqa.analysis.serialize.netcdf import _COORDINATES, _LAYOUT, _leaves
+from fmriqa_io.artifact.netcdf import _COORDINATES, _LAYOUT, _leaves
 
-DOCS = Path(fmriqa.__file__).parents[4] / "docs" / "user-guide"
+DOCS = Path(fmriqa_io.__file__).parents[4] / "docs" / "user-guide"
 ANALYSES = DOCS / "analyses"
 
 # The heading whose table is the page's ownership claim.
@@ -105,7 +105,7 @@ def _document_scalars() -> set[str]:
     newest = max(fixtures.glob("schema_v*.qa.npz"), key=lambda p: int(p.stem[8:-3]))
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")  # an older schema migrates, with a note
-        document, _ = decompose(fmriqa.load_artifact(newest))
+        document, _ = decompose(fmriqa_io.load_artifact(newest))
     return {
         path
         for section in ("curves", "images")

@@ -22,6 +22,11 @@ versioning when the first stable public interface is released.
   `fmri-qa-import` and `fmri-qa-hilo` are no longer installed by
   `fmri-qa-core`; install `fmri-qa-cli`. `python -m fmriqa` is now
   `python -m fmriqa_cli`. The commands themselves are unchanged.
+- **`save_artifact` and `load_artifact` moved from `fmriqa` to `fmriqa_io`.**
+  Import them from `fmriqa_io` (or `fmriqa_io.artifact`); `fmriqa` and
+  `fmriqa.analysis` no longer export them. The file format is unchanged.
+  `fmri-qa-core` no longer depends on netCDF4; `fmri-qa-io` does, except under
+  Pyodide.
 - **The import packages are renamed to match the project: `fmriqc` is now
   `fmriqa`, `fmriqc_report` is `fmriqa_report`, and `fmriqc_launcher` is
   `fmriqa_launcher`.** `FmriqcError` is `FmriqaError`. The distribution and

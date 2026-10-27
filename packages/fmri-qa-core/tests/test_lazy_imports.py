@@ -15,11 +15,9 @@ import pytest
 import fmriqa
 
 # Modules a bare `import fmriqa` must never pull in. Each is expensive with one
-# call site in the package (see `analysis/build.py`, `metrics/artifacts.py`,
-# `analysis/serialize/netcdf.py`), or is a real dependency (`nibabel`, `skimage`)
-# that a name access should trigger. `netCDF4` loads libhdf5 and libnetcdf, so
-# the artifact writer defers it as the pipeline defers `scipy.spatial`.
-_HEAVY_MODULES = ("skimage", "scipy.special", "scipy.spatial", "nibabel", "netCDF4")
+# call site in the package (see `analysis/build.py`, `metrics/artifacts.py`), or
+# is a real dependency (`nibabel`, `skimage`) that a name access should trigger.
+_HEAVY_MODULES = ("skimage", "scipy.special", "scipy.spatial", "nibabel")
 
 # Probe run in a fresh interpreter (see
 # test_bare_import_does_not_load_the_heavy_stack). This process already has half

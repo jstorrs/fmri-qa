@@ -6,9 +6,11 @@ file checks it mechanically. Every `fmriqa` import in the report package must
 land in `fmriqa.analysis` (the artifact), `fmriqa.types` (the shared
 array/option vocabulary), `fmriqa.rename` (how a finished file is moved into
 place) or `fmriqa.path_arguments` (wildcards and same-file checks on path
-arguments). An import of `fmriqa.metrics`, `fmriqa.pipeline`, `fmriqa.prep` or
-`fmriqa.load`, or of the `fmriqa` package as a whole (which pulls all of them),
-fails this test.
+arguments), and every `fmriqa_io` import in `fmriqa_io.artifact` (the artifact
+file) or the lazy `fmriqa_io` root, for a name it re-exports. An import of
+`fmriqa.metrics`, `fmriqa.pipeline`, `fmriqa.prep` or `fmriqa.load`, of the
+`fmriqa` package as a whole (which pulls all of them), or of any other
+`fmriqa_io` submodule fails this test.
 
 That scan reads import *text*, which is necessary but not sufficient. An
 allowed import can still pull in a forbidden module through the `__init__.py`
@@ -24,6 +26,7 @@ from pathlib import Path
 
 import pytest
 
+import fmriqa_io
 import fmriqa_report
 
 # The only calculation-side modules presentation is allowed to reach for.
@@ -38,9 +41,26 @@ import fmriqa_report
 # `fmriqa.path_arguments` is the same kind of leaf: standard library only. It
 # carries a shell quirk (an unexpanded wildcard) and an overwrite guard that the
 # report must apply the same way as the other commands.
+#
+# `fmriqa_io.artifact` is the artifact file, the one thing the report reads. The
+# `fmriqa_io` root is lazy and imports nothing until a name is used. Only its
+# re-exported names count as the root: `from fmriqa_io import testing` is scanned
+# as `fmriqa_io.testing` (see `_fmriqa_imports`).
 ALLOWED = frozenset(
-    {"fmriqa.analysis", "fmriqa.types", "fmriqa.rename", "fmriqa.path_arguments"}
+    {
+        "fmriqa.analysis",
+        "fmriqa.types",
+        "fmriqa.rename",
+        "fmriqa.path_arguments",
+        "fmriqa_io",
+        "fmriqa_io.artifact",
+    }
 )
+
+# The `fmriqa_io` submodules importing the report CLI may load: the artifact
+# file. Any other (NIfTI decoding, DICOM import) is the calculation side's input,
+# not the report's. The root is allowed too; the probe never looks at it.
+_IO_ALLOWED = ("fmriqa_io.artifact",)
 
 _SOURCE_ROOT = Path(fmriqa_report.__file__).parent
 
@@ -85,6 +105,20 @@ loaded = sorted(
 print(loaded)
 """
 
+_IO_PROBE = f"""
+import sys
+import fmriqa_report.cli
+{{extra}}
+allowed = {_IO_ALLOWED!r}
+loaded = sorted(
+    m
+    for m in sys.modules
+    if m.startswith("fmriqa_io.")
+    and not any(m == a or m.startswith(a + ".") for a in allowed)
+)
+print(loaded)
+"""
+
 _REPORT_IMPORT_PROBE = f"""
 import importlib
 import sys
@@ -103,12 +137,12 @@ def _modules() -> list[Path]:
 
 
 def _from_fmriqa(module: str) -> bool:
-    """Return True if a dotted module name names the calculation package."""
-    return module.split(".", maxsplit=1)[0] == "fmriqa"
+    """Return True if a dotted module name names the calculation or IO package."""
+    return module.split(".", maxsplit=1)[0] in {"fmriqa", "fmriqa_io"}
 
 
 def _fmriqa_imports(tree: ast.Module) -> set[str]:
-    """Return the `fmriqa*` modules a parsed source file imports."""
+    """Return the `fmriqa` and `fmriqa_io` modules a parsed source file imports."""
     found: set[str] = set()
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
@@ -120,8 +154,20 @@ def _fmriqa_imports(tree: ast.Module) -> set[str]:
             and node.module
             and _from_fmriqa(node.module)
         ):
-            found.add(node.module)
+            found |= {_from_name(node.module, a.name) for a in node.names}
     return found
+
+
+def _from_name(module: str, name: str) -> str:
+    """Return the module `from module import name` reaches.
+
+    A name from the `fmriqa_io` root that the root does not re-export is a
+    submodule, so it is scanned as one. Otherwise `from fmriqa_io import testing`
+    would pass as an import of the allowed root.
+    """
+    if module == "fmriqa_io" and name not in fmriqa_io.__all__:
+        return f"{module}.{name}"
+    return module
 
 
 def test_the_report_package_has_source_to_check() -> None:
@@ -144,6 +190,18 @@ def test_the_check_would_catch_a_pipeline_import() -> None:
     """A negative control, so the scan cannot pass by failing to see anything."""
     tree = ast.parse("import fmriqa\nfrom fmriqa.pipeline import run_qa\n")
     assert _fmriqa_imports(tree) - ALLOWED == {"fmriqa", "fmriqa.pipeline"}
+
+
+def test_the_check_would_catch_an_io_import_beyond_the_artifact_file() -> None:
+    """The same control for `fmriqa_io`, whose name `fmriqa` alone would miss."""
+    tree = ast.parse("from fmriqa_io.testing import write_phantom\n")
+    assert _fmriqa_imports(tree) - ALLOWED == {"fmriqa_io.testing"}
+
+
+def test_the_check_sees_a_submodule_imported_from_the_io_root() -> None:
+    """The lazy root is allowed for its re-exports, not as a way around the scan."""
+    tree = ast.parse("from fmriqa_io import load_artifact, testing\n")
+    assert _fmriqa_imports(tree) - ALLOWED == {"fmriqa_io.testing"}
 
 
 def test_presentation_never_imports_the_launcher() -> None:
@@ -192,3 +250,27 @@ def test_format_agnostic_report_modules_do_not_load_the_drawing_stack(
     assert result.stdout.strip() == "[]", (
         f"importing {module} loaded the drawing stack: {result.stdout}\n{result.stderr}"
     )
+
+
+def _io_probe(extra: str = "") -> str:
+    """Run `_IO_PROBE`, with `extra` imported after the report CLI; return its list."""
+    result = subprocess.run(  # noqa: S603 - fixed literal script, not untrusted input
+        [sys.executable, "-c", _IO_PROBE.format(extra=extra)],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    return result.stdout.strip()
+
+
+def test_importing_the_report_cli_loads_only_the_artifact_file_from_io() -> None:
+    """Of `fmriqa_io`, the report CLI loads the artifact file and nothing else."""
+    output = _io_probe()
+    assert output == "[]", (
+        f"importing the report CLI loaded more of fmriqa_io: {output}"
+    )
+
+
+def test_the_io_probe_would_catch_another_io_module() -> None:
+    """A negative control, so the probe cannot pass by failing to see anything."""
+    assert _io_probe("import fmriqa_io.testing") == "['fmriqa_io.testing']"

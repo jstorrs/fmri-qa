@@ -3,7 +3,7 @@
 The root is lazy so that importing one Pyodide-safe submodule never imports the
 filesystem-bound ones. That holds only if `_EXPORTS` never drifts from
 `__all__` and a bare `import fmriqa_io` loads no submodule. Both are asserted
-here, and stay meaningful while the export map is still empty.
+here.
 """
 
 import subprocess
@@ -52,3 +52,19 @@ def test_bare_import_loads_no_submodule() -> None:
         check=True,
     )
     assert result.stdout.strip() == "[]", result.stdout + result.stderr
+
+
+def test_importing_the_artifact_module_does_not_load_netcdf4() -> None:
+    """`netCDF4` loads libhdf5 and libnetcdf, so it waits for a file.
+
+    The report CLI imports `fmriqa_io.artifact` to read one artifact, and
+    `--help` must not pay for the native libraries first.
+    """
+    probe = "import sys, fmriqa_io.artifact; print('netCDF4' in sys.modules)"
+    result = subprocess.run(  # noqa: S603 - fixed literal script, not untrusted input
+        [sys.executable, "-c", probe],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    assert result.stdout.strip() == "False", result.stdout + result.stderr

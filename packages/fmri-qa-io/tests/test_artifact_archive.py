@@ -33,13 +33,14 @@ import numpy as np
 import pytest
 
 import fmriqa as q
+import fmriqa_io
 from fmriqa.analysis import ARTIFACT_SCHEMA_VERSION
 from fmriqa.analysis.serialize.compose import _floats
 
 
 def test_save_load_round_trips_every_section(tmp_path, artifact) -> None:
-    path = q.save_artifact(artifact, tmp_path / "qa.nc")
-    loaded = q.load_artifact(path)
+    path = fmriqa_io.save_artifact(artifact, tmp_path / "qa.nc")
+    loaded = fmriqa_io.load_artifact(path)
 
     assert loaded.schema_version == ARTIFACT_SCHEMA_VERSION
     assert loaded.settings == artifact.settings
@@ -76,9 +77,9 @@ def test_analysis_reexports_the_one_error_load_artifact_raises() -> None:
 
 def test_save_uses_the_exact_path_given(tmp_path, artifact) -> None:
     """A caller's name is used as given, with or without a suffix."""
-    path = q.save_artifact(artifact, tmp_path / "nested" / "run1.artifact")
+    path = fmriqa_io.save_artifact(artifact, tmp_path / "nested" / "run1.artifact")
     assert path.is_file() and path.name == "run1.artifact"
-    assert q.load_artifact(path).measurements.snr == artifact.measurements.snr
+    assert fmriqa_io.load_artifact(path).measurements.snr == artifact.measurements.snr
 
 
 def test_save_refuses_an_artifact_the_reader_would_reject(tmp_path, artifact) -> None:
@@ -90,7 +91,7 @@ def test_save_refuses_an_artifact_the_reader_would_reject(tmp_path, artifact) ->
     """
     broken = replace(artifact, provenance=replace(artifact.provenance, te="0.03"))
     with pytest.raises(q.InvalidArtifactError, match=r"provenance\.te"):
-        q.save_artifact(broken, tmp_path / "qa.nc")
+        fmriqa_io.save_artifact(broken, tmp_path / "qa.nc")
     assert not (tmp_path / "qa.nc").exists()
 
 
@@ -113,7 +114,7 @@ def test_save_refuses_an_roi_box_that_is_square_but_off_the_image(
     )
     broken = replace(artifact, images=replace(artifact.images, roi=moved))
     with pytest.raises(q.InvalidArtifactError, match="inside the image"):
-        q.save_artifact(broken, tmp_path / "qa.nc")
+        fmriqa_io.save_artifact(broken, tmp_path / "qa.nc")
     assert not (tmp_path / "qa.nc").exists()
 
 
@@ -122,7 +123,7 @@ def test_a_saved_archive_respects_the_umask(tmp_path, artifact) -> None:
     """An archive is handed to colleagues, so it must not come out owner-only."""
     old_umask = os.umask(0o022)
     try:
-        path = q.save_artifact(artifact, tmp_path / "qa.nc")
+        path = fmriqa_io.save_artifact(artifact, tmp_path / "qa.nc")
     finally:
         os.umask(old_umask)
     assert stat.S_IMODE(path.stat().st_mode) == 0o644
@@ -130,11 +131,11 @@ def test_a_saved_archive_respects_the_umask(tmp_path, artifact) -> None:
 
 def test_a_refused_save_preserves_the_archive_already_there(tmp_path, artifact) -> None:
     """A rejected write leaves the valid file it would have replaced untouched."""
-    path = q.save_artifact(artifact, tmp_path / "qa.nc")
+    path = fmriqa_io.save_artifact(artifact, tmp_path / "qa.nc")
     before = path.read_bytes()
     broken = replace(artifact, provenance=replace(artifact.provenance, te="0.03"))
     with pytest.raises(q.InvalidArtifactError, match=r"provenance\.te"):
-        q.save_artifact(broken, path)
+        fmriqa_io.save_artifact(broken, path)
     assert path.read_bytes() == before
     assert not list(tmp_path.glob(".*.tmp"))  # and no temporary beside it
 
@@ -158,7 +159,7 @@ def test_a_failed_save_leaves_neither_a_file_nor_a_temporary(
     monkeypatch.setattr(os, "fsync", fails)
     archive_dir = tmp_path / "archive"
     with pytest.raises(OSError, match="no space left on device"):
-        q.save_artifact(artifact, archive_dir / "qa.nc")
+        fmriqa_io.save_artifact(artifact, archive_dir / "qa.nc")
     assert list(archive_dir.iterdir()) == []
 
 
@@ -167,14 +168,14 @@ def test_load_rejects_a_netcdf_file_that_is_not_an_artifact(tmp_path) -> None:
     path = tmp_path / "weather.nc"
     _write_netcdf(path, {"temperature": np.arange(3.0)}, attributes={})
     with pytest.raises(q.InvalidArtifactError, match="not an fmri-qa artifact"):
-        q.load_artifact(path)
+        fmriqa_io.load_artifact(path)
 
 
 def test_load_rejects_an_npz_that_is_not_an_artifact(tmp_path) -> None:
     plain = tmp_path / "plain.npz"
     np.savez_compressed(plain, values=np.arange(3))
     with pytest.raises(q.InvalidArtifactError, match="not an fmri-qa artifact"):
-        q.load_artifact(plain)
+        fmriqa_io.load_artifact(plain)
 
 
 def test_load_rejects_a_document_attribute_that_is_not_text(tmp_path) -> None:
@@ -183,7 +184,7 @@ def test_load_rejects_a_document_attribute_that_is_not_text(tmp_path) -> None:
     signal = {"images.signal": np.ones((2, 2))}
     _write_netcdf(path, signal, attributes={"document": np.int32(7)})
     with pytest.raises(q.InvalidArtifactError, match="document attribute is not text"):
-        q.load_artifact(path)
+        fmriqa_io.load_artifact(path)
 
 
 @pytest.mark.parametrize(
@@ -210,10 +211,10 @@ def test_load_rejects_a_file_that_is_neither_container(
     elif name.endswith(".npy"):
         np.save(path, np.ones(3))
     else:
-        whole = q.save_artifact(artifact, tmp_path / "whole.nc").read_bytes()
+        whole = fmriqa_io.save_artifact(artifact, tmp_path / "whole.nc").read_bytes()
         path.write_bytes(whole[: len(whole) // 2])
     with pytest.raises(q.InvalidArtifactError):
-        q.load_artifact(path)
+        fmriqa_io.load_artifact(path)
 
 
 def test_load_rejects_a_path_that_is_not_a_readable_file(tmp_path) -> None:
@@ -225,7 +226,7 @@ def test_load_rejects_a_path_that_is_not_a_readable_file(tmp_path) -> None:
     (tmp_path / "archive").mkdir()
     for path in (tmp_path / "archive", tmp_path / "absent.qa.nc"):
         with pytest.raises(q.InvalidArtifactError):
-            q.load_artifact(path)
+            fmriqa_io.load_artifact(path)
 
 
 def test_load_rejects_non_object_documents(tmp_path) -> None:
@@ -234,7 +235,7 @@ def test_load_rejects_non_object_documents(tmp_path) -> None:
         signal = {"images.signal": np.ones((2, 2))}
         _write_netcdf(path, signal, attributes={"document": json.dumps(document)})
         with pytest.raises(q.InvalidArtifactError, match="JSON object"):
-            q.load_artifact(path)
+            fmriqa_io.load_artifact(path)
 
 
 def test_load_rejects_invalid_scalar_records(
@@ -275,7 +276,7 @@ def test_load_rejects_invalid_scalar_records(
         ("curves.psf.unit", "cm"),
     )
     for field, value in edits:
-        path = q.save_artifact(artifact, tmp_path / "bad.nc")
+        path = fmriqa_io.save_artifact(artifact, tmp_path / "bad.nc")
 
         def edit(doc, field=field, value=value):
             target = doc
@@ -287,7 +288,7 @@ def test_load_rejects_invalid_scalar_records(
 
         rewrite_document(path, edit)
         with pytest.raises(q.InvalidArtifactError):
-            q.load_artifact(path)
+            fmriqa_io.load_artifact(path)
 
 
 def test_load_rejects_inconsistent_arrays(tmp_path, artifact, read_netcdf) -> None:
@@ -316,7 +317,7 @@ def test_load_rejects_inconsistent_arrays(tmp_path, artifact, read_netcdf) -> No
         ("images.phantom_hull", np.full((3, 2), np.nan)),
     )
     for field, value in edits:
-        path = q.save_artifact(artifact, tmp_path / "bad.nc")
+        path = fmriqa_io.save_artifact(artifact, tmp_path / "bad.nc")
         document, arrays = read_netcdf(path)
         _write_netcdf(
             path,
@@ -324,7 +325,7 @@ def test_load_rejects_inconsistent_arrays(tmp_path, artifact, read_netcdf) -> No
             attributes={"document": json.dumps(document)},
         )
         with pytest.raises(q.InvalidArtifactError):
-            q.load_artifact(path)
+            fmriqa_io.load_artifact(path)
 
 
 def test_load_rejects_an_array_that_is_not_real_numbers() -> None:
@@ -344,7 +345,9 @@ def test_artifact_arrays_own_readonly_copies(tmp_path, artifact) -> None:
     images = replace(artifact.images, signal=signal)
     signal[:] = 0
     assert images.signal.any()
-    loaded = q.load_artifact(q.save_artifact(artifact, tmp_path / "qa.nc"))
+    loaded = fmriqa_io.load_artifact(
+        fmriqa_io.save_artifact(artifact, tmp_path / "qa.nc")
+    )
     for obj in (artifact, loaded):
         assert obj.images.ghost is not None
         for array in (
@@ -377,7 +380,9 @@ def test_failed_motion_survives_the_artifact_round_trip(tmp_path, artifact) -> N
             shear_pct=np.full(n, np.nan),
         ),
     )
-    loaded = q.load_artifact(q.save_artifact(broken, tmp_path / "failed-motion.nc"))
+    loaded = fmriqa_io.load_artifact(
+        fmriqa_io.save_artifact(broken, tmp_path / "failed-motion.nc")
+    )
     assert np.isnan(loaded.curves.translation).all()
     assert np.isnan(loaded.measurements.max_translation)
 
@@ -390,20 +395,20 @@ def test_load_rejects_an_artifact_from_a_newer_build(
     This direction cannot be migrated: this build does not know what a later
     schema put in the file, and guessing is worse than refusing.
     """
-    path = q.save_artifact(artifact, tmp_path / "qa.nc")
+    path = fmriqa_io.save_artifact(artifact, tmp_path / "qa.nc")
     rewrite_document(path, lambda doc: doc | {"schema_version": 99})
     with pytest.raises(q.InvalidArtifactError, match="schema version 99, newer"):
-        q.load_artifact(path)
+        fmriqa_io.load_artifact(path)
 
 
 def test_load_rejects_an_old_version_it_cannot_migrate_from(
     tmp_path, artifact, rewrite_document
 ) -> None:
     """An older version with no route forward is named, not mangled."""
-    path = q.save_artifact(artifact, tmp_path / "qa.nc")
+    path = fmriqa_io.save_artifact(artifact, tmp_path / "qa.nc")
     rewrite_document(path, lambda doc: doc | {"schema_version": 0})
     with pytest.raises(q.InvalidArtifactError, match="no migration from 0"):
-        q.load_artifact(path)
+        fmriqa_io.load_artifact(path)
 
 
 def test_load_migrates_a_schema_1_artifact(
@@ -416,11 +421,11 @@ def test_load_migrates_a_schema_1_artifact(
     carried survives. The two diagnostics it lacked are unknown, not invented,
     since a fabricated pass would vouch for numbers nothing here can vouch for.
     """
-    path = q.save_artifact(artifact, tmp_path / "qa.nc")
+    path = fmriqa_io.save_artifact(artifact, tmp_path / "qa.nc")
     rewrite_document(path, _as_schema(1))
 
     with pytest.warns(UserWarning, match="migrated to"):
-        loaded = q.load_artifact(path)
+        loaded = fmriqa_io.load_artifact(path)
 
     assert loaded.schema_version == ARTIFACT_SCHEMA_VERSION
     assert loaded.measurements.phantom_mask_ok is None
@@ -441,11 +446,11 @@ def test_load_migrating_a_schema_2_artifact_keeps_what_it_recorded(
     Schema 2 measured the phantom fraction and the ROI fit but had no verdict
     field. The migration must keep the two it has.
     """
-    path = q.save_artifact(artifact, tmp_path / "qa.nc")
+    path = fmriqa_io.save_artifact(artifact, tmp_path / "qa.nc")
     rewrite_document(path, _as_schema(2))
 
     with pytest.warns(UserWarning, match="schema 2, migrated"):
-        loaded = q.load_artifact(path)
+        loaded = fmriqa_io.load_artifact(path)
 
     m, before = loaded.measurements, artifact.measurements
     assert m.phantom_mask_ok is None  # the one field schema 2 lacked
@@ -463,11 +468,11 @@ def test_load_migrating_a_schema_3_artifact_leaves_the_trim_unrecorded(
     mapped through a guess is worse than one a reader knows it cannot map.
     Everything schema 3 recorded survives.
     """
-    path = q.save_artifact(artifact, tmp_path / "qa.nc")
+    path = fmriqa_io.save_artifact(artifact, tmp_path / "qa.nc")
     rewrite_document(path, _as_schema(3))
 
     with pytest.warns(UserWarning, match="schema 3, migrated"):
-        loaded = q.load_artifact(path)
+        loaded = fmriqa_io.load_artifact(path)
 
     assert loaded.provenance.n_trimmed is None  # the one field schema 3 lacked
     assert loaded.provenance.n_frames == artifact.provenance.n_frames
@@ -484,11 +489,11 @@ def test_load_migrating_a_schema_4_artifact_leaves_slice_and_contrast_unrecorded
     carry, and a recomputed contrast would pass off this build's definition as
     the writing build's measurement. The verdict schema 4 recorded is kept.
     """
-    path = q.save_artifact(artifact, tmp_path / "qa.nc")
+    path = fmriqa_io.save_artifact(artifact, tmp_path / "qa.nc")
     rewrite_document(path, _as_schema(4))
 
     with pytest.warns(UserWarning, match="schema 4, migrated"):
-        loaded = q.load_artifact(path)
+        loaded = fmriqa_io.load_artifact(path)
 
     assert loaded.provenance.slice_index is None
     assert loaded.provenance.n_slices is None
@@ -507,11 +512,11 @@ def test_load_migrating_a_schema_5_artifact_reports_displacement_in_voxels(
     is a fact about the old format. This fixture's `fwhm_unit` is "mm", so the
     two units can disagree on a migrated artifact, never on a fresh one.
     """
-    path = q.save_artifact(artifact, tmp_path / "qa.nc")
+    path = fmriqa_io.save_artifact(artifact, tmp_path / "qa.nc")
     rewrite_document(path, _as_schema(5))
 
     with pytest.warns(UserWarning, match="schema 5, migrated"):
-        loaded = q.load_artifact(path)
+        loaded = fmriqa_io.load_artifact(path)
 
     assert loaded.measurements.displacement_unit == "vox"
     assert loaded.measurements.fwhm_unit == "mm"  # this fixture's voxel size is known
@@ -536,11 +541,11 @@ def test_load_migrating_a_schema_6_artifact_keeps_its_clipping_answers(
     the artifact does not record the storage datatype to tell them apart. So the
     step carries them through untouched, which this pins.
     """
-    path = q.save_artifact(artifact, tmp_path / "qa.nc")
+    path = fmriqa_io.save_artifact(artifact, tmp_path / "qa.nc")
     rewrite_document(path, _as_schema(6))
 
     with pytest.warns(UserWarning, match="schema 6, migrated"):
-        loaded = q.load_artifact(path)
+        loaded = fmriqa_io.load_artifact(path)
 
     before, after = artifact.measurements, loaded.measurements
     assert after.clipped_any == before.clipped_any is not None
@@ -617,10 +622,10 @@ def test_load_rejects_a_closed_set_value_from_outside_the_set(
         ("pe_label", _with_measurement("pe_label", "diagonal")),
         ("psf.unit", _with_psf_unit("cm")),
     ):
-        path = q.save_artifact(artifact, tmp_path / f"{field}.nc")
+        path = fmriqa_io.save_artifact(artifact, tmp_path / f"{field}.nc")
         rewrite_document(path, edit)
         with pytest.raises(q.InvalidArtifactError, match=field):
-            q.load_artifact(path)
+            fmriqa_io.load_artifact(path)
 
 
 def test_load_rejects_clipped_kept_disagreeing_with_its_count(
@@ -631,20 +636,20 @@ def test_load_rejects_clipped_kept_disagreeing_with_its_count(
     `clipped_kept` is a property of `n_clipped_kept` in the type that measures
     it, not an independent fact. Only the flat artifact stores both.
     """
-    path = q.save_artifact(artifact, tmp_path / "qa.nc")
+    path = fmriqa_io.save_artifact(artifact, tmp_path / "qa.nc")
     rewrite_document(path, _with_measurement("n_clipped_kept", 5))
     with pytest.raises(q.InvalidArtifactError, match="clipped_kept"):
-        q.load_artifact(path)
+        fmriqa_io.load_artifact(path)
 
 
 def test_load_rejects_clipped_any_disagreeing_with_its_counts(
     tmp_path, artifact, rewrite_document
 ) -> None:
     """`clipped_any` is derived from both clipping counts, and must still hold."""
-    path = q.save_artifact(artifact, tmp_path / "qa.nc")
+    path = fmriqa_io.save_artifact(artifact, tmp_path / "qa.nc")
     rewrite_document(path, _with_measurement("n_clipped_pre", 3))
     with pytest.raises(q.InvalidArtifactError, match="clipped_any"):
-        q.load_artifact(path)
+        fmriqa_io.load_artifact(path)
 
 
 def test_load_rejects_fwhm_pe_null_when_pe_axis_is_known(
@@ -652,19 +657,19 @@ def test_load_rejects_fwhm_pe_null_when_pe_axis_is_known(
 ) -> None:
     """`fwhm_pe` is None when `pe_axis` is None, and only then."""
     assert artifact.measurements.pe_axis is not None
-    path = q.save_artifact(artifact, tmp_path / "qa.nc")
+    path = fmriqa_io.save_artifact(artifact, tmp_path / "qa.nc")
     rewrite_document(path, _with_measurement("fwhm_pe", None))
     with pytest.raises(q.InvalidArtifactError, match="fwhm_pe"):
-        q.load_artifact(path)
+        fmriqa_io.load_artifact(path)
 
 
 def test_load_rejects_a_document_missing_a_section(
     tmp_path, artifact, rewrite_document
 ) -> None:
-    path = q.save_artifact(artifact, tmp_path / "qa.nc")
+    path = fmriqa_io.save_artifact(artifact, tmp_path / "qa.nc")
     rewrite_document(path, lambda doc: {**doc, "images": {}})
     with pytest.raises(q.InvalidArtifactError, match="malformed artifact"):
-        q.load_artifact(path)
+        fmriqa_io.load_artifact(path)
 
 
 def test_load_rejects_a_schema_1_archive_missing_its_measurements(
@@ -676,7 +681,7 @@ def test_load_rejects_a_schema_1_archive_missing_its_measurements(
     does not is malformed and must be refused as such, not raise the bare
     KeyError of whichever migration step reached for it.
     """
-    path = q.save_artifact(artifact, tmp_path / "qa.nc")
+    path = fmriqa_io.save_artifact(artifact, tmp_path / "qa.nc")
     rewrite_document(
         path,
         lambda doc: (
@@ -685,7 +690,7 @@ def test_load_rejects_a_schema_1_archive_missing_its_measurements(
         ),
     )
     with pytest.raises(q.InvalidArtifactError, match="malformed artifact"):
-        q.load_artifact(path)
+        fmriqa_io.load_artifact(path)
 
 
 def _same_scalars(left, right) -> bool:

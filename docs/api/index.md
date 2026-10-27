@@ -5,8 +5,8 @@ describes the code you have. It has two tiers.
 
 The **public API** is what each distribution exports from its root, or from a
 subpackage's own `__all__`. There is one page each for {doc}`fmri-qa-core`,
-{doc}`fmri-qa-report` and {doc}`fmri-qa-launcher`. Build on these names. They
-are the ones kept stable.
+{doc}`fmri-qa-io`, {doc}`fmri-qa-report` and {doc}`fmri-qa-launcher`. Build on
+these names. They are the ones kept stable.
 
 The **building blocks** are the names a module lists in its own `__all__` but its
 package does not re-export: the individual metrics, the preparation steps, the
@@ -17,6 +17,7 @@ the commands.
 
 ```{toctree}
 fmri-qa-core
+fmri-qa-io
 fmri-qa-report
 fmri-qa-launcher
 building-blocks

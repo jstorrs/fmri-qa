@@ -54,6 +54,8 @@ jobs:
           .venv-core-smoke/bin/python -c "from importlib.resources import files; assert files('fmriqa').joinpath('py.typed').is_file()"
           # The seam, checked against the installed artifact: no drawing stack.
           .venv-core-smoke/bin/python -c "import importlib.util as u; assert u.find_spec('matplotlib') is None"
+          # Nor the artifact file's native library: the container is fmri-qa-io's.
+          .venv-core-smoke/bin/python -c "import importlib.util as u; assert u.find_spec('netCDF4') is None, 'the core wheel pulled in netCDF4'"
           # The MIT text has to reach whoever installs the wheel. hatchling puts
           # a declared license file under the dist-info `licenses/` directory.
           .venv-core-smoke/bin/python -c "from importlib.metadata import distribution; text = distribution('fmri-qa-core').read_text('licenses/LICENSE'); assert text and 'MIT License' in text, 'the core wheel ships no license text'"
@@ -86,13 +88,14 @@ jobs:
           # Core ships no commands: only the cli wheel owns the entry points.
           .venv-cli-smoke/bin/python -c "from importlib.metadata import distribution; assert not distribution('fmri-qa-core').entry_points, 'the core wheel ships console scripts'"
 
-      - name: Smoke-test the report wheel against the core wheel
+      - name: Smoke-test the report wheel against the core and io wheels
         run: |
           core=(dist/fmri_qa_core-*.whl)
+          io=(dist/fmri_qa_io-*.whl)
           report=(dist/fmri_qa_report-*.whl)
           test -f "${report[0]}"
           uv venv --python 3.13 .venv-report-smoke
-          uv pip install --python .venv-report-smoke/bin/python "${core[0]}" "${report[0]}"
+          uv pip install --python .venv-report-smoke/bin/python "${core[0]}" "${io[0]}" "${report[0]}"
           .venv-report-smoke/bin/fmri-qa-report --version
           .venv-report-smoke/bin/python -c "from importlib.resources import files; assert files('fmriqa_report').joinpath('py.typed').is_file()"
           .venv-report-smoke/bin/python -c "from importlib.resources import files; root = files('fmriqa_report.formats.html'); assert root.joinpath('templates/run.html').is_file() and root.joinpath('assets/report.css').is_file(), 'the report wheel ships no HTML resources'"

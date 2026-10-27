@@ -6,22 +6,24 @@ the **analysis artifact** they are published in.
 
 ```python
 import fmriqa as q
+import fmriqa_io
 
 scan = q.QAScan.from_nifti("qa.nii.gz")
 artifact = q.analyze(scan, name="qa.nii.gz")
-q.save_artifact(artifact, "qa.nc")
+fmriqa_io.save_artifact(artifact, "qa.nc")
 ```
 
 A `QAArtifact` carries the run's settings, provenance, scalar measurements,
 stability curves, and the four FBIRN summary images. That is everything a report
-or a trend database needs, and nothing only the pipeline needs. It saves as a
-netCDF-4 file, written through `netCDF4`, which wraps the Unidata C library the
-other readers use. MATLAB's `ncread`/`ncinfo`/`ncdisp`/`ncreadatt` are built in
-and need no toolbox. R reads one through `ncdf4` on CRAN, Python through
-netCDF4-python or xarray, and `ncdump` comes with the netCDF tools. Artifacts
-written by earlier builds as `.qa.npz` still load. Rendering an artifact into a
-report is the job of the separate [`fmri-qa-report`](../fmri-qa-report)
-distribution. This package depends on nothing that draws.
+or a trend database needs, and nothing only the pipeline needs.
+[`fmri-qa-io`](../fmri-qa-io) saves it as a netCDF-4 file, written through
+`netCDF4`, which wraps the Unidata C library the other readers use. MATLAB's
+`ncread`/`ncinfo`/`ncdisp`/`ncreadatt` are built in and need no toolbox. R
+reads one through `ncdf4` on CRAN, Python through netCDF4-python or xarray, and
+`ncdump` comes with the netCDF tools. Artifacts written by earlier builds as
+`.qa.npz` still load. Rendering an artifact into a report is the job of the
+separate [`fmri-qa-report`](../fmri-qa-report) distribution. This package
+depends on nothing that draws.
 
 ## What it calculates
 

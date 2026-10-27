@@ -2,14 +2,15 @@
 
 `artifact` defines the value objects. `build` projects a computed `QAResult`
 into one (`analyze` runs the whole thing from a scan). `validation` checks them
-against the published contract. `serialize` reads and writes an artifact as a
-single netCDF-4 file. Everything a report, a plot or a trend database needs is
-here. Nothing in this subpackage reaches back into the metric, prep, or load
-layers at read time.
+against the published contract. `serialize` maps an artifact to and from the
+JSON document and named arrays its file holds. `fmriqa_io.artifact` is the file
+itself (`save_artifact`, `load_artifact`). Everything else a report, a plot or a
+trend database needs is here. Nothing in this subpackage reaches back into the
+metric, prep, or load layers at read time.
 
-The two halves are imported differently. The artifact, its validator and its
-serializer are cheap, so they load eagerly. So does `InvalidArtifactError`, the
-one error `load_artifact` raises. `fmriqa.exceptions` imports nothing, and a
+The two halves are imported differently. The artifact and its validator are
+cheap, so they load eagerly. So does `InvalidArtifactError`, the one error
+`fmriqa_io.load_artifact` raises. `fmriqa.exceptions` imports nothing, and a
 reader that crosses only this seam must be able to catch it by name. `build` is
 not eager: projecting a `QAResult` imports the pipeline, and behind it the whole
 metric, prep and load stack, including scikit-image, scipy and nibabel.
@@ -37,7 +38,6 @@ from .artifact import (
     RoiBox,
     WeisskoffCurve,
 )
-from .serialize import load_artifact, save_artifact
 
 if TYPE_CHECKING:
     # Imported directly (not through the lazy `__getattr__` below) so mypy and
@@ -60,8 +60,6 @@ __all__ = [
     "analyze",
     "build_artifact",
     "core_version",
-    "load_artifact",
-    "save_artifact",
 ]
 
 # The two names `build` defines, and the only ones resolved on first access.

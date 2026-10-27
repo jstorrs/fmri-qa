@@ -12,9 +12,9 @@ build, not about the artifact.
 Bumping `ARTIFACT_SCHEMA_VERSION` is not done until the outgoing version has a
 committed fixture. Run the old code (a `git worktree` checkout of the last commit
 at that version) over the shared synthetic phantom and save the file to
-`tests/fixtures/schema_v{N}.qa.nc`, or `.qa.npz` if that build still wrote that
-container. `test_artifact_fixtures.py` finds either, and the loader tells them
-apart by leading bytes. A migration tested only against a same-build document
+fmri-qa-io's `tests/fixtures/schema_v{N}.qa.nc`, or `.qa.npz` if that build still
+wrote that container. `test_artifact_fixtures.py` finds either, and the loader
+tells them apart by leading bytes. A migration tested only against a same-build document
 synthesized to look old (as `test_artifact_archive.py` does) proves the step
 matches its docstring, not that a real file from that version still parses.
 """

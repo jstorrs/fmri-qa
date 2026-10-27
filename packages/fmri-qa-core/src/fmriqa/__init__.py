@@ -38,8 +38,6 @@ if TYPE_CHECKING:
         WeisskoffCurve,
         analyze,
         build_artifact,
-        load_artifact,
-        save_artifact,
     )
     from .convert.session import ImportedSeries, ImportResult, import_dicom
     from .exceptions import (
@@ -176,14 +174,12 @@ __all__ = [
     "estimate_pe_axis",
     "estimate_smoothness",
     "import_dicom",
-    "load_artifact",
     "outlier_fraction",
     "percent_fluctuation",
     "preprocess",
     "resolve_roi",
     "run_hilo",
     "run_qa",
-    "save_artifact",
     "sfnr",
     "snr",
     "spike_scores",
@@ -206,8 +202,6 @@ _EXPORTS: dict[str, tuple[str, ...]] = {
         "WeisskoffCurve",
         "analyze",
         "build_artifact",
-        "load_artifact",
-        "save_artifact",
     ),
     ".convert.session": ("ImportResult", "ImportedSeries", "import_dicom"),
     ".exceptions": (

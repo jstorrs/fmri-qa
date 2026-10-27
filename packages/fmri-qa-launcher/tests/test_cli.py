@@ -15,6 +15,7 @@ from pathlib import Path
 import pytest
 
 import fmriqa
+import fmriqa_io
 import fmriqa_launcher.session as session_module
 from fmriqa.convert.dcm2niix import find_dcm2niix
 from fmriqa.settings import AnalysisSettings
@@ -193,7 +194,7 @@ def test_the_published_run_matches_a_direct_analyze(
     published_nifti = output_dir / name / f"{name}.nii.gz"
     published_artifact = output_dir / name / f"{name}.qa.nc"
 
-    reloaded = fmriqa.load_artifact(published_artifact)
+    reloaded = fmriqa_io.load_artifact(published_artifact)
     direct = fmriqa.analyze(
         fmriqa.QAScan.from_nifti(published_nifti), fmriqa.AnalysisSettings()
     )

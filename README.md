@@ -13,7 +13,8 @@ a result from presenting it. The third is an application shell built on both.
 
 | Package | Import | Does | Needs |
 | --- | --- | --- | --- |
-| **`fmri-qa-core`** | `fmriqa` | the metrics, the pipeline, and the **analysis artifact** they are published as | numpy, scipy, nibabel, scikit-image, netCDF4 |
+| **`fmri-qa-core`** | `fmriqa` | the metrics, the pipeline, and the **analysis artifact** they are published as | numpy, scipy, nibabel, scikit-image |
+| **`fmri-qa-io`** | `fmriqa_io` | reading and writing files, including the artifact's netCDF-4 file (`save_artifact`, `load_artifact`) | core, nibabel, netCDF4 |
 | **`fmri-qa-report`** | `fmriqa_report` | plots and a self-contained offline HTML report, built from an artifact | matplotlib (+ core) |
 | **`fmri-qa-launcher`** | `fmriqa_launcher` | one-step DICOM-directory-in, report-directory-out pipeline: a command line and a desktop panel | core + report; stdlib `tkinter` for the panel |
 
@@ -396,13 +397,14 @@ data keeps its colors. The page is print-ready.
 
 ```python
 import fmriqa as q
+import fmriqa_io
 
 scan = q.QAScan.from_nifti("scan.nii.gz")
 artifact = q.analyze(scan, name="scan.nii.gz")
 m = artifact.measurements
 print(m.snr, m.sfnr, m.rdc, m.drift_pct)
 
-q.save_artifact(artifact, "qa.nc")
+fmriqa_io.save_artifact(artifact, "qa.nc")
 ```
 
 `analyze` is the main entry point. Underneath, the pipeline is a chain of small
@@ -430,10 +432,10 @@ consumer never recomputes a metric.
 ### Reporting
 
 ```python
-import fmriqa as q
+import fmriqa_io
 import fmriqa_report as report
 
-artifact = q.load_artifact("qa.nc")
+artifact = fmriqa_io.load_artifact("qa.nc")
 
 report.write_run_page(
     artifact, "report.html", title="run-1", theme=report.Theme(panel_accent="#1a4d7a")

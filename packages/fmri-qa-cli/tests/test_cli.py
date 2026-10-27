@@ -17,6 +17,7 @@ import pytest
 
 import fmriqa as q
 import fmriqa_cli as cli
+import fmriqa_io
 from fmriqa_cli import qa, table
 from fmriqa_cli.arguments import attributed_warnings
 from fmriqa_cli.record import metric_record
@@ -47,7 +48,7 @@ def test_main_saves_a_loadable_artifact(tmp_path, write_scan, capsys) -> None:
     rc = cli.main([write_scan(tmp_path), "--roi-size", "9", "--artifact", str(out)])
     assert rc == 0
     assert f"# wrote {out}" in capsys.readouterr().out
-    artifact = q.load_artifact(out)
+    artifact = fmriqa_io.load_artifact(out)
     assert artifact.provenance.scan == "scan.nii.gz"
     assert artifact.settings.roi_size == 9
     assert artifact.measurements.snr > 0
@@ -68,7 +69,7 @@ def test_main_files_one_scan_into_an_existing_artifact_directory(
     assert rc == 0
     written = out / "scan.qa.nc"
     assert f"# wrote {written}" in capsys.readouterr().out
-    assert q.load_artifact(written).provenance.scan == "scan.nii.gz"
+    assert fmriqa_io.load_artifact(written).provenance.scan == "scan.nii.gz"
 
 
 def test_main_still_writes_one_scan_to_a_plain_path(
@@ -79,7 +80,7 @@ def test_main_still_writes_one_scan_to_a_plain_path(
     rc = cli.main([write_scan(tmp_path), "--roi-size", "9", "--artifact", str(out)])
     assert rc == 0
     assert out.is_file()
-    assert q.load_artifact(out).provenance.scan == "scan.nii.gz"
+    assert fmriqa_io.load_artifact(out).provenance.scan == "scan.nii.gz"
 
 
 def test_main_saves_one_artifact_per_scan_in_a_batch(
@@ -92,7 +93,9 @@ def test_main_saves_one_artifact_per_scan_in_a_batch(
     assert rc == 0
     written = sorted(p.name for p in out.glob("*.nc"))
     assert written == ["first.qa.nc", "second.qa.nc"]
-    assert q.load_artifact(out / "first.qa.nc").provenance.scan == "first.nii.gz"
+    assert (
+        fmriqa_io.load_artifact(out / "first.qa.nc").provenance.scan == "first.nii.gz"
+    )
 
 
 def test_main_refuses_a_batch_whose_artifacts_would_collide(
@@ -656,7 +659,7 @@ def test_a_wildcard_matching_one_scan_is_not_a_batch(
     )
     assert rc == 0
     assert out.is_file()
-    assert q.load_artifact(out).provenance.scan == "only.nii.gz"
+    assert fmriqa_io.load_artifact(out).provenance.scan == "only.nii.gz"
 
 
 def test_a_wildcard_matching_nothing_is_reported_not_dropped(tmp_path, capsys) -> None:

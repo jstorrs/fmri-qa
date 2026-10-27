@@ -138,13 +138,13 @@ from typing import TYPE_CHECKING, Any, Final, Literal
 import numpy as np
 from numpy.typing import NDArray
 
-from ...exceptions import InvalidArtifactError
-from .decompose import Member
+from fmriqa.analysis.serialize.decompose import Member
+from fmriqa.exceptions import InvalidArtifactError
 
 if TYPE_CHECKING:  # the import itself is deferred; see `write`
     from netCDF4 import Dataset, Variable
 
-# What a netCDF-4 file starts with, and so how `serialize` recognizes one. A
+# What a netCDF-4 file starts with, and so how `artifact` recognizes one. A
 # netCDF-4 file is an HDF5 file and carries HDF5's own signature.
 MAGIC: Final = b"\x89HDF\r\n\x1a\n"
 

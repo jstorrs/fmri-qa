@@ -22,6 +22,8 @@ members = ["packages/*"]
 dev = [
     "hypothesis>=6.100",
     "mypy>=1.18",
+    # Only `tests/test_packaging.py` uses it, to evaluate dependency markers.
+    "packaging>=25",
     # Only the git hook uses it (`uv run pre-commit install`).
     "pre-commit>=4",
     "pyright>=1.1.390",

@@ -30,6 +30,7 @@ bundle = [{ name = "pyinstaller", specifier = ">=6.11" }]
 dev = [
     { name = "hypothesis", specifier = ">=6.100" },
     { name = "mypy", specifier = ">=1.18" },
+    { name = "packaging", specifier = ">=25" },
     { name = "pre-commit", specifier = ">=4" },
     { name = "pyright", specifier = ">=1.1.390" },
     { name = "pytest", specifier = ">=8.0" },
@@ -867,7 +868,6 @@ version = "0.1.0"
 source = { editable = "packages/fmri-qa-core" }
 dependencies = [
     { name = "dcm2niix" },
-    { name = "netcdf4" },
     { name = "nibabel" },
     { name = "numpy" },
     { name = "scikit-image" },
@@ -877,7 +877,6 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "dcm2niix", specifier = ">=1.0.20250506" },
-    { name = "netcdf4", specifier = ">=1.7" },
     { name = "nibabel", specifier = ">=5.3.2" },
     { name = "numpy", specifier = ">=2.3.4" },
     { name = "scikit-image", specifier = ">=0.25.2" },
@@ -890,6 +889,7 @@ version = "0.1.0"
 source = { editable = "packages/fmri-qa-io" }
 dependencies = [
     { name = "fmri-qa-core" },
+    { name = "netcdf4", marker = "sys_platform != 'emscripten'" },
     { name = "nibabel" },
     { name = "numpy" },
 ]
@@ -897,6 +897,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "fmri-qa-core", editable = "packages/fmri-qa-core" },
+    { name = "netcdf4", marker = "sys_platform != 'emscripten'", specifier = ">=1.7" },
     { name = "nibabel", specifier = ">=5.3.2" },
     { name = "numpy", specifier = ">=2.3.4" },
 ]
@@ -927,6 +928,7 @@ source = { editable = "packages/fmri-qa-report" }
 dependencies = [
     { name = "cycler" },
     { name = "fmri-qa-core" },
+    { name = "fmri-qa-io" },
     { name = "matplotlib" },
     { name = "numpy" },
 ]
@@ -935,6 +937,7 @@ dependencies = [
 requires-dist = [
     { name = "cycler", specifier = ">=0.10" },
     { name = "fmri-qa-core", editable = "packages/fmri-qa-core" },
+    { name = "fmri-qa-io", editable = "packages/fmri-qa-io" },
     { name = "matplotlib", specifier = ">=3.10.7" },
     { name = "numpy", specifier = ">=2.3.4" },
 ]

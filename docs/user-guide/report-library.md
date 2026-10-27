@@ -2,11 +2,11 @@
 
 The command is a thin shell over `write_run_page`. Import it and `render_run_page`
 from `fmriqa_report`. Both take a loaded `QAArtifact`. Load one with
-`fmriqa.analysis.load_artifact`, which reads any file the command would (see
+`fmriqa_io.load_artifact`, which reads any file the command would (see
 {doc}`/user-guide/artifact`).
 
 ```python
-from fmriqa.analysis import load_artifact
+from fmriqa_io import load_artifact
 from fmriqa_report import Theme, write_run_page
 
 artifact = load_artifact("qa.nc")

@@ -23,11 +23,15 @@ classifiers = [
     "Programming Language :: Python :: 3.13",
     "Typing :: Typed",
 ]
-# fmri-qa-core supplies the QAArtifact value objects and the artifact reader.
-# This package consumes an artifact and never runs the pipeline, so nibabel and
-# scikit-image are not needed here (they arrive only via core).
+# fmri-qa-core supplies the QAArtifact value objects and fmri-qa-io the artifact
+# reader. This package consumes an artifact and never runs the pipeline, so
+# nibabel and scikit-image are not needed here (they arrive only via core and
+# io).
 dependencies = [
     "fmri-qa-core==0.1.0",
+    # Only to read an artifact file. Its netCDF library loads on the first read,
+    # not on import.
+    "fmri-qa-io==0.1.0",
     # The Theme builds an axes.prop_cycle directly, so cycler is a direct
     # dependency even though matplotlib always brings it along.
     "cycler>=0.10",
@@ -40,6 +44,7 @@ fmri-qa-report = "fmriqa_report.cli:main"
 
 [tool.uv.sources]
 fmri-qa-core = { workspace = true }
+fmri-qa-io = { workspace = true }
 
 [build-system]
 requires = ["hatchling"]

@@ -35,6 +35,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import fmriqa
+import fmriqa_io
 from fmriqa.convert.session import ImportedSeries
 from fmriqa.exceptions import ConversionError
 from fmriqa.load.paths import nifti_stem
@@ -316,7 +317,7 @@ def _publish_series(
     noted = _messages(caught)
 
     try:
-        fmriqa.save_artifact(artifact, artifact_path)
+        fmriqa_io.save_artifact(artifact, artifact_path)
     except Exception as exc:  # noqa: BLE001 - one series' failure, reported and skipped
         return _failed(name, exc, noted)
 

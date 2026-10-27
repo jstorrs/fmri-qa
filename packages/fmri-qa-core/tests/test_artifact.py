@@ -4,7 +4,7 @@ The artifact is the contract between the calculation half and every consumer,
 so these pin that everything a report needs is settled at build time: derived
 properties as plain fields, curves extracted, masks and outlines materialized,
 and no metric object left for a reader to walk. The round trip to disk is
-`test_artifact_archive.py`.
+fmri-qa-io's `test_artifact_archive.py`.
 """
 
 import warnings
@@ -165,21 +165,20 @@ def test_displacement_reports_mm_with_a_known_voxel_size_else_voxels(
     assert unmetered.fwhm_unit == "vox"
 
 
-def test_a_noise_only_scan_keeps_its_failed_mask_verdict(tmp_path) -> None:
-    """Analyzing background must not save a passing localization.
+def test_a_noise_only_scan_keeps_its_failed_mask_verdict() -> None:
+    """Analyzing background must not publish a passing localization.
 
     Slice selection says no slice holds a phantom, but that warning is gone once
     the run ends, and reports and trend databases read the artifact's verdict.
     The noise segments to a middling share of the frame, so the verdict must
-    fail on contrast, as the slice test did, and stay failed through the
-    archive.
+    fail on contrast, as the slice test did. fmri-qa-io's
+    `test_artifact_roundtrip.py` checks it stays failed through the archive.
     """
     noise = np.abs(np.random.default_rng(0).normal(size=(32, 32, 1, 40)))
     settings = q.AnalysisSettings(trim_sec=0, center="phantom", roi_size=3)
     with pytest.warns(UserWarning, match="no slice holds a recognizable phantom"):
         artifact = q.analyze(q.QAScan(data=noise, tr=2.0), settings)
-    loaded = q.load_artifact(q.save_artifact(artifact, tmp_path / "noise.qa.nc"))
-    m = loaded.measurements
+    m = artifact.measurements
     assert 0.0 < m.phantom_fraction < 0.95  # the share alone would have passed
     assert m.phantom_mask_ok is False
 
@@ -315,14 +314,13 @@ def test_the_default_roi_size_is_the_shared_fbirn_constant() -> None:
     assert q.AnalysisSettings().roi_size == q.FBIRN_ROI_SIZE
 
 
-def test_undeterminable_clipping_survives_the_archive(tmp_path, make_scan) -> None:
-    """ "Not determinable" is a third answer, and it round-trips as one.
+def test_undeterminable_clipping_is_published_as_unknown(make_scan) -> None:
+    """ "Not determinable" is a third answer, and the artifact gives it as one.
 
     A scan whose storage cannot support the rail test publishes the whole clipping
     block as None, not zero counts and a False verdict, which would report a
-    scanner verified against a check that never ran. The distinction only helps
-    if it survives to the reader, so it is pinned through
-    `save_artifact`/`load_artifact`.
+    scanner verified against a check that never ran. fmri-qa-io's
+    `test_artifact_roundtrip.py` checks the distinction survives to the reader.
     """
     scan = replace(make_scan(), stored_integer=False)
     with warnings.catch_warnings():
@@ -332,10 +330,6 @@ def test_undeterminable_clipping_survives_the_archive(tmp_path, make_scan) -> No
     for name in ("clipped_any", "clipped_kept", "n_clipped_kept", "n_clipped_pre"):
         assert getattr(artifact.measurements, name) is None, name
     assert artifact.measurements.clip_ceiling is None
-
-    loaded = q.load_artifact(q.save_artifact(artifact, tmp_path / "undet.qa.nc"))
-    assert loaded.measurements.clipped_any is None
-    assert loaded.measurements.n_clipped_kept is None
 
 
 def test_integer_storage_still_answers_the_clipping_question(make_scan) -> None:
@@ -529,15 +523,3 @@ def test_every_float_field_stores_a_whole_number_as_a_float(artifact) -> None:
         elements = stored if isinstance(stored, tuple) else (stored,)
         label = f"{type(record).__name__}.{name}"
         assert all(type(v) is float for v in elements), (label, stored)
-
-
-def test_a_bool_in_a_float_field_is_kept_for_the_archive_to_refuse(
-    tmp_path, artifact
-) -> None:
-    """`True` is an int to Python but not a measurement; it is not made 1.0."""
-    measurements = replace(artifact.measurements, snr=True)
-    assert measurements.snr is True
-    with pytest.raises(q.InvalidArtifactError, match=r"measurements\.snr"):
-        q.save_artifact(
-            replace(artifact, measurements=measurements), tmp_path / "qa.nc"
-        )

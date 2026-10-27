@@ -13,14 +13,22 @@ access. `_EXPORTS` maps each defining module to its names, and
 
 import logging
 from importlib import import_module
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    # Plain imports, not the lazy `_EXPORTS` map below, so mypy and pyright
+    # resolve every name statically. Never executed at runtime.
+    from .artifact import load_artifact, save_artifact
 
 logging.getLogger(__name__).addHandler(logging.NullHandler())
 
-__all__: list[str] = []
+__all__ = ["load_artifact", "save_artifact"]
 
 # Which submodule defines each name in `__all__`, keyed by module path so one
-# import serves every name it owns. Empty until code moves in.
-_EXPORTS: dict[str, tuple[str, ...]] = {}
+# import serves every name it owns.
+_EXPORTS: dict[str, tuple[str, ...]] = {
+    ".artifact": ("load_artifact", "save_artifact"),
+}
 
 # Reverse lookup of `_EXPORTS`, for `__getattr__`.
 _NAME_TO_MODULE: dict[str, str] = {

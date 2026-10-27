@@ -3,7 +3,7 @@
 The read half of the archive layout, mirroring `decompose`. Besides assembling
 the value objects, it checks each array member for the dtype its field is
 declared with (`_floats`, `_bools`). The document's own fields, closed-set
-strings included, are not re-checked here. `load_artifact` runs
+strings included, are not re-checked here. `fmriqa_io.load_artifact` runs
 `validate_document` first, so `compose` trusts what it is handed.
 """
 

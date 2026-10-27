@@ -30,13 +30,6 @@ dependencies = [
     "numpy>=2.3.4",
     "scikit-image>=0.25.2",
     "scipy>=1.16.2",
-    # The artifact's container. It is worth a ~10 MB wheel carrying libhdf5 and
-    # libnetcdf: this is the Unidata C library that MATLAB's `ncread`, R's
-    # `ncdf4`, `ncdump` and xarray read through, so a file it writes is a file
-    # those were tested against. Writing netCDF-4 by hand or with a pure-Python
-    # encoder would claim compatibility with a format whose only reference
-    # implementation we declined to link.
-    "netCDF4>=1.7",
     # The DICOM importer's converter. It is a plain dependency, not an extra.
     # As an extra it spared people who only analyze NIfTI a ~3 MB binary, which
     # is under a percent of an installed environment. It also made `fmri-qa-import`

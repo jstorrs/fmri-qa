@@ -31,7 +31,7 @@ from pathlib import Path
 
 import pytest
 
-import fmriqa as q
+import fmriqa_io
 from fmriqa.analysis import ARTIFACT_SCHEMA_VERSION
 from fmriqa.analysis.serialize.migrate import _MIGRATIONS
 
@@ -176,7 +176,7 @@ def test_a_real_archive_from_an_older_build_still_loads(version: int) -> None:
     """
     path = _FIXTURES[version]
     with pytest.warns(UserWarning, match="migrated to"):
-        loaded = q.load_artifact(path)
+        loaded = fmriqa_io.load_artifact(path)
 
     assert loaded.schema_version == ARTIFACT_SCHEMA_VERSION
 

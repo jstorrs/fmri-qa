@@ -12,6 +12,7 @@ import numpy as np
 import pytest
 
 import fmriqa as q
+import fmriqa_io
 from fmriqa_report.content import METRIC_DOCS
 from fmriqa_report.formats.html import resources
 from fmriqa_report.formats.html.figures import FIGURE_ASSETS, RenderedFigure
@@ -187,7 +188,9 @@ def test_run_page_is_byte_reproducible(artifact) -> None:
 
 def test_a_reloaded_artifact_renders_identically(tmp_path, artifact) -> None:
     """The seam's payoff: a saved artifact is as good as a freshly computed one."""
-    reloaded = q.load_artifact(q.save_artifact(artifact, tmp_path / "qa.nc"))
+    reloaded = fmriqa_io.load_artifact(
+        fmriqa_io.save_artifact(artifact, tmp_path / "qa.nc")
+    )
     live = render_run_page(artifact, title="Test run", report_version="report-test")
     disk = render_run_page(reloaded, title="Test run", report_version="report-test")
     assert live == disk
@@ -199,7 +202,9 @@ def test_a_blank_scan_with_an_unresolved_rdc_still_renders(tmp_path) -> None:
         q.QAScan(data=np.zeros((16, 16, 1, 10)), tr=2.0, pe_axis=1),
         q.AnalysisSettings(roi_size=3, trim_sec=0, detrend_order=0),
     )
-    reloaded = q.load_artifact(q.save_artifact(artifact, tmp_path / "blank.nc"))
+    reloaded = fmriqa_io.load_artifact(
+        fmriqa_io.save_artifact(artifact, tmp_path / "blank.nc")
+    )
     assert not np.isfinite(reloaded.curves.weisskoff.rdc).any()
     page = render_run_page(reloaded, title="blank", report_version="report-test")
     assert "Unavailable — estimator unresolved" in page

@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import TextIO
 
 import fmriqa as q
+import fmriqa_io
 from fmriqa.load.paths import nifti_stem, sidecar_path
 from fmriqa.path_arguments import same_file
 
@@ -120,7 +121,7 @@ def report_destination_problems(destinations: Sequence[tuple[str, Path]]) -> boo
 def write_artifact(artifact: q.QAArtifact, out: Path, info: TextIO) -> str | None:
     """Write one artifact; return None if written, else the error as reported."""
     try:
-        q.save_artifact(artifact, out)
+        fmriqa_io.save_artifact(artifact, out)
     except (OSError, q.InvalidArtifactError) as exc:
         # A bad destination is a user error, and an artifact the reader would
         # refuse is a defect worth a line, not a traceback. Either way the

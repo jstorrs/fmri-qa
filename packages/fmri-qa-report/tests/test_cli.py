@@ -4,14 +4,14 @@ from pathlib import Path
 
 import pytest
 
-import fmriqa as q
+import fmriqa_io
 from fmriqa_report import cli
 
 
 @pytest.fixture
 def saved(tmp_path, artifact) -> str:
     """The shared artifact written to disk, as the CLI would receive it."""
-    return str(q.save_artifact(artifact, tmp_path / "scan.qa.nc"))
+    return str(fmriqa_io.save_artifact(artifact, tmp_path / "scan.qa.nc"))
 
 
 def test_main_reports_a_write_failure_without_a_traceback(
@@ -88,8 +88,8 @@ def test_main_fails_when_the_artifact_cannot_be_read(tmp_path, capsys) -> None:
 
 def test_main_titles_a_section_from_the_artifact_provenance(tmp_path, artifact) -> None:
     """The recorded scan name is the section title, whatever the file is called."""
-    path = q.save_artifact(artifact, tmp_path / "unrelated-name.nc")
-    assert cli._title(q.load_artifact(path), str(path)) == "scan.nii.gz"
+    path = fmriqa_io.save_artifact(artifact, tmp_path / "unrelated-name.nc")
+    assert cli._title(fmriqa_io.load_artifact(path), str(path)) == "scan.nii.gz"
 
 
 def test_main_falls_back_to_the_file_name(tmp_path, bare_artifact) -> None:
@@ -98,8 +98,8 @@ def test_main_falls_back_to_the_file_name(tmp_path, bare_artifact) -> None:
     anonymous = replace(
         bare_artifact, provenance=replace(bare_artifact.provenance, scan="")
     )
-    path = q.save_artifact(anonymous, tmp_path / "run-7.qa.nc")
-    assert cli._title(q.load_artifact(path), str(path)) == "run-7.qa.nc"
+    path = fmriqa_io.save_artifact(anonymous, tmp_path / "run-7.qa.nc")
+    assert cli._title(fmriqa_io.load_artifact(path), str(path)) == "run-7.qa.nc"
 
 
 def test_version_flag_prints_and_exits(capsys) -> None:
@@ -128,7 +128,7 @@ def test_help_renders(capsys) -> None:
 
 def test_a_wildcard_argument_is_expanded(tmp_path, artifact) -> None:
     """PowerShell hands `artifacts/*.qa.nc` over with the `*` still in it."""
-    q.save_artifact(artifact, tmp_path / "scan.qa.nc")
+    fmriqa_io.save_artifact(artifact, tmp_path / "scan.qa.nc")
     html = tmp_path / "qa.html"
     rc = cli.main([f"{tmp_path}/*.qa.nc", "--html", str(html)])
     assert rc == 0

@@ -174,20 +174,14 @@ def test_a_malformed_sidecar_field_is_unknown_and_named(
     analysis, but it must not be copied through either. A string where the
     schema promises a number saves fine and fails when the report opens it,
     months later and far from the sidecar. The value is not coerced: "0.03" may
-    be 30 ms, but deciding so is guessing.
+    be 30 ms, but deciding so is guessing. fmri-qa-io's
+    `test_artifact_roundtrip.py` checks that what it produces reads back.
     """
     nifti = _write_scan(tmp_path, {"PhaseEncodingDirection": "j", key: value})
     with pytest.warns(UserWarning, match=f"sidecar {key} .* recording it as unknown"):
         scan = q.QAScan.from_nifti(nifti)
     assert scan.meta is not None
     assert getattr(scan.meta, field) is None
-    # And what it produces reads back. The boundary check makes the producer's
-    # output valid reader input.
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        artifact = q.analyze(scan, q.AnalysisSettings(trim_sec=0, roi_size=3))
-    path = q.save_artifact(artifact, tmp_path / "qa.nc")
-    assert getattr(q.load_artifact(path).provenance, field) is None
 
 
 def test_a_numeric_serial_number_is_kept_as_text(tmp_path) -> None:

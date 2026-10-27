@@ -21,8 +21,9 @@ import numpy as np
 import pytest
 
 import fmriqa as q
-from fmriqa.analysis.serialize import netcdf
+import fmriqa_io
 from fmriqa.analysis.serialize.decompose import decompose
+from fmriqa_io.artifact import netcdf
 
 # The CF marker the writer puts on a mask. Spelled out, not imported, so
 # changing it means editing both places.
@@ -59,7 +60,7 @@ def test_every_stored_array_is_declared_over_named_dimensions(
     tmp_path, artifact
 ) -> None:
     """The file says which axis each array lies along, not just its length."""
-    saved = q.save_artifact(artifact, tmp_path / "scan.qa.nc")
+    saved = fmriqa_io.save_artifact(artifact, tmp_path / "scan.qa.nc")
     declared, lengths = _declared(saved)
 
     assert set(declared) == set(decompose(artifact)[1]) | _DIMENSIONS
@@ -74,7 +75,7 @@ def test_curves_along_one_axis_share_one_dimension(tmp_path, artifact) -> None:
     A reader that opens this in xarray gets the per-frame traces aligned on
     `frame`. A bag of equal-length vectors would leave it guessing.
     """
-    saved = q.save_artifact(artifact, tmp_path / "scan.qa.nc")
+    saved = fmriqa_io.save_artifact(artifact, tmp_path / "scan.qa.nc")
     declared, _ = _declared(saved)
 
     assert declared["curves.roi_signal"] == declared["curves.time"] == ("frame",)
@@ -93,7 +94,7 @@ def test_axes_that_only_happen_to_match_stay_separate(tmp_path, artifact) -> Non
     hull's (x, y) plot order. One shared dimension for all three, because they
     are all 2 long, would publish a relationship that does not exist.
     """
-    saved = q.save_artifact(artifact, tmp_path / "scan.qa.nc")
+    saved = fmriqa_io.save_artifact(artifact, tmp_path / "scan.qa.nc")
     declared, lengths = _declared(saved)
 
     paired = ("image_axis", "psf_direction", "hull_coord")
@@ -149,7 +150,7 @@ def test_every_dimension_carries_a_coordinate_variable(tmp_path, artifact) -> No
 
     A reader finds every axis resolved, not eleven dimensions to number itself.
     """
-    saved = q.save_artifact(artifact, tmp_path / "scan.qa.nc")
+    saved = fmriqa_io.save_artifact(artifact, tmp_path / "scan.qa.nc")
     _, lengths = _declared(saved)
     axes = _axes(saved)
     with netCDF4.Dataset(str(saved)) as dataset:
@@ -168,7 +169,7 @@ def test_every_dimension_carries_a_coordinate_variable(tmp_path, artifact) -> No
 
 def test_an_index_axis_counts_from_zero(tmp_path, artifact) -> None:
     """Where the axis is a position, the coordinate is that position."""
-    saved = q.save_artifact(artifact, tmp_path / "scan.qa.nc")
+    saved = fmriqa_io.save_artifact(artifact, tmp_path / "scan.qa.nc")
     axes = _axes(saved)
 
     for axis in _INDEX_AXES:
@@ -182,7 +183,7 @@ def test_a_value_axis_is_the_curve_it_labels(tmp_path, artifact) -> None:
     The curves stay under their own dotted names. The coordinate is a second
     spelling, because the dimension's name is the only one CF reads as the axis.
     """
-    saved = q.save_artifact(artifact, tmp_path / "scan.qa.nc")
+    saved = fmriqa_io.save_artifact(artifact, tmp_path / "scan.qa.nc")
     axes = _axes(saved)
     _, arrays = decompose(artifact)
 
@@ -201,7 +202,7 @@ def test_the_frame_axis_counts_the_way_the_artifact_counts(tmp_path, artifact) -
     acquired volume number is the index plus `provenance.n_trimmed`, so the
     coordinate's comment names the offset.
     """
-    saved = q.save_artifact(artifact, tmp_path / "scan.qa.nc")
+    saved = fmriqa_io.save_artifact(artifact, tmp_path / "scan.qa.nc")
     frame, attributes = _axes(saved)["frame"]
 
     assert np.array_equal(frame, np.arange(artifact.provenance.n_frames))
@@ -220,7 +221,7 @@ def test_a_named_axis_carries_its_labels_as_flags(tmp_path, artifact) -> None:
     older readers. The flag vocabulary already avoids it for masks, so these
     axes do too.
     """
-    saved = q.save_artifact(artifact, tmp_path / "scan.qa.nc")
+    saved = fmriqa_io.save_artifact(artifact, tmp_path / "scan.qa.nc")
     axes = _axes(saved)
 
     for axis, meanings in _LABEL_AXES.items():
@@ -240,7 +241,7 @@ def test_every_per_frame_variable_points_at_the_time_axis(tmp_path, artifact) ->
     gives `ds["curves.roi_signal"].coords["curves.time"]`. The two PSF sample
     axes work the same way, and their lags are also 2-D.
     """
-    saved = q.save_artifact(artifact, tmp_path / "scan.qa.nc")
+    saved = fmriqa_io.save_artifact(artifact, tmp_path / "scan.qa.nc")
     declared, _ = _declared(saved)
     with netCDF4.Dataset(str(saved)) as dataset:
         labelled = {
@@ -273,7 +274,7 @@ def test_the_coordinates_are_stored_plain(tmp_path, artifact) -> None:
     is not needed because nothing reads them back; `load_artifact` rebuilds the
     artifact from the arrays and the document.
     """
-    saved = q.save_artifact(artifact, tmp_path / "scan.qa.nc")
+    saved = fmriqa_io.save_artifact(artifact, tmp_path / "scan.qa.nc")
     with netCDF4.Dataset(str(saved)) as dataset:
         stored = {
             axis: (dataset[axis].filters(), dataset[axis].chunking())
@@ -293,12 +294,12 @@ def test_the_reader_ignores_the_coordinate_variables(tmp_path, artifact) -> None
     `compose` receives what `decompose` produced and a coordinate cannot become
     a second answer.
     """
-    saved = q.save_artifact(artifact, tmp_path / "scan.qa.nc")
+    saved = fmriqa_io.save_artifact(artifact, tmp_path / "scan.qa.nc")
     _, arrays = netcdf.read(saved)
 
     assert set(arrays) == set(decompose(artifact)[1])
     assert not set(arrays) & _DIMENSIONS
-    loaded = q.load_artifact(saved)
+    loaded = fmriqa_io.load_artifact(saved)
     assert np.array_equal(loaded.curves.time, artifact.curves.time)
     assert np.array_equal(loaded.curves.spectrum_hz, artifact.curves.spectrum_hz)
     assert np.array_equal(loaded.images.phantom_hull, artifact.images.phantom_hull)
@@ -330,10 +331,10 @@ def test_an_artifact_without_ghost_regions_still_carries_every_axis(
             psf=replace(artifact.curves.psf, labels=("axis0", "axis1")),
         ),
     )
-    saved = q.save_artifact(without, tmp_path / "ng.qa.nc")
+    saved = fmriqa_io.save_artifact(without, tmp_path / "ng.qa.nc")
     declared, _ = _declared(saved)
 
-    assert q.load_artifact(saved).images.ghost is None
+    assert fmriqa_io.load_artifact(saved).images.ghost is None
     assert not [name for name in declared if name.startswith("images.ghost.")]
     axes = _axes(saved)
     assert set(axes) == _DIMENSIONS
@@ -395,7 +396,7 @@ def test_masks_are_stored_as_cf_flagged_bytes(tmp_path, artifact) -> None:
     The flags let a reader with no fmriqa knowledge rebuild a `bool` array and
     learn that 1 is inside the phantom.
     """
-    saved = q.save_artifact(artifact, tmp_path / "scan.qa.nc")
+    saved = fmriqa_io.save_artifact(artifact, tmp_path / "scan.qa.nc")
     with netCDF4.Dataset(str(saved)) as dataset:
         dataset.set_auto_mask(False)
         mask = dataset["images.phantom_mask"]
@@ -406,7 +407,7 @@ def test_masks_are_stored_as_cf_flagged_bytes(tmp_path, artifact) -> None:
     assert set(np.unique(stored)) <= {0, 1}
     assert np.array_equal(attributes["flag_values"], _FLAG_VALUES)
     assert attributes["flag_meanings"] == "outside inside"
-    assert q.load_artifact(saved).images.phantom_mask.dtype == np.bool_
+    assert fmriqa_io.load_artifact(saved).images.phantom_mask.dtype == np.bool_
 
 
 def test_the_units_a_reader_is_told_are_the_ones_that_are_certain(
@@ -417,7 +418,7 @@ def test_the_units_a_reader_is_told_are_the_ones_that_are_certain(
     The PSF abscissas are mm or voxels depending on what the header gave, so
     they carry a long name and no `units` rather than a guess.
     """
-    saved = q.save_artifact(artifact, tmp_path / "scan.qa.nc")
+    saved = fmriqa_io.save_artifact(artifact, tmp_path / "scan.qa.nc")
     with netCDF4.Dataset(str(saved)) as dataset:
         attributes = {
             name: set(variable.ncattrs())
@@ -456,7 +457,7 @@ def test_every_array_is_compressed_and_checksummed(tmp_path, artifact) -> None:
     acquisitions, whose noisy float64 mean and SFNR images have a distinct value
     in nearly every voxel, where it saves around 13%.
     """
-    saved = q.save_artifact(artifact, tmp_path / "scan.qa.nc")
+    saved = fmriqa_io.save_artifact(artifact, tmp_path / "scan.qa.nc")
     with netCDF4.Dataset(str(saved)) as dataset:
         filters = {
             name: (variable.filters(), variable.dtype)
@@ -479,7 +480,9 @@ def test_loaded_arrays_are_plain_native_endian_ndarrays(tmp_path, artifact) -> N
     measurement. Byte order matters the same way: an artifact written on one
     machine must arrive as numbers another can compute with directly.
     """
-    loaded = q.load_artifact(q.save_artifact(artifact, tmp_path / "scan.qa.nc"))
+    loaded = fmriqa_io.load_artifact(
+        fmriqa_io.save_artifact(artifact, tmp_path / "scan.qa.nc")
+    )
     for array in (
         loaded.images.signal,
         loaded.images.phantom_mask,
@@ -524,7 +527,7 @@ def test_a_flipped_byte_anywhere_is_refused_or_harmless(tmp_path, artifact) -> N
     signature, the superblock behind it, the stored document text, and the tail
     where the last chunk lies.
     """
-    saved = q.save_artifact(artifact, tmp_path / "scan.qa.nc")
+    saved = fmriqa_io.save_artifact(artifact, tmp_path / "scan.qa.nc")
     whole = saved.read_bytes()
     document_at = whole.find(b'"schema_version"')
     assert document_at > 0  # the document is stored as plain text, so this finds it
@@ -535,7 +538,7 @@ def test_a_flipped_byte_anywhere_is_refused_or_harmless(tmp_path, artifact) -> N
         damaged[offset] ^= 0xFF
         path.write_bytes(bytes(damaged))
         try:
-            loaded = q.load_artifact(path)
+            loaded = fmriqa_io.load_artifact(path)
         except q.InvalidArtifactError:
             continue
         # A flip that lands in slack space changes nothing a reader can see.
@@ -551,8 +554,10 @@ def test_an_artifact_with_no_hull_round_trips(tmp_path, artifact) -> None:
     has ordinary zero-length dimensions.
     """
     images = replace(artifact.images, phantom_hull=np.zeros((0, 2)))
-    saved = q.save_artifact(replace(artifact, images=images), tmp_path / "flat.qa.nc")
-    loaded = q.load_artifact(saved)
+    saved = fmriqa_io.save_artifact(
+        replace(artifact, images=images), tmp_path / "flat.qa.nc"
+    )
+    loaded = fmriqa_io.load_artifact(saved)
 
     assert loaded.images.phantom_hull.shape == (0, 2)
     _, lengths = _declared(saved)
@@ -567,7 +572,7 @@ def test_an_artifact_with_no_hull_round_trips(tmp_path, artifact) -> None:
 
 def test_xarray_opens_the_artifact_without_a_warning(tmp_path, artifact) -> None:
     """`xr.open_dataset` is the one-line path a notebook takes to an artifact."""
-    saved = str(q.save_artifact(artifact, tmp_path / "scan.qa.nc"))
+    saved = str(fmriqa_io.save_artifact(artifact, tmp_path / "scan.qa.nc"))
     # Imported here, before the filter. Importing either library under `error`
     # raises the netCDF4 wheel's own Cython `RuntimeWarning`, which no artifact
     # can fix and a test of the file must not trip on.
@@ -600,7 +605,9 @@ def test_xarray_hands_over_the_provenance_attributes(tmp_path, artifact) -> None
     non-ASCII scan name written as UTF-8 NC_CHAR comes back unchanged.
     """
     prov = replace(artifact.provenance, scan="sujet_créé_Ω_頭部.nii.gz")
-    saved = str(q.save_artifact(replace(artifact, provenance=prov), tmp_path / "u.nc"))
+    saved = str(
+        fmriqa_io.save_artifact(replace(artifact, provenance=prov), tmp_path / "u.nc")
+    )
     # Imported before the filter, for the reason the test above gives.
     import xarray as xr
 
@@ -625,7 +632,7 @@ def test_xarray_resolves_every_axis_as_a_coordinate(tmp_path, artifact) -> None:
     select and align on, `curves.time` rides along as a second label on the
     per-frame traces, and `ds["curves.roi_signal"].plot()` draws against seconds.
     """
-    saved = str(q.save_artifact(artifact, tmp_path / "scan.qa.nc"))
+    saved = str(fmriqa_io.save_artifact(artifact, tmp_path / "scan.qa.nc"))
     # Imported before the filter, for the reason the test above gives.
     import xarray as xr
 
@@ -656,7 +663,7 @@ def test_the_unidata_library_opens_the_artifact_without_a_warning(
     The container's main claim: a reader that has never heard of fmriqa can open
     the file, find the axes named, and turn the flagged bytes back into a mask.
     """
-    saved = str(q.save_artifact(artifact, tmp_path / "scan.qa.nc"))
+    saved = str(fmriqa_io.save_artifact(artifact, tmp_path / "scan.qa.nc"))
 
     with warnings.catch_warnings():
         warnings.simplefilter("error")

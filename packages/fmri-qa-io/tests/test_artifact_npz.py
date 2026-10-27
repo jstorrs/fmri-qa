@@ -19,6 +19,7 @@ import numpy as np
 import pytest
 
 import fmriqa as q
+import fmriqa_io
 
 # Nothing writes one any more, and every artifact written before this one does
 # -- so the reader stays, and these build the two forms by hand rather than
@@ -45,7 +46,7 @@ def test_load_rejects_a_damaged_npz(tmp_path, artifact, read_netcdf) -> None:
     error, a truncated member -- and the reader turns all of them into the one
     thing a caller can act on.
     """
-    saved = q.save_artifact(artifact, tmp_path / "new.qa.nc")
+    saved = fmriqa_io.save_artifact(artifact, tmp_path / "new.qa.nc")
     document, arrays = read_netcdf(saved)
     old = tmp_path / "old.qa.npz"
     _as_npz(old, json.dumps(document), arrays, _as_utf8_bytes)
@@ -54,7 +55,7 @@ def test_load_rejects_a_damaged_npz(tmp_path, artifact, read_netcdf) -> None:
     old.write_bytes(whole[: len(whole) // 2])
     assert old.read_bytes()[:4] == b"PK\x03\x04"  # still claims to be the container
     with pytest.raises(q.InvalidArtifactError):
-        q.load_artifact(old)
+        fmriqa_io.load_artifact(old)
 
 
 @pytest.mark.parametrize(
@@ -72,13 +73,13 @@ def test_an_npz_artifact_still_loads(
     NaN, and NaN != NaN would fail a dataclass comparison for reasons that have
     nothing to do with the stored form.
     """
-    saved = q.save_artifact(artifact, tmp_path / "new.qa.nc")
+    saved = fmriqa_io.save_artifact(artifact, tmp_path / "new.qa.nc")
     document, arrays = read_netcdf(saved)
     old = tmp_path / "old.qa.npz"
     _as_npz(old, json.dumps(document), arrays, document_member)
 
     assert old.read_bytes()[:4] == b"PK\x03\x04"  # the other container, by its magic
-    loaded = q.load_artifact(old)
+    loaded = fmriqa_io.load_artifact(old)
     assert asdict(loaded.provenance) == asdict(artifact.provenance)
     assert asdict(loaded.settings) == asdict(artifact.settings)
     assert loaded.schema_version == artifact.schema_version

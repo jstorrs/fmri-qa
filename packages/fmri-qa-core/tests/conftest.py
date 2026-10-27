@@ -12,13 +12,11 @@ import stat
 from collections.abc import Callable, Iterator
 from pathlib import Path
 
-import netCDF4
 import nibabel as nib
 import numpy as np
 import pytest
 
 import fmriqa as q
-from fmriqa.analysis.serialize import netcdf
 from fmriqa.testing import phantom_scan, synthetic_series
 
 WriteScan = Callable[..., str]
@@ -113,49 +111,6 @@ def artifact() -> q.QAArtifact:
         "shared artifact has a writeable array"
     )
     return result
-
-
-@pytest.fixture
-def read_netcdf() -> Callable[[Path], tuple[dict, dict[str, np.ndarray]]]:
-    """Return a reader of a stored artifact that drives `netCDF4` directly.
-
-    Tests that corrupt or inspect a stored artifact use plain netCDF instead of
-    the package's `netcdf` module, since readability that way is why this
-    container was chosen.
-    """
-
-    def read(path: Path) -> tuple[dict, dict[str, np.ndarray]]:
-        """The document and every array of a stored artifact, read with netCDF4 alone.
-
-        Coordinate variables are skipped. They are derived on the way out, so the
-        result is what `decompose` produced.
-        """
-        with netCDF4.Dataset(str(path)) as dataset:
-            dataset.set_auto_mask(False)
-            document = json.loads(dataset.getncattr("document"))
-            arrays = {
-                name: (
-                    np.asarray(variable[...] != 0)
-                    if "flag_values" in variable.ncattrs()
-                    else np.asarray(variable[...])
-                )
-                for name, variable in dataset.variables.items()
-                if name not in dataset.dimensions
-            }
-        return document, arrays
-
-    return read
-
-
-@pytest.fixture
-def encode() -> Callable[[dict, dict[str, np.ndarray]], bytes]:
-    """Return `netcdf.encode` as `save_artifact` calls it: text and its parse."""
-
-    def run(document: dict, arrays: dict[str, np.ndarray]) -> bytes:
-        text = json.dumps(document)
-        return netcdf.encode(text, json.loads(text), arrays)
-
-    return run
 
 
 # Mirrors `fmriqa_io.testing.fake_dcm2niix_script`. Goes away when the import

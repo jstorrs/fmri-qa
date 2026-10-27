@@ -18,7 +18,7 @@ from pathlib import Path
 
 import pytest
 
-import fmriqa
+import fmriqa_io
 from fmriqa.settings import AnalysisSettings
 from fmriqa_launcher.exceptions import SessionError
 from fmriqa_launcher.outcome import Failed, Published, Refused
@@ -129,7 +129,7 @@ def test_one_series_is_imported_analyzed_and_published(
     assert [p.name for p in output_dir.iterdir()] == [name]
     assert list(staging_root.iterdir()) == []
 
-    reloaded = fmriqa.load_artifact(published.artifact)
+    reloaded = fmriqa_io.load_artifact(published.artifact)
     assert reloaded.provenance.source == str(series_dir / f"{name}.nii.gz")
     assert ".fmri-qa-run." not in reloaded.provenance.source
     assert Path(reloaded.provenance.source).is_absolute()
@@ -668,7 +668,7 @@ def test_a_failure_saving_the_artifact_is_a_failed_outcome_with_its_warnings(
     def _failing_save(*_args: object, **_kwargs: object) -> None:
         raise OSError("disk full while saving the artifact")
 
-    monkeypatch.setattr(fmriqa, "save_artifact", _failing_save)
+    monkeypatch.setattr(fmriqa_io, "save_artifact", _failing_save)
     converter, _ = stub_series()
 
     output_dir = tmp_path / "output"
