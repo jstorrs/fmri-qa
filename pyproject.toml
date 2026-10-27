@@ -205,7 +205,7 @@ python_files = ["test_*.py"]
 python_functions = ["test_*"]
 # Coverage is opt-in (the `check` gate passes --cov), so a bare `pytest` on one
 # file stays fast and skips the package-wide floor. `importlib` import mode
-# lets both packages have a `test_cli.py` without a module name collision.
+# lets several packages each have a `test_cli.py` without a module name collision.
 addopts = "-v --tb=short --import-mode=importlib"
 
 [tool.coverage.run]

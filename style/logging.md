@@ -32,8 +32,7 @@ is the job:
 ```toml
 # root pyproject.toml — [tool.ruff.lint.per-file-ignores]
 "**/cli.py" = ["T201"]
-"**/cli/**" = ["T201"]
-"**/main.py" = ["T201"]
+"packages/fmri-qa-cli/src/**" = ["T201"]
 ```
 
 Errors propagate up and are reported once at the top. The CLI catches the package's base

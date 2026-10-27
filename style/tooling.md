@@ -74,7 +74,8 @@ left out for now, as the config notes.
 - Current `per-file-ignores` (see `pyproject.toml`):
   - Tests re-allow `assert` (`S101`) and magic values (`PLR2004`), and skip unused
     fixture arguments (`ARG`) and docstring rules (`D`).
-  - `cli.py`, `cli/` and `__main__.py` re-allow `print` (`T201`), which enforces the
+  - `cli.py`, the `fmri-qa-cli` sources (`packages/fmri-qa-cli/src/**`) and
+    `__main__.py` re-allow `print` (`T201`), which enforces the
     "output belongs to the binary" rule from [logging.md](logging.md). `__main__.py` also
     skips `D`.
   - `packages/fmri-qa-report/**` allows the intentional typography in its text (`RUF001`).
@@ -118,9 +119,12 @@ them. Work down this ladder and take the first option that fits:
    `typing.cast(Target, expr)` with a one-line reason. Write a stub once the narrowing
    recurs.
 4. **Shipped types wrong or absent for a small, well-defined surface: write a local partial
-   stub** in `stubs/`. `nibabel` and `scipy.ndimage` hit this. `nib.load` is typed to a base
-   class without the NIfTI accessors we call, and `ndimage`'s transforms are overloaded so
-   their returns come back as broad unions. A few lines of `.pyi` pin the forms we use, and
+   stub** in `stubs/`. `nibabel` and `scipy.ndimage` hit this. nibabel types its image classes
+   as the `FileBasedImage` base class, which lacks the NIfTI accessors `fmriqa_io.decode`
+   uses (`get_fdata`, `affine`, the scaled `dataobj` proxy, the spatial header), and it
+   mistypes `get_zooms`. The stub declares those, plus `from_bytes` and the `Nifti2Image`
+   class `fmriqa_io.decode` constructs. `ndimage`'s transforms are overloaded so their
+   returns come back as broad unions. A few lines of `.pyi` pin the forms we use, and
    unlike a `cast`, every call site is checked against them.
 5. **Untyped across a large or awkward surface, or you monkeypatch its internals: treat it
    as `Any`.** In the mypy override, `follow_imports = "skip"` (plus `ignore_missing_imports`)

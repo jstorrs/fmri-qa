@@ -1,7 +1,9 @@
 # Implementation status vs. `notes/`
 
 How the `fmriqa` pipeline (`packages/fmri-qa-core/src/fmriqa/`) lines up with
-the methods described in the other `notes/` files. Read this alongside
+the methods described in the other `notes/` files. The `CLI` columns below are
+printed by `fmri-qa` (`packages/fmri-qa-cli/src/fmriqa_cli/`), and scans are
+read by `packages/fmri-qa-io/src/fmriqa_io/`. Read this alongside
 `fMRI_QA_Implementation_Guide.md` (the Glover 2005 / Friedman & Glover 2006
 GSQAP rubric the rest are measured against).
 

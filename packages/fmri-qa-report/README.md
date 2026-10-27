@@ -1,17 +1,25 @@
 # fmri-qa-report
 
 The presentation half of [fmri-qa](../../README.md): a single self-contained
-offline HTML report rendered from a `fmriqa.analysis.QAArtifact`.
+offline HTML report rendered from a `fmriqa.analysis.QAArtifact`, or from the
+`.qa.nc` file that holds one.
 
 ```console
 $ fmri-qa scan.nii.gz --artifact qa.nc
 $ fmri-qa-report qa.nc --html report.html
 ```
 
+`fmri-qa` comes from [`fmri-qa-cli`](../fmri-qa-cli), which is a separate
+install. `fmri-qa-report` itself needs only an artifact file.
+
 The artifact is the only input. [`fmri-qa-core`](../fmri-qa-core) precomputes
 every number, curve, mask, and image the report draws. A report can therefore be
 produced on another machine, long after the acquisition, with no access to the
 series. An artifact read back from disk renders the same as one just computed.
+
+It depends on `fmri-qa-core` for the `QAArtifact` types and on
+[`fmri-qa-io`](../fmri-qa-io) to read an artifact file, plus matplotlib to draw.
+It never runs the pipeline and never reads a scan.
 
 Inside, content is separate from format. `summary` and `content` build the text,
 `panels` builds the matplotlib figures, and `formats/` holds one driver per

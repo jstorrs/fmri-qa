@@ -7,9 +7,9 @@ renaming a field means editing it here and bumping the version.
 """
 
 # The `q.*` parameter annotations below name artifact types behind `fmriqa`'s
-# lazy re-exports. Evaluated at `def` time, they would load the whole
-# calculation stack just to import this module. Deferring them keeps `--help`
-# and usage errors from importing numpy, scipy and nibabel.
+# lazy re-exports. Evaluated at `def` time, they would load `fmriqa.analysis`
+# just to import this module. Deferring them avoids that. That `--help` stays
+# off scipy and scikit-image is checked by `tests/test_startup.py`.
 from __future__ import annotations
 
 import math

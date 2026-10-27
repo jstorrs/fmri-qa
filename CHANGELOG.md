@@ -8,10 +8,12 @@ versioning when the first stable public interface is released.
 
 ### Added
 
-- **`fmri-qa-io`, a new distribution for file formats and filesystem IO.**
-  Code that reads or writes files moves into it from `fmri-qa-core` over the
-  following changes, so core is left with the calculation alone and can run in
-  the browser under Pyodide.
+- **`fmri-qa-io`, a new distribution for file formats and filesystem IO, and
+  `fmri-qa-cli` for the commands: the project is now five distributions.**
+  `fmri-qa-core` (calculation), `fmri-qa-io` (files), `fmri-qa-cli` (commands),
+  `fmri-qa-report` and `fmri-qa-launcher`. Everything that reads or writes a file
+  moved out of core into `fmri-qa-io` (see Changed), so core is left with the
+  calculation alone and can run in the browser under Pyodide.
 - **`fmriqa.testing`, the synthetic phantom the tests and docs measure
   against.** `synthetic_series` builds the array and `phantom_scan` the scan;
   `fmriqa_io.testing.write_phantom` writes it as a NIfTI + sidecar.
@@ -54,7 +56,6 @@ versioning when the first stable public interface is released.
   command names are unchanged, and saved artifacts still load. The SVG element
   ids in rendered reports change with the name, so a report re-rendered from an
   old artifact differs from the original in those ids only.
-
 - **The motion registration covers the whole phantom edge.** The watershed
   phantom mask ends at the steepest point of the phantom boundary, so the fit
   saw only the inner half of the edge, about half the gradient it runs on. It
@@ -64,7 +65,7 @@ versioning when the first stable public interface is released.
   frame-to-frame jitter drops by about a third. A scan whose fit used to fail
   on some frames may now converge.
 - **The documentation builds as one Sphinx project, `docs/`.** The landing page
-  and the three packages' pages are one site with one navigation tree, built by
+  and the packages' pages are one site with one navigation tree, built by
   one `sphinx-build` into `build/site`; the pages themselves are unchanged. The
   package pages moved from `packages/*/docs/` to `docs/user-guide/`, and the
   launcher's and report's were renamed after what they describe:
@@ -484,9 +485,11 @@ versioning when the first stable public interface is released.
   into a module per command (`qa`, `hilo`) plus the pieces they report through
   (`table`, `record`, `destinations`, `arguments`);
   and `fmriqa.analysis.serialize` splits at its own section banners into
-  `decompose` / `compose` / `migrate`. Every import path a caller uses is
-  unchanged — `fmriqa.cli:main`, `fmriqa.cli:hilo_main`,
-  `fmriqa.save_artifact`/`load_artifact` — and no rendered output changed.
+  `decompose` / `compose` / `migrate`. At the time, every import path a caller
+  used was unchanged (`fmriqa.cli:main`, `fmriqa.cli:hilo_main`,
+  `fmriqa.save_artifact`/`load_artifact`) and no rendered output changed. The
+  commands and the artifact functions have since moved; see the `fmri-qa-cli`
+  and `fmri-qa-io` bullets above.
 - `fmriqa.hilo` (307 lines) is now a subpackage by the same rule: `result`
   holds `HiLoResult` and the pure `separate_noise` algebra that fills it,
   `mask` holds `phantom_core_mask` and its `HILO_ERODE` tuning constant,
@@ -513,9 +516,10 @@ versioning when the first stable public interface is released.
   `roi_size` is now the side *requested*; the side analyzed is
   `images.roi.size`, as it always was.
 - The phase-encode axis is estimated from the Nyquist ghost in one place, the
-  pipeline. `QAScan.from_nifti` no longer estimates it (its `estimate_pe`
-  parameter is gone) and only reports what the sidecar and header say, so the
-  load layer no longer depends on the metrics layer.
+  pipeline. The loader (`QAScan.from_nifti` then, `fmriqa_io.load_scan` now) no
+  longer estimates it (its `estimate_pe` parameter is gone) and only reports what
+  the sidecar and header say, so the load layer no longer depends on the metrics
+  layer.
 - `Measurements.fwhm_unit`, `Measurements.pe_label`, and `PsfCurves.unit` are
   closed sets (`LengthUnit`, `PeLabel` in `fmriqa.types`), and `load_artifact`
   refuses a stored value outside them. `FBIRN_ROI_SIZE` lives in
@@ -528,11 +532,12 @@ versioning when the first stable public interface is released.
   `make check` cannot disagree on formatting. The style guides describe the
   tooling this repository actually has.
 
-- **The project is now two distributions.** `fmri-qa-core` (import `fmriqa`)
-  holds the calculation half and depends on nothing that draws; `fmri-qa-report`
-  (import `fmriqa_report`) holds the plots and the HTML report and consumes only a
-  `QAArtifact`. Installing `fmri-qa-report` brings both. The single `fmri-qa`
-  distribution is gone; see `notes/analysis_report_split.md`.
+- **The single `fmri-qa` distribution is split in two: calculation and
+  presentation.** `fmri-qa-core` (import `fmriqa`) holds the calculation half
+  and depends on nothing that draws; `fmri-qa-report` (import `fmriqa_report`)
+  holds the plots and the HTML report and consumes only a `QAArtifact`. This was
+  the first step toward the five-distribution layout described in the first
+  Added bullet; see `notes/analysis_report_split.md`.
 - A report header now shows the phase-encode direction that was actually used.
   It previously preferred the sidecar's DICOM direction even when `--pe-axis`
   overrode the axis, so the header could disagree with the metrics table.

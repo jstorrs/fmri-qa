@@ -31,6 +31,8 @@ artifact change is tested on both sides of the seam:
 [tool.pytest.ini_options]
 testpaths = [
     "packages/fmri-qa-core/tests",
+    "packages/fmri-qa-io/tests",
+    "packages/fmri-qa-cli/tests",
     "packages/fmri-qa-report/tests",
     "packages/fmri-qa-launcher/tests",
     "scripts/tests",
@@ -41,8 +43,8 @@ python_functions = ["test_*"]
 addopts = "-v --tb=short --import-mode=importlib"
 ```
 
-`--import-mode=importlib` lets every package name a test file for what it tests (each has a
-`test_cli.py`) without the module names colliding.
+`--import-mode=importlib` lets every package name a test file for what it tests (three of
+them have a `test_cli.py`) without the module names colliding.
 
 ## `assert` and `pytest.raises` Are the Assertion
 

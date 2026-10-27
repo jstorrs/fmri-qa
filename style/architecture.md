@@ -415,16 +415,18 @@ This is the one-topic rule a level up. The shape `fmriqa` uses:
 fmriqa/
     types.py            # shared vocabulary: array dtypes + closed-set Literals
     exceptions.py       # the package exception hierarchy
-    load/               # I/O boundary: file + sidecar -> value objects
+    load/               # value objects: QAScan and ScanMeta, plus the pure sidecar rules (no file IO)
     prep/               # preprocessing: raw-array ops -> the analysis images
     metrics/            # the domain operations, one family per module
     pipeline.py         # aggregation: orchestrate the operations + the combined result
-    analysis/           # publication: the artifact those results are published as
-    cli/                # the imperative shell: one module per command, plus its output forms
+    analysis/           # publication: the artifact and its schema (compose, decompose, migrate)
 ```
 
-Presentation is not a layer of this package. It is a second distribution, `fmri-qa-report`,
-on top of `analysis/`. See
+`fmriqa` is pure: it reads no files and runs under Pyodide. The file boundary is a
+separate distribution, `fmri-qa-io` (`fmriqa_io`), which turns a file or bytes into
+`load/`'s value objects and an artifact into a `.qa.nc` file. The imperative shell is
+`fmri-qa-cli` (`fmriqa_cli`): one module per command, plus its output forms. Presentation is
+`fmri-qa-report`, on top of `analysis/`. See
 [Split the Product at Its Widest Seam](#split-the-product-at-its-widest-seam) below.
 
 Three rules keep the layering clean:
@@ -451,19 +453,29 @@ Three rules keep the layering clean:
 
 When two stages differ in almost everything (dependencies, speed, what changes them, who
 deploys them), make the boundary a **package boundary**: separate distributions,
-installable apart. In this repo that seam is calculation versus presentation. Computing
-needs numpy, scipy, and the acquisition on disk, and changes when the physics changes.
-Drawing needs matplotlib, and changes when someone wants a different report. Only a result
-passes between them.
+installable apart. In this repo the first seam is calculation versus presentation.
+Computing needs numpy and scipy, and changes when the physics changes. Drawing needs
+matplotlib, and changes when someone wants a different report. Only a result passes
+between them.
+
+The second seam is calculation versus IO. Reading a file, writing netCDF-4 and running
+dcm2niix need a filesystem, a native library or a subprocess. The calculation needs none
+of them, and a browser has none of them: the motivation is a single offline HTML page that
+runs the pipeline under Pyodide. So core takes arrays and value objects (a `QAScan`) and returns values, and io decodes
+bytes and files into them, and
+every file touch lives in `fmri-qa-io`. The commands are their own distribution too, so
+that core and io stay libraries with no entry points.
 
 ```
 packages/
-    fmri-qa-core/       # fmriqa          -- metrics, pipeline, and the artifact
+    fmri-qa-core/       # fmriqa          -- metrics, pipeline, and the artifact; reads no files
+    fmri-qa-io/         # fmriqa_io       -- scans, the .qa.nc file, DICOM import; the file boundary
+    fmri-qa-cli/        # fmriqa_cli      -- fmri-qa, fmri-qa-hilo, fmri-qa-import
     fmri-qa-report/     # fmriqa_report   -- plots and an HTML report, from an artifact
-    fmri-qa-launcher/   # fmriqa_launcher -- the application shell over the two above
+    fmri-qa-launcher/   # fmriqa_launcher -- the application shell over the four above
 ```
 
-Three rules make such a split hold:
+Four rules make such a split hold:
 
 - **One value object crosses, and it is complete.** Define the seam as a single published
   type (here `QAArtifact`). Resolve everything a consumer could need while producing it:
@@ -474,6 +486,14 @@ Three rules make such a split hold:
   boundary to disk and read it back, you have proved it is complete. It also lets you render
   later, elsewhere, without the inputs. Version the layout and refuse an unknown version by
   name. Test that a round-tripped value behaves identically to a live one.
+- **Keep the pure side pure, and mark the native side.** A package that must run in a
+  browser declares only dependencies that have a browser build. Anything native goes in
+  the IO package, with a `sys_platform != 'emscripten'` marker so a browser install skips
+  it. Test it: an isolation test fails on any forbidden import in the pure side's sources,
+  imports every module in a fresh interpreter, and checks the declared requirements, and a
+  packaging test evaluates the markers. The browser-safe part of the IO package
+  (`fmriqa_io.decode`) is held to an import allowlist by
+  `tests/test_decode_isolation.py`.
 - **Enforce the direction mechanically.** A rule like "the report half must not import the
   pipeline" erodes one convenient import at a time. Make it a test: parse the consuming
   package's sources and fail on any import outside the allowlist. Check the packaging claim
@@ -481,7 +501,8 @@ Three rules make such a split hold:
 
 Don't split on a narrow seam. Two distributions cost two release trains and a version
 constraint between them. Don't pay that to separate modules that are always installed
-together. See `notes/analysis_report_split.md` for this split's full rationale.
+together. See `notes/analysis_report_split.md` for the calculation/presentation split's
+full rationale, and `notes/pyodide-spike/README.md` for the browser motivation.
 
 ### Separate Content from Format
 

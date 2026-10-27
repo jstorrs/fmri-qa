@@ -2,6 +2,12 @@
 
 Status: implemented.
 
+Update (2026-10-27): the layout has grown since this note was written. Core is
+now pure calculation and reads no files, so it can run in a browser under
+Pyodide. File formats and IO moved to a new `fmri-qa-io`, and the commands to
+`fmri-qa-cli`. That makes five distributions; see the table under "The
+packages". The calculation/presentation reasoning below still holds.
+
 This document records why fmri-qa is split into separate distributions, what
 crosses the boundary between calculation and presentation, and the rules that
 keep the boundary from eroding.
@@ -64,23 +70,26 @@ The artifact is saved as one netCDF-4 file (`<scan>.qa.nc`) carrying
 `ARTIFACT_SCHEMA_VERSION`, which a reader checks and refuses by name on a
 mismatch. The layout, the reasons for netCDF, and the NaN-versus-`null`
 convention are in
-[`packages/fmri-qa-core/docs/artifact.md`](../packages/fmri-qa-core/docs/artifact.md).
+[`docs/user-guide/artifact.md`](../docs/user-guide/artifact.md).
 
 ## The packages
 
 | Distribution | Import | Role | Dependencies |
 |---|---|---|---|
-| `fmri-qa-core` | `fmriqa` | Calculation: load, prep, metrics, pipeline, the artifact and its file format, DICOM conversion. No drawing stack. | numpy, scipy, nibabel, scikit-image, netCDF4, dcm2niix |
-| `fmri-qa-report` | `fmriqa_report` | One artifact rendered as one self-contained HTML page. | fmri-qa-core, numpy, matplotlib, cycler |
-| `fmri-qa-launcher` | `fmriqa_launcher` | The one-step DICOM-to-report command (`fmri-qa-run`) and the desktop panel (`fmri-qa-panel`). | fmri-qa-core, fmri-qa-report; tkinter from the standard library |
+| `fmri-qa-core` | `fmriqa` | Calculation: scan value objects, prep, metrics, pipeline, the artifact and its schema (compose, decompose, migrate), the pure sidecar and DICOM-naming rules. No drawing stack, and no file IO. | numpy, scipy, scikit-image |
+| `fmri-qa-io` | `fmriqa_io` | Files: `load_scan`, `scan_from_bytes`, the netCDF-4 artifact container (`save_artifact`, `load_artifact`), DICOM import through dcm2niix. | fmri-qa-core, nibabel, numpy, netCDF4 and dcm2niix (not under Pyodide) |
+| `fmri-qa-cli` | `fmriqa_cli` | The `fmri-qa`, `fmri-qa-hilo` and `fmri-qa-import` commands. | fmri-qa-core, fmri-qa-io |
+| `fmri-qa-report` | `fmriqa_report` | One artifact rendered as one self-contained HTML page. | fmri-qa-core, fmri-qa-io, numpy, matplotlib, cycler |
+| `fmri-qa-launcher` | `fmriqa_launcher` | The one-step DICOM-to-report command (`fmri-qa-run`) and the desktop panel (`fmri-qa-panel`). | fmri-qa-cli, fmri-qa-core, fmri-qa-io, fmri-qa-report; tkinter from the standard library |
 
-The dependency points one way: report depends on core, core knows nothing of
-report, and the launcher sits on top of both. Within that, the report half may
-import only `fmriqa.analysis` (the artifact), `fmriqa.types` (the shared
-array/option vocabulary), and two standard-library leaves it shares with core
-(`fmriqa.rename` for the atomic write, `fmriqa.path_arguments` for command-line
-paths) -- never `load`, `prep`, `metrics`, or `pipeline`, and never the
-`fmriqa` package as a whole, which would pull all of them.
+The dependency points one way: report depends on core and io, core knows nothing
+of either, and the launcher sits on top of all of them. Within that, the report
+half may import only `fmriqa.analysis` (the artifact), `fmriqa.types` (the shared
+array/option vocabulary), and from `fmriqa_io` only the artifact file
+(`fmriqa_io.artifact`) and two standard-library leaves (`fmriqa_io.rename` for the
+atomic write, `fmriqa_io.path_arguments` for command-line paths) -- never `load`,
+`prep`, `metrics`, or `pipeline`, and never the `fmriqa` package as a whole, which
+would pull all of them.
 
 A rule like that erodes one convenient import at a time, so layering tests check
 it mechanically:

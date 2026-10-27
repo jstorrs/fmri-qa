@@ -7,10 +7,11 @@ protocol. Given a 4-D phantom time series, `fmri-qa` measures how stable the
 scanner was during the acquisition and publishes the result as a single netCDF-4
 file that a report, a spreadsheet, or a trend database can read.
 
-These pages document the calculation, which belongs to `fmri-qa-core`. Each
-analysis has a page covering what it is for, the computation with its equations
-and settings, a figure, and a table of what it adds to the artifact, under the
-names you will find in the file.
+These pages document the calculation, which belongs to `fmri-qa-core`. Reading the
+scan and writing the file belong to `fmri-qa-io`, and the `fmri-qa` command to
+`fmri-qa-cli`. Each analysis has a page covering what it is for, the computation
+with its equations and settings, a figure, and a table of what it adds to the
+artifact, under the names you will find in the file.
 
 ```{toctree}
 :maxdepth: 2
@@ -68,12 +69,13 @@ directory of DICOM files and writes one folder per series. Each folder holds the
 converted scan, its {doc}`analysis artifact <artifact>` and a self-contained HTML
 report.
 
-It computes and draws nothing itself. Conversion and analysis belong to
-`fmri-qa-core` and rendering to `fmri-qa-report`. Settings default to core's, so
-the numbers match a `fmri-qa` run by hand. This package adds the sequence (import,
-then analyze, archive, render and publish each series) and guarantees a series
-appears in the output folder only once all its files are finished. It adds no
-third-party dependency. The desktop panel uses the standard library's `tkinter`.
+It computes and draws nothing itself. Conversion belongs to `fmri-qa-io`,
+analysis to `fmri-qa-core` and rendering to `fmri-qa-report`. Settings default
+to core's, so the numbers match a `fmri-qa` run by hand. This package adds the
+sequence (import, then analyze, archive, render and publish each series) and
+guarantees a series appears in the output folder only once all its files are
+finished. It adds no third-party dependency. The desktop panel uses the
+standard library's `tkinter`.
 
 ### Two entry points
 
@@ -87,7 +89,7 @@ third-party dependency. The desktop panel uses the standard library's `tkinter`.
 ### The single-file executable
 
 `make bundle` builds `fmri-qa-run` as one executable, with the interpreter,
-all three packages and dcm2niix inside, for a machine with no Python. It is
+all five packages and dcm2niix inside, for a machine with no Python. It is
 built with PyInstaller from an environment resolved from `uv.lock`, into
 `dist/bundle`. PyInstaller does not cross-compile, so the executable only runs
 on the platform it was built on. On Windows, where there is no `make`,

@@ -8,20 +8,22 @@ ghosting ratio). It renders a self-contained offline HTML report per scan.
 
 ## The packages
 
-The project ships as three installable packages. The first two split calculating
-a result from presenting it. The third is an application shell built on both.
+The project ships as five installable packages. Core calculates and reads no
+files. IO reads and writes them. The command line is a shell over both. Report
+presents a result, and the launcher is an application shell on top of all four.
 
 | Package | Import | Does | Needs |
 | --- | --- | --- | --- |
-| **`fmri-qa-core`** | `fmriqa` | the metrics, the pipeline, and the **analysis artifact** they are published as | numpy, scipy, nibabel, scikit-image |
-| **`fmri-qa-io`** | `fmriqa_io` | reading and writing files, including the artifact's netCDF-4 file (`save_artifact`, `load_artifact`), and DICOM import through dcm2niix (`import_dicom`) | core, nibabel, netCDF4, dcm2niix |
-| **`fmri-qa-report`** | `fmriqa_report` | plots and a self-contained offline HTML report, built from an artifact | matplotlib (+ core) |
-| **`fmri-qa-launcher`** | `fmriqa_launcher` | one-step DICOM-directory-in, report-directory-out pipeline: a command line and a desktop panel | core + report; stdlib `tkinter` for the panel |
+| **`fmri-qa-core`** | `fmriqa` | the metrics, the pipeline, and the **analysis artifact** they are published as. Pure calculation: it reads no files | numpy, scipy, scikit-image |
+| **`fmri-qa-io`** | `fmriqa_io` | reading and writing files: scans (`load_scan`), the artifact's netCDF-4 file (`save_artifact`, `load_artifact`), and DICOM import through dcm2niix (`import_dicom`) | core, nibabel, numpy; netCDF4 and dcm2niix (not in a browser) |
+| **`fmri-qa-cli`** | `fmriqa_cli` | the `fmri-qa`, `fmri-qa-hilo` and `fmri-qa-import` commands | core + io |
+| **`fmri-qa-report`** | `fmriqa_report` | plots and a self-contained offline HTML report, built from an artifact | core + io, matplotlib |
+| **`fmri-qa-launcher`** | `fmriqa_launcher` | one-step DICOM-directory-in, report-directory-out pipeline: a command line and a desktop panel | cli, core, io + report; stdlib `tkinter` for the panel |
 
-Only a `QAArtifact` passes between the first two. It holds the run's settings,
-provenance, scalar measurements, stability curves, and the four FBIRN summary
-images: everything a report needs, none of the heavy inputs. It saves to one
-netCDF-4 file, so calculation and reporting stay separate steps even when
+Only a `QAArtifact` passes between calculating and presenting. It holds the run's
+settings, provenance, scalar measurements, stability curves, and the four FBIRN
+summary images: everything a report needs, none of the heavy inputs. It saves to
+one netCDF-4 file, so calculation and reporting stay separate steps even when
 `fmri-qa-launcher` runs them back to back:
 
 ```bash
@@ -29,8 +31,14 @@ uv run fmri-qa scan.nii.gz --artifact qa.nc      # calculate once
 uv run fmri-qa-report qa.nc --html report.html   # render as often as you like
 ```
 
-Install the core alone if you only want numbers (a trend database, a cron job).
-It skips the drawing stack. See
+Core is split from IO so that it can run in a browser. It needs nothing native
+and touches no file, so it loads under [Pyodide](https://pyodide.org). The aim is
+a single offline HTML page a hospital can open to run QA with nothing installed.
+`fmriqa_io.scan_from_bytes` decodes the bytes a browser was given into the
+`QAScan` core takes.
+[`notes/pyodide-spike/README.md`](notes/pyodide-spike/README.md) records the
+spike. Install core and IO without the command line if you only want numbers in
+your own code (a trend database, a cron job). See
 [`notes/analysis_report_split.md`](notes/analysis_report_split.md) for the
 rationale and the artifact's layout.
 
@@ -67,19 +75,22 @@ environment:
 uv sync --all-packages
 ```
 
-Downstream, install the package you need. Each pulls in the ones it builds on:
+Downstream, install the package you need. Each pulls in the ones it needs from
+the table above, and the comments say what it provides:
 
 ```bash
-pip install fmri-qa-core      # metrics and artifacts only
-pip install fmri-qa-cli       # + fmri-qa, fmri-qa-import and fmri-qa-hilo
-pip install fmri-qa-report    # + plots and self-contained HTML reports
-pip install fmri-qa-launcher  # + fmri-qa-run and the desktop panel
+pip install fmri-qa-core      # metrics and artifacts; reads no files
+pip install fmri-qa-io        # + core: reading scans, artifact files, DICOM import
+pip install fmri-qa-cli       # + core, io: fmri-qa, fmri-qa-import, fmri-qa-hilo
+pip install fmri-qa-report    # + core, io: plots and self-contained HTML reports
+pip install fmri-qa-launcher  # + all four: fmri-qa-run and the desktop panel
 ```
 
-`fmri-qa-import` needs dcm2niix, and `fmri-qa-io` depends on one. The install
-bundles a binary, so the importer runs with nothing else set up. To use another
-build (a newer one, or one with vendor patches), name it. You have to, because
-the bundled binary is preferred over whatever is on `PATH`:
+`fmri-qa-import` needs dcm2niix, and `fmri-qa-io` depends on one (except in a
+browser, where no binary can run). The install bundles a binary, so the importer
+runs with nothing else set up. To use another build (a newer one, or one with
+vendor patches), name it. You have to, because the bundled binary is preferred
+over whatever is on `PATH`:
 
 ```bash
 fmri-qa-import STUDY_DIR --dcm2niix /opt/vendor/bin/dcm2niix
@@ -399,7 +410,7 @@ data keeps its colors. The page is print-ready.
 import fmriqa as q
 import fmriqa_io
 
-scan = q.QAScan.from_nifti("scan.nii.gz")
+scan = fmriqa_io.load_scan("scan.nii.gz")
 artifact = q.analyze(scan, name="scan.nii.gz")
 m = artifact.measurements
 print(m.snr, m.sfnr, m.rdc, m.drift_pct)

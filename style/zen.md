@@ -50,8 +50,8 @@ everywhere. Examples:
 - A blanket `except`, `# type: ignore`, or `# noqa` is denied by default. Allow it at the
   one site that needs it, with a specific rule code and a reason
   (`# noqa: E402 — re-export ordering`).
-- `print` is linted out of libraries (`T201`). `cli.py`/`cli/` re-allow it through
-  per-file-ignores.
+- `print` is linted out of libraries (`T201`). `cli.py` and the `fmri-qa-cli`
+  sources re-allow it through per-file-ignores.
 
 → [tooling.md](tooling.md), [stability.md](stability.md), [logging.md](logging.md)
 

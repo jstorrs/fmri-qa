@@ -4,11 +4,26 @@ The calculation half of [fmri-qa](../../README.md): phantom fMRI quality-assuran
 metrics (SNR, SFNR, RDC/Weisskoff, Nyquist ghost, spikes, motion, smoothness) and
 the **analysis artifact** they are published in.
 
+Core is pure calculation. It reads no files, so it depends only on numpy, scipy
+and scikit-image and runs under Pyodide in a browser. Loading a scan from disk,
+and saving an artifact, are [`fmri-qa-io`](../fmri-qa-io)'s job. This package
+ships a synthetic phantom, so the quick start needs no data:
+
+```python
+import fmriqa as q
+from fmriqa.testing import phantom_scan
+
+artifact = q.analyze(phantom_scan(), name="phantom")
+print(artifact.measurements.snr)
+```
+
+With a file on disk, load it with `fmri-qa-io` instead:
+
 ```python
 import fmriqa as q
 import fmriqa_io
 
-scan = q.QAScan.from_nifti("qa.nii.gz")
+scan = fmriqa_io.load_scan("qa.nii.gz")
 artifact = q.analyze(scan, name="qa.nii.gz")
 fmriqa_io.save_artifact(artifact, "qa.nc")
 ```
@@ -23,7 +38,7 @@ reads one through `ncdf4` on CRAN, Python through netCDF4-python or xarray, and
 `ncdump` comes with the netCDF tools. Artifacts written by earlier builds as
 `.qa.npz` still load. Rendering an artifact into a report is the job of the
 separate [`fmri-qa-report`](../fmri-qa-report) distribution. This package
-depends on nothing that draws.
+depends on nothing that draws and nothing that reads a file.
 
 ## What it calculates
 
