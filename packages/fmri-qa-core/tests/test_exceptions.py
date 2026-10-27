@@ -1,7 +1,6 @@
 """The exception contract: every promised error, and its dual catchability."""
 
 from dataclasses import replace
-from pathlib import Path
 
 import numpy as np
 import pytest
@@ -33,20 +32,6 @@ def test_resolve_roi_rejects_unknown_center() -> None:
     geom = q.detect_phantom(images)
     with pytest.raises(InvalidChoiceError, match="ROI center"):
         resolve_roi(images, geom, center="corner")  # type: ignore[arg-type]
-
-
-def test_import_dicom_rejects_unknown_name_style(tmp_path: Path) -> None:
-    destination = tmp_path / "out"
-    with pytest.raises(InvalidChoiceError, match="names"):
-        q.import_dicom(tmp_path, destination, names="QA")  # type: ignore[arg-type]
-    assert not destination.exists()
-
-
-def test_import_dicom_rejects_unknown_anonymize_mode(tmp_path: Path) -> None:
-    destination = tmp_path / "out"
-    with pytest.raises(InvalidChoiceError, match="anonymize"):
-        q.import_dicom(tmp_path, destination, anonymize="y")  # type: ignore[arg-type]
-    assert not destination.exists()
 
 
 def test_invalid_choice_is_fmriqa_error_and_value_error() -> None:

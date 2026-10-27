@@ -30,13 +30,6 @@ dependencies = [
     "numpy>=2.3.4",
     "scikit-image>=0.25.2",
     "scipy>=1.16.2",
-    # The DICOM importer's converter. It is a plain dependency, not an extra.
-    # As an extra it spared people who only analyze NIfTI a ~3 MB binary, which
-    # is under a percent of an installed environment. It also made `fmri-qa-import`
-    # the one command that could be installed and still not run, and a `uv sync`
-    # without `--all-extras` quietly removed it. A site with its own dcm2niix
-    # names it with `fmri-qa-import --dcm2niix`.
-    "dcm2niix>=1.0.20250506",
 ]
 
 [build-system]

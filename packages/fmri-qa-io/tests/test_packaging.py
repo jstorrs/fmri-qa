@@ -1,10 +1,10 @@
-"""The installed requirements leave netCDF4 out of a browser install.
+"""The installed requirements leave netCDF4 and dcm2niix out of a browser install.
 
 Pyodide reports `sys_platform` "emscripten", and micropip evaluates each
-requirement's marker against it. netCDF4 is a native wheel with no Pyodide
-build, so its marker must exclude it there and keep it everywhere else. This
-reads the markers off the installed distribution's metadata, which is what
-micropip and pip see.
+requirement's marker against it. netCDF4 and dcm2niix are native wheels with no
+Pyodide build, so their markers must exclude them there and keep them everywhere
+else. This reads the markers off the installed distribution's metadata, which is
+what micropip and pip see.
 """
 
 from importlib.metadata import requires
@@ -42,3 +42,14 @@ def test_netcdf4_is_required_only_off_the_browser(
     installed = _installed(environment)
     assert "fmri-qa-core" in installed
     assert ("netcdf4" in installed) is expected
+
+
+@pytest.mark.parametrize(
+    ("environment", "expected"),
+    [(_EMSCRIPTEN, False), (_LINUX, True)],
+    ids=["emscripten", "linux"],
+)
+def test_dcm2niix_is_required_only_off_the_browser(
+    environment: dict[str, str], expected: bool
+) -> None:
+    assert ("dcm2niix" in _installed(environment)) is expected

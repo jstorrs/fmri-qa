@@ -14,7 +14,7 @@ a result from presenting it. The third is an application shell built on both.
 | Package | Import | Does | Needs |
 | --- | --- | --- | --- |
 | **`fmri-qa-core`** | `fmriqa` | the metrics, the pipeline, and the **analysis artifact** they are published as | numpy, scipy, nibabel, scikit-image |
-| **`fmri-qa-io`** | `fmriqa_io` | reading and writing files, including the artifact's netCDF-4 file (`save_artifact`, `load_artifact`) | core, nibabel, netCDF4 |
+| **`fmri-qa-io`** | `fmriqa_io` | reading and writing files, including the artifact's netCDF-4 file (`save_artifact`, `load_artifact`), and DICOM import through dcm2niix (`import_dicom`) | core, nibabel, netCDF4, dcm2niix |
 | **`fmri-qa-report`** | `fmriqa_report` | plots and a self-contained offline HTML report, built from an artifact | matplotlib (+ core) |
 | **`fmri-qa-launcher`** | `fmriqa_launcher` | one-step DICOM-directory-in, report-directory-out pipeline: a command line and a desktop panel | core + report; stdlib `tkinter` for the panel |
 
@@ -76,7 +76,7 @@ pip install fmri-qa-report    # + plots and self-contained HTML reports
 pip install fmri-qa-launcher  # + fmri-qa-run and the desktop panel
 ```
 
-`fmri-qa-import` needs dcm2niix, and `fmri-qa-core` depends on one. The install
+`fmri-qa-import` needs dcm2niix, and `fmri-qa-io` depends on one. The install
 bundles a binary, so the importer runs with nothing else set up. To use another
 build (a newer one, or one with vendor patches), name it. You have to, because
 the bundled binary is preferred over whatever is on `PATH`:

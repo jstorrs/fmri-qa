@@ -8,7 +8,6 @@ session.
 
 import dataclasses
 import json
-import stat
 from collections.abc import Callable, Iterator
 from pathlib import Path
 
@@ -111,42 +110,3 @@ def artifact() -> q.QAArtifact:
         "shared artifact has a writeable array"
     )
     return result
-
-
-# Mirrors `fmriqa_io.testing.fake_dcm2niix_script`. Goes away when the import
-# session tests move to fmri-qa-io.
-@pytest.fixture
-def fake_dcm2niix(tmp_path):
-    """Build a stub dcm2niix that writes the outputs a test asks for.
-
-    For each stem, writes a NIfTI containing the stem, plus `<stem>.json` where
-    a sidecar was given, into the directory named by `-o`. Prints dcm2niix's real
-    banner line for the version parser.
-    """
-
-    def build(
-        outputs, returncode=0, name="dcm2niix", *, suffix=".nii.gz", companions=None
-    ):
-        script = tmp_path / name
-        script.write_text(
-            "#!/usr/bin/env python3\n"
-            "import json, sys\n"
-            "from pathlib import Path\n"
-            f"outputs = {outputs!r}\n"
-            f"companions = {companions or {}!r}\n"
-            f"suffix = {suffix!r}\n"
-            "args = sys.argv[1:]\n"
-            "out = Path(args[args.index('-o') + 1])\n"
-            'print("Chris Rorden\'s dcm2niiX version v1.0.20260724 (JP2:OpenJPEG)")\n'
-            "for stem, sidecar in outputs.items():\n"
-            "    (out / f'{stem}{suffix}').write_bytes(stem.encode())\n"
-            "    if sidecar is not None:\n"
-            "        (out / f'{stem}.json').write_text(json.dumps(sidecar))\n"
-            "for filename, content in companions.items():\n"
-            "    (out / filename).write_bytes(content)\n"
-            f"sys.exit({returncode})\n"
-        )
-        script.chmod(script.stat().st_mode | stat.S_IXUSR)
-        return script
-
-    return build

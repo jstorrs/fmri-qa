@@ -7,9 +7,9 @@ directory and its warnings.
 
 import pytest
 
-import fmriqa as q
 import fmriqa_cli as cli
-from fmriqa.convert.session import import_dicom
+from fmriqa_io import ConversionError
+from fmriqa_io.convert.session import import_dicom
 
 # A sidecar with every field the name is built from, as dcm2niix writes them.
 FULL_SIDECAR = {
@@ -173,7 +173,7 @@ def test_a_destination_the_caller_already_had_survives_a_failed_import(
     out.mkdir()
     binary = fake_dcm2niix({"2_QA": FULL_SIDECAR}, returncode=2)
 
-    with pytest.raises(q.ConversionError):
+    with pytest.raises(ConversionError):
         import_dicom(tmp_path, out, binary=binary)
 
     assert out.is_dir()

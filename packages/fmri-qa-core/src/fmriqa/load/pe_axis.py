@@ -65,9 +65,9 @@ _BIDS_AXES: dict[str, int] = {"i": 0, "i-": 0, "j": 1, "j-": 1, "k": 2, "k-": 2}
 # Both outrank `InPlanePhaseEncodingDirectionDICOM`, DICOM (0018,1312) verbatim
 # in row/col image terms. Turning that into an array axis needs the mapping
 # `PE_ROWCOL` records as verified on one vendor and orientation. Preferring
-# dcm2niix's fields is the same choice `convert` makes. The synthetic study in
-# `tests/fixtures/dicom` has only `PhaseEncodingAxis`, since it has no CSA header
-# to determine polarity from.
+# dcm2niix's fields is the same choice `fmriqa_io.convert` makes. The synthetic
+# study in fmri-qa-io's `tests/fixtures/dicom` has only `PhaseEncodingAxis`, since
+# it has no CSA header to determine polarity from.
 _SIDECAR_PE_FIELDS = ("PhaseEncodingDirection", "PhaseEncodingAxis")
 
 

@@ -27,6 +27,14 @@ versioning when the first stable public interface is released.
   `fmriqa.analysis` no longer export them. The file format is unchanged.
   `fmri-qa-core` no longer depends on netCDF4; `fmri-qa-io` does, except under
   Pyodide.
+- **`import_dicom`, `ImportResult`, `ImportedSeries` and `ConversionError`
+  moved from `fmriqa` to `fmriqa_io`.** Import them from `fmriqa_io`.
+  `ConversionError` and `ConversionStage` are defined in `fmriqa_io.exceptions`,
+  and `ConversionError` is still an `FmriqaError`. Finding and running dcm2niix
+  is `fmriqa_io.convert.dcm2niix`.
+  `fmri-qa-core` no longer depends on dcm2niix; `fmri-qa-io` does, except under
+  Pyodide. Core keeps the converter flags as `fmriqa.convert.dcm2niix.flags`,
+  for another converter to mirror.
 - **The import packages are renamed to match the project: `fmriqc` is now
   `fmriqa`, `fmriqc_report` is `fmriqa_report`, and `fmriqc_launcher` is
   `fmriqa_launcher`.** `FmriqcError` is `FmriqaError`. The distribution and

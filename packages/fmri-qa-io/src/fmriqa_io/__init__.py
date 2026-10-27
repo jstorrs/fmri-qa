@@ -19,15 +19,26 @@ if TYPE_CHECKING:
     # Plain imports, not the lazy `_EXPORTS` map below, so mypy and pyright
     # resolve every name statically. Never executed at runtime.
     from .artifact import load_artifact, save_artifact
+    from .convert.session import ImportedSeries, ImportResult, import_dicom
+    from .exceptions import ConversionError
 
 logging.getLogger(__name__).addHandler(logging.NullHandler())
 
-__all__ = ["load_artifact", "save_artifact"]
+__all__ = [
+    "ConversionError",
+    "ImportResult",
+    "ImportedSeries",
+    "import_dicom",
+    "load_artifact",
+    "save_artifact",
+]
 
 # Which submodule defines each name in `__all__`, keyed by module path so one
 # import serves every name it owns.
 _EXPORTS: dict[str, tuple[str, ...]] = {
     ".artifact": ("load_artifact", "save_artifact"),
+    ".convert.session": ("ImportResult", "ImportedSeries", "import_dicom"),
+    ".exceptions": ("ConversionError",),
 }
 
 # Reverse lookup of `_EXPORTS`, for `__getattr__`.

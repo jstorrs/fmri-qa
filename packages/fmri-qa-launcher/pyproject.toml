@@ -23,8 +23,8 @@ classifiers = [
     "Programming Language :: Python :: 3.13",
     "Typing :: Typed",
 ]
-# The launcher only orchestrates fmri-qa-core (conversion and analysis),
-# fmri-qa-io (files) and fmri-qa-report (rendering), and borrows two argument
+# The launcher only orchestrates fmri-qa-core (analysis), fmri-qa-io (files
+# and conversion) and fmri-qa-report (rendering), and borrows two argument
 # parsers from fmri-qa-cli. It adds no third-party dependency. Its desktop panel
 # uses tkinter, from the standard library.
 dependencies = [

@@ -2,7 +2,8 @@
 
 The application shell for [fmri-qa](../../README.md): a one-step pipeline that
 takes a DICOM directory and writes one report directory per series. It is built
-on [`fmri-qa-core`](../fmri-qa-core) (conversion and analysis) and
+on [`fmri-qa-core`](../fmri-qa-core) (analysis),
+[`fmri-qa-io`](../fmri-qa-io) (files and conversion) and
 [`fmri-qa-report`](../fmri-qa-report) (rendering). It adds no third-party
 dependency of its own.
 

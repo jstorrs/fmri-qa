@@ -9,9 +9,10 @@ existing file. That order has three consequences:
   no parsing of `Convert 20 DICOM as ...` lines and no confusion with files a
   previous import left in the destination.
 * **A destination collision costs nothing.** The names depend on the DICOM
-  content, so they can't be checked before converting the way `cli.destinations`
-  checks `--artifact` paths. They are checked before the move instead: the
-  import refuses with every conflict named and the destination untouched.
+  content, so they can't be checked before converting the way
+  `fmriqa_cli.destinations` checks `--artifact` paths. They are checked before
+  the move instead: the import refuses with every conflict named and the
+  destination untouched.
 * **A move that fails part-way is undone.** Filing is a sequence of renames, and
   the fifth of twelve can be refused (a sync client holding the file, a disk
   error). The import records its renames and reverses them. Where that can't be
@@ -31,21 +32,22 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import assert_never
 
-from ..exceptions import ConversionError, InvalidChoiceError
-from ..load.paths import NIFTI_SUFFIXES, nifti_stem, sidecar_path
-from ..rename import replace_patiently
-from ..types import ANONYMIZE_MODES, NAME_STYLES, Anonymize, NameStyle, Sidecar
-from ..warn import warn
-from . import naming
-from .dcm2niix import (
+from fmriqa.convert import naming
+from fmriqa.convert.dcm2niix import (
     DEFAULT_ANONYMIZE,
     DEFAULT_DEPTH,
     DEFAULT_TEMPLATE,
     build_args,
-    find_dcm2niix,
-    run,
     version,
 )
+from fmriqa.exceptions import InvalidChoiceError
+from fmriqa.load.paths import NIFTI_SUFFIXES, nifti_stem, sidecar_path
+from fmriqa.rename import replace_patiently
+from fmriqa.types import ANONYMIZE_MODES, NAME_STYLES, Anonymize, NameStyle, Sidecar
+from fmriqa.warn import warn
+
+from ..exceptions import ConversionError
+from .dcm2niix import find_dcm2niix, run
 
 # How `import_dicom` and `fmri-qa-import` name files unless told otherwise.
 DEFAULT_NAMES: NameStyle = "qa"
@@ -86,7 +88,7 @@ def _read_sidecar(path: Path) -> Sidecar | None:
 
     An unreadable sidecar is not fatal. The series keeps its dcm2niix name
     instead of a QA name, and the NIfTI is still analyzable, with a warning from
-    `load.metadata`.
+    `fmriqa.load.metadata`.
     """
     beside = sidecar_path(path)
     try:
@@ -147,7 +149,7 @@ def import_dicom(
     """Convert every DICOM series under `source` into NIfTI under `destination`.
 
     `destination` is created if it does not exist. With `names="qa"` each series
-    is filed under the name `convert.naming` builds from its sidecar; with
+    is filed under the name `fmriqa.convert.naming` builds from its sidecar; with
     `names="dcm2niix"` it keeps whatever `template` produced.
 
     Raises
@@ -169,10 +171,10 @@ def import_dicom(
     # error, not a silent fall-through at runtime.
     if names not in NAME_STYLES:
         raise InvalidChoiceError("names", names, NAME_STYLES)
-    # `anonymize` is only looked up in `dcm2niix._BA`, a `dict[Anonymize, str]`
-    # covering the Literal. Nothing here would make a new mode a type error, so
-    # this guard is all that stands between an untyped caller and a bare
-    # `KeyError`.
+    # `anonymize` is only looked up in `fmriqa.convert.dcm2niix._BA`, a
+    # `dict[Anonymize, str]` covering the Literal. Nothing here would make a new
+    # mode a type error, so this guard is all that stands between an untyped
+    # caller and a bare `KeyError`.
     if anonymize not in ANONYMIZE_MODES:
         raise InvalidChoiceError("anonymize", anonymize, ANONYMIZE_MODES)
     source = Path(source)

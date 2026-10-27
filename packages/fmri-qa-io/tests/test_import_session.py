@@ -1,4 +1,4 @@
-"""`convert.session`: staging, naming, filing and refusing.
+"""`fmriqa_io.convert.session`: staging, naming, filing and refusing.
 
 Runs against a stub dcm2niix (the `fake_dcm2niix` fixture), a script that
 writes the files a real conversion would. The session has to get everything
@@ -13,8 +13,8 @@ from pathlib import Path
 
 import pytest
 
-import fmriqa as q
-from fmriqa.convert.session import import_dicom
+from fmriqa_io import ConversionError
+from fmriqa_io.convert.session import import_dicom
 
 # A sidecar with every field the name is built from, as dcm2niix writes them.
 FULL_SIDECAR = {
@@ -162,7 +162,7 @@ def test_a_collision_between_companions_is_refused_before_any_file_moves(
     existing = out / "a.b.json"
     existing.write_bytes(b"an earlier import")
 
-    with pytest.raises(q.ConversionError, match="would share destinations") as excinfo:
+    with pytest.raises(ConversionError, match="would share destinations") as excinfo:
         import_dicom(tmp_path, out, binary=binary, force=force)
 
     assert excinfo.value.stage == "destination"
@@ -195,7 +195,7 @@ def test_existing_companions_are_checked_at_their_own_series_destination(
             "s002.nii.gz": b"scan.repeat",
         }
     else:
-        with pytest.raises(q.ConversionError, match=r"s002\.trace\.txt"):
+        with pytest.raises(ConversionError, match=r"s002\.trace\.txt"):
             import_dicom(tmp_path, out, binary=binary)
         assert {path.name: path.read_bytes() for path in out.iterdir()} == {
             "s002.trace.txt": b"an earlier import"
@@ -219,7 +219,7 @@ def test_the_staging_directory_is_removed_when_the_converter_fails(
     out = tmp_path / "nifti"
     binary = fake_dcm2niix({"2_QA": FULL_SIDECAR}, returncode=2)
 
-    with pytest.raises(q.ConversionError, match="exited 2"):
+    with pytest.raises(ConversionError, match="exited 2"):
         import_dicom(tmp_path, out, binary=binary)
     assert not out.exists()  # not even the directory it staged into
 
@@ -239,7 +239,7 @@ def test_an_import_refuses_a_destination_it_would_overwrite(
     existing = out / "20260909_143012_s002_QA_EPI_ISO.nii.gz"
     existing.write_text("an earlier import")
 
-    with pytest.raises(q.ConversionError) as excinfo:
+    with pytest.raises(ConversionError) as excinfo:
         import_dicom(tmp_path, out, binary=binary)
 
     assert excinfo.value.stage == "destination"
@@ -277,7 +277,7 @@ def _refusing(monkeypatch, refuse) -> list[tuple[str, str]]:
             raise PermissionError(13, "held open by a sync client")
         source.replace(target)
 
-    monkeypatch.setattr("fmriqa.convert.session.replace_patiently", replace)
+    monkeypatch.setattr("fmriqa_io.convert.session.replace_patiently", replace)
     return asked
 
 
@@ -318,7 +318,7 @@ def test_directory_targets_are_refused_before_any_file_moves(
     before = _listing(out)
     asked = _refusing(monkeypatch, lambda _source, _target: False)
 
-    with pytest.raises(q.ConversionError) as excinfo:
+    with pytest.raises(ConversionError) as excinfo:
         import_dicom(tmp_path, out, binary=binary, names="dcm2niix", force=force)
 
     assert excinfo.value.stage == "destination"
@@ -347,7 +347,7 @@ def test_a_move_that_fails_part_way_is_undone(
         monkeypatch, lambda _, target: target.parent == out and target.name == QA_NIFTI
     )
 
-    with pytest.raises(q.ConversionError) as excinfo:
+    with pytest.raises(ConversionError) as excinfo:
         import_dicom(tmp_path, out, binary=binary)
 
     assert excinfo.value.stage == "destination"
@@ -367,7 +367,7 @@ def test_a_fresh_destination_is_removed_again_when_the_move_is_undone(
     out = tmp_path / "nifti"
     _refusing(monkeypatch, lambda _, target: target.name == QA_NIFTI)
 
-    with pytest.raises(q.ConversionError, match="was undone"):
+    with pytest.raises(ConversionError, match="was undone"):
         import_dicom(tmp_path, out, binary=binary)
 
     assert not out.exists()
@@ -390,7 +390,7 @@ def test_a_forced_move_that_fails_puts_back_what_it_had_replaced(
         lambda source, target: source.name == "2_QA.nii.gz" and target.parent == out,
     )
 
-    with pytest.raises(q.ConversionError, match="was undone"):
+    with pytest.raises(ConversionError, match="was undone"):
         import_dicom(tmp_path, out, binary=binary, force=True)
 
     assert _listing(out) == before
@@ -420,7 +420,7 @@ def test_nothing_is_filed_until_everything_in_its_way_has_been_set_aside(
 
     asked = _refusing(monkeypatch, refuse)
 
-    with pytest.raises(q.ConversionError) as excinfo:
+    with pytest.raises(ConversionError) as excinfo:
         import_dicom(tmp_path, out, binary=binary, force=True)
 
     assert f"could not set the existing {QA_NIFTI} aside" in str(excinfo.value)
@@ -444,7 +444,7 @@ def test_a_forced_move_refused_at_its_first_file_puts_everything_back(
         lambda source, target: source.name == "2_QA.json" and target.parent == out,
     )
 
-    with pytest.raises(q.ConversionError, match="was undone"):
+    with pytest.raises(ConversionError, match="was undone"):
         import_dicom(tmp_path, out, binary=binary, force=True)
 
     assert _listing(out) == before
@@ -469,7 +469,7 @@ def test_a_series_already_filed_is_withdrawn_when_a_later_one_is_refused(
         lambda source, target: source.name == "3_QA.nii.gz" and target.parent == out,
     )
 
-    with pytest.raises(q.ConversionError, match="was undone"):
+    with pytest.raises(ConversionError, match="was undone"):
         import_dicom(tmp_path, out, binary=binary)
 
     # The whole of series 2 had landed, and the whole of it went back.
@@ -499,7 +499,7 @@ def test_a_set_aside_directory_that_will_not_go_does_not_hide_the_error(
         lambda source, target: source.name == "2_QA.nii.gz" and target.parent == out,
     )
 
-    with pytest.raises(q.ConversionError, match="was undone"):
+    with pytest.raises(ConversionError, match="was undone"):
         import_dicom(tmp_path, out, binary=binary, force=True)
 
     assert (out / QA_NIFTI).read_text() == "an earlier scan"
@@ -519,7 +519,7 @@ def test_replaced_files_that_cannot_be_deleted_are_not_left_silently(
         if not Path(path).name.startswith(".fmri-qa-replaced-"):
             real(path, **kwargs)
 
-    monkeypatch.setattr("fmriqa.convert.session.shutil.rmtree", rmtree)
+    monkeypatch.setattr("fmriqa_io.convert.session.shutil.rmtree", rmtree)
 
     with pytest.warns(UserWarning, match="holds the files this import replaced"):
         result = import_dicom(tmp_path, out, binary=binary, force=True)
@@ -569,7 +569,7 @@ def test_a_move_that_cannot_be_undone_says_exactly_what_is_left(
 
     _refusing(monkeypatch, refuse)
 
-    with pytest.raises(q.ConversionError) as excinfo:
+    with pytest.raises(ConversionError) as excinfo:
         import_dicom(tmp_path, out, binary=binary, force=True)
 
     message = str(excinfo.value)
@@ -602,7 +602,7 @@ def test_an_unforced_move_that_cannot_be_undone_names_what_it_left(
 
     _refusing(monkeypatch, refuse)
 
-    with pytest.raises(q.ConversionError) as excinfo:
+    with pytest.raises(ConversionError) as excinfo:
         import_dicom(tmp_path, out, binary=binary)
 
     message = str(excinfo.value)
@@ -635,7 +635,7 @@ def test_a_replaced_file_that_cannot_be_put_back_is_kept_and_named(
 
     _refusing(monkeypatch, refuse)
 
-    with pytest.raises(q.ConversionError) as excinfo:
+    with pytest.raises(ConversionError) as excinfo:
         import_dicom(tmp_path, out, binary=binary, force=True)
 
     message = str(excinfo.value)
@@ -678,7 +678,7 @@ def test_a_series_with_no_readable_sidecar_still_gets_imported(
 def test_a_source_that_is_not_a_directory_is_refused_before_anything_runs(
     tmp_path,
 ) -> None:
-    with pytest.raises(q.ConversionError) as excinfo:
+    with pytest.raises(ConversionError) as excinfo:
         import_dicom(tmp_path / "nowhere", tmp_path / "out")
 
     assert excinfo.value.stage == "source"
@@ -693,7 +693,7 @@ def test_a_destination_that_cannot_be_made_is_a_conversion_error_not_a_crash(
     blocked = tmp_path / "out"
     blocked.write_text("not a directory")
 
-    with pytest.raises(q.ConversionError) as excinfo:
+    with pytest.raises(ConversionError) as excinfo:
         import_dicom(tmp_path, blocked, binary=binary)
 
     assert excinfo.value.stage == "destination"

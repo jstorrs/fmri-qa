@@ -26,6 +26,15 @@ classifiers = [
 # fmri-qa-core supplies the value objects this package reads and writes.
 dependencies = [
     "fmri-qa-core==0.1.0",
+    # The DICOM importer's converter. It is a plain dependency, not an extra.
+    # As an extra it spared people who only analyze NIfTI a ~3 MB binary, which
+    # is under a percent of an installed environment. It also made `fmri-qa-import`
+    # the one command that could be installed and still not run, and a `uv sync`
+    # without `--all-extras` quietly removed it. A site with its own dcm2niix
+    # names it with `fmri-qa-import --dcm2niix`.
+    # Like netCDF4 below, it is a native binary with no Pyodide build, so the
+    # marker leaves it out of a browser install.
+    "dcm2niix>=1.0.20250506; sys_platform != 'emscripten'",
     "nibabel>=5.3.2",
     # The artifact's container. It is worth a ~10 MB wheel carrying libhdf5 and
     # libnetcdf: this is the Unidata C library that MATLAB's `ncread`, R's

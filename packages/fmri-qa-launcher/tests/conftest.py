@@ -4,7 +4,7 @@
 pair with `fmriqa_io.testing.write_phantom`. The phantom itself is
 `fmriqa.testing`'s, the one core and io test against.
 
-`stub_dcm2niix` stands in for the real converter. `fmri-qa-core`'s
+`stub_dcm2niix` stands in for the real converter. `fmri-qa-io`'s
 `fake_dcm2niix` writes NIfTI files that don't load, which is enough for naming
 and staging but not for `analyze`. This stub copies an analyzable
 `prepared_series` pair into the `-o` directory under dcm2niix-style stems, so
@@ -69,7 +69,7 @@ def stub_dcm2niix(tmp_path: Path) -> StubDcm2niix:
     `nifti`/`sidecar` are what `prepared_series` returns, with the naming
     fields (`SeriesNumber`, `AcquisitionDateTime`, `SeriesDescription`, ...)
     merged into `sidecar`. The script reads only the `-o DIR` argument from
-    `dcm2niix.build_args` and ignores the rest, like `fmri-qa-core`'s
+    `dcm2niix.build_args` and ignores the rest, like `fmri-qa-io`'s
     `fake_dcm2niix`.
     """
 

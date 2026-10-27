@@ -18,8 +18,8 @@ from pathlib import Path
 
 import fmriqa as q
 from fmriqa.convert.dcm2niix import DEFAULT_ANONYMIZE, DEFAULT_DEPTH, DEFAULT_TEMPLATE
-from fmriqa.convert.session import DEFAULT_NAMES, ImportResult, import_dicom
 from fmriqa.load.paths import NIFTI_SUFFIXES
+from fmriqa_io.convert.session import DEFAULT_NAMES, ImportResult, import_dicom
 
 from .arguments import PrintVersion, attributed_warnings, positive_int
 

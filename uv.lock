@@ -867,7 +867,6 @@ name = "fmri-qa-core"
 version = "0.1.0"
 source = { editable = "packages/fmri-qa-core" }
 dependencies = [
-    { name = "dcm2niix" },
     { name = "nibabel" },
     { name = "numpy" },
     { name = "scikit-image" },
@@ -876,7 +875,6 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
-    { name = "dcm2niix", specifier = ">=1.0.20250506" },
     { name = "nibabel", specifier = ">=5.3.2" },
     { name = "numpy", specifier = ">=2.3.4" },
     { name = "scikit-image", specifier = ">=0.25.2" },
@@ -888,6 +886,7 @@ name = "fmri-qa-io"
 version = "0.1.0"
 source = { editable = "packages/fmri-qa-io" }
 dependencies = [
+    { name = "dcm2niix", marker = "sys_platform != 'emscripten'" },
     { name = "fmri-qa-core" },
     { name = "netcdf4", marker = "sys_platform != 'emscripten'" },
     { name = "nibabel" },
@@ -896,6 +895,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
+    { name = "dcm2niix", marker = "sys_platform != 'emscripten'", specifier = ">=1.0.20250506" },
     { name = "fmri-qa-core", editable = "packages/fmri-qa-core" },
     { name = "netcdf4", marker = "sys_platform != 'emscripten'", specifier = ">=1.7" },
     { name = "nibabel", specifier = ">=5.3.2" },

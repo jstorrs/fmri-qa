@@ -177,7 +177,7 @@ class RunRequest:
     Build one directly or through `parse_form`. `session.run_session` checks
     none of this again. `dcm2niix` is not checked here: a missing or
     non-executable one surfaces when `run_session` runs it, as a `SessionError`
-    (`find_dcm2niix`'s complaint, by way of `fmriqa.import_dicom`). `settings`
+    (`find_dcm2niix`'s complaint, by way of `fmriqa_io.import_dicom`). `settings`
     and `anonymize` default to `fmriqa`'s own defaults.
     """
 

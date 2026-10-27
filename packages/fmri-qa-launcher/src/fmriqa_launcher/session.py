@@ -36,10 +36,9 @@ from pathlib import Path
 
 import fmriqa
 import fmriqa_io
-from fmriqa.convert.session import ImportedSeries
-from fmriqa.exceptions import ConversionError
 from fmriqa.load.paths import nifti_stem
 from fmriqa.rename import replace_patiently
+from fmriqa_io import ConversionError, ImportedSeries
 from fmriqa_report.formats.html import write_run_page
 
 from .exceptions import SessionError
@@ -203,7 +202,7 @@ def _run_in_staging(
     progress(Progress(Stage.IMPORT))
     import_dir = staging / "import"
     try:
-        result = fmriqa.import_dicom(
+        result = fmriqa_io.import_dicom(
             request.dicom_dir,
             import_dir,
             binary=request.dcm2niix,

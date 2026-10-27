@@ -1,4 +1,4 @@
-"""Running dcm2niix, and the flags a QA conversion must not leave to chance.
+"""The dcm2niix flags a QA conversion must not leave to chance.
 
 Four of dcm2niix's thirty-odd options decide whether the converted series can
 still answer the questions `fmri-qa` asks of it. dcm2niix reads `~/.dcm2nii.ini`
@@ -15,19 +15,20 @@ finds no rail and reports the run clean. The storage gate in
 `metrics.saturation` can't catch this, because the evidence it tests for is
 present but wrong, so pinning the flag is the only prevention.
 
-The rest of the surface is thin. `build_args` produces an argument list a
-reader can compare against `dcm2niix -h`, `extra` passes anything through, and
-`--filename` keeps its own template language.
+These are rules, not a runner. `flags` is the option list without paths, and it
+is the one rule every converter shares: `fmriqa_io.convert.dcm2niix` runs the
+native binary with it, and a converter that runs dcm2niix elsewhere (a wasm
+build in a browser) mirrors it. `build_args` adds the paths and the
+passthrough, producing an argument list a reader can compare against
+`dcm2niix -h`. `extra` passes anything through, and `--filename` keeps its own
+template language.
 """
 
 import re
-import shutil
-import subprocess
 from collections.abc import Sequence
 from itertools import pairwise
-from pathlib import Path
+from pathlib import PurePath
 
-from ..exceptions import ConversionError
 from ..types import Anonymize
 from ..warn import warn
 
@@ -36,7 +37,7 @@ from ..warn import warn
 # the fallback name when the sidecar can't identify the series. `%t` is the
 # study date+time, `%s` the series number, `%d` the series description.
 DEFAULT_TEMPLATE = "%t_%s_%d"
-# `import_dicom`, `build_args` and `fmri-qa-import` all default to these.
+# `import_dicom`, `flags`, `build_args` and `fmri-qa-import` all default to these.
 #: Default sidecar anonymization: ``"pii"``, strip the patient and keep the dates.
 DEFAULT_ANONYMIZE: Anonymize = "pii"
 DEFAULT_DEPTH = 5
@@ -60,66 +61,18 @@ _BA: dict[Anonymize, str] = {"pii": "o", "all": "y", "none": "n"}
 _VERSION = re.compile(r"version\s+(v[\w.]+)")
 
 
-def find_dcm2niix(explicit: str | Path | None = None) -> Path:
-    """Find the dcm2niix to run: the one named, else bundled, else on PATH.
-
-    The `dcm2niix` PyPI package ships the compiled binary and exposes its path.
-    It is a dependency of `fmri-qa-core`, so a working install uses the bundled
-    binary and needs nothing from the system. A site with its own dcm2niix (a
-    newer build, or one with vendor patches) names it with `--dcm2niix`. The
-    bundled binary is preferred over PATH, so installing another is not enough
-    to select it.
-
-    The PATH branch and the error below cover an install that can't import the
-    bundled binary: a platform with no wheel whose sdist failed to build, or a
-    pruned environment.
-
-    Raises
-    ------
-    ConversionError
-        If no dcm2niix can be found, or the named one is not an executable file.
-        A named binary that can't be run is reported, not quietly skipped.
-    """
-    if explicit is not None:
-        found = shutil.which(str(explicit))
-        if found is None:
-            raise ConversionError("dcm2niix", f"{explicit} is not an executable file")
-        return Path(found)
-    try:
-        import dcm2niix  # the PyPI wrapper: a bundled binary and its path
-    except ImportError:
-        pass
-    else:
-        return Path(dcm2niix.bin)
-    found = shutil.which("dcm2niix")
-    if found is None:
-        raise ConversionError(
-            "dcm2niix",
-            "not found — the bundled dcm2niix ships as a dependency of "
-            "fmri-qa-core, so this environment is missing one it should have: "
-            "reinstall fmri-qa-core, put dcm2niix on PATH, or name one "
-            "with --dcm2niix",
-        )
-    return Path(found)
-
-
-def build_args(
-    source: Path,
-    destination: Path,
+def flags(
     *,
     template: str = DEFAULT_TEMPLATE,
     compress: bool = True,
     anonymize: Anonymize = DEFAULT_ANONYMIZE,
     depth: int = DEFAULT_DEPTH,
-    extra: Sequence[str] = (),
 ) -> list[str]:
-    """Build the dcm2niix argument list for one import, pinned flags first.
+    """Return the dcm2niix options for one import, pinned flags first, no paths.
 
-    `extra` is appended after everything this function chooses, so a
-    passthrough argument wins. The one that should not win is `-l`, which
-    `_warn_if_rescaling` warns about.
+    This is what any converter running dcm2niix mirrors, so a series converted
+    elsewhere is converted the same way. `build_args` adds the paths.
     """
-    _warn_if_rescaling(extra)
     return [
         *PINNED,
         "-f",
@@ -130,11 +83,30 @@ def build_args(
         _BA[anonymize],
         "-d",
         str(depth),
-        "-o",
-        str(destination),
-        *extra,
-        str(source),
     ]
+
+
+def build_args(
+    source: str | PurePath,
+    destination: str | PurePath,
+    *,
+    template: str = DEFAULT_TEMPLATE,
+    compress: bool = True,
+    anonymize: Anonymize = DEFAULT_ANONYMIZE,
+    depth: int = DEFAULT_DEPTH,
+    extra: Sequence[str] = (),
+) -> list[str]:
+    """Build the dcm2niix argument list for one import: `flags`, then the paths.
+
+    `extra` is appended after everything this function chooses, so a
+    passthrough argument wins. The one that should not win is `-l`, which
+    `_warn_if_rescaling` warns about.
+    """
+    _warn_if_rescaling(extra)
+    chosen = flags(
+        template=template, compress=compress, anonymize=anonymize, depth=depth
+    )
+    return [*chosen, "-o", str(destination), *extra, str(source)]
 
 
 def _warn_if_rescaling(extra: Sequence[str]) -> None:
@@ -152,35 +124,6 @@ def _warn_if_rescaling(extra: Sequence[str]) -> None:
                 "so the saturation check will report a clipped acquisition as "
                 "clean rather than as not determinable; -l o keeps them",
             )
-
-
-def run(binary: Path, args: Sequence[str]) -> str:
-    """Run dcm2niix and return everything it printed.
-
-    dcm2niix reports per series on stdout, so its output is the log of what
-    happened, and the caller decides how much to show. Which files were produced
-    is not read from it. `session` converts into a directory it owns and lists
-    that instead.
-
-    Raises
-    ------
-    ConversionError
-        If dcm2niix exits non-zero. Its own last words are carried through,
-        since they name the DICOM problem far better than an exit status can.
-    """
-    try:
-        # Not shell=True, and `binary` is an absolute path resolved by
-        # `find_dcm2niix`, not a name looked up at run time.
-        result = subprocess.run(  # noqa: S603
-            [str(binary), *args], capture_output=True, text=True, check=False
-        )
-    except OSError as exc:
-        raise ConversionError("dcm2niix", f"could not run {binary}: {exc}") from exc
-    if result.returncode != 0:
-        detail = (result.stderr or result.stdout).strip().splitlines()
-        last = detail[-1] if detail else "no output"
-        raise ConversionError("dcm2niix", f"exited {result.returncode}: {last}")
-    return result.stdout
 
 
 def version(output: str) -> str | None:

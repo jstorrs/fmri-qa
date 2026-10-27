@@ -17,8 +17,8 @@ import pytest
 import fmriqa
 import fmriqa_io
 import fmriqa_launcher.session as session_module
-from fmriqa.convert.dcm2niix import find_dcm2niix
 from fmriqa.settings import AnalysisSettings
+from fmriqa_io.convert.dcm2niix import find_dcm2niix
 from fmriqa_launcher import cli
 from fmriqa_launcher.exceptions import SessionError
 from fmriqa_launcher.outcome import Failed, Published, Refused, RunResult

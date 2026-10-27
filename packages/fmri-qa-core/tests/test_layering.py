@@ -22,8 +22,8 @@ RANKS = {
     "warn": 0,
     "_records": 0,
     "settings": 0,
-    # A leaf over the standard library only. `convert` files its series with
-    # it, and so does the launcher, from outside this package.
+    # A leaf over the standard library only. fmri-qa-io's import files its
+    # series with it, and so does the launcher, from outside this package.
     "rename": 0,
     # A leaf over the standard library only, shared with the report command.
     "path_arguments": 0,
@@ -31,9 +31,9 @@ RANKS = {
     # The shipped phantom builds a `QAScan`, so it sits on `load`. It is for
     # tests and docs; no module in the package should import it.
     "testing": 1,
-    # `convert` sits beside `load`: both get data in, and convert produces the files
-    # load reads. It borrows load's path conventions, which a rank below load
-    # would forbid.
+    # `convert` sits beside `load`: its rules (flags, names) describe the files
+    # load reads. It imports only rank 0 today, so it could sit lower, but a
+    # rank beside load keeps the two halves of getting data in together.
     "convert": 1,
     "prep": 2,
     "validation": 2,

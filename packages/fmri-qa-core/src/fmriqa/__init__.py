@@ -1,7 +1,7 @@
 """Phantom fMRI quality-assurance metrics (SNR, SFNR, RDC, ghost and more).
 
-The root exports the analysis chain (`import_dicom`, `QAScan`, `analyze`,
-`run_qa`, the metric estimators), its result and value types, the exceptions,
+The root exports the analysis chain (`QAScan`, `analyze`, `run_qa`, the
+metric estimators), its result and value types, the exceptions,
 and the shared option types. Helpers live in their subpackages; import them
 from there (`fmriqa.prep.geometry`, `fmriqa.metrics.ghost`, ...).
 
@@ -39,9 +39,7 @@ if TYPE_CHECKING:
         analyze,
         build_artifact,
     )
-    from .convert.session import ImportedSeries, ImportResult, import_dicom
     from .exceptions import (
-        ConversionError,
         FmriqaError,
         IncompatibleScansError,
         InvalidArtifactError,
@@ -126,7 +124,6 @@ __all__ = [
     "ArtifactImages",
     "CenterOfMassResult",
     "ClipRail",
-    "ConversionError",
     "Curves",
     "DetrendMethod",
     "Detrender",
@@ -134,8 +131,6 @@ __all__ = [
     "GhostRegions",
     "GhostResult",
     "HiLoResult",
-    "ImportResult",
-    "ImportedSeries",
     "IncompatibleScansError",
     "InvalidArtifactError",
     "InvalidChoiceError",
@@ -173,7 +168,6 @@ __all__ = [
     "estimate_motion",
     "estimate_pe_axis",
     "estimate_smoothness",
-    "import_dicom",
     "outlier_fraction",
     "percent_fluctuation",
     "preprocess",
@@ -203,9 +197,7 @@ _EXPORTS: dict[str, tuple[str, ...]] = {
         "analyze",
         "build_artifact",
     ),
-    ".convert.session": ("ImportResult", "ImportedSeries", "import_dicom"),
     ".exceptions": (
-        "ConversionError",
         "FmriqaError",
         "IncompatibleScansError",
         "InvalidArtifactError",

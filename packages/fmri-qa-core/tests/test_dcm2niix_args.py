@@ -1,19 +1,16 @@
 """The dcm2niix command line: the flags that are not a matter of taste.
 
 Covers `convert.dcm2niix`: pinned flags, argument order, passthrough handling
-and warnings, the version banner, and finding a binary. Nothing here converts a
-series.
+and warnings, and the version banner. Nothing here runs or finds a binary;
+fmri-qa-io's `test_dcm2niix_run.py` does.
 """
 
-import shutil
-import sys
 from itertools import pairwise
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 import pytest
 
-import fmriqa as q
-from fmriqa.convert.dcm2niix import PINNED, build_args, find_dcm2niix, run, version
+from fmriqa.convert.dcm2niix import PINNED, build_args, flags, version
 
 
 def test_every_conversion_pins_the_flags_that_keep_a_series_checkable() -> None:
@@ -43,6 +40,29 @@ def test_anonymizing_defaults_to_keeping_the_dates_the_name_needs() -> None:
     for mode, flag in (("pii", "o"), ("all", "y"), ("none", "n")):
         args = build_args(Path("in"), Path("out"), anonymize=mode)
         assert args[args.index("-ba") + 1] == flag
+
+
+def test_the_flags_are_build_args_without_the_paths() -> None:
+    """`flags` is what another converter mirrors, so it must be what runs here.
+
+    The full argument list starts with it, and it names neither directory.
+    """
+    chosen = flags(anonymize="all", compress=False, depth=2, template="%s")
+    args = build_args(
+        PurePosixPath("study"),
+        "out",
+        anonymize="all",
+        compress=False,
+        depth=2,
+        template="%s",
+    )
+
+    assert args[: len(chosen)] == chosen
+    assert args[len(chosen) :] == ["-o", "out", "study"]
+    assert "-o" not in chosen
+    assert chosen[: len(PINNED)] == list(PINNED)
+    # A converter calling `flags()` bare gets what a bare `build_args` runs.
+    assert flags() == build_args("study", "out")[:-3]
 
 
 def test_passthrough_arguments_come_after_everything_chosen_here() -> None:
@@ -76,45 +96,3 @@ def test_the_version_is_read_out_of_dcm2niix_s_own_banner() -> None:
 
     assert version(banner) == "v1.0.20260724"
     assert version("no banner here") is None
-
-
-def test_the_bundled_binary_is_what_an_unconfigured_import_runs() -> None:
-    """dcm2niix is a dependency, so `fmri-qa-import DIR` needs nothing else.
-
-    Not skipped when the binary is absent: the dependency guarantees it.
-    """
-    assert find_dcm2niix().name.startswith("dcm2niix")
-
-
-def test_having_no_dcm2niix_at_all_says_how_to_get_one(monkeypatch) -> None:
-    """The message is the only recovery help, so it names all three routes."""
-    monkeypatch.setitem(sys.modules, "dcm2niix", None)  # import raises ImportError
-    monkeypatch.setattr(shutil, "which", lambda _name: None)
-
-    with pytest.raises(q.ConversionError) as excinfo:
-        find_dcm2niix()
-
-    message = str(excinfo.value)
-    assert "reinstall fmri-qa-core" in message
-    assert "PATH" in message
-    assert "--dcm2niix" in message
-
-
-def test_a_binary_that_vanishes_between_finding_and_running_is_reported(
-    tmp_path,
-) -> None:
-    """`run` is reachable with a path `find_dcm2niix` never vetted."""
-    with pytest.raises(q.ConversionError, match="could not run"):
-        run(tmp_path / "gone", ["-o", str(tmp_path)])
-
-
-def test_naming_a_dcm2niix_that_cannot_be_run_is_reported_not_fallen_past(
-    tmp_path,
-) -> None:
-    """An explicit --dcm2niix must not be silently replaced by another binary."""
-    not_executable = tmp_path / "dcm2niix"
-    not_executable.write_text("")
-
-    with pytest.raises(q.ConversionError) as excinfo:
-        find_dcm2niix(not_executable)
-    assert excinfo.value.stage == "dcm2niix"

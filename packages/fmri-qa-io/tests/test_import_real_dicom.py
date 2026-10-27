@@ -10,8 +10,9 @@ from pathlib import Path
 import pytest
 
 import fmriqa as q
-from fmriqa.convert.dcm2niix import find_dcm2niix
-from fmriqa.convert.session import import_dicom
+from fmriqa_io import ImportResult
+from fmriqa_io.convert.dcm2niix import find_dcm2niix
+from fmriqa_io.convert.session import import_dicom
 
 FIXTURE_STUDY = Path(__file__).parent / "fixtures" / "dicom"
 
@@ -65,7 +66,7 @@ def test_the_real_study_is_named_by_its_own_series_times_not_the_study_s(
     assert len(series_times) == 2  # the sidecar: one time per series
 
 
-def _stems(result: q.ImportResult) -> list[str]:
+def _stems(result: ImportResult) -> list[str]:
     return [entry.path.name.split(".")[0] for entry in result.series]
 
 

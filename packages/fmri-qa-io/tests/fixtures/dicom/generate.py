@@ -17,7 +17,7 @@ The two series make the importer prove:
 
 Run from the workspace root, after `make sync-notebooks`:
 
-    uv run python packages/fmri-qa-core/tests/fixtures/dicom/generate.py
+    uv run python packages/fmri-qa-io/tests/fixtures/dicom/generate.py
 """
 
 from pathlib import Path
