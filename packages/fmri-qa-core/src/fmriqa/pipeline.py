@@ -235,7 +235,7 @@ def _detect_full_series_saturation(
 
     None when the scan was not stored as the scanner's integers, since the rail
     comes from the ADC's integer range (see `metrics.saturation`).
-    `QAScan.from_nifti` has already warned.
+    `fmriqa_io.scan_from_bytes` has already warned.
     """
     return detect_saturation(
         scan.data,

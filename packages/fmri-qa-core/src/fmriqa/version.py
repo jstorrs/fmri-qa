@@ -4,7 +4,7 @@ A leaf module below every layer. `Provenance.core_version` stamps each artifact
 with the build that computed it, and `fmri-qa --version` prints it. The version
 comes from installed package metadata, so it needs nothing this package
 computes with. Kept beside `analyze`, which reaches the whole metrics stack,
-printing a version would import numpy, scipy, scikit-image and nibabel. Here it
+printing a version would import numpy, scipy and scikit-image. Here it
 imports only `importlib.metadata`.
 """
 

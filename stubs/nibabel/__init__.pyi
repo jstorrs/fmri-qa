@@ -1,14 +1,14 @@
-"""Local partial stub for nibabel — only the surface `fmriqa.load.scan` reads and
+"""Local partial stub for nibabel — only the surface `fmriqa_io.decode` reads and
 `fmriqa_io.testing` writes.
 
-nibabel ships type information, but `load` is annotated to return the
+nibabel ships type information, but its image classes come back typed as the
 `FileBasedImage` base class, which lacks the NIfTI accessors (`get_fdata`,
-`affine`, the scaled array proxy and the spatial header) the loader actually
-uses, and its `get_zooms` is mistyped. This stub narrows `load` to a NIfTI image
-with just those accessors, typed as the pipeline expects them.
+`affine`, the scaled array proxy and the spatial header) the decoder actually
+uses, and its `get_zooms` is mistyped. This stub declares the NIfTI image
+classes with just those accessors, typed as the pipeline expects them.
 """
 
-from typing import Any
+from typing import Any, Self
 
 import numpy as np
 import numpy.typing as npt
@@ -34,7 +34,10 @@ class Nifti1Image:
     def __init__(
         self, dataobj: npt.NDArray[Any], affine: npt.NDArray[np.float64]
     ) -> None: ...
+    @classmethod
+    def from_bytes(cls, bytestring: bytes) -> Self: ...
     def get_fdata(self) -> npt.NDArray[np.float64]: ...
 
-def load(filename: str) -> Nifti1Image: ...
+class Nifti2Image(Nifti1Image): ...
+
 def save(img: Nifti1Image, filename: str) -> None: ...

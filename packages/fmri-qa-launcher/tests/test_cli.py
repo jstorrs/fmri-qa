@@ -196,7 +196,7 @@ def test_the_published_run_matches_a_direct_analyze(
 
     reloaded = fmriqa_io.load_artifact(published_artifact)
     direct = fmriqa.analyze(
-        fmriqa.QAScan.from_nifti(published_nifti), fmriqa.AnalysisSettings()
+        fmriqa_io.load_scan(published_nifti), fmriqa.AnalysisSettings()
     )
 
     assert reloaded.settings == direct.settings

@@ -13,7 +13,7 @@ cheap, so they load eagerly. So does `InvalidArtifactError`, the one error
 `fmriqa_io.load_artifact` raises. `fmriqa.exceptions` imports nothing, and a
 reader that crosses only this seam must be able to catch it by name. `build` is
 not eager: projecting a `QAResult` imports the pipeline, and behind it the whole
-metric, prep and load stack, including scikit-image, scipy and nibabel.
+metric, prep and load stack, including scikit-image and scipy.
 Re-exporting `analyze` and `build_artifact` eagerly would charge that cost to
 every reader of a finished artifact, which is the dependency the
 published-artifact seam exists to prevent. So `__getattr__` below (PEP 562)

@@ -41,11 +41,11 @@ from fmriqa.convert.dcm2niix import (
     version,
 )
 from fmriqa.exceptions import InvalidChoiceError
-from fmriqa.load.paths import NIFTI_SUFFIXES, nifti_stem, sidecar_path
 from fmriqa.types import ANONYMIZE_MODES, NAME_STYLES, Anonymize, NameStyle, Sidecar
 from fmriqa.warn import warn
 
 from ..exceptions import ConversionError
+from ..paths import NIFTI_SUFFIXES, nifti_stem, sidecar_path
 from ..rename import replace_patiently
 from .dcm2niix import find_dcm2niix, run
 

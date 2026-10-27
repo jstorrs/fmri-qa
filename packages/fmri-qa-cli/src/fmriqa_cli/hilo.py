@@ -11,6 +11,7 @@ from collections.abc import Sequence
 from pathlib import Path
 
 import fmriqa as q
+import fmriqa_io
 
 from .arguments import (
     PrintVersion,
@@ -66,8 +67,8 @@ def hilo_main(argv: Sequence[str] | None = None) -> int:
     # them still makes the line actionable (see `print_warnings`).
     with attributed_warnings(f"{hi_name} + {lo_name}"):
         try:
-            high = q.QAScan.from_nifti(args.high)
-            low = q.QAScan.from_nifti(args.low)
+            high = fmriqa_io.load_scan(args.high)
+            low = fmriqa_io.load_scan(args.low)
             res = q.run_hilo(
                 high,
                 low,

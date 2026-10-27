@@ -66,7 +66,7 @@ def _import_targets(tree: ast.Module, rel: tuple[str, ...]) -> set[tuple[str, ..
     """Every module `tree` (the source file at `rel`) imports, as resolved parts.
 
     Covers relative imports (`node.level > 0`) and absolute `fmriqa...` imports
-    (`import fmriqa as q`, `from fmriqa.load.paths import ...`).
+    (`import fmriqa as q`, `from fmriqa.load.scan import ...`).
     """
     targets: set[tuple[str, ...]] = set()
     for node in ast.walk(tree):
@@ -134,7 +134,7 @@ def test_every_top_level_module_is_ranked() -> None:
 def test_the_check_would_catch_an_upward_import() -> None:
     """Negative control: the scan must not pass by seeing nothing."""
     tree = ast.parse("from ..metrics.ghost import GHOST_RADIUS\n")
-    rel = ("load", "paths")  # load/paths.py, rank 1
+    rel = ("load", "scan")  # load/scan.py, rank 1
     assert _import_targets(tree, rel) == {("metrics", "ghost")}
     assert RANKS["load"] < RANKS["metrics"]
 

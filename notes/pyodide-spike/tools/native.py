@@ -2,6 +2,7 @@
 import dataclasses, json, sys, time, warnings
 from pathlib import Path
 import fmriqa
+import fmriqa_io
 
 res = {}
 for name in ("small", "large"):
@@ -9,7 +10,7 @@ for name in ("small", "large"):
     with warnings.catch_warnings(record=True) as w:
         warnings.simplefilter("always")
         t0 = time.perf_counter()
-        scan = fmriqa.QAScan.from_nifti(str(p))
+        scan = fmriqa_io.load_scan(p)
         art = fmriqa.analyze(scan, name=p.name, source=p.name)
         dt = time.perf_counter() - t0
     res[name] = {"seconds": dt, "warnings": [str(x.message) for x in w],

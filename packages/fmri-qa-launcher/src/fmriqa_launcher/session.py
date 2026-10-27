@@ -36,8 +36,8 @@ from pathlib import Path
 
 import fmriqa
 import fmriqa_io
-from fmriqa.load.paths import nifti_stem
 from fmriqa_io import ConversionError, ImportedSeries
+from fmriqa_io.paths import nifti_stem
 from fmriqa_io.rename import replace_patiently
 from fmriqa_report.formats.html import write_run_page
 
@@ -302,7 +302,7 @@ def _publish_series(
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
         try:
-            scan = fmriqa.QAScan.from_nifti(scan_path)
+            scan = fmriqa_io.load_scan(scan_path)
             # Use the published path: it goes into the artifact's provenance
             # and the report's "Source" row, and the staging path vanishes.
             artifact = fmriqa.analyze(

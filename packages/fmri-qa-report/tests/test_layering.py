@@ -7,7 +7,8 @@ land in `fmriqa.analysis` (the artifact), `fmriqa.types` (the shared
 array/option vocabulary), and every `fmriqa_io` import in `fmriqa_io.artifact`
 (the artifact file), `fmriqa_io.rename` (how a finished file is moved into
 place), `fmriqa_io.path_arguments` (wildcards and same-file checks on path
-arguments) or the lazy `fmriqa_io` root, for a name it re-exports. An import of
+arguments) or the lazy `fmriqa_io` root, for a name one of those defines. An
+import of
 `fmriqa.metrics`, `fmriqa.pipeline`, `fmriqa.prep` or `fmriqa.load`, of the
 `fmriqa` package as a whole (which pulls all of them), or of any other
 `fmriqa_io` submodule fails this test.
@@ -43,9 +44,10 @@ import fmriqa_report
 # report must apply the same way as the other commands.
 #
 # `fmriqa_io.artifact` is the artifact file, the one thing the report reads. The
-# `fmriqa_io` root is lazy and imports nothing until a name is used. Only its
-# re-exported names count as the root: `from fmriqa_io import testing` is scanned
-# as `fmriqa_io.testing` (see `_fmriqa_imports`).
+# `fmriqa_io` root is lazy and imports nothing until a name is used, so a name
+# imported from it is scanned as the submodule that defines it:
+# `from fmriqa_io import scan_from_bytes` is `fmriqa_io.decode`, and
+# `from fmriqa_io import testing` is `fmriqa_io.testing` (see `_from_name`).
 ALLOWED = frozenset(
     {
         "fmriqa.analysis",
@@ -166,13 +168,18 @@ def _fmriqa_imports(tree: ast.Module) -> set[str]:
 def _from_name(module: str, name: str) -> str:
     """Return the module `from module import name` reaches.
 
-    A name from the `fmriqa_io` root that the root does not re-export is a
-    submodule, so it is scanned as one. Otherwise `from fmriqa_io import testing`
-    would pass as an import of the allowed root.
+    The `fmriqa_io` root is lazy, so a name imported from it is scanned as the
+    submodule that defines it, and a name it does not re-export as a submodule.
+    Otherwise `from fmriqa_io import testing` or `scan_from_bytes` would pass as
+    an import of the allowed root.
     """
-    if module == "fmriqa_io" and name not in fmriqa_io.__all__:
-        return f"{module}.{name}"
-    return module
+    if module != "fmriqa_io":
+        return module
+    if name in fmriqa_io.__all__:
+        # `fmriqa_io.decode.scan` -> `fmriqa_io.decode`, the submodule scanned.
+        defined_in = getattr(fmriqa_io, name).__module__
+        return ".".join(defined_in.split(".")[:2])
+    return f"{module}.{name}"
 
 
 def test_the_report_package_has_source_to_check() -> None:
@@ -207,6 +214,16 @@ def test_the_check_sees_a_submodule_imported_from_the_io_root() -> None:
     """The lazy root is allowed for its re-exports, not as a way around the scan."""
     tree = ast.parse("from fmriqa_io import load_artifact, testing\n")
     assert _fmriqa_imports(tree) - ALLOWED == {"fmriqa_io.testing"}
+
+
+def test_the_check_sees_where_a_root_re_export_is_defined() -> None:
+    """A name re-exported from the root is the submodule that defines it.
+
+    `scan_from_bytes` is the scan decoder, calculation-side input the report
+    never needs, even though the root re-exports it.
+    """
+    tree = ast.parse("from fmriqa_io import load_artifact, scan_from_bytes\n")
+    assert _fmriqa_imports(tree) - ALLOWED == {"fmriqa_io.decode"}
 
 
 def test_presentation_never_imports_the_launcher() -> None:

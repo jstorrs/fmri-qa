@@ -38,7 +38,7 @@ class VoxelSize:
     numpy type where a `float` was promised, which passes every in-process check
     and fails only at serialization.
 
-    Positivity is not checked here. `load.metadata._scan_meta` already refuses a
+    Positivity is not checked here. `load.metadata.scan_meta` already refuses a
     non-positive or non-finite voxel size against the file it came from, where
     the error can name the file.
 

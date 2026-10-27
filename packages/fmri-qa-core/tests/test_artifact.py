@@ -18,6 +18,7 @@ import pytest
 import fmriqa as q
 from fmriqa._records import UNIONS, resolved_annotations
 from fmriqa.analysis.build import _convex_hull
+from fmriqa.testing import phantom_scan
 
 
 def test_analyze_records_the_requested_and_resolved_settings(artifact) -> None:
@@ -183,21 +184,19 @@ def test_a_noise_only_scan_keeps_its_failed_mask_verdict() -> None:
     assert m.phantom_mask_ok is False
 
 
-def test_an_oversized_roi_is_recorded_as_outside_the_phantom(
-    tmp_path, write_scan
-) -> None:
+def test_an_oversized_roi_is_recorded_as_outside_the_phantom() -> None:
     """The ROI-fit warning is transient; the artifact must keep the verdict.
 
     Analysis still completes, with the metrics measured over background at the ROI
     corners, so nothing else in the stored result says the numbers are unusable.
     """
-    scan = q.QAScan.from_nifti(write_scan(tmp_path))
+    scan = phantom_scan()
     with pytest.warns(UserWarning, match="not fully inside the phantom"):
         artifact = q.analyze(scan, q.AnalysisSettings(roi_size=31))
     assert artifact.measurements.roi_inside_phantom is False
 
 
-def test_the_direction_and_the_label_are_the_same_axis(tmp_path, write_scan) -> None:
+def test_the_direction_and_the_label_are_the_same_axis() -> None:
     """`provenance.pe_dir` and `measurements.pe_label` cannot name two axes.
 
     They answer different questions (what the metadata resolved, and what the run
@@ -205,7 +204,7 @@ def test_the_direction_and_the_label_are_the_same_axis(tmp_path, write_scan) -> 
     are derived from an axis, so the acquisition and measurements blocks tell
     one story.
     """
-    scan = q.QAScan.from_nifti(write_scan(tmp_path))
+    scan = phantom_scan()
 
     agreed = q.analyze(scan, q.AnalysisSettings(roi_size=9))
     assert agreed.provenance.pe_dir == agreed.measurements.pe_label == "col"

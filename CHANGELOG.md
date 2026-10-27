@@ -37,6 +37,17 @@ versioning when the first stable public interface is released.
   for another converter to mirror.
 - **`fmriqa.rename` and `fmriqa.path_arguments` are now `fmriqa_io.rename` and
   `fmriqa_io.path_arguments`.** Their contents are unchanged.
+- **`QAScan.from_nifti` is replaced by `fmriqa_io.load_scan(path)`.** The new
+  `fmriqa_io.scan_from_bytes(nifti, sidecar)` decodes a scan in memory, for a
+  browser handed the bytes of a dropped file. `.hdr`/`.img` pairs are no longer
+  accepted; a scan is a single `.nii` or `.nii.gz` file. A `.nii.gz` whose gzip
+  stream is damaged (bad checksum, cut short) is now refused instead of loaded.
+  `fmriqa.load.paths` is now `fmriqa_io.paths`. `fmri-qa-core` no longer
+  depends on nibabel and now needs only numpy, scipy and scikit-image. The
+  rules that read a parsed sidecar are public in core:
+  `fmriqa.load.pe_axis.pe_axis_from_sidecar`,
+  `fmriqa.load.repetition_time.resolve_repetition_time` and
+  `fmriqa.load.metadata.scan_meta`.
 - **The import packages are renamed to match the project: `fmriqc` is now
   `fmriqa`, `fmriqc_report` is `fmriqa_report`, and `fmriqc_launcher` is
   `fmriqa_launcher`.** `FmriqcError` is `FmriqaError`. The distribution and

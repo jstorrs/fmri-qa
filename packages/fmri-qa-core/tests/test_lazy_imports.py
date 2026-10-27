@@ -16,8 +16,8 @@ import fmriqa
 
 # Modules a bare `import fmriqa` must never pull in. Each is expensive with one
 # call site in the package (see `analysis/build.py`, `metrics/artifacts.py`), or
-# is a real dependency (`nibabel`, `skimage`) that a name access should trigger.
-_HEAVY_MODULES = ("skimage", "scipy.special", "scipy.spatial", "nibabel")
+# is a real dependency (`skimage`) that a name access should trigger.
+_HEAVY_MODULES = ("skimage", "scipy.special", "scipy.spatial")
 
 # Probe run in a fresh interpreter (see
 # test_bare_import_does_not_load_the_heavy_stack). This process already has half

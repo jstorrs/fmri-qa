@@ -59,7 +59,9 @@ has this `tools/` in it:
     uv run python $SPIKE/tools/native.py $SPIKE/data $SPIKE/dist/native.json
     (cd $SPIKE/tools && npm ci) && node $SPIKE/tools/run_test.mjs chrome
 
-`make_data.py` uses `fmriqa_io.testing.write_phantom`, and `native.py` calls
-`QAScan.from_nifti`, which will need updating once IO moves to fmri-qa-io;
-check out 34ff19d to rerun it as it is. Snap Firefox cannot read `/tmp`;
-`run_test.mjs firefox` needs `FFPROFILE` and `DATA_DIR` set to paths outside it.
+The page (`tools/template.html`) was built against commit 34ff19d and calls
+`QAScan.from_nifti`. Rebuilding it at a later commit needs porting it to
+`fmriqa_io.scan_from_bytes`, with the fmri-qa-io wheel vendored beside core's.
+
+Snap Firefox cannot read `/tmp`; `run_test.mjs firefox` needs `FFPROFILE` and
+`DATA_DIR` set to paths outside it.

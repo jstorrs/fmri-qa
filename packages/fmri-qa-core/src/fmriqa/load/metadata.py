@@ -1,27 +1,25 @@
-"""Parse the BIDS JSON sidecar into `ScanMeta`.
+"""Read the BIDS sidecar's acquisition metadata into `ScanMeta`.
 
 dcm2niix writes a `.json` sidecar beside every NIfTI it converts; these helpers
-read the acquisition metadata out of it. The sidecar is optional, since a NIfTI
-exported straight off the scanner never had one, so its absence leaves fields
-empty instead of failing. Phase-encode axis resolution lives in `pe_axis` and TR
+read the acquisition metadata out of it, once `fmriqa_io` has parsed the JSON
+into a mapping. The sidecar is optional, since a NIfTI exported straight off
+the scanner never had one, so its absence leaves fields empty instead of
+failing. Phase-encode axis resolution lives in `pe_axis` and TR
 resolution in `repetition_time`. The row/col direction word the report header
 shows is derived here (`_pe_direction`) from that resolved axis.
 """
 
-import json
 import math
 from dataclasses import dataclass
-from pathlib import Path
-from typing import Any
 
 from ..exceptions import InvalidScanError
 from ..types import Sidecar
 from ..warn import warn
-from .paths import sidecar_path
 from .pe_axis import PE_ROWCOL, in_plane
 
 __all__ = [
     "ScanMeta",
+    "scan_meta",
 ]
 
 
@@ -54,44 +52,6 @@ class ScanMeta:
     software: str | None = None
     datetime: str | None = None  # acquisition date and/or time
     series: str | None = None
-
-
-def _load_sidecar(path: str | Path) -> dict[str, object]:
-    """Parse the BIDS JSON sidecar beside `path` (.nii/.nii.gz -> .json).
-
-    A scanner export never went through dcm2niix, so a missing sidecar warns and
-    yields an empty mapping, which everything downstream tolerates. A sidecar
-    that is present but unreadable fails loudly, since we would be misreading
-    real metadata.
-
-    Raises
-    ------
-    InvalidScanError
-        If the sidecar is not parseable as a JSON object.
-    """
-    sidecar = sidecar_path(path)
-    if not sidecar.is_file():
-        warn(
-            f"{path}: no BIDS JSON sidecar found beside the NIfTI; the "
-            f"acquisition metadata, including the sidecar phase-encode "
-            f"direction and TR, will be absent",
-        )
-        return {}
-    try:
-        parsed: object = json.loads(sidecar.read_text())
-    except json.JSONDecodeError as e:
-        raise InvalidScanError(
-            "BIDS JSON sidecar", str(sidecar), f"could not be parsed: {e}"
-        ) from e
-    if not isinstance(parsed, dict):
-        raise InvalidScanError(
-            "BIDS JSON sidecar",
-            str(sidecar),
-            "expected a JSON object of acquisition metadata",
-        )
-    # A JSON object's keys are always strings. Rebuilding the dict tells the
-    # type checkers so, since `json.loads` is typed as returning anything.
-    return {str(key): value for key, value in parsed.items()}
 
 
 def _acq_datetime(sidecar: Sidecar) -> str | None:
@@ -159,7 +119,7 @@ def _pe_direction(pe_axis: int | None) -> str | None:
     Derived from `pe_axis` alone, not from the sidecar's
     `InPlanePhaseEncodingDirectionDICOM`. Reading that word gave a second answer
     to a question `pe_axis` had settled, and the two could disagree:
-    `_pe_axis_from_sidecar` prefers dcm2niix's BIDS fields, so a sidecar whose
+    `pe_axis_from_sidecar` prefers dcm2niix's BIDS fields, so a sidecar whose
     DICOM tag contradicted them gave an axis from one source and a direction
     from the other, and the report showed a direction that was not the axis the
     ghost masks used.
@@ -172,30 +132,33 @@ def _pe_direction(pe_axis: int | None) -> str | None:
     return None if axis is None else PE_ROWCOL[axis]
 
 
-def _scan_meta(
-    img: Any,
+def scan_meta(
     sidecar: Sidecar,
+    *,
+    voxel_mm: tuple[float, float, float],
+    matrix: tuple[int, int],
     pe_axis: int | None,
     tr: float,
-    *,
-    spatial_scale_mm: float,
 ) -> ScanMeta:
-    """Assemble `ScanMeta` from the NIfTI header and (optional) BIDS sidecar.
+    """Assemble `ScanMeta` from the NIfTI geometry and (optional) BIDS sidecar.
 
-    `tr` is passed in already resolved, so the report shows the TR the pipeline
-    ran on. `spatial_scale_mm` is the same unit conversion used for the scan's
-    affine. The sidecar's optional fields are type-checked here at the boundary,
-    so a malformed value is diagnosed against its file and doesn't surface as an
-    unreadable artifact months later. A field that fails is recorded as unknown,
-    with a warning.
+    `voxel_mm` (header zooms, already in millimeters) and `matrix` come from the
+    NIfTI header, which `fmriqa_io` decodes. `tr` is passed in already resolved,
+    so the report shows the TR the pipeline ran on. The sidecar's optional
+    fields are type-checked here at the boundary, so a malformed value is
+    diagnosed against its file and doesn't surface as an unreadable artifact
+    months later. A field that fails is recorded as unknown, with a warning.
+
+    Raises
+    ------
+    InvalidScanError
+        If a voxel size is not positive and finite.
     """
-    zooms = img.header.get_zooms()
-    voxel_mm = tuple(float(z) * spatial_scale_mm for z in zooms[:3])
     if not all(math.isfinite(z) and z > 0 for z in voxel_mm):
         raise InvalidScanError("voxel size", voxel_mm, "expected positive finite sizes")
     return ScanMeta(
-        voxel_mm=(voxel_mm[0], voxel_mm[1], voxel_mm[2]),
-        matrix=(int(img.shape[0]), int(img.shape[1])),
+        voxel_mm=voxel_mm,
+        matrix=matrix,
         tr=tr,
         te=_optional_number(sidecar, "EchoTime"),
         flip_angle=_optional_number(sidecar, "FlipAngle"),

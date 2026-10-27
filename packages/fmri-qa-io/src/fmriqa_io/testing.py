@@ -1,7 +1,8 @@
 """Helpers for tests, docs and spikes that need real file IO.
 
 `write_phantom` writes the synthetic phantom to disk as a NIfTI + BIDS sidecar,
-the file counterpart of `fmriqa.testing.phantom_scan`. `fake_dcm2niix_script`
+the file counterpart of `fmriqa.testing.phantom_scan`: `load_scan` reads it
+back as that scan. `fake_dcm2niix_script`
 writes a stub converter. Import this module as `fmriqa_io.testing`. It is not
 part of the `fmriqa_io` public surface.
 """

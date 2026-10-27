@@ -1,11 +1,5 @@
 # Building blocks
 
-## `fmriqa.load.paths`
-
-```{eval-rst}
-.. automodule:: fmriqa.load.paths
-```
-
 ## `fmriqa.metrics.artifacts`
 
 ```{eval-rst}
@@ -72,6 +66,12 @@
 
 ```{eval-rst}
 .. autofunction:: fmriqa.types.readout_axis
+```
+
+## `fmriqa_io.paths`
+
+```{eval-rst}
+.. automodule:: fmriqa_io.paths
 ```
 
 ## `fmriqa_io.rename`

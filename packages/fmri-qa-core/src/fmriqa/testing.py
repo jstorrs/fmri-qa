@@ -7,9 +7,8 @@ floor, seeded. `synthetic_series` is the raw array. `phantom_scan` is the
 back, built without touching a file. A parity test in `fmri-qa-io` pins the two
 together.
 
-Pure: no file IO of its own. (Until `from_nifti` leaves core, importing
-`load.scan` still loads nibabel.) Import it as `fmriqa.testing`. It is not
-part of the `fmriqa` public surface.
+Pure: no file IO. Import it as `fmriqa.testing`. It is not part of the
+`fmriqa` public surface.
 """
 
 import numpy as np
@@ -61,7 +60,7 @@ def synthetic_series(
 def phantom_scan(
     *, n: int = 32, z: int = 3, t: int = 40, seed: int = 0, flip: float = 77.0
 ) -> QAScan:
-    """Build the scan `QAScan.from_nifti` reads from the `write_phantom` file.
+    """Build the scan `fmriqa_io.load_scan(write_phantom(...))` gives back.
 
     The samples go through `uint16` and back, as they do on disk, so they are
     truncated to whole numbers. `meta` holds what the header and sidecar give:

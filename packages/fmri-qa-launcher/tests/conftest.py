@@ -173,7 +173,7 @@ def warn_during_analysis(monkeypatch: pytest.MonkeyPatch) -> None:
     """Make `fmriqa.analyze` warn "a stub warning from the analysis" first.
 
     `session.py` calls `fmriqa.analyze(...)` as a module attribute, so the
-    warning has to come from there. Only warnings around `from_nifti`/`analyze`
+    warning has to come from there. Only warnings around `load_scan`/`analyze`
     are captured, as in `fmriqa_cli.qa`.
     """
     real = fmriqa.analyze

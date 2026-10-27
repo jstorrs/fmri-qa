@@ -1,7 +1,7 @@
 """`write_phantom` and `phantom_scan` describe the same scan.
 
 `phantom_scan` is built in memory so core's tests need no file. This pins it to
-what `QAScan.from_nifti` reads back from the file.
+what `load_scan` reads back from the file.
 """
 
 from pathlib import Path
@@ -9,8 +9,8 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-import fmriqa
 from fmriqa.testing import phantom_scan
+from fmriqa_io import load_scan
 from fmriqa_io.testing import write_phantom
 
 
@@ -23,7 +23,7 @@ def test_the_file_loads_as_the_in_memory_phantom(
     tmp_path: Path, n: int, z: int, t: int, seed: int, flip: float
 ) -> None:
     nifti = write_phantom(tmp_path, n=n, z=z, t=t, seed=seed, flip=flip)
-    loaded = fmriqa.QAScan.from_nifti(nifti)
+    loaded = load_scan(nifti)
     expected = phantom_scan(n=n, z=z, t=t, seed=seed, flip=flip)
 
     assert np.array_equal(loaded.data, expected.data)

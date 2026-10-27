@@ -1,7 +1,7 @@
 """Verdicts the artifact publishes survive the trip through the file.
 
-Core's `test_artifact.py` and `test_scan.py` pin what `analyze` and
-`QAScan.from_nifti` put in an artifact. These check the same values read back
+Core's `test_artifact.py` and io's `test_load_scan.py` pin what `analyze` and
+`load_scan` put in an artifact. These check the same values read back
 from disk, and that a value the reader would refuse is refused on the way in.
 """
 
@@ -63,7 +63,7 @@ def test_a_malformed_sidecar_field_reads_back_as_unknown(
     sidecar = tmp_path / "scan.json"
     sidecar.write_text(json.dumps({"PhaseEncodingDirection": "j", key: value}))
     with pytest.warns(UserWarning, match=f"sidecar {key} .* recording it as unknown"):
-        scan = q.QAScan.from_nifti(nifti)
+        scan = fmriqa_io.load_scan(nifti)
     assert scan.meta is not None
     assert getattr(scan.meta, field) is None  # dropped before it reaches the file
     with warnings.catch_warnings():

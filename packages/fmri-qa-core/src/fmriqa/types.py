@@ -40,8 +40,8 @@ __all__ = [
 
 # Array aliases. numpy's generic `NDArray` needs a dtype parameter under strict
 # typing. Naming the three element kinds the pipeline uses keeps the annotations
-# accurate (signal is float64 end to end, since nibabel `get_fdata` returns
-# float64; masks are bool; index/size arrays are int) and lets dtype flow
+# accurate (signal is float64 end to end, since the loader's nibabel `get_fdata`
+# returns float64; masks are bool; index/size arrays are int) and lets dtype flow
 # through arithmetic instead of decaying to Any.
 FloatArray = NDArray[np.float64]
 BoolArray = NDArray[np.bool_]

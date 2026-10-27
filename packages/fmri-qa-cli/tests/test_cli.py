@@ -2,7 +2,7 @@
 
 These exercise what unit tests skip: argument wiring, the batch loop and its
 error handling, the JSON document and saving artifacts to disk. A tiny phantom
-is written as a NIfTI + BIDS sidecar (see `conftest`) so `QAScan.from_nifti`
+is written as a NIfTI + BIDS sidecar (see `conftest`) so `fmriqa_io.load_scan`
 runs its real file-I/O path. Rendering reports is `fmri-qa-report`'s job.
 """
 

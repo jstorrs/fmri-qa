@@ -12,7 +12,7 @@ _GEOMETRY_ATOL = 1e-4
 def require_compatible_scans(high: QAScan, low: QAScan) -> None:
     """Require matching geometry and acquisition parameters before pooling.
 
-    Affines and voxel sizes are in millimeters, as supplied by the NIfTI loader
+    Affines and voxel sizes are in millimeters, as supplied by `fmriqa_io.load_scan`
     or by callers constructing `QAScan` directly.
     """
     if high.data.shape != low.data.shape:

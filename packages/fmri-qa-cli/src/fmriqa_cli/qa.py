@@ -13,6 +13,7 @@ from collections.abc import Sequence
 from pathlib import Path
 
 import fmriqa as q
+import fmriqa_io
 from fmriqa_io.path_arguments import expand_globs
 
 from .arguments import (
@@ -157,7 +158,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         # warning is part of the diagnosis.
         with attributed_warnings(name):
             try:
-                scan = q.QAScan.from_nifti(path)
+                scan = fmriqa_io.load_scan(path)
                 artifact = q.analyze(scan, settings, name=name, source=str(path))
             except Exception as exc:  # noqa: BLE001 - report and continue the batch
                 errors.append({"scan": name, "source": str(path), "error": str(exc)})

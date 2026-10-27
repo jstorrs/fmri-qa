@@ -26,6 +26,7 @@ from functools import cache
 from pathlib import Path
 
 import fmriqa as q
+from fmriqa_io import load_scan
 from fmriqa_io.testing import write_phantom
 
 # The size the figures are drawn at. Larger than the unit tests' default, so a
@@ -50,7 +51,7 @@ def _written() -> Path:
     """Write the phantom to a NIfTI + sidecar once, and return its path.
 
     The directory is temporary and removed when the build process exits. The
-    file exists because `QAScan.from_nifti` is the path a real run takes, and
+    file exists because `fmriqa_io.load_scan` is the path a real run takes, and
     the pages describe reading voxel size and phase-encode direction from a
     header.
     """
@@ -69,7 +70,7 @@ def _written() -> Path:
 
 def scan() -> q.QAScan:
     """Return the phantom as the loader hands it to the pipeline."""
-    return q.QAScan.from_nifti(_written())
+    return load_scan(_written())
 
 
 @cache

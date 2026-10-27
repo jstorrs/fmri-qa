@@ -9,8 +9,7 @@ from pathlib import Path
 
 import pytest
 
-import fmriqa as q
-from fmriqa_io import ImportResult
+from fmriqa_io import ImportResult, load_scan
 from fmriqa_io.convert.dcm2niix import find_dcm2niix
 from fmriqa_io.convert.session import import_dicom
 
@@ -43,7 +42,7 @@ def test_a_real_study_converts_to_the_integer_nifti_the_metrics_need(
         scan = nibabel.load(entry.path)
         assert scan.header.get_data_dtype().kind in "iu"  # the saturation gate
         assert scan.dataobj.slope == 1.0  # not rescaled on the way through
-        assert q.QAScan.from_nifti(entry.path).stored_integer
+        assert load_scan(entry.path).stored_integer
 
 
 def test_the_real_study_is_named_by_its_own_series_times_not_the_study_s(

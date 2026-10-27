@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from fmriqa.load.paths import nifti_stem, sidecar_path
+from fmriqa_io.paths import nifti_stem, sidecar_path
 
 
 @pytest.mark.parametrize(

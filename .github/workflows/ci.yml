@@ -58,6 +58,8 @@ jobs:
           .venv-core-smoke/bin/python -c "import importlib.util as u; assert u.find_spec('netCDF4') is None, 'the core wheel pulled in netCDF4'"
           # Nor the DICOM converter: running dcm2niix is fmri-qa-io's.
           .venv-core-smoke/bin/python -c "import importlib.util as u; assert u.find_spec('dcm2niix') is None, 'the core wheel pulled in dcm2niix'"
+          # Nor the NIfTI decoder: core reads no files, and decoding is fmri-qa-io's.
+          .venv-core-smoke/bin/python -c "import importlib.util as u; assert u.find_spec('nibabel') is None, 'the core wheel pulled in nibabel'"
           # The MIT text has to reach whoever installs the wheel. hatchling puts
           # a declared license file under the dist-info `licenses/` directory.
           .venv-core-smoke/bin/python -c "from importlib.metadata import distribution; text = distribution('fmri-qa-core').read_text('licenses/LICENSE'); assert text and 'MIT License' in text, 'the core wheel ships no license text'"

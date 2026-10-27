@@ -6,8 +6,8 @@ still arrive in seconds, or the pipeline trims no warm-up and fits an absurd
 detrend order. The sidecar cases pin that a NIfTI straight off the scanner still
 analyzes, with a warning and empty acquisition metadata.
 
-These build their own files instead of conftest's `write_scan`, which always
-writes a sidecar at a 2 s TR in unlabeled units.
+These build their own files instead of `fmriqa_io.testing.write_phantom`, which
+always writes a sidecar at a 2 s TR.
 """
 
 import json
@@ -20,6 +20,7 @@ import pytest
 
 import fmriqa as q
 from fmriqa.hilo.compatibility import require_compatible_scans
+from fmriqa_io import load_scan
 
 
 def _write_scan(
@@ -32,7 +33,7 @@ def _write_scan(
 ) -> Path:
     """Write a minimal 4-D NIfTI; write a sidecar only when one is given.
 
-    Integer-stored, like `write_scan`, so a float image does not add an unrelated
+    Integer-stored, like `write_phantom`, so a float image does not add an unrelated
     "storage cannot support the saturation check" warning to each test.
     """
     data = np.ones((8, 8, 2, 6), dtype=np.uint16)
@@ -63,7 +64,7 @@ def test_header_tr_converts_by_its_time_unit(
     tmp_path, time_unit: str | None, pixdim_t: float, expected: float
 ) -> None:
     nifti = _write_scan(tmp_path, {}, pixdim_t=pixdim_t, time_unit=time_unit)
-    assert q.QAScan.from_nifti(nifti).tr == pytest.approx(expected)
+    assert load_scan(nifti).tr == pytest.approx(expected)
 
 
 def test_sidecar_repetition_time_wins_over_the_header(tmp_path) -> None:
@@ -71,7 +72,7 @@ def test_sidecar_repetition_time_wins_over_the_header(tmp_path) -> None:
     # wins, with a warning that one file describes a different acquisition.
     nifti = _write_scan(tmp_path, {"RepetitionTime": 2.0}, pixdim_t=3.0)
     with pytest.warns(UserWarning, match="disagrees"):
-        scan = q.QAScan.from_nifti(nifti)
+        scan = load_scan(nifti)
     assert scan.tr == pytest.approx(2.0)
 
 
@@ -82,7 +83,7 @@ def test_agreeing_sidecar_and_header_do_not_warn(tmp_path) -> None:
     )
     with warnings.catch_warnings():
         warnings.simplefilter("error")
-        assert q.QAScan.from_nifti(nifti).tr == pytest.approx(2.0)
+        assert load_scan(nifti).tr == pytest.approx(2.0)
 
 
 def test_empty_header_tr_disagrees_with_nothing(tmp_path) -> None:
@@ -91,12 +92,12 @@ def test_empty_header_tr_disagrees_with_nothing(tmp_path) -> None:
     nifti = _write_scan(tmp_path, {"RepetitionTime": 2.0}, pixdim_t=0.0)
     with warnings.catch_warnings():
         warnings.simplefilter("error")
-        assert q.QAScan.from_nifti(nifti).tr == pytest.approx(2.0)
+        assert load_scan(nifti).tr == pytest.approx(2.0)
 
 
 def test_sidecar_without_repetition_time_falls_back_to_the_header(tmp_path) -> None:
     nifti = _write_scan(tmp_path, {"FlipAngle": 77}, pixdim_t=2500.0, time_unit="msec")
-    assert q.QAScan.from_nifti(nifti).tr == pytest.approx(2.5)
+    assert load_scan(nifti).tr == pytest.approx(2.5)
 
 
 @pytest.mark.parametrize("value", [0, -2.0, "2000", None, float("nan"), True])
@@ -105,14 +106,14 @@ def test_unusable_sidecar_repetition_time_falls_back_to_the_header(
 ) -> None:
     nifti = _write_scan(tmp_path, {"RepetitionTime": value}, pixdim_t=2.0)
     with pytest.warns(UserWarning, match="ignoring sidecar RepetitionTime"):
-        scan = q.QAScan.from_nifti(nifti)
+        scan = load_scan(nifti)
     assert scan.tr == pytest.approx(2.0)
 
 
 def test_meta_tr_is_the_tr_the_pipeline_runs_on(tmp_path) -> None:
     # The report header must not quote a TR the metrics were never computed at.
     nifti = _write_scan(tmp_path, {}, pixdim_t=2000.0, time_unit="msec")
-    scan = q.QAScan.from_nifti(nifti)
+    scan = load_scan(nifti)
     assert scan.meta is not None
     assert scan.meta.tr == scan.tr == pytest.approx(2.0)
 
@@ -120,7 +121,7 @@ def test_meta_tr_is_the_tr_the_pipeline_runs_on(tmp_path) -> None:
 def test_missing_sidecar_warns_and_still_loads(tmp_path) -> None:
     nifti = _write_scan(tmp_path, sidecar=None, phase=1)
     with pytest.warns(UserWarning, match="no BIDS JSON sidecar"):
-        scan = q.QAScan.from_nifti(nifti)
+        scan = load_scan(nifti)
 
     assert scan.pe_axis == 1  # from the header dim_info
     assert scan.tr == pytest.approx(2.0)
@@ -146,7 +147,7 @@ def test_missing_sidecar_and_dim_info_leaves_the_axis_unresolved(tmp_path) -> No
     # twice, for the absent sidecar and for the axis it leaves to the pipeline.
     nifti = _write_scan(tmp_path, sidecar=None, phase=None)
     with pytest.warns(UserWarning) as caught:
-        scan = q.QAScan.from_nifti(nifti)
+        scan = load_scan(nifti)
 
     messages = [str(warning.message) for warning in caught]
     assert any("no BIDS JSON sidecar" in message for message in messages)
@@ -179,7 +180,7 @@ def test_a_malformed_sidecar_field_is_unknown_and_named(
     """
     nifti = _write_scan(tmp_path, {"PhaseEncodingDirection": "j", key: value})
     with pytest.warns(UserWarning, match=f"sidecar {key} .* recording it as unknown"):
-        scan = q.QAScan.from_nifti(nifti)
+        scan = load_scan(nifti)
     assert scan.meta is not None
     assert getattr(scan.meta, field) is None
 
@@ -189,7 +190,7 @@ def test_a_numeric_serial_number_is_kept_as_text(tmp_path) -> None:
     nifti = _write_scan(tmp_path, {"DeviceSerialNumber": 12345, "EchoTime": 0.03})
     with warnings.catch_warnings():
         warnings.simplefilter("error")  # nothing here is malformed
-        scan = q.QAScan.from_nifti(nifti)
+        scan = load_scan(nifti)
     assert scan.meta is not None
     assert scan.meta.serial == "12345"
     assert scan.meta.te == 0.03
@@ -202,7 +203,7 @@ def test_a_numeric_acquisition_date_is_kept_as_text(tmp_path) -> None:
     )
     with warnings.catch_warnings():
         warnings.simplefilter("error")  # nothing here is malformed
-        scan = q.QAScan.from_nifti(nifti)
+        scan = load_scan(nifti)
     assert scan.meta is not None
     assert scan.meta.datetime == "20260909 14:30:12"
 
@@ -212,14 +213,14 @@ def test_missing_nifti_fails_on_the_nifti_not_the_sidecar(tmp_path) -> None:
     with warnings.catch_warnings():
         warnings.simplefilter("error")
         with pytest.raises(FileNotFoundError):
-            q.QAScan.from_nifti(tmp_path / "absent.nii.gz")
+            load_scan(tmp_path / "absent.nii.gz")
 
 
 def test_unparseable_sidecar_is_an_error(tmp_path) -> None:
     nifti = _write_scan(tmp_path, {})
     (tmp_path / "scan.json").write_text("{not json at all")
     with pytest.raises(q.InvalidScanError, match="BIDS JSON sidecar") as info:
-        q.QAScan.from_nifti(nifti)
+        load_scan(nifti)
     assert info.value.value == str(tmp_path / "scan.json")
 
 
@@ -227,7 +228,7 @@ def test_sidecar_that_is_not_an_object_is_an_error(tmp_path) -> None:
     nifti = _write_scan(tmp_path, {})
     (tmp_path / "scan.json").write_text("[1, 2, 3]")
     with pytest.raises(q.InvalidScanError, match="JSON object"):
-        q.QAScan.from_nifti(nifti)
+        load_scan(nifti)
 
 
 def test_rejects_a_three_dimensional_nifti(tmp_path) -> None:
@@ -235,7 +236,7 @@ def test_rejects_a_three_dimensional_nifti(tmp_path) -> None:
     nifti = tmp_path / "scan.nii.gz"
     nib.save(img, str(nifti))
     with pytest.raises(q.InvalidScanError, match="data shape"):
-        q.QAScan.from_nifti(nifti)
+        load_scan(nifti)
 
 
 @pytest.mark.parametrize("compressed", [False, True])
@@ -254,7 +255,7 @@ def test_loaded_scaling_preserves_clipping_and_dead_edges(
     nib.save(img, path)
     (tmp_path / "scaled.json").write_text('{"PhaseEncodingDirection": "j"}')
 
-    scan = q.QAScan.from_nifti(path)
+    scan = load_scan(path)
     assert (scan.slope, scan.inter) == (slope, inter)
     assert np.array_equal(scan.data, raw.astype(float) * slope + inter)
     saturation = q.detect_saturation(scan.data, slope=scan.slope, inter=scan.inter)
@@ -298,8 +299,8 @@ def test_spatial_units_are_converted_to_mm(tmp_path, unit) -> None:
     reference_path = _write_spatial_scan(tmp_path / "reference.nii", affine_mm, "mm")
     with warnings.catch_warnings():
         warnings.simplefilter("error")
-        scan = q.QAScan.from_nifti(path)
-        reference = q.QAScan.from_nifti(reference_path)
+        scan = load_scan(path)
+        reference = load_scan(reference_path)
 
     assert scan.meta.voxel_mm == pytest.approx((2, 3, 4))
     np.testing.assert_allclose(scan.affine, affine_mm, rtol=1e-6, atol=1e-6)
@@ -323,8 +324,8 @@ def test_converted_spatial_units_still_reject_different_geometry(
     else:
         affine_mm[:3, 0] *= -1
     low_path = _write_spatial_scan(tmp_path / "low.nii", affine_mm, unit)
-    high = q.QAScan.from_nifti(high_path)
-    low = q.QAScan.from_nifti(low_path)
+    high = load_scan(high_path)
+    low = load_scan(low_path)
 
     assert low.meta.voxel_mm == pytest.approx(high.meta.voxel_mm)
     with pytest.raises(q.IncompatibleScansError) as info:
@@ -338,7 +339,7 @@ def test_unknown_spatial_units_warn_and_assume_mm(tmp_path) -> None:
     with pytest.warns(
         UserWarning, match="spatial unit is unknown; assuming millimeters"
     ) as caught:
-        scan = q.QAScan.from_nifti(path)
+        scan = load_scan(path)
     assert len(caught) == 1
     assert scan.meta.voxel_mm == pytest.approx((2, 3, 4))
     np.testing.assert_array_equal(scan.affine, nib.load(path).affine)
@@ -363,7 +364,7 @@ def test_float_storage_warns_and_is_recorded_on_the_scan(tmp_path) -> None:
     (tmp_path / "scan.json").write_text(json.dumps({"PhaseEncodingDirection": "j"}))
 
     with pytest.warns(UserWarning, match="not an integer type"):
-        scan = q.QAScan.from_nifti(nifti)
+        scan = load_scan(nifti)
     assert scan.stored_integer is False
 
 
@@ -371,5 +372,5 @@ def test_integer_storage_is_recorded_without_a_warning(tmp_path) -> None:
     nifti = _write_scan(tmp_path, {"PhaseEncodingDirection": "j"})
     with warnings.catch_warnings():
         warnings.simplefilter("error")
-        scan = q.QAScan.from_nifti(nifti)
+        scan = load_scan(nifti)
     assert scan.stored_integer is True

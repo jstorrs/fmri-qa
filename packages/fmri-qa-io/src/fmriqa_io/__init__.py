@@ -20,7 +20,9 @@ if TYPE_CHECKING:
     # resolve every name statically. Never executed at runtime.
     from .artifact import load_artifact, save_artifact
     from .convert.session import ImportedSeries, ImportResult, import_dicom
+    from .decode import scan_from_bytes
     from .exceptions import ConversionError
+    from .load import load_scan
 
 logging.getLogger(__name__).addHandler(logging.NullHandler())
 
@@ -30,7 +32,9 @@ __all__ = [
     "ImportedSeries",
     "import_dicom",
     "load_artifact",
+    "load_scan",
     "save_artifact",
+    "scan_from_bytes",
 ]
 
 # Which submodule defines each name in `__all__`, keyed by module path so one
@@ -38,7 +42,9 @@ __all__ = [
 _EXPORTS: dict[str, tuple[str, ...]] = {
     ".artifact": ("load_artifact", "save_artifact"),
     ".convert.session": ("ImportResult", "ImportedSeries", "import_dicom"),
+    ".decode": ("scan_from_bytes",),
     ".exceptions": ("ConversionError",),
+    ".load": ("load_scan",),
 }
 
 # Reverse lookup of `_EXPORTS`, for `__getattr__`.

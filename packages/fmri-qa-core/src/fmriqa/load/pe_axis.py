@@ -1,10 +1,11 @@
-"""Phase-encode axis resolution from the BIDS sidecar and NIfTI header.
+"""Phase-encode axis resolution from the BIDS sidecar, and the row/col labels.
 
 The authoritative, header-only PE-axis sources, kept apart from the ghost metric
 that provides the last-resort estimate. The BIDS sidecar comes first (see the
 project notes). Within it, dcm2niix's own conclusions (`PhaseEncodingDirection`,
 then `PhaseEncodingAxis`) come before the raw DICOM row/col tag. The NIfTI
-`dim_info` phase field is the last header answer. `scan.from_nifti` tries them
+`dim_info` phase field is the last header answer, read by
+`fmriqa_io.decode.nifti.pe_axis_from_header`. `fmriqa_io.decode.scan` tries them
 in that order and leaves the axis unresolved if none answers, for
 `pipeline.run_qa` to estimate from the Nyquist ghost.
 
@@ -13,12 +14,12 @@ legitimately name the through-plane axis. `in_plane` is the single point that
 narrows one to the `PeAxis` the pipeline measures on.
 """
 
-from typing import Any
-
 from ..exceptions import InvalidScanError
 from ..types import PE_AXES, PeAxis, PeLabel, Sidecar
 
-__all__: list[str] = []
+__all__ = [
+    "pe_axis_from_sidecar",
+]
 
 # DICOM in-plane phase-encode axis -> row/col: NIfTI i (axis 0) is the DICOM
 # row direction, j (axis 1) the column direction (verified against dcm2niix
@@ -71,7 +72,7 @@ _BIDS_AXES: dict[str, int] = {"i": 0, "i-": 0, "j": 1, "j-": 1, "k": 2, "k-": 2}
 _SIDECAR_PE_FIELDS = ("PhaseEncodingDirection", "PhaseEncodingAxis")
 
 
-def _pe_axis_from_sidecar(sidecar: Sidecar) -> int | None:
+def pe_axis_from_sidecar(sidecar: Sidecar) -> int | None:
     """Read the PE axis (0/1/2) from the sidecar, or None if it has no PE field.
 
     dcm2niix's two BIDS answers are tried in turn, then
@@ -106,12 +107,3 @@ def _pe_axis_from_sidecar(sidecar: Sidecar) -> int | None:
             dicom,
             "expected 'ROW' or 'COL'",
         ) from None
-
-
-def _pe_axis_from_header(header: Any) -> int | None:
-    """Read the PE axis from NIfTI `dim_info`, or None if unset or invalid.
-
-    `dim_info` carries no polarity, which we don't need for ghost placement.
-    """
-    phase = header.get_dim_info()[1]
-    return int(phase) if phase in (0, 1, 2) else None
