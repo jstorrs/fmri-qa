@@ -19,6 +19,7 @@ resolution-markers = [
 [manifest]
 members = [
     "fmri-qa-core",
+    "fmri-qa-io",
     "fmri-qa-launcher",
     "fmri-qa-report",
 ]
@@ -865,6 +866,21 @@ requires-dist = [
     { name = "numpy", specifier = ">=2.3.4" },
     { name = "scikit-image", specifier = ">=0.25.2" },
     { name = "scipy", specifier = ">=1.16.2" },
+]
+
+[[package]]
+name = "fmri-qa-io"
+version = "0.1.0"
+source = { editable = "packages/fmri-qa-io" }
+dependencies = [
+    { name = "fmri-qa-core" },
+    { name = "numpy" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "fmri-qa-core", editable = "packages/fmri-qa-core" },
+    { name = "numpy", specifier = ">=2.3.4" },
 ]
 
 [[package]]

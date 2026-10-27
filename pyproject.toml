@@ -1,11 +1,13 @@
-# uv workspace root for fmri-qa. The project ships as three distributions:
+# uv workspace root for fmri-qa. The project ships as four distributions:
 #
 #   packages/fmri-qa-core     the calculation half: metrics, pipeline, and the
 #                             QAArtifact it publishes (`fmri-qa`, `fmri-qa-hilo`)
+#   packages/fmri-qa-io       file formats and filesystem IO: scans, the `.qa.nc`
+#                             artifact file, DICOM import (keeps core pure)
 #   packages/fmri-qa-report   the presentation half: a self-contained HTML report
 #                             built from an artifact (`fmri-qa-report`)
 #   packages/fmri-qa-launcher the application shell: a one-step DICOM-directory-in,
-#                             report-directory-out pipeline over the two above
+#                             report-directory-out pipeline over the packages above
 #
 # This root is virtual. It builds nothing and only holds the shared development
 # environment and the tool configuration all members are checked against. See
@@ -62,7 +64,7 @@ docs = [
 # packages/fmri-qa-launcher/bundle/fmri-qa-run.spec). Like `notebooks` and
 # `docs`, it builds a distribution and is never part of one. `make bundle`
 # resolves an isolated environment from the lock with `dev` left out, so the
-# executable carries only what the three packages declare.
+# executable carries only what the four packages declare.
 bundle = [
     "pyinstaller>=6.11",
 ]
@@ -76,6 +78,7 @@ line-length = 88
 target-version = "py313"
 src = [
     "packages/fmri-qa-core/src",
+    "packages/fmri-qa-io/src",
     "packages/fmri-qa-report/src",
     "packages/fmri-qa-launcher/src",
 ]
@@ -135,7 +138,7 @@ convention = "numpy"
 "stubs/**" = ["A001", "A002", "D"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["fmriqa", "fmriqa_report", "fmriqa_launcher"]
+known-first-party = ["fmriqa", "fmriqa_io", "fmriqa_report", "fmriqa_launcher"]
 
 [tool.mypy]
 python_version = "3.13"
@@ -144,6 +147,7 @@ warn_unused_ignores = true
 warn_return_any = true
 files = [
     "packages/fmri-qa-core/src",
+    "packages/fmri-qa-io/src",
     "packages/fmri-qa-report/src",
     "packages/fmri-qa-launcher/src",
     "scripts",
@@ -166,6 +170,7 @@ follow_imports = "skip"
 [tool.pyright]
 include = [
     "packages/fmri-qa-core/src",
+    "packages/fmri-qa-io/src",
     "packages/fmri-qa-report/src",
     "packages/fmri-qa-launcher/src",
     "scripts",
@@ -180,6 +185,7 @@ typeCheckingMode = "standard"
 [tool.pytest.ini_options]
 testpaths = [
     "packages/fmri-qa-core/tests",
+    "packages/fmri-qa-io/tests",
     "packages/fmri-qa-report/tests",
     "packages/fmri-qa-launcher/tests",
     "scripts/tests",
@@ -197,6 +203,7 @@ addopts = "-v --tb=short --import-mode=importlib"
 [tool.coverage.run]
 source = [
     "packages/fmri-qa-core/src/fmriqa",
+    "packages/fmri-qa-io/src/fmriqa_io",
     "packages/fmri-qa-report/src/fmriqa_report",
     "packages/fmri-qa-launcher/src/fmriqa_launcher",
 ]

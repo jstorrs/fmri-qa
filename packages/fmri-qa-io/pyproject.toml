@@ -1,0 +1,40 @@
+[project]
+name = "fmri-qa-io"
+version = "0.1.0"
+description = "File formats and filesystem IO for fmri-qa: scans, the .qa.nc artifact file, DICOM import"
+readme = "README.md"
+requires-python = ">=3.13"
+license = "MIT"
+# A per-package copy of the root LICENSE. A path outside the package
+# (../../LICENSE) is not portable: hatchling drops it from the wheel and writes
+# an unusable `../../` member into the sdist. `make check` verifies the copy is
+# byte-identical to the root LICENSE.
+license-files = ["LICENSE"]
+authors = [
+    { name = "Judd Storrs", email = "jstorrs@gmail.com" },
+]
+keywords = ["fMRI", "MRI", "phantom", "quality assurance", "NIfTI", "netCDF"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Healthcare Industry",
+    "Intended Audience :: Science/Research",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.13",
+    "Typing :: Typed",
+]
+# fmri-qa-core supplies the value objects this package reads and writes.
+dependencies = [
+    "fmri-qa-core==0.1.0",
+    "numpy>=2.3.4",
+]
+
+[tool.uv.sources]
+fmri-qa-core = { workspace = true }
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/fmriqa_io"]
