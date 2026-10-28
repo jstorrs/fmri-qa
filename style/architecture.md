@@ -464,13 +464,13 @@ of them, and a browser has none of them: the motivation is a single offline HTML
 runs the pipeline under Pyodide. So core takes arrays and value objects (a `QAScan`) and returns values, and io decodes
 bytes and files into them, and
 every file touch lives in `fmri-qa-io`. The commands are their own distribution too, so
-that core and io stay libraries with no entry points.
+that core, io and report stay libraries with no entry points.
 
 ```
 packages/
     fmri-qa-core/       # fmriqa          -- metrics, pipeline, and the artifact; reads no files
     fmri-qa-io/         # fmriqa_io       -- scans, the .qa.nc file, DICOM import; the file boundary
-    fmri-qa-cli/        # fmriqa_cli      -- fmri-qa, fmri-qa-hilo, fmri-qa-import
+    fmri-qa-cli/        # fmriqa_cli      -- fmri-qa, fmri-qa-hilo, fmri-qa-import, fmri-qa-report
     fmri-qa-report/     # fmriqa_report   -- plots and an HTML report, from an artifact
     fmri-qa-launcher/   # fmriqa_launcher -- the application shell over the four above
 ```

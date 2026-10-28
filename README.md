@@ -16,8 +16,8 @@ presents a result, and the launcher is an application shell on top of all four.
 | --- | --- | --- | --- |
 | **`fmri-qa-core`** | `fmriqa` | the metrics, the pipeline, and the **analysis artifact** they are published as. Pure calculation: it reads no files | numpy, scipy, scikit-image |
 | **`fmri-qa-io`** | `fmriqa_io` | reading and writing files: scans (`load_scan`), the artifact's netCDF-4 file (`save_artifact`, `load_artifact`), and DICOM import through dcm2niix (`import_dicom`) | core, nibabel, numpy; netCDF4 and dcm2niix (not in a browser) |
-| **`fmri-qa-cli`** | `fmriqa_cli` | the `fmri-qa`, `fmri-qa-hilo` and `fmri-qa-import` commands | core + io |
-| **`fmri-qa-report`** | `fmriqa_report` | plots and a self-contained offline HTML report, built from an artifact | core + io, matplotlib |
+| **`fmri-qa-cli`** | `fmriqa_cli` | the `fmri-qa`, `fmri-qa-hilo`, `fmri-qa-import` and `fmri-qa-report` commands | core, io + report |
+| **`fmri-qa-report`** | `fmriqa_report` | plots and a self-contained offline HTML report, built from an artifact. A library: its command, `fmri-qa-report`, is in `fmri-qa-cli` | core + io, matplotlib |
 | **`fmri-qa-launcher`** | `fmriqa_launcher` | one-step DICOM-directory-in, report-directory-out pipeline: a command line and a desktop panel | cli, core, io + report; stdlib `tkinter` for the panel |
 
 Only a `QAArtifact` passes between calculating and presenting. It holds the run's
@@ -81,8 +81,8 @@ the table above, and the comments say what it provides:
 ```bash
 pip install fmri-qa-core      # metrics and artifacts; reads no files
 pip install fmri-qa-io        # + core: reading scans, artifact files, DICOM import
-pip install fmri-qa-cli       # + core, io: fmri-qa, fmri-qa-import, fmri-qa-hilo
-pip install fmri-qa-report    # + core, io: plots and self-contained HTML reports
+pip install fmri-qa-cli       # + core, io, report: fmri-qa, fmri-qa-import, fmri-qa-hilo, fmri-qa-report
+pip install fmri-qa-report    # + core, io: plots and self-contained HTML reports (a library)
 pip install fmri-qa-launcher  # + all four: fmri-qa-run and the desktop panel
 ```
 

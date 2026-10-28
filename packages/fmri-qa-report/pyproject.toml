@@ -39,9 +39,6 @@ dependencies = [
     "numpy>=2.3.4",
 ]
 
-[project.scripts]
-fmri-qa-report = "fmriqa_report.cli:main"
-
 [tool.uv.sources]
 fmri-qa-core = { workspace = true }
 fmri-qa-io = { workspace = true }

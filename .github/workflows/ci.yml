@@ -75,20 +75,23 @@ jobs:
           .venv-io-smoke/bin/python -c "from importlib.resources import files; assert files('fmriqa_io').joinpath('py.typed').is_file()"
           .venv-io-smoke/bin/python -c "from importlib.metadata import distribution; text = distribution('fmri-qa-io').read_text('licenses/LICENSE'); assert text and 'MIT License' in text, 'the io wheel ships no license text'"
 
-      - name: Smoke-test the cli wheel against the core and io wheels
+      - name: Smoke-test the cli wheel against the core, io and report wheels
         run: |
           core=(dist/fmri_qa_core-*.whl)
           io=(dist/fmri_qa_io-*.whl)
           cli=(dist/fmri_qa_cli-*.whl)
+          report=(dist/fmri_qa_report-*.whl)
           test -f "${cli[0]}"
           uv venv --python 3.13 .venv-cli-smoke
-          uv pip install --python .venv-cli-smoke/bin/python "${core[0]}" "${io[0]}" "${cli[0]}"
+          uv pip install --python .venv-cli-smoke/bin/python "${core[0]}" "${io[0]}" "${report[0]}" "${cli[0]}"
           .venv-cli-smoke/bin/fmri-qa --version
           .venv-cli-smoke/bin/fmri-qa-hilo --help > /dev/null
           .venv-cli-smoke/bin/fmri-qa-import --help > /dev/null
+          .venv-cli-smoke/bin/fmri-qa-report --help > /dev/null
           .venv-cli-smoke/bin/python -m fmriqa_cli --version
           .venv-cli-smoke/bin/python -c "from importlib.resources import files; assert files('fmriqa_cli').joinpath('py.typed').is_file()"
           .venv-cli-smoke/bin/python -c "from importlib.metadata import distribution; text = distribution('fmri-qa-cli').read_text('licenses/LICENSE'); assert text and 'MIT License' in text, 'the cli wheel ships no license text'"
+          .venv-cli-smoke/bin/python -c "import sys; import fmriqa_cli.report; assert not any(n == 'fmriqa.pipeline' or n.startswith('fmriqa.pipeline.') for n in sys.modules), 'the report command imported the pipeline'"
           # Core ships no commands: only the cli wheel owns the entry points.
           .venv-cli-smoke/bin/python -c "from importlib.metadata import distribution; assert not distribution('fmri-qa-core').entry_points, 'the core wheel ships console scripts'"
 
@@ -100,12 +103,12 @@ jobs:
           test -f "${report[0]}"
           uv venv --python 3.13 .venv-report-smoke
           uv pip install --python .venv-report-smoke/bin/python "${core[0]}" "${io[0]}" "${report[0]}"
-          .venv-report-smoke/bin/fmri-qa-report --version
+          # The report is a library: only the cli wheel owns the entry points.
+          .venv-report-smoke/bin/python -c "from importlib.metadata import distribution; assert not distribution('fmri-qa-report').entry_points, 'the report wheel ships console scripts'"
           .venv-report-smoke/bin/python -c "from importlib.resources import files; assert files('fmriqa_report').joinpath('py.typed').is_file()"
           .venv-report-smoke/bin/python -c "from importlib.resources import files; root = files('fmriqa_report.formats.html'); assert root.joinpath('templates/run.html').is_file() and root.joinpath('assets/report.css').is_file(), 'the report wheel ships no HTML resources'"
           .venv-report-smoke/bin/python -c "import sys; import fmriqa_report; assert 'matplotlib' not in sys.modules, 'importing the report package loaded matplotlib'"
           .venv-report-smoke/bin/python -c "import fmriqa_report.formats.html.run"
-          .venv-report-smoke/bin/python -c "import sys; import fmriqa_report.cli; assert not any(name == 'fmriqa.pipeline' or name.startswith('fmriqa.pipeline.') for name in sys.modules), 'the report CLI imported the pipeline'"
           .venv-report-smoke/bin/python -c "from importlib.metadata import distribution; text = distribution('fmri-qa-report').read_text('licenses/LICENSE'); assert text and 'MIT License' in text, 'the report wheel ships no license text'"
           .venv-report-smoke/bin/python -c "import tarfile; archive = next(__import__('pathlib').Path('dist').glob('fmri_qa_report-*.tar.gz')); names = tarfile.open(archive).getnames(); assert any(name.endswith('src/fmriqa_report/formats/html/templates/run.html') for name in names) and any(name.endswith('src/fmriqa_report/formats/html/assets/report.css') for name in names), 'the report sdist ships no HTML resources'"
 

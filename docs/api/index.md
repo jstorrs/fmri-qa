@@ -13,8 +13,9 @@ package does not re-export: the individual metrics, the preparation steps, the
 launcher's panel state. {doc}`building-blocks` documents them concisely, module
 by module, for readers who want one step of the pipeline. The command-line entry
 points are listed on {doc}`fmri-qa-cli`, which covers only `fmri-qa`,
-`fmri-qa-hilo` and `fmri-qa-import`, and without their options. Each command's
-`--help` has those, and the repository's `README.md` covers them. The
+`fmri-qa-hilo`, `fmri-qa-import` and `fmri-qa-report`, and without their
+options. Each command's `--help` has those, and the repository's `README.md`
+covers them. The
 {doc}`user guide </user-guide/index>` covers `fmri-qa-report`, `fmri-qa-run` and
 the desktop panel.
 

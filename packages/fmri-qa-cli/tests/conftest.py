@@ -1,8 +1,8 @@
 """Shared fixtures for the command-line tests.
 
 `write_scan` writes the synthetic phantom to disk, `artifact` runs the pipeline
-over it once per session, and `fake_dcm2niix` builds the stub converter the
-import tests drive.
+over it once per session, `bare_artifact` does the same without sidecar
+metadata, and `fake_dcm2niix` builds the stub converter the import tests drive.
 """
 
 from collections.abc import Callable
@@ -40,6 +40,13 @@ def artifact() -> q.QAArtifact:
         name="scan.nii.gz",
         source="scan.nii.gz",
     )
+
+
+@pytest.fixture(scope="session")
+def bare_artifact() -> q.QAArtifact:
+    """An artifact with no sidecar metadata, to exercise the missing-field paths."""
+    scan = q.QAScan(data=phantom_scan(seed=7).data, tr=2.0, pe_axis=1)
+    return q.analyze(scan, q.AnalysisSettings(roi_size=9), name="bare.nii.gz")
 
 
 @pytest.fixture

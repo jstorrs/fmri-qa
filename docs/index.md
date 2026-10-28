@@ -23,13 +23,15 @@ api/index
   calculation and reads no files, so it can run in a browser.
 - **fmri-qa-io** and **fmri-qa-cli**: the file boundary and the commands.
   `fmri-qa-io` reads scans, saves and loads the artifact file, and imports DICOM.
-  `fmri-qa-cli` is the `fmri-qa`, `fmri-qa-hilo` and `fmri-qa-import` commands
-  over core and io. They have no user-guide section of their own. The
-  {doc}`Python API </api/index>` is documented, and the repository's `README.md`
-  covers the commands.
+  `fmri-qa-cli` is the `fmri-qa`, `fmri-qa-hilo`, `fmri-qa-import` and
+  `fmri-qa-report` commands over core, io and report. `fmri-qa`,
+  `fmri-qa-hilo` and `fmri-qa-import` have no user-guide section of their own;
+  `fmri-qa-report` has one, below. The {doc}`Python API </api/index>` is
+  documented, and the repository's `README.md` covers the commands.
 - **[fmri-qa-report](user-guide/index.md#rendering-the-result)**: how an
-  artifact becomes a single self-contained HTML page. It covers the command,
-  what the page shows and needs from a browser, and rendering one from Python.
+  artifact becomes a single self-contained HTML page. It covers the command
+  (installed by `fmri-qa-cli`), what the page shows and needs from a browser,
+  and rendering one from Python.
 - **[fmri-qa-launcher](user-guide/index.md#dicom-in-reports-out)**: the whole
   pipeline in one step, from a DICOM directory to one report folder per series.
   It covers the `fmri-qa-run` command, the desktop panel, and what a run writes.

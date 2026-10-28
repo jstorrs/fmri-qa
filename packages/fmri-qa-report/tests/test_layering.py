@@ -16,8 +16,9 @@ import of
 That scan reads import *text*, which is necessary but not sufficient. An
 allowed import can still pull in a forbidden module through the `__init__.py`
 of the package it lands in. So the seam is checked twice: statically, over
-every source file, and at runtime, by importing the report CLI in a fresh
-interpreter and looking at what ended up in `sys.modules`.
+every source file, and at runtime, by importing the report package in a fresh
+interpreter and looking at what ended up in `sys.modules`. The runtime check of
+the `fmri-qa-report` command is in the fmri-qa-cli tests.
 """
 
 import ast
@@ -59,32 +60,7 @@ ALLOWED = frozenset(
     }
 )
 
-# The `fmriqa_io` submodules importing the report CLI may load: the artifact
-# file and the two stdlib-only leaves described above. Any other (NIfTI
-# decoding, DICOM import) is the calculation side's input, not the report's.
-# The root is allowed too; the probe never looks at it.
-_IO_ALLOWED = (
-    "fmriqa_io.artifact",
-    "fmriqa_io.rename",
-    "fmriqa_io.path_arguments",
-)
-
 _SOURCE_ROOT = Path(fmriqa_report.__file__).parent
-
-# The calculation stack, and the third-party libraries only it needs. Rendering
-# a report reaches none of these. `fmriqa.load` and `fmriqa.prep` are listed
-# too: the artifact carries everything a reader wants already resolved, so
-# reading touches none of those layers.
-_CALCULATION_ONLY = (
-    "fmriqa.pipeline",
-    "fmriqa.metrics",
-    "fmriqa.prep",
-    "fmriqa.load",
-    "skimage",
-    "scipy",
-    "nibabel",
-    "netCDF4",
-)
 
 # The format-agnostic public surface must stay importable without the drawing
 # stack. The package resolves its driver lazily so that `import fmriqa_report`
@@ -98,33 +74,6 @@ _REPORT_IMPORT_TARGETS = (
     "fmriqa_report.summary",
     "fmriqa_report.panels",
 )
-
-# Run in a fresh interpreter. Only a process that has imported nothing else can
-# say what `import fmriqa_report.cli` costs; this one already has the whole
-# stack loaded by other tests.
-_PROBE = f"""
-import sys
-import fmriqa_report.cli
-calculation = {_CALCULATION_ONLY!r}
-loaded = sorted(
-    m for m in sys.modules if any(m == c or m.startswith(c + ".") for c in calculation)
-)
-print(loaded)
-"""
-
-_IO_PROBE = f"""
-import sys
-import fmriqa_report.cli
-{{extra}}
-allowed = {_IO_ALLOWED!r}
-loaded = sorted(
-    m
-    for m in sys.modules
-    if m.startswith("fmriqa_io.")
-    and not any(m == a or m.startswith(a + ".") for a in allowed)
-)
-print(loaded)
-"""
 
 _REPORT_IMPORT_PROBE = f"""
 import importlib
@@ -238,26 +187,6 @@ def test_presentation_never_imports_the_launcher() -> None:
     )
 
 
-def test_importing_the_report_cli_does_not_load_the_calculation_stack() -> None:
-    """The seam at runtime, which the static scan above cannot see.
-
-    `fmriqa.analysis` is an allowed import, but what it *executes* is another
-    question. Its `__init__` could pull the pipeline in behind the artifact and
-    the scan would still pass. Only a fresh interpreter's `sys.modules` settles
-    it.
-    """
-    result = subprocess.run(  # noqa: S603 - fixed literal script, not untrusted input
-        [sys.executable, "-c", _PROBE],
-        capture_output=True,
-        text=True,
-        check=True,
-    )
-    assert result.stdout.strip() == "[]", (
-        f"importing the report CLI loaded the calculation stack: {result.stdout}\n"
-        f"{result.stderr}"
-    )
-
-
 @pytest.mark.parametrize("module", _REPORT_IMPORT_TARGETS)
 def test_format_agnostic_report_modules_do_not_load_the_drawing_stack(
     module: str,
@@ -272,27 +201,3 @@ def test_format_agnostic_report_modules_do_not_load_the_drawing_stack(
     assert result.stdout.strip() == "[]", (
         f"importing {module} loaded the drawing stack: {result.stdout}\n{result.stderr}"
     )
-
-
-def _io_probe(extra: str = "") -> str:
-    """Run `_IO_PROBE`, with `extra` imported after the report CLI; return its list."""
-    result = subprocess.run(  # noqa: S603 - fixed literal script, not untrusted input
-        [sys.executable, "-c", _IO_PROBE.format(extra=extra)],
-        capture_output=True,
-        text=True,
-        check=True,
-    )
-    return result.stdout.strip()
-
-
-def test_importing_the_report_cli_loads_only_the_artifact_file_from_io() -> None:
-    """Of `fmriqa_io`, the report CLI loads the artifact file and two leaves."""
-    output = _io_probe()
-    assert output == "[]", (
-        f"importing the report CLI loaded more of fmriqa_io: {output}"
-    )
-
-
-def test_the_io_probe_would_catch_another_io_module() -> None:
-    """A negative control, so the probe cannot pass by failing to see anything."""
-    assert _io_probe("import fmriqa_io.testing") == "['fmriqa_io.testing']"

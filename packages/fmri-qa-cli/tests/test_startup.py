@@ -1,10 +1,11 @@
 """`--help` and `--version` stay cheap: neither imports the heavy numeric stack.
 
 The commands reach core through the lazy `fmriqa` root, so argparse has to run
-before scipy and scikit-image load. `fmri-qa-hilo` is not covered: its parser
-reads `HILO_ERODE` and `DETREND_METHODS` from core, which load them. Each probe
-runs in a fresh interpreter, because this process has already imported scipy
-and scikit-image in other tests.
+before scipy and scikit-image load. `fmri-qa-report` defers its renderer, so
+matplotlib stays out too. `fmri-qa-hilo` is not covered: its parser reads
+`HILO_ERODE` and `DETREND_METHODS` from core, which load them. Each probe runs
+in a fresh interpreter, because this process has already imported scipy and
+scikit-image in other tests.
 """
 
 import subprocess
@@ -19,12 +20,12 @@ try:
     fmriqa_cli.{entry}(["{flag}"])
 except SystemExit:
     pass
-print(sorted(m for m in ("scipy", "skimage") if m in sys.modules))
+print(sorted(m for m in ("scipy", "skimage", "matplotlib") if m in sys.modules))
 """
 
 
 @pytest.mark.parametrize("flag", ["--help", "--version"])
-@pytest.mark.parametrize("entry", ["main", "import_main"])
+@pytest.mark.parametrize("entry", ["main", "import_main", "report_main"])
 def test_a_flag_that_only_prints_does_not_load_the_heavy_stack(
     entry: str, flag: str
 ) -> None:

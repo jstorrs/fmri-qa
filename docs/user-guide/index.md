@@ -35,7 +35,8 @@ artifact
 
 `fmri-qa-report` is the presentation half of fmri-qa. It renders one
 {doc}`analysis artifact <artifact>` into a single self-contained HTML page that
-opens by double-click, with no network and no companion file.
+opens by double-click, with no network and no companion file. Its command comes
+with `fmri-qa-cli`.
 
 The artifact is its only input. `fmri-qa-core` computed and stored every number,
 curve, mask and image the report draws, so a report can be rendered on another

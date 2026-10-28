@@ -1,8 +1,9 @@
 """`fmri-qa-report`: render a saved artifact into a one-file HTML report.
 
-The presentation half's entry point. It reads `.qa.nc` artifacts written by
-`fmri-qa --artifact`, never a NIfTI series, so it can run on another machine,
-long after the calculation, without the acquisition data.
+The presentation half's command, installed with this distribution. It reads
+`.qa.nc` artifacts written by `fmri-qa --artifact`, never a NIfTI series, so it
+can run on another machine, long after the calculation, without the acquisition
+data.
 """
 
 import argparse
@@ -13,8 +14,7 @@ from pathlib import Path
 from fmriqa.analysis import InvalidArtifactError, QAArtifact
 from fmriqa_io.artifact import load_artifact
 from fmriqa_io.path_arguments import expand_globs, same_file
-
-from .summary import package_version
+from fmriqa_report.summary import package_version
 
 
 def _title(artifact: QAArtifact, path: str) -> str:
@@ -47,7 +47,7 @@ def _parser() -> argparse.ArgumentParser:
     return parser
 
 
-def main(argv: Sequence[str] | None = None) -> int:
+def report_main(argv: Sequence[str] | None = None) -> int:
     """Render one artifact to a self-contained HTML report; return the status."""
     parser = _parser()
     args = parser.parse_args(argv)
@@ -73,7 +73,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
 
-    from .formats.html import write_run_page
+    # Deferred so `--help` and `--version` never import the renderer.
+    from fmriqa_report.formats.html import write_run_page
 
     try:
         write_run_page(artifact, args.html, title=_title(artifact, path))
@@ -85,4 +86,4 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    raise SystemExit(report_main())

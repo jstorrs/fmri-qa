@@ -854,12 +854,14 @@ source = { editable = "packages/fmri-qa-cli" }
 dependencies = [
     { name = "fmri-qa-core" },
     { name = "fmri-qa-io" },
+    { name = "fmri-qa-report" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "fmri-qa-core", editable = "packages/fmri-qa-core" },
     { name = "fmri-qa-io", editable = "packages/fmri-qa-io" },
+    { name = "fmri-qa-report", editable = "packages/fmri-qa-report" },
 ]
 
 [[package]]

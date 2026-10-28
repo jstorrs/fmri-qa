@@ -1,5 +1,7 @@
 # Rendering a report
 
+The `fmri-qa-report` command is installed by `fmri-qa-cli`.
+
 ```console
 $ fmri-qa-report ARTIFACT --html FILE
 ```

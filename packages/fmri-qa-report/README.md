@@ -9,8 +9,9 @@ $ fmri-qa scan.nii.gz --artifact qa.nc
 $ fmri-qa-report qa.nc --html report.html
 ```
 
-`fmri-qa` comes from [`fmri-qa-cli`](../fmri-qa-cli), which is a separate
-install. `fmri-qa-report` itself needs only an artifact file.
+The `fmri-qa` and `fmri-qa-report` commands come from
+[`fmri-qa-cli`](../fmri-qa-cli), a separate install that depends on this
+package. This package is a library and ships no commands.
 
 The artifact is the only input. [`fmri-qa-core`](../fmri-qa-core) precomputes
 every number, curve, mask, and image the report draws. A report can therefore be
@@ -25,10 +26,11 @@ Inside, content is separate from format. `summary` and `content` build the text,
 `panels` builds the matplotlib figures, and `formats/` holds one driver per
 output format. To add a format, add a subpackage beside `formats/html`.
 
-`fmri-qa-report ARTIFACT --html FILE` renders one artifact into a single
-self-contained HTML file, with the stylesheet inlined and every figure embedded
-as a `data:` URI. It opens by double-click with no network and no sibling file,
-so it is safe to email, attach to a QA record, or drop into an existing website.
+The command `fmri-qa-report ARTIFACT --html FILE` renders one artifact into a
+single self-contained HTML file, with the stylesheet inlined and every figure
+embedded as a `data:` URI. It opens by double-click with no network and no
+sibling file, so it is safe to email, attach to a QA record, or drop into an
+existing website.
 It carries no JavaScript, so an embedding site's Content-Security-Policy only
 needs `style-src 'unsafe-inline'` (or a hash) and `img-src data:`. Clicking a
 figure enlarges it to fill the viewport, and clicking it again closes it. This

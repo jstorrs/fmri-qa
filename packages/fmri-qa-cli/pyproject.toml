@@ -1,7 +1,7 @@
 [project]
 name = "fmri-qa-cli"
 version = "0.1.0"
-description = "Command-line shell for fmri-qa: fmri-qa, fmri-qa-hilo and fmri-qa-import"
+description = "Command-line shell for fmri-qa: fmri-qa, fmri-qa-hilo, fmri-qa-import and fmri-qa-report"
 readme = "README.md"
 requires-python = ">=3.13"
 license = "MIT"
@@ -24,10 +24,12 @@ classifiers = [
     "Typing :: Typed",
 ]
 # The commands analyze with fmri-qa-core and read and write files through
-# fmri-qa-io. Neither pulls in the drawing stack: rendering is fmri-qa-report.
+# fmri-qa-io. fmri-qa-report draws the HTML page for `fmri-qa-report`; its
+# matplotlib loads only when a page is written.
 dependencies = [
     "fmri-qa-core==0.1.0",
     "fmri-qa-io==0.1.0",
+    "fmri-qa-report==0.1.0",
 ]
 
 # The entry points name `fmriqa_cli`. It reaches core only through the lazy
@@ -36,10 +38,12 @@ dependencies = [
 fmri-qa = "fmriqa_cli:main"
 fmri-qa-hilo = "fmriqa_cli:hilo_main"
 fmri-qa-import = "fmriqa_cli:import_main"
+fmri-qa-report = "fmriqa_cli:report_main"
 
 [tool.uv.sources]
 fmri-qa-core = { workspace = true }
 fmri-qa-io = { workspace = true }
+fmri-qa-report = { workspace = true }
 
 [build-system]
 requires = ["hatchling"]

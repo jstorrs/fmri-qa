@@ -20,6 +20,10 @@ versioning when the first stable public interface is released.
 
 ### Changed
 
+- **`fmri-qa-report` now installs with `fmri-qa-cli`.** `fmri-qa-report` is a
+  library with no commands; install `fmri-qa-cli` for the `fmri-qa-report`
+  command; `python -m fmriqa_report` is gone with it. The command itself is
+  unchanged.
 - **The commands moved to a new distribution, `fmri-qa-cli`.** `fmri-qa`,
   `fmri-qa-import` and `fmri-qa-hilo` are no longer installed by
   `fmri-qa-core`; install `fmri-qa-cli`. `python -m fmriqa` is now

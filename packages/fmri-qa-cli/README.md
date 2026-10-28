@@ -2,12 +2,16 @@
 
 The command-line shell for [fmri-qa](../../README.md): `fmri-qa` analyzes
 scans, `fmri-qa-hilo` separates thermal from instability noise on a flip-angle
-pair, and `fmri-qa-import` converts a DICOM directory into QA-ready NIfTI.
+pair, `fmri-qa-import` converts a DICOM directory into QA-ready NIfTI, and
+`fmri-qa-report` renders a saved artifact into a one-file HTML report. The report
+page itself is drawn by [`fmri-qa-report`](../fmri-qa-report), which installs as
+a dependency.
 
 ```bash
 pip install fmri-qa-cli
 fmri-qa-import STUDY_DIR --out nifti/
 fmri-qa nifti/*.nii.gz --artifact artifacts/
+fmri-qa-report artifacts/scan.qa.nc --html report.html
 ```
 
 With one scan, `--artifact` names the file to write, unless it is an existing
