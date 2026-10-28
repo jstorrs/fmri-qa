@@ -1,35 +1,34 @@
 # From Python
 
-The command is a thin shell over `write_run_page`. Import it and `render_run_page`
-from `fmriqa_report`. Both take a loaded `QAArtifact`. Load one with
+The command loads the artifact, renders it with `render_run_page` from
+`fmriqa_report`, and writes the string it returns. `fmriqa_report` itself reads and
+writes no file, so the load and the write are yours. Load an artifact with
 `fmriqa_io.load_artifact`, which reads any file the command would (see
-{doc}`/user-guide/artifact`).
+{doc}`/user-guide/artifact`). `fmriqa_io.rename.write_text_atomically` writes the
+page the way the command does: through a temporary file moved into place, with
+missing parent directories created, so a reader never sees a partial page.
 
 ```python
 from fmriqa_io import load_artifact
-from fmriqa_report import Theme, write_run_page
+from fmriqa_io.rename import write_text_atomically
+from fmriqa_report import Theme, render_run_page
 
 artifact = load_artifact("qa.nc")
-write_run_page(
+page = render_run_page(
     artifact,
-    "reports/2026-09-24.html",
     title="Bay 2 weekly phantom",
     theme=Theme(panel_accent="#8a1538"),
 )
+write_text_atomically("reports/2026-09-24.html", page)
 ```
 
-## The two functions
+## The function
 
 `render_run_page(artifact, *, title=None, report_version=None, theme=DEFAULT_THEME)`
-returns the complete page as a string. Nothing is written.
+returns the complete page as a string. Nothing is written. The
+{doc}`API reference </api/fmri-qa-report>` has the signature and parameters.
 
-`write_run_page(artifact, path, *, title=None, report_version=None, theme=DEFAULT_THEME)`
-renders the same page, writes it to `path`, and returns the path. The write is
-the command's: rendered in memory, then moved into place atomically, with missing
-parent directories created (see {doc}`fmri-qa-report`). The
-{doc}`API reference </api/fmri-qa-report>` has the signatures and parameters.
-
-The keyword arguments are the same for both:
+The keyword arguments:
 
 - `title`: the page's heading and `<title>`. Without one, the scan name recorded
   in the artifact, else the file name of the series it was computed from.
@@ -61,9 +60,9 @@ page's colors come from its stylesheet.
 ## Importing
 
 Importing `fmriqa_report`, `Theme` or `DEFAULT_THEME` does not import matplotlib.
-The renderer, and with it matplotlib, loads when `render_run_page` or
-`write_run_page` is first looked up on the package, including by
-`from fmriqa_report import write_run_page`. Figures are built as
+The renderer, and with it matplotlib, loads when `render_run_page` is first
+looked up on the package, including by `from fmriqa_report import render_run_page`.
+Figures are built as
 `matplotlib.figure.Figure` objects and saved straight to SVG under a local
 `rc_context` for the theme. Rendering needs no `pyplot`, selects no backend, and
 leaves the process's matplotlib settings unchanged.

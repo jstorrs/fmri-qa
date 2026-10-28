@@ -1,7 +1,7 @@
 """`fmri-qa-run`, exercised over a stub converter and a fast fake render.
 
 Only `test_the_published_run_matches_a_direct_analyze` runs a real analysis.
-The other end-to-end tests patch `fmriqa_launcher.session.write_run_page` with
+The other end-to-end tests patch `fmriqa_launcher.session.render_run_page` with
 the `fast_render` fixture, as `tests/test_session.py` does. Printed output per
 outcome is pinned by calling `_print_outcomes` on a hand-built `RunResult`.
 """

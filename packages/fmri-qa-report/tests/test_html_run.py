@@ -1,22 +1,17 @@
 """The offline per-run HTML report is one self-contained, embedded document."""
 
-import os
 import re
-import stat
-import sys
 from dataclasses import replace
 from html.parser import HTMLParser
-from pathlib import Path
 
 import numpy as np
 import pytest
 
 import fmriqa as q
-import fmriqa_io
 from fmriqa_report.content import METRIC_DOCS
 from fmriqa_report.formats.html import resources
 from fmriqa_report.formats.html.figures import FIGURE_ASSETS, RenderedFigure
-from fmriqa_report.formats.html.run import render_run_page, write_run_page
+from fmriqa_report.formats.html.run import render_run_page
 
 _ID = re.compile(r"^[A-Za-z][A-Za-z0-9_-]*\Z")
 
@@ -186,27 +181,14 @@ def test_run_page_is_byte_reproducible(artifact) -> None:
     assert first == second
 
 
-def test_a_reloaded_artifact_renders_identically(tmp_path, artifact) -> None:
-    """The seam's payoff: a saved artifact is as good as a freshly computed one."""
-    reloaded = fmriqa_io.load_artifact(
-        fmriqa_io.save_artifact(artifact, tmp_path / "qa.nc")
-    )
-    live = render_run_page(artifact, title="Test run", report_version="report-test")
-    disk = render_run_page(reloaded, title="Test run", report_version="report-test")
-    assert live == disk
-
-
-def test_a_blank_scan_with_an_unresolved_rdc_still_renders(tmp_path) -> None:
+def test_a_blank_scan_with_an_unresolved_rdc_still_renders() -> None:
     """Every panel must degrade to a page, not an exception, on a degenerate run."""
     artifact = q.analyze(
         q.QAScan(data=np.zeros((16, 16, 1, 10)), tr=2.0, pe_axis=1),
         q.AnalysisSettings(roi_size=3, trim_sec=0, detrend_order=0),
     )
-    reloaded = fmriqa_io.load_artifact(
-        fmriqa_io.save_artifact(artifact, tmp_path / "blank.nc")
-    )
-    assert not np.isfinite(reloaded.curves.weisskoff.rdc).any()
-    page = render_run_page(reloaded, title="blank", report_version="report-test")
+    assert not np.isfinite(artifact.curves.weisskoff.rdc).any()
+    page = render_run_page(artifact, title="blank", report_version="report-test")
     assert "Unavailable — estimator unresolved" in page
 
 
@@ -299,102 +281,6 @@ def test_run_page_escapes_hostile_metadata_and_long_text(artifact, monkeypatch) 
     assert "&lt;script&gt;alert(&quot;x&quot;)&lt;/script&gt;" in page
     assert "script" not in parsed.tags
     assert "very-long-source-" in page
-
-
-def test_write_run_page_writes_exactly_one_file(
-    tmp_path, artifact, monkeypatch
-) -> None:
-    monkeypatch.setattr(
-        "fmriqa_report.formats.html.run.render_figures",
-        lambda _artifact, **_kwargs: _tiny_rendered_figures(),
-    )
-    destination = tmp_path / "out" / "report.html"
-
-    result = write_run_page(artifact, destination)
-
-    assert result == destination
-    written = [path for path in tmp_path.rglob("*") if path.is_file()]
-    assert written == [destination]
-
-
-@pytest.mark.skipif(sys.platform == "win32", reason="POSIX permission bits only")
-def test_write_run_page_output_respects_the_umask(
-    tmp_path, artifact, monkeypatch
-) -> None:
-    monkeypatch.setattr(
-        "fmriqa_report.formats.html.run.render_figures",
-        lambda _artifact, **_kwargs: _tiny_rendered_figures(),
-    )
-    destination = tmp_path / "out" / "report.html"
-    old_umask = os.umask(0o022)
-    try:
-        write_run_page(artifact, destination)
-    finally:
-        os.umask(old_umask)
-
-    assert stat.S_IMODE(destination.stat().st_mode) == 0o644
-
-
-def test_write_run_page_leaves_no_file_when_a_figure_fails(
-    tmp_path, artifact, monkeypatch
-) -> None:
-    def fail(*_args, **_kwargs):
-        raise RuntimeError("figure failure")
-
-    monkeypatch.setattr("fmriqa_report.formats.html.run.render_figures", fail)
-    destination = tmp_path / "out" / "report.html"
-
-    with pytest.raises(RuntimeError, match="figure failure"):
-        write_run_page(artifact, destination)
-
-    assert not destination.exists()
-
-
-def test_write_run_page_leaves_an_existing_destination_unchanged_when_rendering_fails(
-    tmp_path, artifact, monkeypatch
-) -> None:
-    def fail(*_args, **_kwargs):
-        raise RuntimeError("figure failure")
-
-    monkeypatch.setattr("fmriqa_report.formats.html.run.render_figures", fail)
-    destination = tmp_path / "out"
-    destination.mkdir()
-    target = destination / "report.html"
-    target.write_text("previous report", encoding="utf-8")
-
-    with pytest.raises(RuntimeError, match="figure failure"):
-        write_run_page(artifact, target)
-
-    assert target.read_text(encoding="utf-8") == "previous report"
-    assert [path.name for path in destination.iterdir()] == ["report.html"]
-
-
-def test_write_run_page_is_atomic_when_the_write_step_itself_fails(
-    tmp_path, artifact, monkeypatch
-) -> None:
-    monkeypatch.setattr(
-        "fmriqa_report.formats.html.run.render_figures",
-        lambda _artifact, **_kwargs: _tiny_rendered_figures(),
-    )
-    destination = tmp_path / "out"
-    destination.mkdir()
-    target = destination / "report.html"
-    target.write_text("previous report", encoding="utf-8")
-
-    original_write_text = Path.write_text
-
-    def fail_write_text(self, *args, **kwargs):
-        if self.name.startswith(".report.html."):
-            raise OSError("disk full")
-        return original_write_text(self, *args, **kwargs)
-
-    monkeypatch.setattr(Path, "write_text", fail_write_text)
-
-    with pytest.raises(OSError, match="disk full"):
-        write_run_page(artifact, target)
-
-    assert target.read_text(encoding="utf-8") == "previous report"
-    assert [path.name for path in destination.iterdir()] == ["report.html"]
 
 
 def test_run_template_and_stylesheet_are_packaged_resources() -> None:

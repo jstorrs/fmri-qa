@@ -463,8 +463,10 @@ dcm2niix need a filesystem, a native library or a subprocess. The calculation ne
 of them, and a browser has none of them: the motivation is a single offline HTML page that
 runs the pipeline under Pyodide. So core takes arrays and value objects (a `QAScan`) and returns values, and io decodes
 bytes and files into them, and
-every file touch lives in `fmri-qa-io`. The commands are their own distribution too, so
-that core, io and report stay libraries with no entry points.
+every file touch lives in `fmri-qa-io`. Report is on the pure side too: an artifact
+in memory in, an HTML string out, so it depends on core and matplotlib and never on io.
+The commands are their own distribution too, so that core, io and report stay libraries
+with no entry points. The applications (cli, launcher) load the artifact and write the page.
 
 ```
 packages/

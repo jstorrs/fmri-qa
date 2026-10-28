@@ -78,18 +78,17 @@ convention are in
 |---|---|---|---|
 | `fmri-qa-core` | `fmriqa` | Calculation: scan value objects, prep, metrics, pipeline, the artifact and its schema (compose, decompose, migrate), the pure sidecar and DICOM-naming rules. No drawing stack, and no file IO. | numpy, scipy, scikit-image |
 | `fmri-qa-io` | `fmriqa_io` | Files: `load_scan`, `scan_from_bytes`, the netCDF-4 artifact container (`save_artifact`, `load_artifact`), DICOM import through dcm2niix. | fmri-qa-core, nibabel, numpy, netCDF4 and dcm2niix (not under Pyodide) |
-| `fmri-qa-cli` | `fmriqa_cli` | The `fmri-qa`, `fmri-qa-hilo` and `fmri-qa-import` commands. | fmri-qa-core, fmri-qa-io |
-| `fmri-qa-report` | `fmriqa_report` | One artifact rendered as one self-contained HTML page. | fmri-qa-core, fmri-qa-io, numpy, matplotlib, cycler |
+| `fmri-qa-cli` | `fmriqa_cli` | The `fmri-qa`, `fmri-qa-hilo`, `fmri-qa-import` and `fmri-qa-report` commands. | fmri-qa-core, fmri-qa-io, fmri-qa-report |
+| `fmri-qa-report` | `fmriqa_report` | One artifact rendered as one self-contained HTML page. | fmri-qa-core, numpy, matplotlib, cycler |
 | `fmri-qa-launcher` | `fmriqa_launcher` | The one-step DICOM-to-report command (`fmri-qa-run`) and the desktop panel (`fmri-qa-panel`). | fmri-qa-cli, fmri-qa-core, fmri-qa-io, fmri-qa-report; tkinter from the standard library |
 
-The dependency points one way: report depends on core and io, core knows nothing
-of either, and the launcher sits on top of all of them. Within that, the report
-half may import only `fmriqa.analysis` (the artifact), `fmriqa.types` (the shared
-array/option vocabulary), and from `fmriqa_io` only the artifact file
-(`fmriqa_io.artifact`) and two standard-library leaves (`fmriqa_io.rename` for the
-atomic write, `fmriqa_io.path_arguments` for command-line paths) -- never `load`,
-`prep`, `metrics`, or `pipeline`, and never the `fmriqa` package as a whole, which
-would pull all of them.
+The dependency points one way: report depends on core, core knows nothing of
+report or io, and the launcher sits on top of all of them. Within that, the report half
+may import only `fmriqa.analysis` (the artifact) and `fmriqa.types` (the shared
+array/option vocabulary) -- never `load`, `prep`, `metrics`, or `pipeline`, never
+the `fmriqa` package as a whole, which would pull all of them, and nothing from
+`fmriqa_io`. The report takes an artifact in memory and returns a string. The
+applications load the artifact and write the page.
 
 A rule like that erodes one convenient import at a time, so layering tests check
 it mechanically:

@@ -5,7 +5,8 @@ client, a scanner), which no test can provoke. The tests cover the policy:
 `Path.replace` refuses a set number of times, and the delays and sleep are
 injected, so no test waits.
 
-`rename.atomic_file`, the write-then-rename built on it, is tested at the end.
+`rename.atomic_file`, the write-then-rename built on it, is tested at the end,
+followed by `write_text_atomically` over it.
 """
 
 import os
@@ -16,7 +17,7 @@ from pathlib import Path
 import pytest
 
 from fmriqa_io import rename
-from fmriqa_io.rename import atomic_file, replace_patiently
+from fmriqa_io.rename import atomic_file, replace_patiently, write_text_atomically
 
 DELAYS = (0.1, 0.2, 0.4)
 
@@ -196,3 +197,52 @@ def test_atomic_file_output_respects_the_umask(tmp_path: Path) -> None:
         os.umask(old_umask)
 
     assert stat.S_IMODE(target.stat().st_mode) == 0o644
+
+
+def test_write_text_atomically_writes_exactly_one_file(tmp_path: Path) -> None:
+    destination = tmp_path / "out" / "report.html"
+
+    result = write_text_atomically(destination, "<p>é</p>")
+
+    assert result == destination
+    assert destination.read_text(encoding="utf-8") == "<p>é</p>"
+    assert [path for path in tmp_path.rglob("*") if path.is_file()] == [destination]
+
+
+def test_write_text_atomically_accepts_a_string_path(tmp_path: Path) -> None:
+    result = write_text_atomically(str(tmp_path / "out.txt"), "payload")
+
+    assert result == tmp_path / "out.txt"
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX permission bits only")
+def test_write_text_atomically_output_respects_the_umask(tmp_path: Path) -> None:
+    destination = tmp_path / "out" / "report.html"
+    old_umask = os.umask(0o022)
+    try:
+        write_text_atomically(destination, "payload")
+    finally:
+        os.umask(old_umask)
+
+    assert stat.S_IMODE(destination.stat().st_mode) == 0o644
+
+
+def test_write_text_atomically_is_atomic_when_the_write_step_fails(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    target = tmp_path / "report.html"
+    target.write_text("previous report", encoding="utf-8")
+    original_write_text = Path.write_text
+
+    def fail_write_text(self: Path, *args: object, **kwargs: object) -> int:
+        if self.name.startswith(".report.html."):
+            raise OSError("disk full")
+        return original_write_text(self, *args, **kwargs)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(Path, "write_text", fail_write_text)
+
+    with pytest.raises(OSError, match="disk full"):
+        write_text_atomically(target, "new report")
+
+    assert target.read_text(encoding="utf-8") == "previous report"
+    assert [path.name for path in tmp_path.iterdir()] == ["report.html"]

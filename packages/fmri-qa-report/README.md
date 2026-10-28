@@ -18,9 +18,11 @@ every number, curve, mask, and image the report draws. A report can therefore be
 produced on another machine, long after the acquisition, with no access to the
 series. An artifact read back from disk renders the same as one just computed.
 
-It depends on `fmri-qa-core` for the `QAArtifact` types and on
-[`fmri-qa-io`](../fmri-qa-io) to read an artifact file, plus matplotlib to draw.
-It never runs the pipeline and never reads a scan.
+It depends on `fmri-qa-core` for the `QAArtifact` types, plus matplotlib to
+draw. `render_run_page(artifact)` takes an artifact in memory and returns the
+page as a string. It reads and writes no file: the application loads the
+artifact and writes the page (`fmriqa_io` does both). It never runs the
+pipeline and never reads a scan.
 
 Inside, content is separate from format. `summary` and `content` build the text,
 `panels` builds the matplotlib figures, and `formats/` holds one driver per

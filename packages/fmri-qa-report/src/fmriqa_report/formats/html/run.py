@@ -13,7 +13,6 @@ from string import Template
 from typing import Literal
 
 from fmriqa.analysis import Measurements, QAArtifact
-from fmriqa_io.rename import atomic_file
 
 from ...content import METRIC_DOCS, MetricDoc
 from ...summary import (
@@ -27,7 +26,7 @@ from ...theme import DEFAULT_THEME, Theme
 from . import resources
 from .figures import RenderedFigure, render_figures
 
-__all__ = ["render_run_page", "write_run_page"]
+__all__ = ["render_run_page"]
 
 
 _UNAVAILABLE = "Unavailable — estimator unresolved"
@@ -68,31 +67,6 @@ def render_run_page(
     }
     template = Template(resources.read_resource(resources.RUN_TEMPLATE))
     return template.substitute(values)
-
-
-def write_run_page(
-    artifact: QAArtifact,
-    path: Path | str,
-    *,
-    title: str | None = None,
-    report_version: str | None = None,
-    theme: Theme = DEFAULT_THEME,
-) -> Path:
-    """Write :func:`render_run_page`'s document to ``path`` and return it.
-
-    The write is atomic: the page is rendered in memory, written to a sibling
-    temporary file, then moved into place by
-    :func:`fmriqa_io.rename.replace_patiently`. A reader never sees a partial file,
-    and a failed render or write leaves an existing destination alone.
-    """
-    target = Path(path)
-    page = render_run_page(
-        artifact, title=title, report_version=report_version, theme=theme
-    )
-    target.parent.mkdir(parents=True, exist_ok=True)
-    with atomic_file(target) as temporary:
-        temporary.write_text(page, encoding="utf-8")
-    return target
 
 
 def _subline(artifact: QAArtifact) -> str:

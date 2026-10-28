@@ -152,19 +152,17 @@ def stub_series(
 
 
 @pytest.fixture
-def fast_render(monkeypatch: pytest.MonkeyPatch) -> Callable[..., Path]:
-    """Replace `write_run_page` with a stand-in that skips the ~8 s render.
+def fast_render(monkeypatch: pytest.MonkeyPatch) -> Callable[..., str]:
+    """Replace `render_run_page` with a stand-in that skips the ~8 s render.
 
-    The stand-in still writes a file for `Published.report` to point at, and
-    is returned for a test that wraps it.
+    The stand-in returns a small page, which the session still writes, so
+    `Published.report` points at a file. It is returned for a test that wraps it.
     """
 
-    def render(artifact: object, path: Path, **_kwargs: object) -> Path:
-        target = Path(path)
-        target.write_text("<html><body>stub report</body></html>", encoding="utf-8")
-        return target
+    def render(artifact: object, **_kwargs: object) -> str:
+        return "<html><body>stub report</body></html>"
 
-    monkeypatch.setattr("fmriqa_launcher.session.write_run_page", render)
+    monkeypatch.setattr("fmriqa_launcher.session.render_run_page", render)
     return render
 
 

@@ -2,7 +2,7 @@
 
 Only `test_one_series_is_imported_analyzed_and_published` renders a real
 report (~8 s). Other tests that need a *published* series use the
-`fast_render` fixture, which patches `write_run_page` to take a few
+`fast_render` fixture, which patches `render_run_page` to take a few
 milliseconds and still leaves a file for `Published.report`.
 """
 
@@ -47,7 +47,7 @@ def staging_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     return root
 
 
-def _fail_render(_artifact: object, _path: Path, **_kwargs: object) -> Path:
+def _fail_render(_artifact: object, **_kwargs: object) -> str:
     """A render that always fails -- pairs an analysis warning with a later failure."""
     raise RuntimeError("stub render failure")
 
@@ -382,13 +382,11 @@ def test_a_target_that_appears_mid_run_fails_that_series(
     converter, (name,) = stub_series()
     output_dir = tmp_path / "output"
 
-    def _render_then_collide(artifact: object, path: Path, **_kwargs: object) -> Path:
-        target = Path(path)
-        target.write_text("<html></html>", encoding="utf-8")
+    def _render_then_collide(artifact: object, **_kwargs: object) -> str:
         (output_dir / name).mkdir(parents=True)
-        return target
+        return "<html></html>"
 
-    monkeypatch.setattr("fmriqa_launcher.session.write_run_page", _render_then_collide)
+    monkeypatch.setattr("fmriqa_launcher.session.render_run_page", _render_then_collide)
     request = RunRequest(
         dicom_dir=dicom_dir,
         output_dir=output_dir,
@@ -453,7 +451,7 @@ def test_two_series_with_a_dotted_prefix_pair_each_publish_their_own_files(
 def test_a_series_whose_directory_appears_mid_run_is_refused_not_analyzed(
     tmp_path: Path,
     dicom_dir: Path,
-    fast_render: Callable[..., Path],
+    fast_render: Callable[..., str],
     stub_series: StubSeries,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -461,11 +459,11 @@ def test_a_series_whose_directory_appears_mid_run_is_refused_not_analyzed(
     converter, (first_name, second_name) = stub_series(frames=(40, 40))
     output_dir = tmp_path / "output"
 
-    def render_then_race(artifact: object, path: Path, **kwargs: object) -> Path:
+    def render_then_race(artifact: object, **kwargs: object) -> str:
         (output_dir / second_name).mkdir()
-        return fast_render(artifact, path, **kwargs)
+        return fast_render(artifact, **kwargs)
 
-    monkeypatch.setattr("fmriqa_launcher.session.write_run_page", render_then_race)
+    monkeypatch.setattr("fmriqa_launcher.session.render_run_page", render_then_race)
     request = RunRequest(
         dicom_dir=dicom_dir,
         output_dir=output_dir,
@@ -566,7 +564,7 @@ def test_a_warning_during_analysis_lands_on_the_published_outcome(
 def test_a_warning_during_render_is_not_captured(
     tmp_path: Path,
     dicom_dir: Path,
-    fast_render: Callable[..., Path],
+    fast_render: Callable[..., str],
     stub_series: StubSeries,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -578,11 +576,11 @@ def test_a_warning_during_render_is_not_captured(
     fires (`pytest.warns` around the call) but nothing lands on the outcome.
     """
 
-    def _warn_then_render(artifact: object, path: Path, **_kwargs: object) -> Path:
+    def _warn_then_render(artifact: object, **_kwargs: object) -> str:
         warnings.warn("a stub warning from the render step", stacklevel=2)
-        return fast_render(artifact, path)
+        return fast_render(artifact)
 
-    monkeypatch.setattr("fmriqa_launcher.session.write_run_page", _warn_then_render)
+    monkeypatch.setattr("fmriqa_launcher.session.render_run_page", _warn_then_render)
     converter, _ = stub_series()
 
     request = RunRequest(
@@ -636,7 +634,7 @@ def test_a_warning_during_analysis_lands_on_the_failed_outcome(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """A warning during analysis, then a *later* stage (render) fails: both survive."""
-    monkeypatch.setattr("fmriqa_launcher.session.write_run_page", _fail_render)
+    monkeypatch.setattr("fmriqa_launcher.session.render_run_page", _fail_render)
     converter, _ = stub_series()
 
     request = RunRequest(
@@ -691,7 +689,7 @@ def test_a_failure_saving_the_artifact_is_a_failed_outcome_with_its_warnings(
 def test_the_output_directory_holds_no_intermediates_while_a_series_is_worked_on(
     tmp_path: Path,
     dicom_dir: Path,
-    fast_render: Callable[..., Path],
+    fast_render: Callable[..., str],
     stub_series: StubSeries,
     staging_root: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -706,12 +704,12 @@ def test_the_output_directory_holds_no_intermediates_while_a_series_is_worked_on
     output_dir = tmp_path / "output"
     seen: dict[str, list[str]] = {}
 
-    def _look_then_render(artifact: object, path: Path, **kwargs: object) -> Path:
+    def _look_then_render(artifact: object, **kwargs: object) -> str:
         seen["output"] = sorted(p.name for p in output_dir.rglob("*"))
         seen["staging"] = sorted(p.name for p in staging_root.rglob("*") if p.is_file())
-        return fast_render(artifact, path, **kwargs)
+        return fast_render(artifact, **kwargs)
 
-    monkeypatch.setattr("fmriqa_launcher.session.write_run_page", _look_then_render)
+    monkeypatch.setattr("fmriqa_launcher.session.render_run_page", _look_then_render)
     converter, (name,) = stub_series()
     request = RunRequest(
         dicom_dir=dicom_dir,
@@ -733,7 +731,7 @@ def test_the_output_directory_holds_no_intermediates_while_a_series_is_worked_on
 def test_a_published_series_is_dropped_from_staging_before_the_next_one_starts(
     tmp_path: Path,
     dicom_dir: Path,
-    fast_render: Callable[..., Path],
+    fast_render: Callable[..., str],
     stub_series: StubSeries,
     staging_root: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -746,11 +744,11 @@ def test_a_published_series_is_dropped_from_staging_before_the_next_one_starts(
     """
     staged_at_each_render: list[set[str]] = []
 
-    def _look_then_render(artifact: object, path: Path, **kwargs: object) -> Path:
+    def _look_then_render(artifact: object, **kwargs: object) -> str:
         staged_at_each_render.append({p.name for p in staging_root.rglob("*.qa.nc")})
-        return fast_render(artifact, path, **kwargs)
+        return fast_render(artifact, **kwargs)
 
-    monkeypatch.setattr("fmriqa_launcher.session.write_run_page", _look_then_render)
+    monkeypatch.setattr("fmriqa_launcher.session.render_run_page", _look_then_render)
     converter, (first_name, second_name) = stub_series(frames=(40, 40))
     request = RunRequest(
         dicom_dir=dicom_dir,

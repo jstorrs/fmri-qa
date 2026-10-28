@@ -1,6 +1,7 @@
 """Writing a file or moving a directory into place, all or nothing.
 
 `atomic_file` stages a single file beside its destination and moves it in.
+`write_text_atomically` is that for a string already in hand.
 `replace_patiently` is the move itself, also used directly for a staged
 directory.
 
@@ -27,7 +28,7 @@ from collections.abc import Callable, Iterator, Sequence
 from contextlib import contextmanager
 from pathlib import Path
 
-__all__ = ["atomic_file", "replace_patiently"]
+__all__ = ["atomic_file", "replace_patiently", "write_text_atomically"]
 
 # Waits between attempts, about six seconds in all before the error is allowed
 # through. The delays double because the holders differ by orders of magnitude:
@@ -106,3 +107,17 @@ def atomic_file(target: Path) -> Iterator[Path]:
         # A no-op once the rename succeeded. After a failure this must not
         # leave debris beside the target.
         temporary.unlink(missing_ok=True)
+
+
+def write_text_atomically(path: Path | str, text: str) -> Path:
+    """Write `text` to `path` as UTF-8, all or nothing, and return the path.
+
+    Missing parent directories are created. The text is written through
+    `atomic_file`, so a reader never sees a partial file and a failed write
+    leaves an existing `path` untouched.
+    """
+    target = Path(path)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    with atomic_file(target) as temporary:
+        temporary.write_text(text, encoding="utf-8")
+    return target

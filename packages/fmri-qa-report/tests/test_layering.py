@@ -1,64 +1,40 @@
 """The seam: the report half may read the artifact, and nothing else.
 
 Presentation depends on the *published artifact*, not on the pipeline that
-produced it. That is easy to erode one convenient import at a time, so this
-file checks it mechanically. Every `fmriqa` import in the report package must
-land in `fmriqa.analysis` (the artifact), `fmriqa.types` (the shared
-array/option vocabulary), and every `fmriqa_io` import in `fmriqa_io.artifact`
-(the artifact file), `fmriqa_io.rename` (how a finished file is moved into
-place), `fmriqa_io.path_arguments` (wildcards and same-file checks on path
-arguments) or the lazy `fmriqa_io` root, for a name one of those defines. An
-import of
+produced it, and it does no file IO: an artifact in memory in, a string out.
+Reading the artifact file and writing the page belong to the applications, so
+the report depends on `fmri-qa-core` and matplotlib only. That is easy to
+erode one convenient import at a time, so this file checks it mechanically.
+Every `fmriqa` import in the report package must land in `fmriqa.analysis` (the
+artifact) or `fmriqa.types` (the shared array/option vocabulary). An import of
 `fmriqa.metrics`, `fmriqa.pipeline`, `fmriqa.prep` or `fmriqa.load`, of the
-`fmriqa` package as a whole (which pulls all of them), or of any other
-`fmriqa_io` submodule fails this test.
+`fmriqa` package as a whole (which pulls all of them), or of anything from
+`fmriqa_io` fails this test.
 
 That scan reads import *text*, which is necessary but not sufficient. An
 allowed import can still pull in a forbidden module through the `__init__.py`
 of the package it lands in. So the seam is checked twice: statically, over
-every source file, and at runtime, by importing the report package in a fresh
-interpreter and looking at what ended up in `sys.modules`. The runtime check of
+every source file, and at runtime, by importing every report module in a fresh
+interpreter and looking at what ended up in `sys.modules`: no `fmriqa_io`, no
+`fmriqa.pipeline`, `metrics`, `prep` or `load`, and none of the libraries they
+bring (scipy, scikit-image, nibabel, netCDF4). The runtime check of
 the `fmri-qa-report` command is in the fmri-qa-cli tests.
 """
 
 import ast
+import json
+import os
 import subprocess
 import sys
 from pathlib import Path
 
 import pytest
 
-import fmriqa_io
 import fmriqa_report
 
 # The only calculation-side modules presentation is allowed to reach for.
-#
-# `fmriqa_io.rename` has nothing to do with the artifact, but it is a leaf over the
-# standard library, so it cannot bring any calculation code in behind it (the
-# runtime half of this test would catch it if that changed). It carries a
-# policy, how long to outwait a sync client holding a just-written file, that
-# the artifact's writer and the page's writer must agree on. A second copy kept
-# in step by hand is worse.
-#
-# `fmriqa_io.path_arguments` is the same kind of leaf: standard library only. It
-# carries a shell quirk (an unexpanded wildcard) and an overwrite guard that the
-# report must apply the same way as the other commands.
-#
-# `fmriqa_io.artifact` is the artifact file, the one thing the report reads. The
-# `fmriqa_io` root is lazy and imports nothing until a name is used, so a name
-# imported from it is scanned as the submodule that defines it:
-# `from fmriqa_io import scan_from_bytes` is `fmriqa_io.decode`, and
-# `from fmriqa_io import testing` is `fmriqa_io.testing` (see `_from_name`).
-ALLOWED = frozenset(
-    {
-        "fmriqa.analysis",
-        "fmriqa.types",
-        "fmriqa_io",
-        "fmriqa_io.artifact",
-        "fmriqa_io.rename",
-        "fmriqa_io.path_arguments",
-    }
-)
+# `fmriqa_io` is not among them: it is where files are read and written.
+ALLOWED = frozenset({"fmriqa.analysis", "fmriqa.types"})
 
 _SOURCE_ROOT = Path(fmriqa_report.__file__).parent
 
@@ -110,25 +86,8 @@ def _fmriqa_imports(tree: ast.Module) -> set[str]:
             and node.module
             and _from_fmriqa(node.module)
         ):
-            found |= {_from_name(node.module, a.name) for a in node.names}
+            found |= {node.module}
     return found
-
-
-def _from_name(module: str, name: str) -> str:
-    """Return the module `from module import name` reaches.
-
-    The `fmriqa_io` root is lazy, so a name imported from it is scanned as the
-    submodule that defines it, and a name it does not re-export as a submodule.
-    Otherwise `from fmriqa_io import testing` or `scan_from_bytes` would pass as
-    an import of the allowed root.
-    """
-    if module != "fmriqa_io":
-        return module
-    if name in fmriqa_io.__all__:
-        # `fmriqa_io.decode.scan` -> `fmriqa_io.decode`, the submodule scanned.
-        defined_in = getattr(fmriqa_io, name).__module__
-        return ".".join(defined_in.split(".")[:2])
-    return f"{module}.{name}"
 
 
 def test_the_report_package_has_source_to_check() -> None:
@@ -153,26 +112,17 @@ def test_the_check_would_catch_a_pipeline_import() -> None:
     assert _fmriqa_imports(tree) - ALLOWED == {"fmriqa", "fmriqa.pipeline"}
 
 
-def test_the_check_would_catch_an_io_import_beyond_the_artifact_file() -> None:
+def test_the_check_would_catch_any_io_import() -> None:
     """The same control for `fmriqa_io`, whose name `fmriqa` alone would miss."""
-    tree = ast.parse("from fmriqa_io.testing import write_phantom\n")
-    assert _fmriqa_imports(tree) - ALLOWED == {"fmriqa_io.testing"}
-
-
-def test_the_check_sees_a_submodule_imported_from_the_io_root() -> None:
-    """The lazy root is allowed for its re-exports, not as a way around the scan."""
-    tree = ast.parse("from fmriqa_io import load_artifact, testing\n")
-    assert _fmriqa_imports(tree) - ALLOWED == {"fmriqa_io.testing"}
-
-
-def test_the_check_sees_where_a_root_re_export_is_defined() -> None:
-    """A name re-exported from the root is the submodule that defines it.
-
-    `scan_from_bytes` is the scan decoder, calculation-side input the report
-    never needs, even though the root re-exports it.
-    """
-    tree = ast.parse("from fmriqa_io import load_artifact, scan_from_bytes\n")
-    assert _fmriqa_imports(tree) - ALLOWED == {"fmriqa_io.decode"}
+    tree = ast.parse(
+        "import fmriqa_io\n"
+        "from fmriqa_io import load_artifact\n"
+        "from fmriqa_io.rename import atomic_file\n"
+    )
+    assert _fmriqa_imports(tree) - ALLOWED == {
+        "fmriqa_io",
+        "fmriqa_io.rename",
+    }
 
 
 def test_presentation_never_imports_the_launcher() -> None:
@@ -201,3 +151,92 @@ def test_format_agnostic_report_modules_do_not_load_the_drawing_stack(
     assert result.stdout.strip() == "[]", (
         f"importing {module} loaded the drawing stack: {result.stdout}\n{result.stderr}"
     )
+
+
+# Everything the report must not load, by top-level package or dotted prefix: the
+# IO layer, the calculation layers behind the artifact, and their libraries.
+_FORBIDDEN = (
+    "fmriqa_io",
+    "fmriqa.pipeline",
+    "fmriqa.metrics",
+    "fmriqa.prep",
+    "fmriqa.load",
+    "scipy",
+    "skimage",
+    "nibabel",
+    "netCDF4",
+)
+
+_FORBIDDEN_PROBE = f"""
+import importlib
+import json
+import pkgutil
+import sys
+import fmriqa_report
+for info in pkgutil.walk_packages(fmriqa_report.__path__, "fmriqa_report."):
+    importlib.import_module(info.name)
+for name in sys.argv[1:]:
+    importlib.import_module(name)
+forbidden = {_FORBIDDEN!r}
+print(json.dumps({{
+    "report": sorted(m for m in sys.modules if m.split(".")[0] == "fmriqa_report"),
+    "forbidden": sorted(
+        m for m in sys.modules
+        if any(m == f or m.startswith(f + ".") for f in forbidden)
+    ),
+}}))
+"""
+
+
+def _probe(*extra: str, path: Path | None = None) -> dict[str, list[str]]:
+    """Import every report module in a fresh interpreter; report what got loaded.
+
+    `path`, if given, is put first on the interpreter's module search path.
+    """
+    env = dict(os.environ)
+    if path is not None:
+        env["PYTHONPATH"] = os.pathsep.join(
+            [str(path), *filter(None, [env.get("PYTHONPATH")])]
+        )
+    result = subprocess.run(  # noqa: S603 - fixed literal script, not untrusted input
+        [sys.executable, "-c", _FORBIDDEN_PROBE, *extra],
+        capture_output=True,
+        text=True,
+        check=True,
+        env=env,
+    )
+    return json.loads(result.stdout)
+
+
+def _module_name(path: Path) -> str:
+    """Return the dotted module a report source file defines."""
+    parts = path.relative_to(_SOURCE_ROOT.parent).with_suffix("").parts
+    return ".".join(parts[:-1] if parts[-1] == "__init__" else parts)
+
+
+def test_importing_every_report_module_loads_no_forbidden_module() -> None:
+    """The runtime half: no module, however deep, reaches IO or the pipeline."""
+    probed = _probe()
+
+    expected = {_module_name(path) for path in _modules()}
+    assert expected >= {
+        "fmriqa_report.formats.html.run",
+        "fmriqa_report.panels.images",
+    }
+    assert expected <= set(probed["report"]), "the probe did not import every module"
+    assert probed["forbidden"] == []
+
+
+def test_the_runtime_probe_would_see_a_forbidden_module(tmp_path: Path) -> None:
+    """A negative control: the probe reports `fmriqa_io` when something loads it.
+
+    A stub package stands in, so this needs no `fmri-qa-io` installed.
+    """
+    stub = tmp_path / "fmriqa_io"
+    stub.mkdir()
+    (stub / "__init__.py").write_text("")
+    (stub / "rename.py").write_text("")
+
+    probed = _probe("fmriqa_io.rename", path=tmp_path)
+
+    assert "fmriqa_io.rename" in probed["forbidden"]

@@ -928,7 +928,6 @@ source = { editable = "packages/fmri-qa-report" }
 dependencies = [
     { name = "cycler" },
     { name = "fmri-qa-core" },
-    { name = "fmri-qa-io" },
     { name = "matplotlib" },
     { name = "numpy" },
 ]
@@ -937,7 +936,6 @@ dependencies = [
 requires-dist = [
     { name = "cycler", specifier = ">=0.10" },
     { name = "fmri-qa-core", editable = "packages/fmri-qa-core" },
-    { name = "fmri-qa-io", editable = "packages/fmri-qa-io" },
     { name = "matplotlib", specifier = ">=3.10.7" },
     { name = "numpy", specifier = ">=2.3.4" },
 ]

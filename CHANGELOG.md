@@ -20,6 +20,11 @@ versioning when the first stable public interface is released.
 
 ### Changed
 
+- **`write_run_page` is removed; `fmri-qa-report` now depends only on
+  `fmri-qa-core` and matplotlib.** Render with `render_run_page` and write the
+  string. `fmri-qa-io` has `rename.write_text_atomically` for an atomic write. The
+  `fmri-qa-report` command and `fmri-qa-run` write the page that way, and the page
+  is unchanged.
 - **`fmri-qa-report` now installs with `fmri-qa-cli`.** `fmri-qa-report` is a
   library with no commands; install `fmri-qa-cli` for the `fmri-qa-report`
   command; `python -m fmriqa_report` is gone with it. The command itself is

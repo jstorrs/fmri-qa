@@ -17,7 +17,7 @@ presents a result, and the launcher is an application shell on top of all four.
 | **`fmri-qa-core`** | `fmriqa` | the metrics, the pipeline, and the **analysis artifact** they are published as. Pure calculation: it reads no files | numpy, scipy, scikit-image |
 | **`fmri-qa-io`** | `fmriqa_io` | reading and writing files: scans (`load_scan`), the artifact's netCDF-4 file (`save_artifact`, `load_artifact`), and DICOM import through dcm2niix (`import_dicom`) | core, nibabel, numpy; netCDF4 and dcm2niix (not in a browser) |
 | **`fmri-qa-cli`** | `fmriqa_cli` | the `fmri-qa`, `fmri-qa-hilo`, `fmri-qa-import` and `fmri-qa-report` commands | core, io + report |
-| **`fmri-qa-report`** | `fmriqa_report` | plots and a self-contained offline HTML report, built from an artifact. A library: its command, `fmri-qa-report`, is in `fmri-qa-cli` | core + io, matplotlib |
+| **`fmri-qa-report`** | `fmriqa_report` | plots and a self-contained offline HTML report, built from an artifact. A library: its command, `fmri-qa-report`, is in `fmri-qa-cli` | core, matplotlib |
 | **`fmri-qa-launcher`** | `fmriqa_launcher` | one-step DICOM-directory-in, report-directory-out pipeline: a command line and a desktop panel | cli, core, io + report; stdlib `tkinter` for the panel |
 
 Only a `QAArtifact` passes between calculating and presenting. It holds the run's
@@ -82,7 +82,7 @@ the table above, and the comments say what it provides:
 pip install fmri-qa-core      # metrics and artifacts; reads no files
 pip install fmri-qa-io        # + core: reading scans, artifact files, DICOM import
 pip install fmri-qa-cli       # + core, io, report: fmri-qa, fmri-qa-import, fmri-qa-hilo, fmri-qa-report
-pip install fmri-qa-report    # + core, io: plots and self-contained HTML reports (a library)
+pip install fmri-qa-report    # + core: plots and self-contained HTML reports (a library)
 pip install fmri-qa-launcher  # + all four: fmri-qa-run and the desktop panel
 ```
 
@@ -445,12 +445,14 @@ consumer never recomputes a metric.
 ```python
 import fmriqa_io
 import fmriqa_report as report
+from fmriqa_io.rename import write_text_atomically
 
 artifact = fmriqa_io.load_artifact("qa.nc")
 
-report.write_run_page(
-    artifact, "report.html", title="run-1", theme=report.Theme(panel_accent="#1a4d7a")
+page = report.render_run_page(
+    artifact, title="run-1", theme=report.Theme(panel_accent="#1a4d7a")
 )
+write_text_atomically("report.html", page)
 ```
 
 Inside `fmriqa_report`, content is separate from format. `summary` (metadata
@@ -458,8 +460,12 @@ text), `content` (the per-metric catalog), and `panels` (the figures) know nothi
 about HTML. `theme` supplies the `Theme` that drives the matplotlib panels, and
 `formats.html` composes everything into the self-contained page.
 
-The page is written atomically. A rendering failure leaves any existing file
-unchanged and makes the CLI exit non-zero.
+`fmriqa_report` writes nothing: `render_run_page` takes an artifact and returns the
+page as a string, and the application loads the artifact and writes the page.
+`fmri-qa-cli` and `fmri-qa-launcher` write it with
+`fmriqa_io.rename.write_text_atomically`, which moves a finished file into place so
+a reader never sees a partial one. They render first, so a rendering failure leaves
+any existing file unchanged and makes the CLI exit non-zero.
 
 ## License
 

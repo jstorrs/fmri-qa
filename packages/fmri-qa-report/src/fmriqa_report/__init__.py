@@ -7,7 +7,7 @@ layers, so an artifact read back from disk renders the same as a fresh one.
 
 `summary` builds the header text, `content` the per-metric vocabulary, `panels`
 the matplotlib figures, and `formats.html` composes them into one
-self-contained page. `write_run_page` / `render_run_page` are re-exported here
+self-contained page. `render_run_page` is re-exported here
 and resolved lazily, so importing this package doesn't pull in matplotlib.
 
 Panels build `matplotlib.figure.Figure` objects directly and render them with
@@ -21,20 +21,19 @@ from .summary import package_version
 from .theme import DEFAULT_THEME, Theme
 
 if TYPE_CHECKING:
-    # Not the lazy `__getattr__` below, so mypy and pyright resolve both names
+    # Not the lazy `__getattr__` below, so mypy and pyright resolve the name
     # statically. Never executed at runtime.
-    from .formats.html import render_run_page, write_run_page
+    from .formats.html import render_run_page
 
 __all__ = [
     "DEFAULT_THEME",
     "Theme",
     "package_version",
     "render_run_page",
-    "write_run_page",
 ]
 
 # The current driver's public names, resolved on first use.
-_LAZY = frozenset({"render_run_page", "write_run_page"})
+_LAZY = frozenset({"render_run_page"})
 
 
 def __getattr__(name: str) -> object:

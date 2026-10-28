@@ -14,6 +14,7 @@ from pathlib import Path
 from fmriqa.analysis import InvalidArtifactError, QAArtifact
 from fmriqa_io.artifact import load_artifact
 from fmriqa_io.path_arguments import expand_globs, same_file
+from fmriqa_io.rename import write_text_atomically
 from fmriqa_report.summary import package_version
 
 
@@ -74,10 +75,13 @@ def report_main(argv: Sequence[str] | None = None) -> int:
         return 1
 
     # Deferred so `--help` and `--version` never import the renderer.
-    from fmriqa_report.formats.html import write_run_page
+    from fmriqa_report.formats.html import render_run_page
 
+    # Render before touching the destination, so a failed render leaves an
+    # existing report alone and creates no directory.
     try:
-        write_run_page(artifact, args.html, title=_title(artifact, path))
+        page = render_run_page(artifact, title=_title(artifact, path))
+        write_text_atomically(args.html, page)
     except Exception as exc:  # noqa: BLE001 - CLI boundary reports cleanly
         print(f"ERROR: could not write HTML {args.html}: {exc}", file=sys.stderr)
         return 1

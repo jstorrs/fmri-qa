@@ -2,10 +2,13 @@
 
 from pathlib import Path
 
+import numpy as np
 import pytest
 
+import fmriqa as q
 import fmriqa_io
 from fmriqa_cli import report
+from fmriqa_report import render_run_page
 
 
 @pytest.fixture
@@ -142,3 +145,63 @@ def test_a_wildcard_matching_nothing_is_reported_not_dropped(tmp_path, capsys) -
     )
     assert rc == 1
     assert "*.qa.nc" in capsys.readouterr().err
+
+
+def test_a_reloaded_artifact_renders_identically(tmp_path, artifact) -> None:
+    """The seam's payoff: a saved artifact is as good as a freshly computed one."""
+    reloaded = fmriqa_io.load_artifact(
+        fmriqa_io.save_artifact(artifact, tmp_path / "qa.nc")
+    )
+    live = render_run_page(artifact, title="Test run", report_version="report-test")
+    disk = render_run_page(reloaded, title="Test run", report_version="report-test")
+    assert live == disk
+
+
+def test_a_blank_scan_with_an_unresolved_rdc_survives_the_file_and_renders(
+    tmp_path,
+) -> None:
+    """An NaN curve is saved, loaded and drawn: the command writes a page."""
+    artifact = q.analyze(
+        q.QAScan(data=np.zeros((16, 16, 1, 10)), tr=2.0, pe_axis=1),
+        q.AnalysisSettings(roi_size=3, trim_sec=0, detrend_order=0),
+    )
+    path = fmriqa_io.save_artifact(artifact, tmp_path / "blank.nc")
+    html = tmp_path / "blank.html"
+    assert report.report_main([str(path), "--html", str(html)]) == 0
+    assert "Unavailable — estimator unresolved" in html.read_text(encoding="utf-8")
+
+
+def _figure_fails(*_args: object, **_kwargs: object) -> str:
+    raise RuntimeError("figure failure")
+
+
+def test_a_failed_render_leaves_no_file(
+    tmp_path, saved, capsys, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr("fmriqa_report.formats.html.render_run_page", _figure_fails)
+    html = tmp_path / "out" / "report.html"
+
+    rc = report.report_main([saved, "--html", str(html)])
+
+    assert rc == 1
+    assert "figure failure" in capsys.readouterr().err
+    assert not html.exists()
+    assert not html.parent.exists()
+
+
+def test_a_failed_render_leaves_an_existing_report_unchanged(
+    tmp_path, saved, capsys, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Render first, then write: a render failure never reaches the destination."""
+    monkeypatch.setattr("fmriqa_report.formats.html.render_run_page", _figure_fails)
+    out = tmp_path / "out"
+    out.mkdir()
+    html = out / "report.html"
+    html.write_text("previous report", encoding="utf-8")
+
+    rc = report.report_main([saved, "--html", str(html)])
+
+    assert rc == 1
+    assert "figure failure" in capsys.readouterr().err
+    assert html.read_text(encoding="utf-8") == "previous report"
+    assert [path.name for path in out.iterdir()] == ["report.html"]

@@ -38,8 +38,8 @@ import fmriqa
 import fmriqa_io
 from fmriqa_io import ConversionError, ImportedSeries
 from fmriqa_io.paths import nifti_stem
-from fmriqa_io.rename import replace_patiently
-from fmriqa_report.formats.html import write_run_page
+from fmriqa_io.rename import replace_patiently, write_text_atomically
+from fmriqa_report.formats.html import render_run_page
 
 from .exceptions import SessionError
 from .outcome import Failed, Published, Refused, RunResult, SeriesOutcome
@@ -322,7 +322,7 @@ def _publish_series(
 
     progress(Progress(Stage.REPORT, planned.index, planned.total, name))
     try:
-        write_run_page(artifact, report_path, title=name)
+        write_text_atomically(report_path, render_run_page(artifact, title=name))
     except Exception as exc:  # noqa: BLE001 - one series' failure, reported and skipped
         return _failed(name, exc, noted)
 
