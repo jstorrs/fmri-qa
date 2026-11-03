@@ -2,8 +2,10 @@
 
 One self-contained HTML file, `web/dist/fmri-qa.html`, that a user saves and double-clicks. It opens from `file://`
 with no network and no install, and runs fmri-qa under [Pyodide](https://pyodide.org) 314.0.7 (CPython 3.14.2 in
-WebAssembly). This step (step 4) proves the boot only: the page starts Python in a worker, imports `fmriqa_web`, shows
-the boot stages, and answers bridge calls. DICOM intake, conversion, the series list, downloads and notices come later.
+WebAssembly). The page starts Python in a worker in the background, imports `fmriqa_web`, shows the boot stages and
+answers bridge calls (step 4). Meanwhile it takes DICOM, shows the series tree and converts a selection with dcm2niix
+WebAssembly (step 5, "Intake and conversion" below). Run orchestration, the report preview, downloads, zips and notices
+come later.
 
 ## Build
 
@@ -14,7 +16,7 @@ From the repo root:
 | `make web-vendor` | `npm ci` in `web/` (only when `package-lock.json` is newer than the install), then `uv run python scripts/web_vendor.py`: fills the gitignored `web/vendor/` (about 56 MB, downloaded once and cached) and writes `web/vendor/manifest.json` |
 | `make web-check` | the same `npm ci` if needed, then `tsc --noEmit` for the app and the tests, then the vitest unit tests (`test/unit/`) |
 | `make web` | `make web-vendor`, then `vite build` to `web/dist/fmri-qa.html` |
-| `make web-e2e` | `make web`, then `node --test e2e/**/*.test.mjs` in Chrome and Firefox (`E2E_BROWSERS=chrome,firefox,webkit` to choose) |
+| `make web-e2e` | `make web`, then `node --test e2e/**/*.test.mjs` (`boot.test.mjs`, `intake.test.mjs`) in Chrome and Firefox (`E2E_BROWSERS=chrome,firefox,webkit` to choose) |
 
 `scripts/web_vendor.py` collects:
 
@@ -144,6 +146,61 @@ with "no such frame", so the worker test is skipped there, and only there (elsew
 and `worker-src` is for the inline worker. `'wasm-unsafe-eval'` is for compiling the interpreter and the packages'
 shared libraries.
 
+## Intake and conversion
+
+Copied from dicom-util (the sibling app) and kept near-verbatim; `VENDORED.md` lists every file, its
+source commit and each deviation. Python is not involved in this step: it boots in the background and is not needed to
+open or convert.
+
+- **Intake** (`src/shell/intake.ts`, `archive.ts`, `zip-source.ts`, `scan.ts`): "Open folder" (the directory picker where
+  there is one, else a `webkitdirectory` input), "Open files" (DICOM and `.zip`), and drag and drop. A `.zip` is replaced
+  by its entries, one level deep, read lazily. Headers are parsed on the main thread (WebKit cannot read a `File` in a
+  worker on file://). `src/shell/intake-ui.ts` is the wiring, from dicom-util's `main.ts` without its export, viewer,
+  restore-previous-set and folder-listing parts.
+- **Tree** (`src/core/tree.ts`, `src/shell/ui/tree.ts`): Patient, Study, Series with checkboxes, counts (`#counts` data
+  attributes), the skipped/rejected/duplicate lists, and the selection summary (`#summary`).
+- **Convert selected** (`src/shell/conversions.ts`): converts each selected series in turn. The result is a list item
+  `#conversions li[data-series][data-status][data-files][data-sizes]` (`data-series` is the series UID, the other two are
+  JSON arrays of output names and byte sizes), with dcm2niix's warnings and errors below it. The output bytes are kept in
+  memory (until the next conversion) only when the e2e init script sets `window.__e2eKeepOutputs`;
+  `window.__fmriqa.output(seriesUid, name)` then returns one as base64. In normal use only names and sizes are kept.
+  Step 6 replaces this with the run table.
+- **dcm2niix arguments** come from Python: `src/core/convert-args.ts` takes `dcm2niix_flags` from
+  `src/generated/contract.json` and adds `-o /out /in`, the paths of the worker's in-memory filesystem. The flags
+  include `-l o -b y` (integer NIfTI, BIDS sidecar) and `-ba o` (omit patient identifiers, keep dates).
+- **Memory.** The Pyodide worker lives for the whole session. Each conversion runs in a fresh dcm2niix worker, one at a
+  time, terminated afterwards (as in dicom-util), so a wasm abort in dcm2niix (an out-of-memory in its 2 GB heap) does not affect Python. The browser may still share
+  renderer memory between the workers. Files are read on the main thread, one at a time, and transferred to the worker.
+
+### dcm2niix's wasm: embedded, handed over as bytes
+
+`scripts/vite-dcm2niix.mjs` puts `dcm2niix.jpeg.wasm` (984 KB) in the page as one inert gzipped base64 block,
+`<script type="application/octet-stream" id="dcm2niix-wasm" data-gz="1">` (it has no `data-name`, so the Pyodide
+asset reader ignores it). On the first conversion the page decodes and gunzips it (`src/shell/dcm2niix-wasm.ts`) and sends
+each dcm2niix worker its own copy in the `run` message; the worker passes it to the Emscripten glue as `wasmBinary`.
+The glue then fetches nothing. dicom-util lets Vite inline the wasm as a `data:` URL that the glue `fetch`es; here that
+fetch would be blocked by the CSP (no `connect-src`, so `default-src 'none'`), and `noInlinedWasm` would fail the build
+on the `data:application/wasm`.
+
+The glue still names its wasm with `new URL("dcm2niix.jpeg.wasm", import.meta.url)`, which makes Vite emit the inlined
+copy. `classicDcm2niixGlue` (a worker-build plugin, like `classicPyodideAsm`) rewrites that one use to a plain string,
+and the three other `import.meta.url` uses to a fixed URL (one is Node-only; one, `_scriptName`, is read on the worker branch but only to locate files, which `wasmBinary` makes unnecessary, as with Pyodide's); the build fails if the glue's count of uses changes. The
+`@dcm2niix-glue` alias and the `__DCM2NIIX_VERSION__` define (read from the wasm's banner) are as in dicom-util.
+
+**CSP: unchanged.** `noInlinedWasm` is unchanged too. A successful conversion is the proof that nothing was fetched:
+with a fetch, the CSP would block it and the conversion would fail. The dcm2niix worker does not forward
+`securitypolicyviolation` events (the Pyodide worker does), so the e2e test checks the page and the Pyodide worker, and
+the conversions themselves.
+
+The e2e test (`e2e/intake.test.mjs`) opens the repo fixtures `packages/fmri-qa-io/tests/fixtures/dicom-qa/` (36 files,
+1 series) and `dicom/` (2 series, 8 DICOM files and one `generate.py` that is skipped as not DICOM) through the file
+input, and a `.zip` of `dicom-qa` built in the test. It converts the QA series and requires the outputs to be exactly
+one `.nii.gz` and one `.json` whose names, decompressed NIfTI bytes and sidecar equal what native dcm2niix writes for
+the same series (`fmriqa_io.import_dicom(..., names="dcm2niix")`, run in the test's setup with `uv run python`). It
+checks the datatype is an integer type, `scl_slope` is 1, and the sidecar has no `PatientName` or `PatientID`. Its
+last test waits for Python to be ready and checks that the page and the Pyodide worker saw no CSP violation or refused
+fetch and that no request left `file:`, `data:` and `blob:`.
+
 ## Boot timings
 
 Measured by `make web-e2e` on the development machine (headless, `file://`). Each stage is milliseconds since the
@@ -163,11 +220,12 @@ matched native CPython within the test's 1e-9 relative tolerance in all three br
 Most of the time goes to the `import` stage, which imports fmriqa, scipy, scikit-image, nibabel and matplotlib inside
 Pyodide, and to `packages`, which unpacks about 50 MB of wheels. Decoding the embedded base64 takes under a second.
 
-Page size: 67.1 MB (49.4 MB gzipped).
+Page size: 67.7 MB (49.8 MB gzipped); step 5 added 0.6 MB (the wasm, gzipped, is about 0.4 MB of that).
 
 ## WebKit
 
-`E2E_BROWSERS=webkit` passes every boot test, the same as Chrome and Firefox. It needed two fixes, both described under
+`E2E_BROWSERS=webkit make web-e2e` passes every boot test and every intake test (12 of 12, step 5), the same as Chrome and
+Firefox: the dcm2niix conversion of the QA series, from files and from a .zip, gives native dcm2niix's bytes there too. It needed two fixes, both described under
 "Boot path": gunzip without a `Blob`, and pyodide.asm.mjs bundled into the worker instead of loaded from a `blob:` URL.
 It runs in Playwright's WebKit build on Linux, which is not Safari on macOS, so that remains untested. It is left out of
 the default `E2E_BROWSERS` only to keep `make web-e2e` at two browsers, as this step's acceptance asks.

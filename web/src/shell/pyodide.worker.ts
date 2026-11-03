@@ -15,6 +15,7 @@ import createPyodideModule from 'pyodide/pyodide.asm.mjs';
 import type { PyCallable, PyProxy } from 'pyodide/ffi';
 import { decodeBase64, type AssetKind, type EncodedAsset } from '../core/assets';
 import { ASSET_BASE, contentType, routeFetch } from '../core/asset-fetch';
+import { gunzip } from './gunzip';
 import { isToWorker, type BootStage, type FromWorker, type ToWorker } from './pyodide-protocol';
 
 declare const self: DedicatedWorkerGlobalScope;
@@ -31,17 +32,6 @@ self.addEventListener('securitypolicyviolation', (e) => {
   const v = e as SecurityPolicyViolationEvent;
   post({ type: 'violation', directive: v.effectiveDirective, blocked: v.blockedURI });
 });
-
-/** Gunzip without a Blob: WebKit cannot read a Blob inside a worker on file:// (NotReadableError). */
-const gunzip = async (bytes: Uint8Array<ArrayBuffer>): Promise<Uint8Array<ArrayBuffer>> => {
-  const source = new ReadableStream<Uint8Array<ArrayBuffer>>({
-    start(controller) {
-      controller.enqueue(bytes);
-      controller.close();
-    },
-  });
-  return new Uint8Array(await new Response(source.pipeThrough(new DecompressionStream('gzip'))).arrayBuffer());
-};
 
 interface DecodedAsset {
   readonly name: string;

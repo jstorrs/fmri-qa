@@ -3,6 +3,7 @@
 // `securitypolicyviolation` the page's document sees, from before any page script runs, in window.__cspViolations.
 // (The worker reports its own through the page: window.__fmriqa.diagnostics().violations.)
 (() => {
+  window.__e2eKeepOutputs = true; // the page keeps the last conversion's bytes for window.__fmriqa.output
   window.__cspViolations = [];
   document.addEventListener('securitypolicyviolation', (e) => {
     window.__cspViolations.push(`${e.effectiveDirective} ${e.blockedURI} ${e.sourceFile}:${e.lineNumber}`);

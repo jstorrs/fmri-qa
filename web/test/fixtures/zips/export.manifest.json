@@ -1,0 +1,130 @@
+{
+  "archive": "export.zip",
+  "entries": [
+    {
+      "name": "DICOM/",
+      "method": "dir",
+      "source": null
+    },
+    {
+      "name": "DICOM/T1/",
+      "method": "dir",
+      "source": null
+    },
+    {
+      "name": "DICOM/T1/IM0001",
+      "method": "stored",
+      "source": "incoming/mprage_run1/035187.dcm"
+    },
+    {
+      "name": "DICOM/T1/IM0002",
+      "method": "deflated",
+      "source": "incoming/mprage_run1/05ba42.dcm"
+    },
+    {
+      "name": "DICOM/T1/IM0003",
+      "method": "stored",
+      "source": "incoming/mprage_run1/0b081e.dcm"
+    },
+    {
+      "name": "DICOM/T1/IM0004",
+      "method": "deflated",
+      "source": "incoming/mprage_run1/128a8d.dcm"
+    },
+    {
+      "name": "DICOM/T1/IM0005",
+      "method": "stored",
+      "source": "incoming/mprage_run1/16e52c.dcm"
+    },
+    {
+      "name": "DICOM/T1/IM0006",
+      "method": "deflated",
+      "source": "incoming/mprage_run1/19ab19.dcm"
+    },
+    {
+      "name": "DICOM/T1/IM0007",
+      "method": "stored",
+      "source": "incoming/mprage_run1/354a29.dcm"
+    },
+    {
+      "name": "DICOM/T1/IM0008",
+      "method": "deflated",
+      "source": "incoming/mprage_run1/3eeccc.dcm"
+    },
+    {
+      "name": "DICOM/T1/IM0009",
+      "method": "stored",
+      "source": "incoming/mprage_run1/46be8c.dcm"
+    },
+    {
+      "name": "DICOM/T1/IM0010",
+      "method": "deflated",
+      "source": "incoming/mprage_run1/5aea54.dcm"
+    },
+    {
+      "name": "DICOM/T1/IM0011",
+      "method": "stored",
+      "source": "incoming/mprage_run1/878487.dcm"
+    },
+    {
+      "name": "DICOM/T1/IM0012",
+      "method": "deflated",
+      "source": "incoming/mprage_run1/879203.dcm"
+    },
+    {
+      "name": "DICOM/T1/IM0013",
+      "method": "stored",
+      "source": "incoming/mprage_run1/8e89e7.dcm"
+    },
+    {
+      "name": "DICOM/T1/IM0014",
+      "method": "deflated",
+      "source": "incoming/mprage_run1/987de8.dcm"
+    },
+    {
+      "name": "DICOM/T1/IM0015",
+      "method": "stored",
+      "source": "incoming/mprage_run1/bd2feb.dcm"
+    },
+    {
+      "name": "DICOM/T1/IM0016",
+      "method": "deflated",
+      "source": "incoming/mprage_run1/c47bb1.dcm"
+    },
+    {
+      "name": "DICOM/Müller_Jürgen/IM0001",
+      "method": "deflated",
+      "source": "mueller/379736/907408/f21810/119fa0.dcm"
+    },
+    {
+      "name": "DICOM/Müller_Jürgen/IM0002",
+      "method": "deflated",
+      "source": "mueller/379736/907408/f21810/506788.dcm"
+    },
+    {
+      "name": "DICOM/Müller_Jürgen/IM0003",
+      "method": "deflated",
+      "source": "mueller/379736/907408/f21810/dacd63.dcm"
+    },
+    {
+      "name": "DICOM/Müller_Jürgen/IM0004",
+      "method": "deflated",
+      "source": "mueller/379736/907408/f21810/f7d52a.dcm"
+    },
+    {
+      "name": "DICOM/OTHER/dfl.dcm",
+      "method": "stored",
+      "source": "pydicom/dfl.dcm"
+    },
+    {
+      "name": "README.txt",
+      "method": "deflated",
+      "source": null
+    },
+    {
+      "name": "nested/inner.zip",
+      "method": "stored",
+      "source": null
+    }
+  ]
+}

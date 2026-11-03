@@ -59,14 +59,17 @@ export const classicPyodideAsm = (scriptUrl) => {
       return { code: code.replaceAll('import.meta.url', JSON.stringify(scriptUrl)), map: null };
     },
     buildEnd(error) {
-      if (!error && !transformed) throw new Error('classic-pyodide-asm: the worker build never loaded node_modules/pyodide/pyodide.asm.mjs');
+      // The worker plugins list is shared by every worker build; only the Pyodide worker's build must have loaded the module.
+      const isPyodideWorker = [...this.getModuleIds()].some((id) => id.endsWith('/src/shell/pyodide.worker.ts'));
+      if (!error && isPyodideWorker && !transformed) throw new Error('classic-pyodide-asm: the worker build never loaded node_modules/pyodide/pyodide.asm.mjs');
     },
   };
 };
 
 /**
  * For the page: fail the build if any wasm was inlined as a `data:` URL. Every wasm reaches the page through the
- * manifest, as base64 in an inert block; a `data:application/wasm` means a copy slipped into a bundle as well.
+ * manifest (or, for dcm2niix, the `#dcm2niix-wasm` block, scripts/vite-dcm2niix.mjs), as base64 in an inert block; a
+ * `data:application/wasm` means a copy slipped into a bundle as well.
  */
 export const noInlinedWasm = () => ({
   name: 'no-inlined-wasm',

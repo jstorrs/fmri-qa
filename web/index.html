@@ -11,15 +11,53 @@
 @media (prefers-color-scheme: dark) { :root { --bg: #161616; --fg: #e8e8e8; --muted: #999; } }
 body { background: var(--bg); color: var(--fg); font: 14px/1.4 system-ui, sans-serif; max-width: 56rem; margin: 1rem auto; padding: 0 16px; }
 h1 { font-size: 1.2rem; }
+h2 { font-size: 1rem; margin: 1.5rem 0 .5rem; }
+/* Read by screen readers only. */
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+button { font: inherit; padding: .3rem .8rem; }
+.pick { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; }
+#drop { border: 2px dashed var(--muted); border-radius: 6px; padding: 1rem; margin: .5rem 0; color: var(--muted); text-align: center; }
+body.dragging #drop { border-color: var(--fg); color: var(--fg); }
+#progress { width: 100%; }
+.tree details { margin-left: 1rem; }
+.tree .row { display: flex; gap: .6rem; align-items: baseline; padding: .15rem 0; }
+.tree .title { flex: 1; display: flex; gap: .5rem; align-items: baseline; }
+.tree .chip, .tree .meta, .tree .pid, .tree .date { color: var(--muted); }
+#conversions li[data-status="failed"] { color: #b00020; }
 pre { white-space: pre-wrap; overflow-wrap: anywhere; color: var(--muted); }
 </style>
 </head>
-<body data-python="booting">
+<body data-python="booting" data-state="empty">
 <h1>fmri-qa</h1>
 <p id="python-status" role="status">Starting Python. This takes about a minute.</p>
 <ol id="python-stages"></ol>
 <pre id="python-error"></pre>
 <pre id="python-contract"></pre>
+
+<h2>DICOM</h2>
+<div class="pick">
+  <button type="button" data-action="open-folder">Open folder</button>
+  <button type="button" data-action="open-files">Open files</button>
+  <span>DICOM files, a folder, or .zip archives</span>
+</div>
+<input type="file" id="open-folder" webkitdirectory hidden>
+<input type="file" id="open-files" multiple hidden>
+<div id="drop">Drop DICOM files, folders or .zip archives here</div>
+<div role="status" id="status" class="sr-only"></div>
+<progress id="progress" hidden></progress>
+<p><span id="progress-text"></span> <button type="button" id="cancel" hidden>Cancel</button></p>
+<p id="outcome" role="status"></p>
+<p id="counts" role="status" tabindex="-1"></p>
+<div id="tree-host"></div>
+<div id="skipped-host"></div>
+<p id="summary"></p>
+<p class="pick">
+  <button type="button" id="select-all">Select all</button>
+  <button type="button" id="select-none">Select none</button>
+  <button type="button" id="convert" disabled>Convert selected</button>
+</p>
+<ul id="conversions"></ul>
+<details id="log" hidden><summary>Messages</summary><ul id="log-list"></ul></details>
 <script type="module" src="/src/main.ts"></script>
 </body>
 </html>

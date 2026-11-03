@@ -1,6 +1,6 @@
 // Browser adapter for e2e: one small page API over puppeteer-core (chrome, firefox) and playwright-core (webkit).
 // Trimmed from dicom-util's e2e/browsers.mjs at fe0d59e: no dialogs, mouse, keyboard or viewport helpers, which this page
-// does not need yet; the browser locations and environment overrides are the same (see e2e/README.md there).
+// does not need yet (`setFiles` and `click` are the only input helpers); the browser locations and environment overrides are the same (see e2e/README.md there).
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -46,6 +46,8 @@ const puppeteerPage = (page, bidiGap) => {
     console,
     addInitScript: (source) => page.evaluateOnNewDocument(source),
     goto: (url) => page.goto(url, { timeout: 120000 }),
+    setFiles: async (selector, files) => (await page.$(selector)).uploadFile(...files),
+    click: (selector) => page.click(selector),
     waitFor: (fn, arg, timeout = 30000) => page.waitForFunction(fn, { timeout, polling: 500 }, arg),
     evaluate: (fn, arg) => page.evaluate(fn, arg),
     evaluateInWorker: (fn) => evaluateInWorker(page.workers(), fn, bidiGap),
@@ -83,6 +85,8 @@ const playwrightPage = (page) => {
     console,
     addInitScript: (source) => page.addInitScript({ content: source }),
     goto: (url) => page.goto(url, { timeout: 120000 }),
+    setFiles: (selector, files) => page.setInputFiles(selector, files),
+    click: (selector) => page.click(selector),
     waitFor: (fn, arg, timeout = 30000) => page.waitForFunction(fn, arg, { timeout, polling: 500 }),
     evaluate: (fn, arg) => page.evaluate(fn, arg),
     evaluateInWorker: (fn) => evaluateInWorker(page.workers(), fn),

@@ -1,6 +1,8 @@
 node_modules/
 dist/
 vendor/
+# The repo root ignores *.zip; this one is a test fixture (zip tests read it).
+!test/fixtures/zips/export.zip
 test/fixtures/boot/
 *.tsbuildinfo
 .vite/
