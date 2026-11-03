@@ -20,6 +20,12 @@ versioning when the first stable public interface is released.
 
 ### Changed
 
+- **The `--json` record is built in `fmri-qa-core`
+  (`fmriqa.analysis.record`), not in `fmri-qa-cli`.** `metric_record`,
+  `config_record`, `JSON_SCHEMA_VERSION` and the new `record_document`, which
+  builds the whole document, moved there so any front end can write the same
+  record. `fmriqa_cli.record` is removed. The output of `fmri-qa --json` is
+  unchanged.
 - **`write_run_page` is removed; `fmri-qa-report` now depends only on
   `fmri-qa-core` and matplotlib.** Render with `render_run_page` and write the
   string. `fmri-qa-io` has `rename.write_text_atomically` for an atomic write. The

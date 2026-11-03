@@ -14,6 +14,7 @@ from pathlib import Path
 
 import fmriqa as q
 import fmriqa_io
+from fmriqa.analysis.record import metric_record, record_document
 from fmriqa_io.path_arguments import expand_globs
 
 from .arguments import (
@@ -29,7 +30,6 @@ from .destinations import (
     report_destination_problems,
     write_artifact,
 )
-from .record import JSON_SCHEMA_VERSION, config_record, metric_record
 from .table import format_row, header_lines
 
 
@@ -175,13 +175,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 errors.append({"scan": name, "source": str(path), "error": problem})
 
     if args.json:
-        document = {
-            "schema_version": JSON_SCHEMA_VERSION,
-            "config": config_record(settings),
-            "requested": list(args.paths),
-            "scans": records,
-            "errors": errors,
-        }
+        document = record_document(settings, args.paths, records, errors)
         json.dump(document, sys.stdout, indent=2, allow_nan=False)
         print()
     if errors:

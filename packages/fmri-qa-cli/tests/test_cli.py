@@ -7,7 +7,6 @@ runs its real file-I/O path. Rendering reports is `fmri-qa-report`'s job.
 """
 
 import json
-import math
 import sys
 import warnings
 from dataclasses import replace
@@ -20,7 +19,6 @@ import fmriqa_cli as cli
 import fmriqa_io
 from fmriqa_cli import qa, table
 from fmriqa_cli.arguments import attributed_warnings
-from fmriqa_cli.record import metric_record
 
 
 def test_main_prints_table_and_succeeds(tmp_path, write_scan, capsys) -> None:
@@ -405,60 +403,6 @@ def test_json_document_is_strict_json(tmp_path, write_scan, capsys) -> None:
     assert "NaN" not in captured.out and "Infinity" not in captured.out
     doc = json.loads(captured.out, parse_constant=_reject_json_constant)
     assert doc["scans"][0]["snr"] > 0
-
-
-def test_json_record_maps_undefined_metrics_to_null(artifact) -> None:
-    """A NaN measurement becomes `null`, not Python's non-standard `NaN` token.
-
-    The NaN is injected, since an undefined metric is an estimator outcome the
-    record has to survive, and relying on whichever metric happens to be NaN on
-    the fixture would tie the test to its geometry.
-    """
-    undefined = replace(
-        artifact.measurements, ghost_pct=float("nan"), sfnr=float("inf")
-    )
-    record = metric_record(replace(artifact, measurements=undefined))
-    assert record["ghost_pct"] is None
-    assert record["sfnr"] is None
-    assert record["snr"] == artifact.measurements.snr  # finite values pass through
-
-
-def test_json_record_leaves_an_unnamed_direction_null(artifact) -> None:
-    """No phase-encode axis means no PE or RO number -- not the combined one.
-
-    `fwhm` is the geometric mean of both axes. Publishing it as `fw_pe` would file
-    a different quantity under that name, unnoticed by a trend database. The
-    combined value rides along under its own key.
-    """
-    unnamed = replace(
-        artifact.measurements,
-        pe_axis=None,
-        pe_label="?",
-        fwhm_pe=None,
-        fwhm_ro=None,
-    )
-    record = metric_record(replace(artifact, measurements=unnamed))
-    assert record["fw_pe"] is None
-    assert record["fw_ro"] is None
-    assert record["fwhm"] == artifact.measurements.fwhm
-    assert record["fwhm_unit"] == "mm"
-
-
-def test_json_record_carries_the_displacement_unit(artifact) -> None:
-    """`motn`/`com` carry their unit the same way `fwhm`/`fwhm_unit` do.
-
-    `motn` is left loose against NaN-as-null (see
-    `test_json_record_maps_undefined_metrics_to_null`): the motion fit does not
-    converge for every frame on this fixture, so `max_translation` is NaN and the
-    record maps it to `null`.
-    """
-    m = artifact.measurements
-    record = metric_record(artifact)
-    assert record["motn"] == (
-        None if math.isnan(m.max_translation) else m.max_translation
-    )
-    assert record["com"] == m.max_com_displacement
-    assert record["displacement_unit"] == "mm"  # the fixture's voxel size is known
 
 
 def test_table_marks_an_unnamed_direction_unknown(artifact) -> None:

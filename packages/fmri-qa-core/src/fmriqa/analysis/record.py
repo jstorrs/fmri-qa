@@ -1,31 +1,34 @@
-"""The `--json` document: the same metrics as a record a trend database can file.
+"""The published JSON record: the same metrics as a row a trend database can file.
 
-Mirrors the table's columns as raw numbers instead of fixed-width text, with
-enough provenance that a stored row still means something months later. The
-layout is a published contract pinned by `JSON_SCHEMA_VERSION`. Adding or
-renaming a field means editing it here and bumping the version.
+This is what `fmri-qa --json` writes. It mirrors the table's columns as raw
+numbers instead of fixed-width text, with enough provenance that a stored row
+still means something months later. The layout is a published contract pinned
+by `JSON_SCHEMA_VERSION`. Adding or renaming a field means editing it here and
+bumping the version.
+
+Pure: it maps an artifact and settings to plain data and does no IO, so the
+command line and any other front end build the identical record. Only the
+artifact, settings and version modules are imported, so importing this does not
+load the pipeline (see `fmriqa.analysis`).
 """
 
-# The `q.*` parameter annotations below name artifact types behind `fmriqa`'s
-# lazy re-exports. Evaluated at `def` time, they would load `fmriqa.analysis`
-# just to import this module. Deferring them avoids that. That `--help` stays
-# off scipy and scikit-image is checked by `tests/test_startup.py`.
-from __future__ import annotations
-
 import math
+from collections.abc import Mapping, Sequence
 
-import fmriqa as q
+from ..settings import AnalysisSettings
+from ..version import core_version
+from .artifact import QAArtifact
 
 JSON_SCHEMA_VERSION = 6
 
 
-def metric_record(artifact: q.QAArtifact) -> dict[str, object]:
+def metric_record(artifact: QAArtifact) -> dict[str, object]:
     """Build the scalar metrics for one scan as a JSON-serializable record.
 
     Mirrors the human table's columns as raw numbers, so downstream tools can
-    read `--json` directly. The table's one `loc` cell is three fields here: the
-    measured fraction, the contrast and both verdicts, which the trend database
-    needs.
+    read the published JSON record directly. The table's one `loc` cell is three
+    fields here: the measured fraction, the contrast and both verdicts, which the
+    trend database needs.
 
     A directional FWHM the run could not name (no phase-encode axis) is `null`,
     with the combined `fwhm` and its `fwhm_unit` alongside. `motn` and `com`
@@ -89,20 +92,43 @@ def metric_record(artifact: q.QAArtifact) -> dict[str, object]:
         "fwhm_unit": m.fwhm_unit,  # "mm", or "vox" when the voxel size is unknown
     }
     # Undefined numerical metrics are JSON null, not Python's non-standard NaN
-    # or Infinity tokens, so strict JSON parsers can read stdout.
+    # or Infinity tokens, so strict JSON parsers can read the record.
     return {
         key: None if isinstance(value, float) and not math.isfinite(value) else value
         for key, value in record.items()
     }
 
 
-def config_record(settings: q.AnalysisSettings) -> dict[str, object]:
-    """Build the run parameters echoed into the JSON document's header."""
+def config_record(settings: AnalysisSettings) -> dict[str, object]:
+    """Build the run parameters echoed into the JSON record's header."""
     return {
-        "version": q.core_version(),
+        "version": core_version(),
         "detrend": settings.detrend,
         "trim_sec": settings.trim_sec,
         "center": settings.center,
         "roi_size": settings.roi_size,
         "pe_axis_override": settings.pe_axis_override,
+    }
+
+
+def record_document(
+    settings: AnalysisSettings,
+    requested: Sequence[str],
+    scans: Sequence[Mapping[str, object]],
+    errors: Sequence[Mapping[str, str]],
+) -> dict[str, object]:
+    """Wrap per-scan records in the envelope `fmri-qa --json` writes.
+
+    `requested` lists every path asked for, so a scan that failed is told apart
+    from one never requested. `scans` are `metric_record` results for the scans
+    that succeeded, and `errors` the failures. The lists are copied, so the
+    result shares no mutable state with the arguments and is JSON-serializable
+    when they are.
+    """
+    return {
+        "schema_version": JSON_SCHEMA_VERSION,
+        "config": config_record(settings),
+        "requested": list(requested),
+        "scans": list(scans),
+        "errors": list(errors),
     }
