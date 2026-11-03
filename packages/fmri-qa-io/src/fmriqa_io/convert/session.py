@@ -22,7 +22,6 @@ Staging is created inside the destination so the move is a rename within one
 filesystem, not a copy, and is removed whether or not the import succeeds.
 """
 
-import json
 import shutil
 import tempfile
 from collections import Counter
@@ -30,7 +29,6 @@ from collections.abc import Sequence
 from contextlib import suppress
 from dataclasses import dataclass
 from pathlib import Path
-from typing import assert_never
 
 from fmriqa.convert import naming
 from fmriqa.convert.dcm2niix import (
@@ -47,6 +45,7 @@ from fmriqa.warn import warn
 from ..exceptions import ConversionError
 from ..paths import NIFTI_SUFFIXES, nifti_stem, sidecar_path
 from ..rename import replace_patiently
+from . import filing
 from .dcm2niix import find_dcm2niix, run
 
 # How `import_dicom` and `fmri-qa-import` name files unless told otherwise.
@@ -92,45 +91,10 @@ def _read_sidecar(path: Path) -> Sidecar | None:
     """
     beside = sidecar_path(path)
     try:
-        parsed = json.loads(beside.read_text())
-    except (OSError, ValueError):
+        text = beside.read_text()
+    except (OSError, ValueError):  # ValueError: undecodable text
         return None
-    return parsed if isinstance(parsed, dict) else None
-
-
-def _refiled(name: str, stem: str, target: str) -> str:
-    """Swap the leading `stem` of `name` for `target`.
-
-    A slice, not `str.replace`, which would also rewrite a later occurrence.
-    `_plan_files` matches on `stem + "."`, so the stem is always a prefix.
-    """
-    return target + name[len(stem) :]
-
-
-def _plan_files(
-    staged: Sequence[Path], destination: Path, chosen: dict[str, str]
-) -> dict[str, list[tuple[Path, Path]]]:
-    """Assign each NIfTI and companion one destination before any file moves.
-
-    Return each stem's `(staged, target)` moves, keyed by the stem.
-
-    NIfTIs belong to their parsed stem: `x.nii.gz` belongs to `x` even when
-    another series has stem `x.nii`. Other files belong to the longest matching
-    stem, so `scan.repeat.json` travels with `scan.repeat`, never `scan`.
-    """
-    stems = sorted(chosen, key=len, reverse=True)
-    planned: dict[str, list[tuple[Path, Path]]] = {stem: [] for stem in chosen}
-    for path in staged:
-        if path.name.endswith(NIFTI_SUFFIXES):
-            stem: str | None = nifti_stem(path)
-        else:
-            stem = next(
-                (stem for stem in stems if path.name.startswith(f"{stem}.")), None
-            )
-        if stem is not None:
-            target = destination / _refiled(path.name, stem, chosen[stem])
-            planned[stem].append((path, target))
-    return planned
+    return filing.sidecar_or_none(text)
 
 
 def import_dicom(
@@ -166,7 +130,7 @@ def import_dicom(
         any file moves, and a move that fails is undone.
     """
     # Guarded up front so an untyped caller still gets the named error.
-    # `_file_series` then matches exhaustively: its `assert_never` is
+    # `filing.plan_names` then matches exhaustively: its `assert_never` is
     # unreachable for a `NameStyle`, so adding a style to that Literal is a type
     # error, not a silent fall-through at runtime.
     if names not in NAME_STYLES:
@@ -231,31 +195,30 @@ def _file_series(
     staged = sorted(staging.iterdir())
     produced = [path for path in staged if path.name.endswith(NIFTI_SUFFIXES)]
     sidecars = {nifti_stem(path): _read_sidecar(path) for path in produced}
-    match names:
-        case "qa":
-            chosen = naming.plan(sidecars)
-        case "dcm2niix":
-            chosen = {stem: stem for stem in sidecars}
-        case _:
-            assert_never(names)
-    by_stem = _plan_files(staged, destination, chosen)
+    filings = filing.plan_names([path.name for path in staged], sidecars, names)
+    # Each series' moves, keyed by its dcm2niix stem. Files `plan_names` left out
+    # belong to no series and stay in staging, which is then removed.
+    by_stem: dict[str, list[tuple[Path, Path]]] = {stem: [] for stem in sidecars}
+    for path in staged:
+        if (placed := filings.get(path.name)) is not None:
+            by_stem[placed.stem].append((path, destination / placed.name))
     planned = [move for moves in by_stem.values() for move in moves]
     _refuse_collisions(planned, destination, force)
     _file_atomically(planned, destination)
 
-    filed = []
+    described = []
     for path in produced:
         stem = nifti_stem(path)
-        target = chosen[stem]
-        filed.append(
+        target = destination / filings[path.name].name
+        described.append(
             _describe(
-                destination / _refiled(path.name, stem, target),
+                target,
                 [moved for _, moved in by_stem[stem]],
                 sidecars[stem] or {},
-                renamed_from=stem if target != stem else None,
+                renamed_from=stem if target.name != path.name else None,
             )
         )
-    return tuple(sorted(filed, key=lambda entry: entry.path.name))
+    return tuple(sorted(described, key=lambda entry: entry.path.name))
 
 
 def _refuse_collisions(

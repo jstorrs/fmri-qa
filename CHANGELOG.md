@@ -17,6 +17,11 @@ versioning when the first stable public interface is released.
 - **`fmriqa.testing`, the synthetic phantom the tests and docs measure
   against.** `synthetic_series` builds the array and `phantom_scan` the scan;
   `fmriqa_io.testing.write_phantom` writes it as a NIfTI + sidecar.
+- **`fmriqa_io.convert.filing.plan_names`, the import's file naming as a pure
+  function.** It maps the filenames dcm2niix wrote, and their sidecars, to the
+  names `import_dicom` files them under, with no filesystem, so a browser can
+  name files exactly as the command line does. `import_dicom` calls it; the
+  names on disk are unchanged.
 
 ### Changed
 

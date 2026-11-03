@@ -2,7 +2,9 @@
 
 `dcm2niix` finds and runs the converter with the flags `fmriqa.convert.dcm2niix`
 pins, and `session` is the whole import: convert into a staging directory, name
-the results by `fmriqa.convert.naming`, move them into place.
+the results, move them into place. The QA name rule lives in
+`fmriqa.convert.naming`. `filing` applies it to a list of filenames and their
+sidecars with no filesystem, so a page with no files names them the same way.
 
 **Why this converts rather than reads.** `fmri-qa` takes NIfTI, and DICOM
 support means running dcm2niix, not parsing DICOM. That is a deliberate scope

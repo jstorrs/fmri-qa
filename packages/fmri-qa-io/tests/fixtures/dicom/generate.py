@@ -1,12 +1,25 @@
-"""Regenerate the miniature DICOM study `test_import_real_dicom.py` imports.
+"""Regenerate the synthetic DICOM studies the import tests convert.
 
 Committed rather than generated at test time because pydicom is not a
 dependency of either distribution (it lives in the workspace's `notebooks`
 group), and a test that skipped without it would skip everywhere that matters.
-The files are synthetic: a 16x16 disc phantom, two slices, two volumes, two
-series. Nothing came from a scanner and no patient exists.
+The files are synthetic: disc phantoms with a little noise. Nothing came from a
+scanner and no patient exists (PatientName is `QA^PHANTOM`).
 
-The two series make the importer prove:
+Two studies are committed, both from this script:
+
+* `dicom/`, the defaults: 16x16, two slices, two volumes, two series. Too short
+  to analyze (`MIN_ANALYSIS_FRAMES` after the warm-up trim), which is fine for
+  the naming and conversion tests it serves. Its UIDs came from random
+  `generate_uid()` calls, so **regenerating it with the defaults changes every
+  byte of the UIDs**; do not, unless the fixture has to change.
+* `dicom-qa/`, one series (2), 48x48, three slices, twelve volumes at TR 2 s:
+  converts *and* analyzes with the default settings (48 wide so the default
+  21x21 ROI fits inside the disc; 32 did not). With `--seed` the UIDs are
+  derived from the seed and the noise from it too, so regenerating is
+  byte-identical for the same pydicom and numpy versions.
+
+The two series of `dicom/` make the importer prove:
 
 * series **2** and **11** sort wrongly under dcm2niix's unpadded `%s` and
   rightly under the zero-padded QA name;
@@ -15,11 +28,17 @@ The two series make the importer prove:
 * distinct `SeriesTime`s under one `StudyTime`, which dcm2niix's `%t` cannot
   express (it is the study's time, the same for both).
 
-Run from the workspace root, after `make sync-notebooks`:
+Run from the workspace root:
 
-    uv run python packages/fmri-qa-io/tests/fixtures/dicom/generate.py
+    uv run --group notebooks python \\
+        packages/fmri-qa-io/tests/fixtures/dicom/generate.py \\
+        --seed 1 --dim 48 --slices 3 --volumes 12 \\
+        --series 2:QA_EPI_ISO:143012.500000 \\
+        --out packages/fmri-qa-io/tests/fixtures/dicom-qa
 """
 
+import argparse
+from collections.abc import Sequence
 from pathlib import Path
 
 import numpy as np
@@ -27,7 +46,6 @@ from pydicom.dataset import Dataset, FileMetaDataset
 from pydicom.uid import ExplicitVRLittleEndian, generate_uid
 
 HERE = Path(__file__).parent
-DIM, N_SLICE, N_VOL = 16, 2, 2
 
 # (series number, description, series time)
 SERIES = (
@@ -36,46 +54,86 @@ SERIES = (
 )
 
 
-def build() -> None:
-    """Write the study under this directory, one folder per series."""
-    study_uid = generate_uid()
-    for number, description, series_time in SERIES:
-        series_uid = generate_uid()
-        for volume in range(N_VOL):
-            for index in range(N_SLICE):
-                ds = _instance(study_uid, series_uid, number, description, series_time)
-                ds.InstanceNumber = volume * N_SLICE + index + 1
+def build(
+    out: Path = HERE,
+    *,
+    dim: int = 16,
+    n_slice: int = 2,
+    n_vol: int = 2,
+    series: Sequence[tuple[int, str, str]] = SERIES,
+    seed: int | None = None,
+) -> None:
+    """Write the study under `out`, one folder per series.
+
+    With `seed` None the UIDs are random and the noise is the original
+    per-slice sequence, which is how `dicom/` was made. With a seed both are
+    derived from it, so the same arguments give the same bytes.
+    """
+    study_uid = _uid(seed, "study")
+    for number, description, series_time in series:
+        series_uid = _uid(seed, "series", number)
+        for volume in range(n_vol):
+            for index in range(n_slice):
+                ds = _instance(
+                    dim, study_uid, series_uid, number, description, series_time
+                )
+                ds.InstanceNumber = volume * n_slice + index + 1
+                ds.SOPInstanceUID = _uid(seed, "instance", number, ds.InstanceNumber)
+                ds.file_meta.MediaStorageSOPInstanceUID = ds.SOPInstanceUID
                 ds.AcquisitionNumber = volume + 1
-                ds.ImagePositionPatient = [-24.0, -24.0, float(index) * 4.0]
+                ds.ImagePositionPatient = [
+                    -dim * 1.5,
+                    -dim * 1.5,
+                    float(index) * 4.0,
+                ]
                 ds.SliceLocation = float(index) * 4.0
-                ds.PixelData = _phantom(volume, index).tobytes()
+                ds.PixelData = _phantom(dim, seed, number, volume, index).tobytes()
 
-                out = HERE / f"series{number:03d}" / f"{ds.InstanceNumber:04d}.dcm"
-                out.parent.mkdir(parents=True, exist_ok=True)
-                ds.save_as(out, enforce_file_format=True)
+                path = out / f"series{number:03d}" / f"{ds.InstanceNumber:04d}.dcm"
+                path.parent.mkdir(parents=True, exist_ok=True)
+                ds.save_as(path, enforce_file_format=True)
 
 
-def _phantom(volume: int, index: int) -> np.ndarray:
+def _uid(seed: int | None, *parts: object) -> str:
+    """A fresh UID, or one derived from `seed` and `parts` when seeded."""
+    if seed is None:
+        return generate_uid()
+    # One separated string: pydicom joins `entropy_srcs` with nothing, so
+    # separate parts would let ("instance", 2, 11) and ("instance", 21, 1) collide.
+    return generate_uid(entropy_srcs=[":".join(map(str, (seed, *parts)))])
+
+
+def _phantom(
+    dim: int, seed: int | None, number: int, volume: int, index: int
+) -> np.ndarray:
     """A bright disc on a dim background, with a little noise."""
-    rng = np.random.default_rng(volume * 10 + index)
-    y, x = np.ogrid[:DIM, :DIM]
-    disc = ((x - DIM / 2) ** 2 + (y - DIM / 2) ** 2) < (DIM / 3) ** 2
-    return (np.where(disc, 1000, 20) + rng.integers(0, 10, (DIM, DIM))).astype(
+    rng = np.random.default_rng(
+        volume * 10 + index if seed is None else [seed, number, volume, index]
+    )
+    y, x = np.ogrid[:dim, :dim]
+    disc = ((x - dim / 2) ** 2 + (y - dim / 2) ** 2) < (dim / 3) ** 2
+    return (np.where(disc, 1000, 20) + rng.integers(0, 10, (dim, dim))).astype(
         np.uint16
     )
 
 
 def _instance(
-    study_uid: str, series_uid: str, number: int, description: str, series_time: str
+    dim: int,
+    study_uid: str,
+    series_uid: str,
+    number: int,
+    description: str,
+    series_time: str,
 ) -> Dataset:
-    """One MR image instance, minus the per-slice fields the caller sets."""
+    """One MR image instance, minus the per-slice fields the caller sets.
+
+    Those are the instance number and UID, the position and the pixels.
+    """
     ds = Dataset()
     ds.file_meta = FileMetaDataset()
     ds.file_meta.MediaStorageSOPClassUID = "1.2.840.10008.5.1.4.1.1.4"
-    ds.file_meta.MediaStorageSOPInstanceUID = generate_uid()
     ds.file_meta.TransferSyntaxUID = ExplicitVRLittleEndian
     ds.SOPClassUID = ds.file_meta.MediaStorageSOPClassUID
-    ds.SOPInstanceUID = ds.file_meta.MediaStorageSOPInstanceUID
 
     ds.PatientName = "QA^PHANTOM"
     ds.PatientID = "QA001"
@@ -90,7 +148,7 @@ def _instance(
     ds.SeriesNumber = number
     ds.SeriesDescription = description
     ds.ProtocolName = "ep2d_bold_qa"
-    ds.SequenceName = "epfid2d1_16"
+    ds.SequenceName = f"epfid2d1_{dim}"
 
     ds.MRAcquisitionType = "2D"
     ds.RepetitionTime = 2000.0
@@ -102,7 +160,7 @@ def _instance(
     ds.SpacingBetweenSlices = 4.0
     ds.PixelSpacing = [3.0, 3.0]
 
-    ds.Rows = ds.Columns = DIM
+    ds.Rows = ds.Columns = dim
     ds.SamplesPerPixel = 1
     ds.PhotometricInterpretation = "MONOCHROME2"
     ds.BitsAllocated = 16
@@ -112,5 +170,38 @@ def _instance(
     return ds
 
 
+def _series_arg(text: str) -> tuple[int, str, str]:
+    """Parse `NUMBER:DESCRIPTION:SERIESTIME`."""
+    number, description, series_time = text.split(":", 2)
+    return int(number), description, series_time
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
+    parser.add_argument("--out", type=Path, default=HERE)
+    parser.add_argument("--dim", type=int, default=16)
+    parser.add_argument("--slices", type=int, default=2)
+    parser.add_argument("--volumes", type=int, default=2)
+    parser.add_argument(
+        "--series",
+        type=_series_arg,
+        action="append",
+        metavar="NUMBER:DESCRIPTION:SERIESTIME",
+        help="repeatable; default is the two series in SERIES",
+    )
+    parser.add_argument(
+        "--seed", type=int, default=None, help="make UIDs and noise reproducible"
+    )
+    args = parser.parse_args()
+    build(
+        args.out,
+        dim=args.dim,
+        n_slice=args.slices,
+        n_vol=args.volumes,
+        series=args.series or SERIES,
+        seed=args.seed,
+    )
+
+
 if __name__ == "__main__":
-    build()
+    main()

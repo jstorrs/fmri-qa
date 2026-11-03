@@ -493,9 +493,10 @@ Four rules make such a split hold:
   the IO package, with a `sys_platform != 'emscripten'` marker so a browser install skips
   it. Test it: an isolation test fails on any forbidden import in the pure side's sources,
   imports every module in a fresh interpreter, and checks the declared requirements, and a
-  packaging test evaluates the markers. The browser-safe part of the IO package
-  (`fmriqa_io.decode`) is held to an import allowlist by
-  `tests/test_decode_isolation.py`.
+  packaging test evaluates the markers. The browser-safe parts of the IO package
+  are `fmriqa_io.decode` and `fmriqa_io.convert.filing` (file naming, with no
+  filesystem); each is held to an import allowlist by its own isolation test,
+  `tests/test_decode_isolation.py` and `tests/test_filing_isolation.py`.
 - **Enforce the direction mechanically.** A rule like "the report half must not import the
   pipeline" erodes one convenient import at a time. Make it a test: parse the consuming
   package's sources and fail on any import outside the allowlist. Check the packaging claim

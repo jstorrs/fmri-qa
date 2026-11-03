@@ -68,6 +68,12 @@
 .. autofunction:: fmriqa.types.readout_axis
 ```
 
+## `fmriqa_io.convert.filing`
+
+```{eval-rst}
+.. automodule:: fmriqa_io.convert.filing
+```
+
 ## `fmriqa_io.paths`
 
 ```{eval-rst}
