@@ -8,9 +8,10 @@ ghosting ratio). It renders a self-contained offline HTML report per scan.
 
 ## The packages
 
-The project ships as five installable packages. Core calculates and reads no
+The project ships as five installable packages, plus a private sixth. Core calculates and reads no
 files. IO reads and writes them. The command line is a shell over both. Report
 presents a result, and the launcher is an application shell on top of all four.
+`fmri-qa-web` is the Python glue of the browser page. It is not published.
 
 | Package | Import | Does | Needs |
 | --- | --- | --- | --- |
@@ -19,6 +20,7 @@ presents a result, and the launcher is an application shell on top of all four.
 | **`fmri-qa-cli`** | `fmriqa_cli` | the `fmri-qa`, `fmri-qa-hilo`, `fmri-qa-import` and `fmri-qa-report` commands | core, io + report |
 | **`fmri-qa-report`** | `fmriqa_report` | plots and a self-contained offline HTML report, built from an artifact. A library: its command, `fmri-qa-report`, is in `fmri-qa-cli` | core, matplotlib |
 | **`fmri-qa-launcher`** | `fmriqa_launcher` | one-step DICOM-directory-in, report-directory-out pipeline: a command line and a desktop panel | cli, core, io + report; stdlib `tkinter` for the panel |
+| `fmri-qa-web` (private) | `fmriqa_web` | the browser page's Python glue: bytes in; file names, report and record out. Not published | core, io + report |
 
 Only a `QAArtifact` passes between calculating and presenting. It holds the run's
 settings, provenance, scalar measurements, stability curves, and the four FBIRN

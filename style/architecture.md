@@ -475,6 +475,7 @@ packages/
     fmri-qa-cli/        # fmriqa_cli      -- fmri-qa, fmri-qa-hilo, fmri-qa-import, fmri-qa-report
     fmri-qa-report/     # fmriqa_report   -- plots and an HTML report, from an artifact
     fmri-qa-launcher/   # fmriqa_launcher -- the application shell over the four above
+    fmri-qa-web/        # fmriqa_web      -- private: the browser page's Python glue; bytes in, values out
 ```
 
 Four rules make such a split hold:

@@ -22,6 +22,11 @@ versioning when the first stable public interface is released.
   names `import_dicom` files them under, with no filesystem, so a browser can
   name files exactly as the command line does. `import_dicom` calls it; the
   names on disk are unchanged.
+- **`fmri-qa-web`, a private sixth workspace member: the Python glue of the
+  browser page.** `analyze_series`, `name_outputs`, `batch_document` and
+  `contract` take bytes and return the report page, the metrics record, the
+  `import_dicom` file names and the dcm2niix flags, with no file and no
+  process, so they run under Pyodide. It is never published.
 
 ### Changed
 

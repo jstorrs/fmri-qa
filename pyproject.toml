@@ -1,4 +1,5 @@
-# uv workspace root for fmri-qa. The project ships as five distributions:
+# uv workspace root for fmri-qa. The project has six members, five published
+# distributions and one private one:
 #
 #   packages/fmri-qa-core     the calculation half: metrics, pipeline, and the
 #                             QAArtifact it publishes
@@ -10,6 +11,8 @@
 #                             built from an artifact (`fmri-qa-report`)
 #   packages/fmri-qa-launcher the application shell: a one-step DICOM-directory-in,
 #                             report-directory-out pipeline over the packages above
+#   packages/fmri-qa-web      private, never published: the Python glue of the
+#                             browser page (bytes in; names, report and record out)
 #
 # This root is virtual. It builds nothing and only holds the shared development
 # environment and the tool configuration all members are checked against. See
@@ -86,6 +89,7 @@ src = [
     "packages/fmri-qa-cli/src",
     "packages/fmri-qa-report/src",
     "packages/fmri-qa-launcher/src",
+    "packages/fmri-qa-web/src",
 ]
 # Reference notebooks and the Pyodide spike are exploratory scratch, not maintained
 # code — skip them.
@@ -143,7 +147,7 @@ convention = "numpy"
 "stubs/**" = ["A001", "A002", "D"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["fmriqa", "fmriqa_io", "fmriqa_cli", "fmriqa_report", "fmriqa_launcher"]
+known-first-party = ["fmriqa", "fmriqa_io", "fmriqa_cli", "fmriqa_report", "fmriqa_launcher", "fmriqa_web"]
 
 [tool.mypy]
 python_version = "3.13"
@@ -156,6 +160,7 @@ files = [
     "packages/fmri-qa-cli/src",
     "packages/fmri-qa-report/src",
     "packages/fmri-qa-launcher/src",
+    "packages/fmri-qa-web/src",
     "scripts",
 ]
 # Local partial stubs (see stubs/) fix the return types nibabel and scipy ship
@@ -180,6 +185,7 @@ include = [
     "packages/fmri-qa-cli/src",
     "packages/fmri-qa-report/src",
     "packages/fmri-qa-launcher/src",
+    "packages/fmri-qa-web/src",
     "scripts",
 ]
 # scripts/ is not a package. Its tests import a script by bare module name,
@@ -196,6 +202,7 @@ testpaths = [
     "packages/fmri-qa-cli/tests",
     "packages/fmri-qa-report/tests",
     "packages/fmri-qa-launcher/tests",
+    "packages/fmri-qa-web/tests",
     "scripts/tests",
 ]
 # The repository's scripts are not a package, so their tests import one by its
@@ -215,6 +222,7 @@ source = [
     "packages/fmri-qa-cli/src/fmriqa_cli",
     "packages/fmri-qa-report/src/fmriqa_report",
     "packages/fmri-qa-launcher/src/fmriqa_launcher",
+    "packages/fmri-qa-web/src/fmriqa_web",
 ]
 branch = true
 # `panel.py` is Tk widget construction, layout and the `after` pump, and

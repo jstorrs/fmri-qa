@@ -35,6 +35,7 @@ testpaths = [
     "packages/fmri-qa-cli/tests",
     "packages/fmri-qa-report/tests",
     "packages/fmri-qa-launcher/tests",
+    "packages/fmri-qa-web/tests",
     "scripts/tests",
 ]
 pythonpath = ["scripts"]
