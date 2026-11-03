@@ -7,7 +7,7 @@
 # stack is a separate group, `make sync-notebooks`.
 
 .PHONY: all format format-check lint typecheck pyright test test-cov license check sync sync-notebooks \
-	sync-docs docs docs-clean build bundle
+	sync-docs docs docs-clean build bundle web-vendor web-check web web-e2e
 
 all: lint typecheck pyright test
 
@@ -101,6 +101,34 @@ bundle:
 		pyinstaller --noconfirm --distpath dist/bundle --workpath build/bundle \
 		packages/fmri-qa-launcher/bundle/fmri-qa-run.spec
 	dist/bundle/fmri-qa-run --version
+
+# The browser page: one self-contained web/dist/fmri-qa.html that boots Pyodide
+# offline from file:// (see web/README.md). `web-vendor` installs the npm
+# dependencies if needed and fills the gitignored web/vendor/ with Pyodide, its
+# packages, nibabel and the four workspace wheels, every download checked
+# against its lock-file hash; it downloads about 60 MB once, cached after. The
+# page embeds all of it, so `web` needs it. `web-check` is the type check and
+# unit tests, which need only the npm install. `web-e2e` opens the built page in
+# Chrome and Firefox (E2E_BROWSERS=chrome,firefox,webkit to choose) and takes
+# a few minutes, most of it Pyodide starting. `npm ci` runs only when the lock
+# file is newer than the install: npm writes node_modules/.package-lock.json on
+# every install, so that file is the stamp.
+WEB_NPM := web/node_modules/.package-lock.json
+
+$(WEB_NPM): web/package.json web/package-lock.json
+	npm --prefix web ci
+
+web-vendor: $(WEB_NPM)
+	uv run python scripts/web_vendor.py
+
+web-check: $(WEB_NPM)
+	npm --prefix web run check && npm --prefix web test
+
+web: web-vendor
+	npm --prefix web run build
+
+web-e2e: web
+	npm --prefix web run e2e
 
 # CI-style gate: check each package ships the right LICENSE, then fail on any
 # formatting drift or lint hit, then run both type checkers and the tests with a

@@ -25,7 +25,9 @@ members = ["packages/*"]
 dev = [
     "hypothesis>=6.100",
     "mypy>=1.18",
-    # Only `tests/test_packaging.py` uses it, to evaluate dependency markers.
+    # Evaluates dependency markers: fmri-qa-io's `tests/test_packaging.py`, and
+    # `scripts/web_vendor.py`, which checks the browser page's wheels against
+    # Pyodide's interpreter.
     "packaging>=25",
     # Only the git hook uses it (`uv run pre-commit install`).
     "pre-commit>=4",

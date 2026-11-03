@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' 'wasm-unsafe-eval' blob:; worker-src blob:; img-src data: blob:; style-src 'unsafe-inline'">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>fmri-qa</title>
+<style>
+:root { --bg: #fff; --fg: #1a1a1a; --muted: #666; }
+@media (prefers-color-scheme: dark) { :root { --bg: #161616; --fg: #e8e8e8; --muted: #999; } }
+body { background: var(--bg); color: var(--fg); font: 14px/1.4 system-ui, sans-serif; max-width: 56rem; margin: 1rem auto; padding: 0 16px; }
+h1 { font-size: 1.2rem; }
+pre { white-space: pre-wrap; overflow-wrap: anywhere; color: var(--muted); }
+</style>
+</head>
+<body data-python="booting">
+<h1>fmri-qa</h1>
+<p id="python-status" role="status">Starting Python. This takes about a minute.</p>
+<ol id="python-stages"></ol>
+<pre id="python-error"></pre>
+<pre id="python-contract"></pre>
+<script type="module" src="/src/main.ts"></script>
+</body>
+</html>

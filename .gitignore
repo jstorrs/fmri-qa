@@ -33,3 +33,12 @@ QA_FMRI_2025-10-07a/
 # The conventional output directory of a hand-run sphinx-build (sphinx-quickstart's
 # `_build`); `make docs` builds the documentation site into build/site instead.
 _build/
+
+# The browser page (web/): npm dependencies, the vendored Pyodide and wheels
+# `make web-vendor` downloads and builds, the built page and the boot test's
+# generated fixture. The root `dist/` and `build/` patterns above match web/dist
+# already; it is listed for the reader.
+web/node_modules/
+web/vendor/
+web/dist/
+web/test/fixtures/boot/
