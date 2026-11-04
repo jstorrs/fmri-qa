@@ -4,7 +4,8 @@
  * (`tr.result[data-series][data-stem][data-status][data-dcm2niix-files]`, plus `data-reason` and, for Python's own
  * failure, `data-stage`; `data-dcm2niix-files` is a JSON array of the names dcm2niix gave its files). Its downloads
  * are `button[data-action]`: `nifti`, `sidecar`, `companion` (one each), and once done `html` and `record`, plus
- * `preview`. These attributes are what the e2e tests read.
+ * `preview`, and `zip` (the whole folder as `<stem>.zip`) once the result has settled. These attributes are what the
+ * e2e tests read.
  */
 import type { OutputFile } from '../../core/dcm2niix';
 import type { Job, Report, Result, Run } from '../../core/run';
@@ -13,6 +14,7 @@ import { h } from './h';
 export interface ResultActions {
   preview(report: Report): void;
   download(name: string, blob: Blob): void;
+  zip(result: Result): void;
 }
 
 const JOB_STATUS: Record<Job['status'], string> = {
@@ -44,7 +46,7 @@ const jobRow = (job: Job): HTMLTableRowElement => {
   );
 };
 
-const resultRow = (job: Job, r: Result, actions: ResultActions): HTMLTableRowElement => {
+const resultRow = (job: Job, r: Result, actions: ResultActions, canZip: boolean): HTMLTableRowElement => {
   const button = (key: string, text: string, label: string, onClick: () => void): HTMLButtonElement =>
     h('button', { attrs: { type: 'button', title: label, 'aria-label': label }, data: { action: key }, on: { click: onClick } }, text);
   const save = (key: string, name: string, blob: () => Blob): HTMLButtonElement =>
@@ -55,6 +57,12 @@ const resultRow = (job: Job, r: Result, actions: ResultActions): HTMLTableRowEle
   const reason = cause === null ? null : cause.kind === 'failure' ? `${cause.stage} failed: ${cause.reason}` : cause.reason;
   const warnings = r.status === 'done' ? r.report.warnings : cause?.kind === 'failure' ? cause.warnings : [];
   const report = r.status === 'done' ? r.report : null;
+  // aria-disabled, not disabled: a disabled button cannot keep the focus the redraw gives back while a ZIP is written.
+  const zipOff = !canZip || (r.status !== 'done' && r.status !== 'failed');
+  const zip = button('zip', 'Zip', `Download ${r.stem}.zip`, () => {
+    if (!zipOff) actions.zip(r);
+  });
+  if (zipOff) zip.setAttribute('aria-disabled', 'true');
   return h(
     'tr',
     {
@@ -80,6 +88,7 @@ const resultRow = (job: Job, r: Result, actions: ResultActions): HTMLTableRowEle
       ...r.files.companions.map((f) => file('companion', f)),
       report && save('html', `${r.stem}.html`, () => new Blob([report.html], { type: 'text/html' })),
       report && save('record', `${r.stem}.qa.json`, () => new Blob([report.documentText], { type: 'application/json' })),
+      zip,
     ),
   );
 };
@@ -90,13 +99,14 @@ const buttonKey = (b: HTMLButtonElement): string => {
   return JSON.stringify([row?.dataset['series'], row?.dataset['dcm2niixFiles'], b.dataset['action'], b.textContent]);
 };
 
-export const renderResults = (body: HTMLElement, run: Run, actions: ResultActions): void => {
+/** `canZip`: the page is free for a ZIP (no run, no other ZIP); a row's Zip also waits for its result to settle. */
+export const renderResults = (body: HTMLElement, run: Run, actions: ResultActions, canZip: boolean): void => {
   // The table is rebuilt on every event, so a focused button the redraw removed is given back, for the keyboard.
   const active = document.activeElement;
   const focused = active instanceof HTMLButtonElement && body.contains(active) ? buttonKey(active) : null;
   body.replaceChildren(
     ...run.jobs.flatMap((job) =>
-      job.status === 'converted' && job.results.length > 0 ? job.results.map((r) => resultRow(job, r, actions)) : [jobRow(job)],
+      job.status === 'converted' && job.results.length > 0 ? job.results.map((r) => resultRow(job, r, actions, canZip)) : [jobRow(job)],
     ),
   );
   const lost = document.activeElement === null || document.activeElement === document.body;

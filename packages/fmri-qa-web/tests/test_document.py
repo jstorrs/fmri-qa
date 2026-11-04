@@ -135,7 +135,7 @@ def test_a_float_that_is_whole_stays_a_float_through_document_json(
         ('{"kind": "report", "stem": 3}', "stem must be a string, got 3"),
         (
             '{"kind": "rpt", "stem": "a"}',
-            "kind must be 'report' or 'failure', got 'rpt'",
+            "kind must be 'report', 'failure' or 'error', got 'rpt'",
         ),
         (
             '{"kind": "report", "stem": "a", "record": []}',
@@ -149,6 +149,8 @@ def test_a_float_that_is_whole_stays_a_float_through_document_json(
             '{"kind": "failure", "stem": "a", "stage": "decode", "reason": 7}',
             "reason must be a string, got 7",
         ),
+        ('{"kind": "error", "stem": "a"}', "reason must be a string, got None"),
+        ('{"kind": "error", "reason": "x"}', "stem must be a string, got None"),
     ],
 )
 def test_a_malformed_result_is_refused_by_index_and_problem(
@@ -217,3 +219,53 @@ def test_a_report_carries_the_one_scan_document_as_file_text(phantom_bytes) -> N
     assert '\n      "tr": 2.0,\n' in text
     failure = json.loads(bridge.analyze_json(b"junk", None, "j"))
     assert "record_document_json" not in failure
+
+
+def test_result_json_is_the_result_without_page_or_warnings(phantom_bytes) -> None:
+    report = json.loads(bridge.analyze_json(*phantom_bytes, "p"))
+    failure = json.loads(bridge.analyze_json(b"junk", None, "j"))
+
+    assert json.loads(report["result_json"]) == {
+        "kind": "report",
+        "stem": "p",
+        "record": report["record"],
+    }
+    assert json.loads(failure["result_json"]) == {
+        "kind": "failure",
+        "stem": "j",
+        "stage": "decode",
+        "reason": failure["reason"],
+    }
+    assert '"tr": 2.0' in report["result_json"]
+
+
+def test_result_json_rebuilds_the_same_document_as_batch_document(
+    phantom_bytes,
+) -> None:
+    compact = [
+        json.loads(bridge.analyze_json(*phantom_bytes, "p"))["result_json"],
+        json.loads(bridge.analyze_json(b"junk", None, "j"))["result_json"],
+    ]
+
+    text = bridge.document_json(compact)
+
+    direct = batch_document(
+        [
+            analyze_series(*phantom_bytes, stem="p"),
+            analyze_series(b"junk", None, stem="j"),
+        ]
+    )
+    assert text == json.dumps(direct, indent=2, allow_nan=False) + "\n"
+
+
+def test_a_page_error_is_requested_and_listed_with_its_reason(phantom_bytes) -> None:
+    ok = json.loads(bridge.analyze_json(*phantom_bytes, "p"))["result_json"]
+    error = json.dumps({"kind": "error", "stem": "q", "reason": "Python did not start"})
+
+    document = json.loads(bridge.document_json([ok, error]))
+
+    assert document["requested"] == ["p.nii.gz", "q.nii.gz"]
+    assert len(document["scans"]) == 1
+    assert document["errors"] == [
+        {"scan": "q.nii.gz", "source": "q.nii.gz", "error": "Python did not start"}
+    ]

@@ -40,8 +40,15 @@ const NAMES = { [`${A}.nii.gz`]: 'qa_a.nii.gz', [`${A}.json`]: 'qa_a.json', [`${
 const named: RunEvent[] = [...bothConverted, { type: 'named', names: NAMES }];
 const first = { job: 0, result: 0 };
 const second = { job: 1, result: 0 };
-const report = (stem: string): Analysis => ({ kind: 'report', stem, html: '<html>', documentText: '{"tr": 2.0}\n', warnings: ['w'] });
-const failure = (stem: string): Analysis => ({ kind: 'failure', stem, stage: 'analyze', reason: 'invalid frame count 2', warnings: [] });
+const report = (stem: string): Analysis => ({ kind: 'report', stem, html: '<html>', documentText: '{"tr": 2.0}\n', resultText: '{}', warnings: ['w'] });
+const failure = (stem: string): Analysis => ({
+  kind: 'failure',
+  stem,
+  stage: 'analyze',
+  reason: 'invalid frame count 2',
+  resultText: '{}',
+  warnings: [],
+});
 
 describe('groupOutputs', () => {
   test('a NIfTI takes its sidecar and companions; a file of no NIfTI is dropped', () => {
@@ -256,19 +263,27 @@ describe('stop', () => {
 describe('parse', () => {
   test('a report keeps the document text verbatim', () => {
     const text =
-      '{"kind": "report", "stem": "s", "html": "<p>", "record": {"tr": 2.0}, "warnings": ["w"], "record_document_json": "{\\n  \\"tr\\": 2.0\\n}\\n"}';
-    expect(parseAnalysis(text)).toEqual({ kind: 'report', stem: 's', html: '<p>', documentText: '{\n  "tr": 2.0\n}\n', warnings: ['w'] });
+      '{"kind": "report", "stem": "s", "html": "<p>", "record": {"tr": 2.0}, "warnings": ["w"], "record_document_json": "{\\n  \\"tr\\": 2.0\\n}\\n", "result_json": "{\\"tr\\": 2.0}"}';
+    expect(parseAnalysis(text)).toEqual({
+      kind: 'report',
+      stem: 's',
+      html: '<p>',
+      documentText: '{\n  "tr": 2.0\n}\n',
+      resultText: '{"tr": 2.0}',
+      warnings: ['w'],
+    });
   });
 
   test('a failure keeps stage and reason', () => {
-    const text = '{"kind": "failure", "stem": "s", "stage": "analyze", "reason": "short", "warnings": []}';
-    expect(parseAnalysis(text)).toEqual({ kind: 'failure', stem: 's', stage: 'analyze', reason: 'short', warnings: [] });
+    const text = '{"kind": "failure", "stem": "s", "stage": "analyze", "reason": "short", "warnings": [], "result_json": "{}"}';
+    expect(parseAnalysis(text)).toEqual({ kind: 'failure', stem: 's', stage: 'analyze', reason: 'short', resultText: '{}', warnings: [] });
   });
 
   test.each([
     'not json',
     '[]',
-    '{"kind": "report", "stem": "s", "html": "", "warnings": []}',
+    '{"kind": "report", "stem": "s", "html": "", "warnings": [], "result_json": "{}"}',
+    '{"kind": "failure", "stem": "s", "stage": "decode", "reason": "x", "warnings": []}',
     '{"kind": "failure", "stem": "s", "stage": "save", "reason": "x", "warnings": []}',
     '{"kind": "failure", "stem": "s", "stage": "decode", "reason": "x", "warnings": [1]}',
   ])('anything else is refused: %s', (text) => {

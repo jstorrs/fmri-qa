@@ -3,8 +3,13 @@
 // - every `securitypolicyviolation` the page's document sees, from before any page script runs, in window.__cspViolations
 //   (the worker reports its own through the page: window.__fmriqa.diagnostics().violations; one inside the srcdoc
 //   preview iframe reaches neither, so it is not observed);
-// - every a[download] blob download, captured instead of saved, in window.__downloads as {name, b64} (or {name, error}).
+// - every a[download] blob download, captured instead of saved, in window.__downloads as {name, b64, via: 'anchor'}
+//   (or {name, error});
+// - with window.__e2eOpts.fakePicker, and only where the browser has a showSaveFilePicker of its own (Chrome), a fake
+//   one in its place that refuses without user activation, as the real one does, and captures what is written as
+//   {name, b64, via: 'picker'}. Elsewhere the page takes its Blob path. Adapted from the same file of dicom-util.
 (() => {
+  const opts = window.__e2eOpts || {};
   window.__cspViolations = [];
   document.addEventListener('securitypolicyviolation', (e) => {
     window.__cspViolations.push(`${e.effectiveDirective} ${e.blockedURI} ${e.sourceFile}:${e.lineNumber}`);
@@ -35,7 +40,22 @@
       return;
     }
     toB64(blob)
-      .then((b64) => window.__downloads.push({ name, b64 }))
+      .then((b64) => window.__downloads.push({ name, b64, via: 'anchor' }))
       .catch((e) => window.__downloads.push({ name, error: String(e) }));
   };
+
+  if (opts.fakePicker && typeof window.showSaveFilePicker === 'function') {
+    window.showSaveFilePicker = async (o) => {
+      if (!navigator.userActivation?.isActive) throw new DOMException('', 'SecurityError');
+      const name = (o && o.suggestedName) || 'download';
+      const chunks = [];
+      return {
+        createWritable: async () =>
+          new WritableStream({
+            write: (c) => void chunks.push(c),
+            close: async () => window.__downloads.push({ name, b64: await toB64(new Blob(chunks)), via: 'picker' }),
+          }),
+      };
+    };
+  }
 })();

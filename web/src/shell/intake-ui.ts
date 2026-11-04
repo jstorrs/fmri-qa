@@ -19,6 +19,7 @@ import { formatSize, plural } from './ui/format';
 import { mountLog } from './ui/log';
 import type { Log } from './ui/log';
 import { mountOutcome } from './ui/outcome';
+import type { Outcome } from './ui/outcome';
 import { mountProgress } from './ui/progress';
 import type { Progress } from './ui/progress';
 import { buildSkipped, buildTreeView } from './ui/tree';
@@ -55,6 +56,8 @@ const $ = <T extends HTMLElement>(id: string): T => {
 export interface IntakeArea {
   readonly log: Log;
   readonly progress: Progress;
+  /** Show and announce the outcome of the last task (cleared when the next one starts). */
+  readonly notify: Outcome['notify'];
   /** The selected series, in tree order. */
   selected(): SeriesNode[];
   /** Called after the phase or the selection changed. */
@@ -339,6 +342,7 @@ export const mountIntake = (): IntakeArea => {
   return {
     log,
     progress,
+    notify: outcome.notify,
     selected: () => [...state.series.values()].filter((s) => state.selection.has(s.key)),
     onChange: (cb) => void listeners.add(cb),
     phase: () => state.phase,

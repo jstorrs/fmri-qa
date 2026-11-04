@@ -24,7 +24,7 @@ const converted = (s: string): Conversion => ({
   messages: [],
 });
 const report = (stem: string): string =>
-  JSON.stringify({ kind: 'report', stem, html: '<html>', record: {}, warnings: [], record_document_json: `{"stem": "${stem}"}\n` });
+  JSON.stringify({ kind: 'report', stem, html: '<html>', record: {}, warnings: [], record_document_json: `{"stem": "${stem}"}\n`, result_json: '{}' });
 /** names_json gives every file `qa_` in front; analyze_json reports. */
 const answer = (fn: BridgeFn, args: readonly unknown[]): string => {
   if (fn === 'names_json') return JSON.stringify(Object.fromEntries([...(args[0] as Map<string, Uint8Array>).keys()].map((n) => [n, `qa_${n}`])));

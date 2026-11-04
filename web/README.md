@@ -227,19 +227,48 @@ violation or refused fetch and that no request left `file:`, `data:` and `blob:`
 The page is `working` for the whole run, so nothing else can be opened meanwhile. Cancel aborts the conversion in
 progress (dcm2niix can stop) and lets an analysis in progress finish (Python cannot) and keep its report; nothing new
 starts, queued series are cancelled and the results not yet analyzing fail as cancelled. An unexpected error ends the
-run the same way, with its reason in place of "cancelled". A new run replaces the old one.
+run the same way, with its reason in place of "cancelled". A new run replaces the old one, and so does opening
+new DICOM: the results, their bytes and the preview are cleared as the open starts.
 
 **The table** (`src/shell/ui/results.ts`, rebuilt on every change, giving the focused button back) has one row per
 result, `#results-body tr.result[data-series][data-stem][data-status][data-dcm2niix-files]` with `data-reason` and
 `data-stage` on a failure, and one `tr.job` row for a series that gave no NIfTI. What can be downloaded, from a result's
 row (`button[data-action]`), is exactly: the NIfTI (`nifti`), the sidecar when there is one (`sidecar`), each companion
 (`companion`), under their current names whatever happened to Python, and once done the report page
-(`html`, `<stem>.html`) and the record (`record`, `<stem>.qa.json`). Single files go through `src/shell/download.ts`.
+(`html`, `<stem>.html`) and the record (`record`, `<stem>.qa.json`), plus, once the result has settled, the whole folder
+(`zip`, `<stem>.zip`, below). Single files go through `src/shell/download.ts`.
 
 **The record file.** JSON from Python is never re-serialized in JS, which would turn `2.0` into `2`. `analyze_json`
 therefore also returns `record_document_json`: the document `fmri-qa --json` prints for that one scan
 (`schema_version`, `config`, `requested`, `scans`, `errors`; indent 2 and a closing newline), and the page saves that
 string as `<stem>.qa.json`.
+
+**ZIPs.** Once the run has settled, a row's Zip and "Download all (.zip)" (`#download-all`, enabled when the run has
+settled and has at least one result; both use `aria-disabled`, so a button keeps its focus while a ZIP is written) write a ZIP through `src/shell/zip-sink.ts`'s `saveZip`: streamed through the save
+dialog where the browser has one, else built as a Blob. The page is `working` meanwhile; the progress bar counts the
+bytes and Cancel stops the write. The layouts are `src/core/bundle.ts`:
+
+- `<stem>.zip`, one result: `<stem>/` holding `<stem>.nii.gz`, `<stem>.json` when there is a sidecar, any companions,
+  and once done `<stem>.html` and `<stem>.qa.json`. That is the launcher's series directory without `.qa.nc`. A result
+  that failed has its NIfTI, sidecar and companions, under their current names: the QA name, or dcm2niix's when naming
+  never ran.
+- `fmri-qa-YYYYMMDD-HHMM.zip` (local time of the click), the run: `fmri-qa.json` at the top, then every result's folder
+  in run order. Two results with one stem (possible after a naming fallback) cannot share a folder: the first keeps
+  `<stem>/`, the next takes the lowest `<stem>-2/`, `<stem>-3/`, ... that no stem already is; the files inside keep
+  their names. No folder is named `fmri-qa.json`.
+
+Every entry is stamped with the time of the click; the bytes are the single downloads' (text as UTF-8), stored
+uncompressed (client-zip does not compress; `.nii.gz` already is).
+
+**fmri-qa.json** is the batch envelope `fmri-qa --json` prints (indent 2, a closing newline), written by Python's
+`document_json`. The page never builds or re-serializes a record: `analyze_json` also returns `result_json`, the result
+without its page or warnings (`kind`, `stem` and `record`, or `kind`, `stem`, `stage` and `reason`), and the page keeps
+that string verbatim per result and hands the list back. A result that failed where Python never saw it (Python did not
+start or crashed, Cancel, naming failed) is handed over as `{"kind": "error", "stem", "reason"}` with the page's reason,
+strings only; it is `requested` and listed in `errors` like Python's own failures. A series that gave no NIfTI has no stem
+and is left out of the envelope (its row shows why). `requested` lists `<stem>.nii.gz` per result, so two results with
+one stem are listed twice, as Python would. When Python has not started, failed to start, or fails the call, the run's
+ZIP is still written, with every folder and no `fmri-qa.json`, and the outcome line says why.
 
 **The preview** is `<iframe id="preview" sandbox="" srcdoc>`: no `allow-scripts`, no `allow-same-origin`, so the report
 runs no script and has an opaque origin. It inherits the page's CSP, which its inline styles and `data:` images fit. A
@@ -253,7 +282,11 @@ that a different CPU's last bit does not (regenerate it with `uv run python scri
 give the native stem and record (numbers within a relative 1e-9, everything else exact, null included; in the
 `.qa.json`, `scans[0]` and the schema version), a `<title>` naming the stem, no `<script` in the report, the inert
 preview and every download under its QA name. Both series of `dicom/`, two volumes each, must fail at `analyze` with the
-native frame-count reason. Rows are matched by `data-stem`. The no-violation, no-refusal and no-request checks cover the
+native frame-count reason. For each fixture, a row's ZIP and the run's ZIP are unzipped in node and must hold exactly
+the layout's entries (read in order from the central directory, so a duplicate name fails) with the single downloads' bytes (NIfTI, sidecar, report, `.qa.json`), and `fmri-qa.json` the
+contract's schema version, every result in `requested`, the native records in `scans` (within 1e-9) or the native
+reasons in `errors`. In Chrome they must be written through a fake save dialog (`e2e/init-hooks.js`, `fakePicker`), in
+Firefox, which has none, through the Blob path. Rows are matched by `data-stem`. The no-violation, no-refusal and no-request checks cover the
 whole flow, in the page and the Pyodide worker (not inside the preview, as above).
 
 ## Boot timings

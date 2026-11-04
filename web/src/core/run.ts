@@ -11,20 +11,25 @@ import type { OutputFile } from './dcm2niix';
 
 export type Stage = 'decode' | 'analyze' | 'render';
 
-/** `analyze_json`'s result for a series that analyzed. `documentText` is its `record_document_json`. */
+/**
+ * `analyze_json`'s result for a series that analyzed. `documentText` is its `record_document_json`; `resultText` its
+ * `result_json`, the small verbatim string `document_json` takes back for the run's `fmri-qa.json`.
+ */
 export interface Report {
   readonly kind: 'report';
   readonly stem: string;
   readonly html: string;
   readonly documentText: string;
+  readonly resultText: string;
   readonly warnings: readonly string[];
 }
-/** `analyze_json`'s result for a series that failed at `stage`. */
+/** `analyze_json`'s result for a series that failed at `stage`; `resultText` as for a report. */
 export interface Failure {
   readonly kind: 'failure';
   readonly stem: string;
   readonly stage: Stage;
   readonly reason: string;
+  readonly resultText: string;
   readonly warnings: readonly string[];
 }
 export type Analysis = Report | Failure;
@@ -283,12 +288,13 @@ const isStage = (x: unknown): x is Stage => STAGES.includes(x as Stage);
 /** Parse `analyze_json`'s string. Throws on anything that is not one of its two shapes. */
 export const parseAnalysis = (text: string): Analysis => {
   const x: unknown = JSON.parse(text);
-  if (!isRecord(x) || typeof x['stem'] !== 'string' || !isStrings(x['warnings'])) throw new Error('analyze_json returned an unexpected result');
-  const [stem, warnings] = [x['stem'], x['warnings']];
+  if (!isRecord(x) || typeof x['stem'] !== 'string' || !isStrings(x['warnings']) || typeof x['result_json'] !== 'string')
+    throw new Error('analyze_json returned an unexpected result');
+  const [stem, warnings, resultText] = [x['stem'], x['warnings'], x['result_json']];
   if (x['kind'] === 'report' && typeof x['html'] === 'string' && typeof x['record_document_json'] === 'string')
-    return { kind: 'report', stem, html: x['html'], documentText: x['record_document_json'], warnings };
+    return { kind: 'report', stem, html: x['html'], documentText: x['record_document_json'], resultText, warnings };
   if (x['kind'] === 'failure' && isStage(x['stage']) && typeof x['reason'] === 'string')
-    return { kind: 'failure', stem, stage: x['stage'], reason: x['reason'], warnings };
+    return { kind: 'failure', stem, stage: x['stage'], reason: x['reason'], resultText, warnings };
   throw new Error('analyze_json returned an unexpected result');
 };
 

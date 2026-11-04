@@ -28,8 +28,9 @@ const findFirefox = () => {
   return builds.length ? path.join(root, builds[0], 'firefox', 'firefox') : undefined;
 };
 
-/** Source for the init script: e2e/init-hooks.js. */
-export const hooksSource = () => fs.readFileSync(fileURLToPath(new URL('./init-hooks.js', import.meta.url)), 'utf8');
+/** Source for the init script: sets options (see e2e/init-hooks.js), then runs e2e/init-hooks.js. */
+export const hooksSource = (opts = {}) =>
+  `window.__e2eOpts = ${JSON.stringify(opts)};\n` + fs.readFileSync(fileURLToPath(new URL('./init-hooks.js', import.meta.url)), 'utf8');
 
 /** Wrap a puppeteer page. `bidiGap`: the Firefox driver, which cannot evaluate in a worker (see evaluateInWorker). */
 const puppeteerPage = (page, bidiGap) => {

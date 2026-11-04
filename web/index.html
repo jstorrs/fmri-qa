@@ -31,6 +31,7 @@ body.dragging #drop { border-color: var(--fg); color: var(--fg); }
 #results td ul { margin: .2rem 0 0; padding-left: 1rem; color: var(--muted); }
 #results td.actions { white-space: nowrap; }
 #results td.actions button { padding: .1rem .5rem; margin: 0 .2rem .2rem 0; }
+#results button[aria-disabled="true"] { opacity: .5; cursor: not-allowed; }
 #results tr[data-status="failed"] .status { color: #b00020; }
 #preview { display: block; width: 100%; height: 75vh; margin-top: 1rem; border: 1px solid var(--muted); background: #fff; }
 #preview[hidden] { display: none; }
@@ -68,6 +69,7 @@ pre { white-space: pre-wrap; overflow-wrap: anywhere; color: var(--muted); }
 </p>
 <section id="results" hidden>
   <h2>Results</h2>
+  <p><button type="button" id="download-all" aria-disabled="true">Download all (.zip)</button></p>
   <div class="table-wrap">
     <table>
       <thead><tr><th>Series</th><th>Status</th><th>Notes</th><th>Files</th></tr></thead>
