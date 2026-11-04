@@ -2,6 +2,7 @@ import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vite';
 import { viteSingleFile } from 'vite-plugin-singlefile';
 import { classicDcm2niixGlue, dcm2niixVersion, dcm2niixWasmBlock } from './scripts/vite-dcm2niix.mjs';
+import { bundledPackages, noticesBlock } from './scripts/vite-notices.mjs';
 import { classicPyodideAsm, noInlinedWasm, pyodideAssets } from './scripts/vite-pyodide.mjs';
 
 /**
@@ -32,9 +33,11 @@ const pageName = () => ({
   },
 });
 
+const packages = bundledPackages(); // one record across the page build and its worker builds
+
 export default defineConfig({
   define: { __DCM2NIIX_VERSION__: JSON.stringify(dcm2niixVersion()) },
-  plugins: [viteSingleFile(), pyodideAssets(), dcm2niixWasmBlock(), noInlinedWasm(), pageName()],
+  plugins: [viteSingleFile(), pyodideAssets(), dcm2niixWasmBlock(), noticesBlock(), noInlinedWasm(), packages.page, pageName()],
   build: {
     modulePreload: { polyfill: false }, // useless in a single-file build
     rolldownOptions: { onLog: quietPyodide }, // Vite routes the worker build's logs through this one too
@@ -48,7 +51,7 @@ export default defineConfig({
   // Must match ASSET_BASE in src/core/asset-fetch.ts.
   worker: {
     format: 'iife',
-    plugins: () => [classicPyodideAsm('https://pyodide.invalid/pyodide.asm.mjs'), classicDcm2niixGlue()],
+    plugins: () => [classicPyodideAsm('https://pyodide.invalid/pyodide.asm.mjs'), classicDcm2niixGlue(), packages.worker],
     rolldownOptions: { output: { strict: true } }, // "use strict" at the top of the worker script
   },
   test: { include: ['test/unit/**/*.test.ts'], environment: 'node', testTimeout: 30_000 },

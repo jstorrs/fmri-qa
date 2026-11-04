@@ -5,7 +5,8 @@ with no network and no install, and runs fmri-qa under [Pyodide](https://pyodide
 WebAssembly). The page starts Python in a worker in the background, imports `fmriqa_web`, shows the boot stages and
 answers bridge calls (step 4). Meanwhile it takes DICOM, shows the series tree and converts a selection with dcm2niix
 WebAssembly (step 5, "Intake and conversion" below), then names and analyzes each series in Python, with a report preview
-and per-file downloads (step 6, "Runs" below). Zips and notices come later.
+and per-file downloads (step 6, "Runs" below). It carries the licences of everything it bundles under "About & licences"
+(step 8, "Notices" below).
 
 ## Build
 
@@ -15,8 +16,9 @@ From the repo root:
 |---|---|
 | `make web-vendor` | `npm ci` in `web/` (only when `package-lock.json` is newer than the install), then `uv run python scripts/web_vendor.py`: fills the gitignored `web/vendor/` (about 56 MB, downloaded once and cached) and writes `web/vendor/manifest.json` |
 | `make web-check` | the same `npm ci` if needed, then `tsc --noEmit` for the app and the tests, then the vitest unit tests (`test/unit/`) |
-| `make web` | `make web-vendor`, then `vite build` to `web/dist/fmri-qa.html` |
-| `make web-e2e` | `make web`, then `node --test e2e/**/*.test.mjs` (`boot.test.mjs`, `intake.test.mjs`, `run.test.mjs`) in Chrome and Firefox (`E2E_BROWSERS=chrome,firefox,webkit` to choose) |
+| `make web-notices` | `make web-vendor`, then `uv run python scripts/web_notices.py`: rewrites the committed `web/THIRD_PARTY_NOTICES.md` ("Notices" below) |
+| `make web` | `make web-vendor`, then `vite build` to `web/dist/fmri-qa.html`; the build first runs `scripts/web_notices.py --check` and fails if the notices are stale |
+| `make web-e2e` | `make web`, then `node --test e2e/**/*.test.mjs` (`boot.test.mjs`, `intake.test.mjs`, `run.test.mjs`, `about.test.mjs`) in Chrome and Firefox (`E2E_BROWSERS=chrome,firefox,webkit` to choose) |
 
 `scripts/web_vendor.py` collects:
 
@@ -288,6 +290,43 @@ contract's schema version, every result in `requested`, the native records in `s
 reasons in `errors`. In Chrome they must be written through a fake save dialog (`e2e/init-hooks.js`, `fakePicker`), in
 Firefox, which has none, through the Blob path. Rows are matched by `data-stem`. The no-violation, no-refusal and no-request checks cover the
 whole flow, in the page and the Pyodide worker (not inside the preview, as above).
+
+## Notices
+
+`web/THIRD_PARTY_NOTICES.md` holds the licence texts of everything in the page: Pyodide (MPL-2.0, with the two files
+the build modifies, each change described exactly), CPython, the libraries in `pyodide.asm.wasm`, Emscripten, every wheel,
+fmri-qa itself, dcm2niix and the npm packages. `scripts/web_notices.py` writes it from what is bundled:
+
+- each wheel's section from the wheel itself: every licence file it ships, each text once, and its licence metadata;
+- the hand-kept texts in `web/notices/` for what the wheels and npm packages do not ship. These are the runtime
+  (Pyodide's MPL text, CPython, the libraries Pyodide links, Emscripten), dcm2niix (from dicom-util's notices), and
+  per-wheel supplements for libraries Pyodide's builds link in (scipy's OpenBLAS, Pillow's image libraries,
+  matplotlib's Agg, qhull, FreeType and fonts). Each starts with the version it was verified for; a supplement also
+  names the Pyodide and Emscripten whose build it describes, so a Pyodide upgrade fails every one until it is checked
+  again. `web/notices/README.md` records how each was verified. The script fails, naming the component, when a bundled
+  version no longer matches, when anything bundled has no licence text, or on a file in `web/notices/` it does not read;
+- the npm packages' own LICENSE files. The build (`scripts/vite-notices.mjs`) fails unless the npm packages with code
+  in the page, read from the bundler's module list for the page and both workers, are exactly `package.json`'s
+  `dependencies`.
+
+The file is committed and reviewed like code. The build only checks it: `scripts/vite-notices.mjs` runs
+`scripts/web_notices.py --check` before bundling, so `make web` and a bare `npm run build` both fail if it is stale.
+After changing the vendored set or the npm dependencies, run `make web-notices`, check that the diff is right, and
+commit it. `packages/fmri-qa-web/tests/test_notices.py` checks the same in `pytest`; it skips when `web/vendor/` or
+`web/node_modules/` is missing. `scripts/tests/test_web_notices_pins.py` needs neither: it checks that the committed file
+has a heading for each npm dependency at its pinned version, and states the `pyodide.asm.mjs` replacement that
+`vite.config.mjs` applies.
+
+The page embeds the file as one inert, gzipped, base64 block (`#notices-data`). It is about 350 KB as text and 73 KB
+gzipped, over the size at which it would be inlined plainly. `src/shell/about.ts` unpacks it with `DecompressionStream`
+the first time "About & licences" is opened, so the CSP needs nothing new. `e2e/about.test.mjs` checks that nothing is
+unpacked before then, opens the section in Chrome and Firefox and checks the text is the file's.
+
+**If you pass `fmri-qa.html` on, keep the "About & licences" footer, or ship `THIRD_PARTY_NOTICES.md` next to it.**
+Many of the bundled licences require their notices to go with every copy.
+
+setuptools is left out of the page (`EXCLUDED` in `scripts/web_vendor.py`, also removed from the vendored lock).
+Pyodide's lock lists it under networkx, but nothing bundled needs it, and it vendors autocommand, which is LGPL-3.0.
 
 ## Boot timings
 

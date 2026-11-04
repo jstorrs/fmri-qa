@@ -472,3 +472,7 @@ any existing file unchanged and makes the CLI exit non-zero.
 ## License
 
 fmri-qa is available under the [MIT License](LICENSE).
+
+The browser page, `web/dist/fmri-qa.html`, bundles third-party software under its own licences. It shows them under
+"About & licences", from `web/THIRD_PARTY_NOTICES.md`; `web/README.md` ("Notices") says how that file is generated and
+checked. If you pass the HTML file on, keep that footer, or ship the notices file next to it.

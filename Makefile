@@ -7,7 +7,7 @@
 # stack is a separate group, `make sync-notebooks`.
 
 .PHONY: all format format-check lint typecheck pyright test test-cov license check sync sync-notebooks \
-	sync-docs docs docs-clean build bundle web-vendor web-check web web-e2e
+	sync-docs docs docs-clean build bundle web-vendor web-notices web-check web web-e2e
 
 all: lint typecheck pyright test
 
@@ -113,6 +113,12 @@ bundle:
 # a few minutes, most of it Pyodide starting. `npm ci` runs only when the lock
 # file is newer than the install: npm writes node_modules/.package-lock.json on
 # every install, so that file is the stamp.
+# `web-notices` rewrites the committed web/THIRD_PARTY_NOTICES.md from what
+# web/vendor and the npm install hold (scripts/web_notices.py). The build only
+# checks it (web/scripts/vite-notices.mjs runs `web_notices.py --check` first)
+# and fails if it is stale, so a page cannot ship with notices nobody reviewed.
+# Run `web-notices` and commit the result after a change to the vendored set or
+# the npm dependencies.
 WEB_NPM := web/node_modules/.package-lock.json
 
 $(WEB_NPM): web/package.json web/package-lock.json
@@ -123,6 +129,9 @@ web-vendor: $(WEB_NPM)
 
 web-check: $(WEB_NPM)
 	npm --prefix web run check && npm --prefix web test
+
+web-notices: web-vendor
+	uv run python scripts/web_notices.py
 
 web: web-vendor
 	npm --prefix web run build

@@ -9,6 +9,9 @@ from packaging.requirements import Requirement
 from web_vendor import (
     closure,
     emscripten_environment,
+    excluded_requirements,
+    lock_without,
+    metadata_path,
     nibabel_wheel,
     requires_dist,
     unmet_requirements,
@@ -148,3 +151,54 @@ def test_nibabel_wheel_needs_nibabel_in_the_lock() -> None:
         ValueError, match=r"expected exactly one nibabel in uv\.lock, found 0"
     ):
         nibabel_wheel(_uv_lock({"name": "numpy", "wheels": []}))
+
+
+def test_closure_leaves_out_an_excluded_package_and_what_only_it_brings() -> None:
+    lock: dict[str, dict[str, object]] = {
+        "networkx": {"depends": ["setuptools"]},
+        "setuptools": {"depends": ["only-setuptools"]},
+        "only-setuptools": {"depends": []},
+    }
+    assert closure(lock, ["networkx"], frozenset({"setuptools"})) == ["networkx"]
+
+
+def test_lock_without_drops_the_entry_and_every_dependency_on_it() -> None:
+    lock_file: dict[str, object] = {
+        "info": {"python": "3.14.2"},
+        "packages": {
+            "networkx": {"depends": ["setuptools", "numpy"], "version": "3.6.1"},
+            "setuptools": {"depends": []},
+            "numpy": {"depends": []},
+        },
+    }
+    assert lock_without(lock_file, frozenset({"setuptools"})) == {
+        "info": {"python": "3.14.2"},
+        "packages": {
+            "networkx": {"depends": ["numpy"], "version": "3.6.1"},
+            "numpy": {"depends": []},
+        },
+    }
+
+
+def test_an_applicable_requirement_on_an_excluded_package_is_reported() -> None:
+    requirements = [
+        Requirement("SetupTools>=60"),
+        Requirement('setuptools; sys_platform != "emscripten"'),
+        Requirement("numpy"),
+    ]
+    assert excluded_requirements(requirements, frozenset({"setuptools"}), ENV) == [
+        "SetupTools>=60"
+    ]
+
+
+def test_metadata_path_is_the_wheels_own_not_a_vendored_one() -> None:
+    names = [
+        "setuptools/_vendor/zipp-3.23.0.dist-info/METADATA",
+        "setuptools-82.0.1.dist-info/METADATA",
+    ]
+    assert metadata_path(names, "w.whl") == "setuptools-82.0.1.dist-info/METADATA"
+
+
+def test_metadata_path_names_a_wheel_without_one() -> None:
+    with pytest.raises(ValueError, match=r"top-level METADATA in w\.whl, found 0"):
+        metadata_path(["x/y.dist-info/METADATA"], "w.whl")

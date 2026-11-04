@@ -2,6 +2,7 @@
  * The page: boots Python in its worker in the background (the DOM data attributes are what e2e/boot.test.mjs reads) while
  * the user opens DICOM, looks at the series tree (e2e/intake.test.mjs) and runs QA on a selection (e2e/run.test.mjs).
  */
+import { mountAbout } from './shell/about';
 import { mountIntake } from './shell/intake-ui';
 import { BRIDGE_FNS, type BridgeFn } from './shell/pyodide-protocol';
 import { startPython, type BootEvent } from './shell/python';
@@ -57,6 +58,7 @@ const python = startPython(show);
 python.ready.catch(() => {}); // reported through `show`
 
 mountRun(mountIntake(), python);
+mountAbout($('about') as HTMLDetailsElement, $('notices'));
 
 /** Test-facing: the e2e tests run one bridge call and read the worker's diagnostics. Not an API of the page. */
 const testHooks = {

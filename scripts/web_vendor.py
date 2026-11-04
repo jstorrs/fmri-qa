@@ -7,16 +7,18 @@ Pyodide's lock) and the four workspace wheels. This collects them into
 (`web/scripts/vite-pyodide.mjs`) reads to inline them in order.
 
 - The runtime is copied from the `pyodide` npm package in `web/node_modules`,
-  so its version is the one `web/package.json` pins.
+  so its version is the one `web/package.json` pins. The lock is written
+  without `EXCLUDED` (`lock_without`), so Pyodide never asks for one.
 - The Pyodide packages are the dependency closure of `ROOTS` in that
-  package's `pyodide-lock.json`, downloaded from the matching CDN release and
-  checked against the lock's sha256.
+  package's `pyodide-lock.json`, less `EXCLUDED`, downloaded from the matching
+  CDN release and checked against the lock's sha256.
 - nibabel is the wheel `uv.lock` pins, checked against its hash there.
 - The workspace wheels are built with `uv build`.
 
 Finally every wheel that is not a Pyodide package must have each of its
 `Requires-Dist` met, as Pyodide would evaluate the markers, by a vendored
 wheel or a package in the closure: the page unpacks them without a resolver.
+No vendored wheel, a Pyodide package included, may require an `EXCLUDED` one.
 
 Run from the workspace root after `npm ci` in `web/`
 (`make web-vendor` does both): `uv run python scripts/web_vendor.py`.
@@ -31,6 +33,7 @@ import sys
 import tomllib
 import urllib.request
 from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Set as AbstractSet
 from dataclasses import asdict, dataclass
 from email.parser import HeaderParser
 from pathlib import Path
@@ -44,7 +47,10 @@ __all__ = [
     "Asset",
     "closure",
     "emscripten_environment",
+    "excluded_requirements",
+    "lock_without",
     "main",
+    "metadata_path",
     "nibabel_wheel",
     "requires_dist",
     "unmet_requirements",
@@ -59,6 +65,12 @@ PYODIDE_NPM = WEB / "node_modules" / "pyodide"
 # numpy, scipy, scikit-image; fmri-qa-io and nibabel: packaging; fmri-qa-report:
 # matplotlib, cycler). The closure brings their dependencies.
 ROOTS = ("numpy", "scipy", "scikit-image", "packaging", "matplotlib", "cycler")
+# Lock dependencies left out of the closure. Pyodide's lock lists setuptools
+# under networkx, but no vendored wheel requires it (`_check_requirements`
+# fails if one does) and nothing the page runs imports it. It vendors
+# autocommand, which is LGPL-3.0, a licence the page does not otherwise carry
+# (web/THIRD_PARTY_NOTICES.md).
+EXCLUDED = frozenset({"setuptools"})
 # The workspace distributions the page runs, in the order they are unpacked.
 WORKSPACE = ("fmri-qa-core", "fmri-qa-io", "fmri-qa-report", "fmri-qa-web")
 # The runtime files `loadPyodide` reads, and whether the page stores each
@@ -94,18 +106,21 @@ def _one[T](items: Iterable[T], what: str) -> T:
 
 
 def closure(
-    lock: Mapping[str, Mapping[str, object]], roots: Iterable[str]
+    lock: Mapping[str, Mapping[str, object]],
+    roots: Iterable[str],
+    excluded: AbstractSet[str] = frozenset(),
 ) -> list[str]:
     """Return the lock's packages `roots` need, each after its dependencies.
 
     `lock` is `pyodide-lock.json`'s `packages`, keyed by normalized name.
-    Raises `KeyError` naming a package the lock does not have.
+    A package in `excluded` (normalized names) is left out with what only it
+    brings. Raises `KeyError` naming a package the lock does not have.
     """
     seen: list[str] = []
 
     def visit(name: str) -> None:
         key = canonicalize_name(name)
-        if key in seen:
+        if key in seen or key in excluded:
             return
         if key not in lock:
             raise KeyError(f"{key} is not in pyodide-lock.json")
@@ -116,6 +131,32 @@ def closure(
     for root in roots:
         visit(root)
     return seen
+
+
+def lock_without(
+    lock_file: Mapping[str, object], excluded: AbstractSet[str]
+) -> dict[str, object]:
+    """Return `pyodide-lock.json` without the `excluded` packages.
+
+    They leave both `packages` and every entry's `depends`: `loadPackage`
+    resolves `depends` from the lock, so a package left out of the closure must
+    leave the lock too, or it is requested (and refused: the page has no such
+    file).
+    """
+    packages = cast("Mapping[str, Mapping[str, object]]", lock_file["packages"])
+    kept = {
+        name: {
+            **entry,
+            "depends": [
+                d
+                for d in cast("list[str]", entry["depends"])
+                if canonicalize_name(d) not in excluded
+            ],
+        }
+        for name, entry in packages.items()
+        if name not in excluded
+    }
+    return {**lock_file, "packages": kept}
 
 
 def emscripten_environment(python: str, platform: str) -> dict[str, str]:
@@ -171,6 +212,20 @@ def unmet_requirements(
     return unmet
 
 
+def excluded_requirements(
+    requirements: Iterable[Requirement],
+    excluded: AbstractSet[str],
+    environment: Mapping[str, str],
+) -> list[str]:
+    """Return each requirement that applies in `environment` and is `excluded`."""
+    return [
+        str(req)
+        for req in requirements
+        if canonicalize_name(req.name) in excluded
+        and (req.marker is None or req.marker.evaluate(dict(environment)))
+    ]
+
+
 def nibabel_wheel(uv_lock: Mapping[str, object]) -> tuple[str, str]:
     """Return the url and sha256 of the one nibabel wheel `uv.lock` pins."""
     packages = cast("list[dict[str, object]]", uv_lock["package"])
@@ -208,11 +263,21 @@ def _download(url: str, target: Path, sha256: str) -> None:
     partial.replace(target)
 
 
+def metadata_path(names: Iterable[str], wheel: str) -> str:
+    """Return the path of a wheel's own METADATA among its archive `names`.
+
+    It is the top-level dist-info's; a wheel that vendors others (setuptools
+    does) nests theirs deeper. A `ValueError` names `wheel` unless there is one.
+    """
+    found = (
+        n for n in names if n.endswith(".dist-info/METADATA") and n.count("/") == 1
+    )
+    return _one(found, f"top-level METADATA in {wheel}")
+
+
 def _metadata(wheel: Path) -> str:
     with ZipFile(wheel) as z:
-        metadata = (n for n in z.namelist() if n.endswith(".dist-info/METADATA"))
-        name = _one(metadata, f"METADATA in {wheel.name}")
-        return z.read(name).decode("utf-8")
+        return z.read(metadata_path(z.namelist(), wheel.name)).decode("utf-8")
 
 
 def _pinned_pyodide() -> str:
@@ -226,12 +291,16 @@ def _pinned_pyodide() -> str:
     return str(pinned)
 
 
-def _core() -> list[Asset]:
+def _core(lock_file: Mapping[str, object]) -> list[Asset]:
     out = VENDOR / "pyodide"
     out.mkdir(parents=True, exist_ok=True)
     assets = []
     for name, gz in CORE_FILES.items():
-        shutil.copyfile(PYODIDE_NPM / name, out / name)
+        if name == "pyodide-lock.json":
+            text = json.dumps(lock_without(lock_file, EXCLUDED), separators=(",", ":"))
+            (out / name).write_text(text, encoding="utf-8")
+        else:
+            shutil.copyfile(PYODIDE_NPM / name, out / name)
         assets.append(
             Asset(name, f"pyodide/{name}", _sha256(out / name), "pyodide-core", gz)
         )
@@ -243,7 +312,7 @@ def _packages(lock: Mapping[str, Mapping[str, object]], version: str) -> list[As
     out.mkdir(parents=True, exist_ok=True)
     cdn = f"https://cdn.jsdelivr.net/pyodide/v{version}/full/"
     assets = []
-    for name in closure(lock, ROOTS):
+    for name in closure(lock, ROOTS, EXCLUDED):
         file_name, sha256 = str(lock[name]["file_name"]), str(lock[name]["sha256"])
         _download(cdn + file_name, out / file_name, sha256)
         assets.append(
@@ -277,11 +346,19 @@ def _wheels() -> list[Asset]:
 
 def _check_requirements(
     wheels: Sequence[Path],
+    packages: Sequence[Path],
     lock: Mapping[str, Mapping[str, object]],
     info: Mapping[str, str],
 ) -> dict[str, str]:
-    """Fail unless every wheel's requirements are vendored; return their versions."""
-    available = {name: str(lock[name]["version"]) for name in closure(lock, ROOTS)}
+    """Fail unless every wheel's requirements are vendored; return their versions.
+
+    `packages` (the Pyodide ones) are checked only against `EXCLUDED`: Pyodide
+    patches some requirements away (scikit-image's tifffile) without editing
+    their metadata, so the rest of theirs need not be met.
+    """
+    available = {
+        name: str(lock[name]["version"]) for name in closure(lock, ROOTS, EXCLUDED)
+    }
     metadata = {wheel: _metadata(wheel) for wheel in wheels}
     versions: dict[str, str] = {}
     for text in metadata.values():
@@ -289,10 +366,23 @@ def _check_requirements(
         versions[canonicalize_name(headers["Name"])] = headers["Version"]
     available |= versions
     environment = emscripten_environment(info["python"], info["platform"])
+    # A requirement on an excluded package is reported once, as excluded.
+    kept = {
+        wheel: [
+            r for r in requires_dist(text) if canonicalize_name(r.name) not in EXCLUDED
+        ]
+        for wheel, text in metadata.items()
+    }
     problems = [
         f"{wheel.name}: {unmet}"
-        for wheel, text in metadata.items()
-        for unmet in unmet_requirements(requires_dist(text), available, environment)
+        for wheel, requirements in kept.items()
+        for unmet in unmet_requirements(requirements, available, environment)
+    ] + [
+        f"{package.name}: {req} (excluded in scripts/web_vendor.py)"
+        for package in [*packages, *wheels]
+        for req in excluded_requirements(
+            requires_dist(_metadata(package)), EXCLUDED, environment
+        )
     ]
     if problems:
         raise SystemExit(
@@ -310,9 +400,10 @@ def main() -> None:
     version = _pinned_pyodide()
     lock_file = json.loads((PYODIDE_NPM / "pyodide-lock.json").read_text())
     lock = lock_file["packages"]
-    assets = _core() + _packages(lock, version) + _wheels()
+    assets = _core(lock_file) + _packages(lock, version) + _wheels()
     wheels = [VENDOR / a.file for a in assets if a.kind == "wheel"]
-    versions = _check_requirements(wheels, lock, lock_file["info"])
+    packages = [VENDOR / a.file for a in assets if a.kind == "pyodide-package"]
+    versions = _check_requirements(wheels, packages, lock, lock_file["info"])
     manifest = {
         "pyodide": version,
         "assets": [asdict(a) for a in assets],
