@@ -4,8 +4,8 @@ One self-contained HTML file, `web/dist/fmri-qa.html`, that a user saves and dou
 with no network and no install, and runs fmri-qa under [Pyodide](https://pyodide.org) 314.0.7 (CPython 3.14.2 in
 WebAssembly). The page starts Python in a worker in the background, imports `fmriqa_web`, shows the boot stages and
 answers bridge calls (step 4). Meanwhile it takes DICOM, shows the series tree and converts a selection with dcm2niix
-WebAssembly (step 5, "Intake and conversion" below). Run orchestration, the report preview, downloads, zips and notices
-come later.
+WebAssembly (step 5, "Intake and conversion" below), then names and analyzes each series in Python, with a report preview
+and per-file downloads (step 6, "Runs" below). Zips and notices come later.
 
 ## Build
 
@@ -16,7 +16,7 @@ From the repo root:
 | `make web-vendor` | `npm ci` in `web/` (only when `package-lock.json` is newer than the install), then `uv run python scripts/web_vendor.py`: fills the gitignored `web/vendor/` (about 56 MB, downloaded once and cached) and writes `web/vendor/manifest.json` |
 | `make web-check` | the same `npm ci` if needed, then `tsc --noEmit` for the app and the tests, then the vitest unit tests (`test/unit/`) |
 | `make web` | `make web-vendor`, then `vite build` to `web/dist/fmri-qa.html` |
-| `make web-e2e` | `make web`, then `node --test e2e/**/*.test.mjs` (`boot.test.mjs`, `intake.test.mjs`) in Chrome and Firefox (`E2E_BROWSERS=chrome,firefox,webkit` to choose) |
+| `make web-e2e` | `make web`, then `node --test e2e/**/*.test.mjs` (`boot.test.mjs`, `intake.test.mjs`, `run.test.mjs`) in Chrome and Firefox (`E2E_BROWSERS=chrome,firefox,webkit` to choose) |
 
 `scripts/web_vendor.py` collects:
 
@@ -159,12 +159,8 @@ open or convert.
   restore-previous-set and folder-listing parts.
 - **Tree** (`src/core/tree.ts`, `src/shell/ui/tree.ts`): Patient, Study, Series with checkboxes, counts (`#counts` data
   attributes), the skipped/rejected/duplicate lists, and the selection summary (`#summary`).
-- **Convert selected** (`src/shell/conversions.ts`): converts each selected series in turn. The result is a list item
-  `#conversions li[data-series][data-status][data-files][data-sizes]` (`data-series` is the series UID, the other two are
-  JSON arrays of output names and byte sizes), with dcm2niix's warnings and errors below it. The output bytes are kept in
-  memory (until the next conversion) only when the e2e init script sets `window.__e2eKeepOutputs`;
-  `window.__fmriqa.output(seriesUid, name)` then returns one as base64. In normal use only names and sizes are kept.
-  Step 6 replaces this with the run table.
+- **Conversion** (`src/shell/conversions.ts`, `runOne`): one series in a fresh dcm2niix worker; the first part of a run
+  (below). dcm2niix's warnings, errors and skipped-file lines go to the log on every outcome.
 - **dcm2niix arguments** come from Python: `src/core/convert-args.ts` takes `dcm2niix_flags` from
   `src/generated/contract.json` and adds `-o /out /in`, the paths of the worker's in-memory filesystem. The flags
   include `-l o -b y` (integer NIfTI, BIDS sidecar) and `-ba o` (omit patient identifiers, keep dates).
@@ -194,12 +190,71 @@ the conversions themselves.
 
 The e2e test (`e2e/intake.test.mjs`) opens the repo fixtures `packages/fmri-qa-io/tests/fixtures/dicom-qa/` (36 files,
 1 series) and `dicom/` (2 series, 8 DICOM files and one `generate.py` that is skipped as not DICOM) through the file
-input, and a `.zip` of `dicom-qa` built in the test. It converts the QA series and requires the outputs to be exactly
-one `.nii.gz` and one `.json` whose names, decompressed NIfTI bytes and sidecar equal what native dcm2niix writes for
-the same series (`fmriqa_io.import_dicom(..., names="dcm2niix")`, run in the test's setup with `uv run python`). It
-checks the datatype is an integer type, `scl_slope` is 1, and the sidecar has no `PatientName` or `PatientID`. Its
-last test waits for Python to be ready and checks that the page and the Pyodide worker saw no CSP violation or refused
-fetch and that no request left `file:`, `data:` and `blob:`.
+input, and a `.zip` of `dicom-qa` built in the test. It runs the QA series and requires the outputs to be exactly
+one `.nii.gz` and one `.json` whose dcm2niix names (the row's `data-dcm2niix-files`), decompressed NIfTI bytes and
+sidecar equal what native dcm2niix writes for the same series (`fmriqa_io.import_dicom(..., names="dcm2niix")`, run in
+the test's setup with `uv run python`). It then cancels the run and reads the files through the run table's download
+buttons (the init script captures `a[download]` blob downloads into `window.__downloads`), under the dcm2niix name or
+the QA one (the run names them as soon as Python is ready). It checks the datatype is an integer type, `scl_slope` is 1, and the sidecar has no `PatientName` or
+`PatientID`. Its last test waits for Python to be ready and checks that the page and the Pyodide worker saw no CSP
+violation or refused fetch and that no request left `file:`, `data:` and `blob:`.
+
+## Runs
+
+"Run QA on selected" runs the selected series. The state is a pure reducer, `src/core/run.ts` (unit-tested in
+`test/unit/run.test.ts`). `src/shell/drive.ts` is the sequence, with no DOM (unit-tested with a fake Python in
+`test/unit/drive.test.ts`), and `src/shell/run.ts` wires it to the page.
+
+1. Each series is converted in turn (`runOne`). A series is `queued`, `converting`, then `converted`, `failed` or
+   `cancelled`. A converted series gives one result per NIfTI: the `.nii.gz` with its `<stem>.json` sidecar and any other
+   `<stem>.*` file as a companion, grouped as `fmriqa_io`'s `filing.plan_names` does. A file that belongs to no NIfTI
+   is dropped, as the native import drops it.
+2. **dcm2niix's `-w 2` suffix.** Native dcm2niix converts a study in one go, and when a series' NIfTI name is taken it
+   writes the first free of `<stem>a` .. `<stem>y`, and fails the series when none is ("Too many NIFTI images with the
+   name"; `nii_createFilename` in `console/nii_dicom_batch.cpp`, which checks only for an existing NIfTI; its loop
+   assigns `<stem>z` last without checking it, so `z` is never used). Each of the
+   page's workers starts with an empty `/out`, so the run applies the same rule as each series converts, against the
+   NIfTIs of the series before it, renaming the NIfTI and every file of its stem together. Each row keeps the names
+   dcm2niix gave (`data-dcm2niix-files`). Which of two clashing series gets the suffix follows the page's (tree) order,
+   which need not be dcm2niix's.
+3. Once Python is ready, one `names_json` call names every output of the run. Only the sidecars' bytes are sent; every
+   other file goes as empty bytes. A Python that did not start and a `names_json` that raised (a `NameCollisionError`,
+   as the native import refuses) each fail every result of the run, which keeps its dcm2niix names.
+4. Each result is then analyzed with `analyze_json`, one at a time. A result is `naming`, `waiting-for-python`,
+   `analyzing`, then `done` or `failed`. A failure is either Python's own (`data-stage` says where) or anything else: a
+   rejected call, which is how a crashed worker shows, fails that result with the reason.
+
+The page is `working` for the whole run, so nothing else can be opened meanwhile. Cancel aborts the conversion in
+progress (dcm2niix can stop) and lets an analysis in progress finish (Python cannot) and keep its report; nothing new
+starts, queued series are cancelled and the results not yet analyzing fail as cancelled. An unexpected error ends the
+run the same way, with its reason in place of "cancelled". A new run replaces the old one.
+
+**The table** (`src/shell/ui/results.ts`, rebuilt on every change, giving the focused button back) has one row per
+result, `#results-body tr.result[data-series][data-stem][data-status][data-dcm2niix-files]` with `data-reason` and
+`data-stage` on a failure, and one `tr.job` row for a series that gave no NIfTI. What can be downloaded, from a result's
+row (`button[data-action]`), is exactly: the NIfTI (`nifti`), the sidecar when there is one (`sidecar`), each companion
+(`companion`), under their current names whatever happened to Python, and once done the report page
+(`html`, `<stem>.html`) and the record (`record`, `<stem>.qa.json`). Single files go through `src/shell/download.ts`.
+
+**The record file.** JSON from Python is never re-serialized in JS, which would turn `2.0` into `2`. `analyze_json`
+therefore also returns `record_document_json`: the document `fmri-qa --json` prints for that one scan
+(`schema_version`, `config`, `requested`, `scans`, `errors`; indent 2 and a closing newline), and the page saves that
+string as `<stem>.qa.json`.
+
+**The preview** is `<iframe id="preview" sandbox="" srcdoc>`: no `allow-scripts`, no `allow-same-origin`, so the report
+runs no script and has an opaque origin. It inherits the page's CSP, which its inline styles and `data:` images fit. A
+violation inside it would not be seen by the e2e tests: the page's listener does not hear the iframe's document.
+
+`e2e/run.test.mjs` runs both fixtures from `file://` and compares the page with `test/fixtures/expected.json`, which
+`scripts/web_expected.py` writes from a native run (`import_dicom` with native dcm2niix, then `name_outputs` and
+`analyze_series`, as `packages/fmri-qa-web/tests/test_launcher_parity.py` checks against the launcher).
+`packages/fmri-qa-web/tests/test_expected.py` fails when the file is stale, comparing numbers within a relative 1e-9 so
+that a different CPU's last bit does not (regenerate it with `uv run python scripts/web_expected.py`). `dicom-qa/` must
+give the native stem and record (numbers within a relative 1e-9, everything else exact, null included; in the
+`.qa.json`, `scans[0]` and the schema version), a `<title>` naming the stem, no `<script` in the report, the inert
+preview and every download under its QA name. Both series of `dicom/`, two volumes each, must fail at `analyze` with the
+native frame-count reason. Rows are matched by `data-stem`. The no-violation, no-refusal and no-request checks cover the
+whole flow, in the page and the Pyodide worker (not inside the preview, as above).
 
 ## Boot timings
 

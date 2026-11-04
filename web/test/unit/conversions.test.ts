@@ -19,9 +19,8 @@ describe('runOne', () => {
       o.log('Skipped d/x.dcm: not a deflated file');
       return ok(['a.json', 'a.nii.gz']);
     });
-    expect(r.status).toBe('ok');
     expect(r.messages).toEqual(['Warning: Patient Position not specified', 'Skipped d/x.dcm: not a deflated file']);
-    expect(r.files.map((f) => f.name)).toEqual(['a.json', 'a.nii.gz']);
+    expect(r.status === 'ok' && r.files.map((f) => f.name)).toEqual(['a.json', 'a.nii.gz']);
   });
 
   test('keeps what was logged before a rejection, wasm crash text included, and maps the error', async () => {
@@ -30,8 +29,7 @@ describe('runOne', () => {
       o.log('RuntimeError: memory access out of bounds');
       throw new Error('RuntimeError: memory access out of bounds');
     });
-    expect(r.status).toBe('failed');
-    expect(r.text).toBe('failed: dcm2niix crashed, probably out of memory (the series may be too large)');
+    expect(r).toMatchObject({ status: 'failed', reason: 'dcm2niix crashed, probably out of memory (the series may be too large)' });
     expect(r.messages).toEqual(['Skipped d/x.dcm: bad', 'RuntimeError: memory access out of bounds']);
   });
 
@@ -40,11 +38,11 @@ describe('runOne', () => {
       o.log('Error: no DICOM images');
       return { ...ok([]), exitCode: 2 };
     });
-    expect(r).toMatchObject({ status: 'failed', text: 'failed: dcm2niix exited with code 2', messages: ['Error: no DICOM images'] });
+    expect(r).toMatchObject({ status: 'failed', reason: 'dcm2niix exited with code 2', messages: ['Error: no DICOM images'] });
   });
 
   test('no output files fails', async () => {
-    expect(await runOne(series, [], wasm, signal, async () => ok([]))).toMatchObject({ status: 'failed', text: 'failed: dcm2niix wrote no files' });
+    expect(await runOne(series, [], wasm, signal, async () => ok([]))).toMatchObject({ status: 'failed', reason: 'dcm2niix wrote no files' });
   });
 
   test('an aborted signal is cancelled without converting', async () => {

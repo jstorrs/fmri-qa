@@ -1,0 +1,76 @@
+{
+  "packages/fmri-qa-io/tests/fixtures/dicom-qa": [
+    {
+      "stem": "20260909_143012_s002_QA_EPI_ISO",
+      "files": [
+        "20260909_143012_s002_QA_EPI_ISO.json",
+        "20260909_143012_s002_QA_EPI_ISO.nii.gz"
+      ],
+      "kind": "report",
+      "record": {
+        "scan": "20260909_143012_s002_QA_EPI_ISO.nii.gz",
+        "source": "20260909_143012_s002_QA_EPI_ISO.nii.gz",
+        "datetime": "2026-09-09 14:30:12",
+        "tr": 2.0,
+        "n_frames": 10,
+        "n_trimmed": 2,
+        "slice_index": 1,
+        "pe": "col",
+        "pe_axis": 1,
+        "phantom_fraction": 0.3441840277777778,
+        "phantom_contrast": 35.393231899027306,
+        "phantom_mask_ok": true,
+        "roi_inside_phantom": true,
+        "snr": 352.88890511929037,
+        "sfnr": 383.01436141160883,
+        "rdc": 18.239576855783973,
+        "drift_pct": 0.0,
+        "ghost_pct": 2.439726138540945,
+        "ghost_top_pct": 2.5990908601546554,
+        "ro_ghost_pct": 2.435192850984048,
+        "acr_ghost_pct": 0.0045332875568973585,
+        "outl_pct": 0.6305170239596469,
+        "outlier_worst_frame": 7,
+        "tc_outlier": 3.343917649867575,
+        "spec_outlier": 1.851393363803234,
+        "clip": 0,
+        "clip_kept": false,
+        "clip_pre": 0,
+        "motn": 0.0033421837351431333,
+        "scl_pct": 0.007704722295735684,
+        "shr_pct": 0.008690607570984011,
+        "com": 0.01150189453566597,
+        "displacement_unit": "mm",
+        "fw_pe": 1.750832651832928,
+        "fw_ro": 1.892754351291154,
+        "fwhm": 1.8204109756149585,
+        "fwhm_unit": "mm"
+      },
+      "warnings": []
+    }
+  ],
+  "packages/fmri-qa-io/tests/fixtures/dicom": [
+    {
+      "stem": "20260909_143012_s002_QA_EPI_ISO",
+      "files": [
+        "20260909_143012_s002_QA_EPI_ISO.json",
+        "20260909_143012_s002_QA_EPI_ISO.nii.gz"
+      ],
+      "kind": "failure",
+      "stage": "analyze",
+      "reason": "invalid frame count 2: expected at least 4 frame(s)",
+      "warnings": []
+    },
+    {
+      "stem": "20260909_145533_s011_QA_EPI_32ch_rep",
+      "files": [
+        "20260909_145533_s011_QA_EPI_32ch_rep.json",
+        "20260909_145533_s011_QA_EPI_32ch_rep.nii.gz"
+      ],
+      "kind": "failure",
+      "stage": "analyze",
+      "reason": "invalid frame count 2: expected at least 4 frame(s)",
+      "warnings": []
+    }
+  ]
+}

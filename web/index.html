@@ -23,7 +23,17 @@ body.dragging #drop { border-color: var(--fg); color: var(--fg); }
 .tree .row { display: flex; gap: .6rem; align-items: baseline; padding: .15rem 0; }
 .tree .title { flex: 1; display: flex; gap: .5rem; align-items: baseline; }
 .tree .chip, .tree .meta, .tree .pid, .tree .date { color: var(--muted); }
-#conversions li[data-status="failed"] { color: #b00020; }
+/* The table scrolls inside its own box, so the page never scrolls sideways on a phone. */
+.table-wrap { overflow-x: auto; }
+#results table { border-collapse: collapse; width: 100%; }
+#results th, #results td { text-align: left; vertical-align: top; padding: .3rem .5rem; border-bottom: 1px solid var(--muted); }
+#results td.name { overflow-wrap: anywhere; min-width: 10rem; }
+#results td ul { margin: .2rem 0 0; padding-left: 1rem; color: var(--muted); }
+#results td.actions { white-space: nowrap; }
+#results td.actions button { padding: .1rem .5rem; margin: 0 .2rem .2rem 0; }
+#results tr[data-status="failed"] .status { color: #b00020; }
+#preview { display: block; width: 100%; height: 75vh; margin-top: 1rem; border: 1px solid var(--muted); background: #fff; }
+#preview[hidden] { display: none; }
 pre { white-space: pre-wrap; overflow-wrap: anywhere; color: var(--muted); }
 </style>
 </head>
@@ -54,9 +64,19 @@ pre { white-space: pre-wrap; overflow-wrap: anywhere; color: var(--muted); }
 <p class="pick">
   <button type="button" id="select-all">Select all</button>
   <button type="button" id="select-none">Select none</button>
-  <button type="button" id="convert" disabled>Convert selected</button>
+  <button type="button" id="run" disabled>Run QA on selected</button>
 </p>
-<ul id="conversions"></ul>
+<section id="results" hidden>
+  <h2>Results</h2>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Series</th><th>Status</th><th>Notes</th><th>Files</th></tr></thead>
+      <tbody id="results-body"></tbody>
+    </table>
+  </div>
+  <!-- The report is shown inert: an empty sandbox allows no script and gives it no origin. -->
+  <iframe id="preview" sandbox="" title="Report preview" hidden></iframe>
+</section>
 <details id="log" hidden><summary>Messages</summary><ul id="log-list"></ul></details>
 <script type="module" src="/src/main.ts"></script>
 </body>

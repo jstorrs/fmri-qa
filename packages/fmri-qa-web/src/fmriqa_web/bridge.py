@@ -9,7 +9,9 @@ A JS array of strings via `toPy` is a `list[str]`.
 `allow_nan=False` makes a stray NaN a raised `ValueError` here instead of a
 document a browser's `JSON.parse` rejects. Records already carry `None` for
 non-finite floats (`metric_record`). Strings are returned verbatim, so JS must
-pass them on unparsed: a JS round trip turns `2.0` into `2`.
+pass them on unparsed: a JS round trip turns `2.0` into `2`. For the same
+reason a report also carries `record_document_json`, the text the page saves
+as `<stem>.qa.json` without parsing it.
 """
 
 import json
@@ -40,15 +42,26 @@ def _bytes(value: Buffer) -> bytes:
 def analyze_json(nifti: Buffer, sidecar: Buffer | None, stem: str) -> str:
     """Analyze one series; `{"kind": "report", ...}` or `{"kind": "failure", ...}`.
 
-    A series that fails to decode, analyze or render is a `"failure"` result,
-    not a raise. Raises to JS only `TypeError` for a `nifti` or `sidecar` that
-    is not a buffer.
+    A report adds `record_document_json`, the text of its `<stem>.qa.json`:
+    the document `fmri-qa --json` prints for that one scan. A series that
+    fails to decode, analyze or render is a `"failure"` result, not a raise.
+    Raises to JS only `TypeError` for a `nifti` or `sidecar` that is not a
+    buffer.
     """
     result = series.analyze_series(
         _bytes(nifti), None if sidecar is None else _bytes(sidecar), stem=stem
     )
-    kind = "report" if isinstance(result, series.SeriesReport) else "failure"
-    return _dumps({"kind": kind, **asdict(result)})
+    if isinstance(result, series.SeriesReport):
+        text = _document_text(result)
+        return _dumps(
+            {"kind": "report", **asdict(result), "record_document_json": text}
+        )
+    return _dumps({"kind": "failure", **asdict(result)})
+
+
+def _document_text(report: series.SeriesReport) -> str:
+    """Return the one-scan envelope exactly as `fmri-qa --json` prints it."""
+    return json.dumps(batch_document([report]), indent=2, allow_nan=False) + "\n"
 
 
 def names_json(files: Mapping[str, Buffer]) -> str:

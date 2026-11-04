@@ -202,3 +202,18 @@ def test_names_json_and_contract_json_round_trip() -> None:
 
 def _refuse(token: str) -> object:
     raise AssertionError(f"non-standard JSON token {token}")
+
+
+def test_a_report_carries_the_one_scan_document_as_file_text(phantom_bytes) -> None:
+    parsed = json.loads(bridge.analyze_json(*phantom_bytes, "p"))
+
+    text = parsed["record_document_json"]
+    direct = batch_document([analyze_series(*phantom_bytes, stem="p")])
+    assert text == json.dumps(direct, indent=2, allow_nan=False) + "\n"
+    document = json.loads(text)
+    assert document["schema_version"] == JSON_SCHEMA_VERSION
+    assert document["scans"] == [parsed["record"]]
+    assert document["errors"] == []
+    assert '\n      "tr": 2.0,\n' in text
+    failure = json.loads(bridge.analyze_json(b"junk", None, "j"))
+    assert "record_document_json" not in failure
