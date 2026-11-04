@@ -528,6 +528,24 @@ A driver that outgrows one file becomes a subpackage. The HTML driver holds `fig
 (rendering each panel to a standalone SVG), `resources` (the packaged template and
 stylesheet), and `run` (composing them into one page).
 
+## The Web Page
+
+The browser page is the same split, with the shell in TypeScript and the core in Python. It ships as one offline file, `web/dist/fmri-qa.html` ([web/README.md](../web/README.md)).
+
+- **`web/`** is the Vite + TypeScript app. `src/core/` holds pure functions over plain data (naming, ZIP layout, dcm2niix arguments, DICOM headers); `src/shell/` does the IO: the DOM, files, downloads and the workers.
+- **`fmriqa_web`** (`packages/fmri-qa-web`) is the Python glue. Its functions take bytes and return strings and bytes, with no file and no process, so they run under Pyodide, and the page calls them through one JSON bridge.
+- **Two workers**, so a crash in one cannot take the other down: Pyodide, which runs `fmriqa_web`, and dcm2niix in WebAssembly, started per series and terminated afterwards.
+
+What the page assumes about Python is committed, and a test fails when the two drift:
+
+| Check | Guards | Lives in |
+|---|---|---|
+| `web/src/generated/contract.json` | the dcm2niix flags and schema versions the app reads, as `fmriqa_web.contract()` returns them (regenerate with `scripts/web_contract.py`) | `packages/fmri-qa-web/tests/test_contract.py` |
+| `web/test/fixtures/expected.json` | native dcm2niix and fmri-qa results for the fixtures, which the e2e tests compare the page against (`scripts/web_expected.py`) | `packages/fmri-qa-web/tests/test_expected.py` |
+| `web/THIRD_PARTY_NOTICES.md` | the licence of everything the page bundles (`scripts/web_notices.py`) | `packages/fmri-qa-web/tests/test_notices.py`, and `--check` in `vite build` |
+
+`test_notices.py` skips without `web/vendor` and `web/node_modules`, so CI's `web` job runs it after `make web`. The size budget is checked by `web/scripts/size-check.mjs` in `npm run build`.
+
 ## Example: Complete Pattern
 
 ```python

@@ -9,7 +9,7 @@
   "scripts": {
     "check": "tsc --noEmit && tsc --noEmit -p test",
     "test": "vitest run",
-    "build": "vite build",
+    "build": "vite build && node scripts/size-check.mjs",
     "e2e": "node --test --test-concurrency=1 \"e2e/**/*.test.mjs\""
   },
   "dependencies": {

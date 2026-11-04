@@ -144,3 +144,86 @@ jobs:
           # The browser seam, checked against the installed artifact: no commands, no launcher, no artifact file.
           .venv-web-smoke/bin/python -c "import importlib.util as u, sys; import fmriqa_web; assert fmriqa_web.contract()['json_schema_version'], 'no contract'; assert u.find_spec('fmriqa_cli') is None and u.find_spec('fmriqa_launcher') is None, 'the web wheel pulled in a command line or the launcher'; assert 'netCDF4' not in sys.modules, 'importing fmriqa_web loaded netCDF4'"
           .venv-web-smoke/bin/python -c "from importlib.metadata import distribution; text = distribution('fmri-qa-web').read_text('licenses/LICENSE'); assert text and 'MIT License' in text, 'the web wheel ships no license text'"
+
+  # The browser page (web/README.md): type check and unit tests, the single-file build
+  # with its size budget, then the end-to-end tests in Chrome and Firefox. Separate from
+  # `check` because it downloads about 56 MB of Pyodide and runs for ten minutes or more.
+  web:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      # Puppeteer's build id for the Firefox the e2e tests drive; bump it to move Firefox.
+      # Chrome is the runner's own google-chrome (/usr/bin/google-chrome, e2e's default).
+      FIREFOX_BUILD: stable_159.0
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.9.8"
+          enable-cache: true
+
+      - name: Install Python
+        run: uv python install
+
+      - name: Install Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22.22.2"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      # The page's build runs `uv run --no-sync`, so the venv must be complete first.
+      # No docs group: this job never builds the documentation.
+      - name: Sync the locked environment
+        run: uv sync --all-packages --locked
+
+      - name: Install the npm dependencies
+        run: npm --prefix web ci
+
+      # web_vendor.py keeps a download whose sha256 matches, so the cache saves the Pyodide
+      # packages and nibabel. The workspace wheels are rebuilt (and the stale ones deleted)
+      # on every run, so the package sources are deliberately not in the key.
+      - name: Cache web/vendor
+        uses: actions/cache@v4
+        with:
+          path: web/vendor
+          key: web-vendor-${{ runner.os }}-${{ hashFiles('uv.lock', 'web/package-lock.json', 'scripts/web_vendor.py') }}
+          # Safe fallback: web_vendor.py keeps a cached download only if its sha256 matches the lock.
+          restore-keys: web-vendor-${{ runner.os }}-
+
+      - name: Cache Firefox
+        id: firefox
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/dicom-util/browsers/firefox
+          key: firefox-${{ runner.os }}-${{ env.FIREFOX_BUILD }}
+
+      # The install the web README describes: puppeteer's own browser downloader.
+      - name: Install Firefox
+        if: steps.firefox.outputs.cache-hit != 'true'
+        run: npx browsers install "firefox@${FIREFOX_BUILD}" --path "$HOME/.cache/dicom-util/browsers"  # the cache root: installs to <root>/firefox/<platform>-<build>/, where findFirefox looks
+        working-directory: web
+
+      - name: Type-check and unit-test the page
+        run: make web-check
+
+      # Includes the size budget (web/scripts/size-check.mjs) and the notices check.
+      - name: Build the page
+        run: make web
+
+      # With web/vendor present, the notices drift test runs instead of skipping.
+      - name: Test the page's Python side and scripts
+        run: uv run pytest packages/fmri-qa-web/tests/test_notices.py scripts/tests -q -rs  # -rs lists any skip, e.g. test_notices not finding web/vendor
+
+      - name: Run the end-to-end tests
+        run: E2E_BROWSERS=chrome,firefox npm --prefix web run e2e
+
+      - name: Keep the page from a tag
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: actions/upload-artifact@v4
+        with:
+          name: fmri-qa.html
+          path: web/dist/fmri-qa.html
+          if-no-files-found: error

@@ -27,6 +27,14 @@ versioning when the first stable public interface is released.
   `contract` take bytes and return the report page, the metrics record, the
   `import_dicom` file names and the dcm2niix flags, with no file and no
   process, so they run under Pyodide. It is never published.
+- **`fmri-qa.html`, the whole of fmri-qa as one offline page.** Save the file and
+  double-click it: it opens from `file://` with no network, no install and no
+  server, takes a folder of DICOM (or a `.zip`), converts each series with
+  dcm2niix in WebAssembly, runs the same analysis and report as the command line
+  under Pyodide, and downloads the NIfTI, report and `--json` record per series
+  or as one ZIP. It carries the licences of everything it bundles. Built from
+  `web/` with `make web`, which keeps it under a 72 MB budget; Chrome and Firefox
+  are tested in CI.
 
 ### Changed
 

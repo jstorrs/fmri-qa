@@ -1,5 +1,7 @@
 # Pyodide feasibility spike (2026-10-27)
 
+> The production page now lives in [`web/`](../../web/README.md); this is the spike that led to it.
+
 Question: can fmri-qa-core run in the browser as a single HTML file that is saved
 and double-clicked on a locked-down machine (`file://`, no network, no install),
 the way the sql.js-based exar1 viewer is delivered? The user picks a `.nii.gz` and

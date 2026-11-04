@@ -17,7 +17,7 @@ From the repo root:
 | `make web-vendor` | `npm ci` in `web/` (only when `package-lock.json` is newer than the install), then `uv run python scripts/web_vendor.py`: fills the gitignored `web/vendor/` (about 56 MB, downloaded once and cached) and writes `web/vendor/manifest.json` |
 | `make web-check` | the same `npm ci` if needed, then `tsc --noEmit` for the app and the tests, then the vitest unit tests (`test/unit/`) |
 | `make web-notices` | `make web-vendor`, then `uv run python scripts/web_notices.py`: rewrites the committed `web/THIRD_PARTY_NOTICES.md` ("Notices" below) |
-| `make web` | `make web-vendor`, then `vite build` to `web/dist/fmri-qa.html`; the build first runs `scripts/web_notices.py --check` and fails if the notices are stale |
+| `make web` | `make web-vendor`, then `vite build` to `web/dist/fmri-qa.html`; the build first runs `scripts/web_notices.py --check` and fails if the notices are stale, and `scripts/size-check.mjs` then fails it over 72 MB ("Limits" below) |
 | `make web-e2e` | `make web`, then `node --test e2e/**/*.test.mjs` (`boot.test.mjs`, `intake.test.mjs`, `run.test.mjs`, `about.test.mjs`) in Chrome and Firefox (`E2E_BROWSERS=chrome,firefox,webkit` to choose) |
 
 `scripts/web_vendor.py` collects:
@@ -356,6 +356,38 @@ Firefox: the dcm2niix conversion of the QA series, from files and from a .zip, g
 "Boot path": gunzip without a `Blob`, and pyodide.asm.mjs bundled into the worker instead of loaded from a `blob:` URL.
 It runs in Playwright's WebKit build on Linux, which is not Safari on macOS, so that remains untested. It is left out of
 the default `E2E_BROWSERS` only to keep `make web-e2e` at two browsers, as this step's acceptance asks.
+
+## Limits
+
+**Memory.** Series are processed one at a time, so the page holds one series' DICOM, NIfTI and report at once, not the
+whole study. dcm2niix runs in a fresh worker per series (a 2 GB WebAssembly heap) and Python runs in its own worker
+(Pyodide's heap grows as needed, up to the 32-bit WebAssembly limit). The browser may still share renderer memory between
+them. Files are read on the main thread, one at a time, and transferred. Downloads: where the browser has a save dialog
+(`showSaveFilePicker`) the ZIP is streamed to disk and memory stays flat. Elsewhere (Firefox, Safari) it is built as a
+Blob in memory, and `zip-sink.ts` asks first when the archive is predicted to exceed 2 GB (`BLOB_WARN_BYTES`, 2 x 1024^3
+bytes) because the whole archive is buffered and needs about that much free disk space when saving.
+
+**Out of memory.** A wasm abort cannot be caught and resumed. If dcm2niix runs out of memory, that series' result fails
+with "dcm2niix crashed, probably out of memory (the series may be too large)" and the other series are unaffected (its
+worker is terminated). If Python's worker dies, the page says "Python stopped. Reload the page to start it again." and
+the results so far stay on screen until the reload. Memory use is not measured; see "Known gaps".
+
+**Size budget.** `dist/fmri-qa.html` must be at most 72 MB, where MB is 1 000 000 bytes (every size in this file is in
+that unit). `web/scripts/size-check.mjs` runs after `vite build` in `npm run build`, so `make web` fails over the budget.
+It prints each embedded asset (the `<script type="application/octet-stream">` blocks: every Pyodide asset by name,
+`dcm2niix-wasm`, `notices-data`, and the JS), the total and the headroom. The page is 66.84 MB, 5.16 MB under. The unit tests
+for its parsing and arithmetic are `test/unit/size-check.test.ts`. The budget is `BUDGET_BYTES` in the script; raise it
+there and here together, with a reason.
+
+**Browsers.** Chrome and Firefox are tested on every `make web-e2e` and in CI: locally Chrome 149 and Firefox 159; in CI the
+runner's current Chrome (unpinned) and Firefox `FIREFOX_BUILD` (pinned). WebKit is opt-in
+(`E2E_BROWSERS=webkit`, see "WebKit"): it passes in Playwright's Linux build, which is not Safari on macOS, so Safari is
+untested. An older browser than those, or a real hospital machine, has not been tried.
+
+**CI.** The `web` job in `.github/workflows/ci.yml` runs `make web-check`, `make web`, the notices and script tests with
+`web/vendor` present, and the e2e tests in Chrome (the runner's) and Firefox (installed with
+`npx browsers install firefox@<build> --path ~/.cache/dicom-util/browsers` from `web/`, which is puppeteer's
+downloader, and cached). It uploads the page as an artifact on a tag.
 
 ## Known gaps
 
