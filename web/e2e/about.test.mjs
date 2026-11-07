@@ -49,5 +49,33 @@ for (const name of selectedBrowsers()) {
       assert.deepEqual(page.pageErrors, []);
       assert.deepEqual(page.requests.filter((u) => !/^(file|data|blob):/.test(u)), []);
     });
+
+    // scripts/vite-build-info.mjs: the footer says which build this is and links where a newer one is.
+    test('the footer names the build and links the site and the repository', async () => {
+      await page.goto(PAGE_URL);
+      const info = await page.evaluate(() => {
+        const p = document.getElementById('build-info');
+        return p && {
+          text: p.textContent,
+          version: p.dataset.version,
+          commit: p.dataset.commit,
+          links: [...p.querySelectorAll('a')].map((a) => ({ href: a.href, target: a.target, rel: a.rel })),
+        };
+      });
+      assert.ok(info, 'no #build-info in the footer');
+      assert.match(info.version, /^\d+\.\d+\.\d+/);
+      assert.match(info.commit, /^[0-9a-f]{40}$/);
+      assert.ok(info.text.startsWith(`fmri-qa ${info.version}, built from ${info.commit.slice(0, 7)} (`), info.text);
+      assert.deepEqual(
+        info.links.map((l) => l.href),
+        [
+          `https://github.com/jstorrs/fmri-qa/commit/${info.commit}`,
+          'https://jstorrs.github.io/fmri-qa/app/',
+          'https://jstorrs.github.io/fmri-qa/',
+          'https://github.com/jstorrs/fmri-qa',
+        ],
+      );
+      for (const l of info.links) assert.deepEqual([l.target, l.rel], ['_blank', 'noopener noreferrer']);
+    });
   });
 }

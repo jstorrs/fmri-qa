@@ -37,6 +37,7 @@ body.dragging #drop { border-color: var(--fg); color: var(--fg); }
 #preview[hidden] { display: none; }
 pre { white-space: pre-wrap; overflow-wrap: anywhere; color: var(--muted); }
 footer { margin-top: 2rem; border-top: 1px solid var(--muted); color: var(--muted); }
+footer a { color: inherit; }
 #about pre { max-height: 50vh; overflow: auto; font-size: 12px; }
 </style>
 </head>
@@ -83,6 +84,8 @@ footer { margin-top: 2rem; border-top: 1px solid var(--muted); color: var(--mute
 </section>
 <details id="log" hidden><summary>Messages</summary><ul id="log-list"></ul></details>
 <footer>
+  <!-- Which build this is and where a newer one is (scripts/vite-build-info.mjs fills it in). -->
+  <!--build-info-->
   <!-- The licences of what this file bundles. Keep it if you pass the file on (web/README.md, "Notices"). -->
   <details id="about"><summary>About &amp; licences</summary><pre id="notices"></pre></details>
 </footer>

@@ -1,6 +1,7 @@
 import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vite';
 import { viteSingleFile } from 'vite-plugin-singlefile';
+import { buildInfo } from './scripts/vite-build-info.mjs';
 import { classicDcm2niixGlue, dcm2niixVersion, dcm2niixWasmBlock } from './scripts/vite-dcm2niix.mjs';
 import { bundledPackages, noticesBlock } from './scripts/vite-notices.mjs';
 import { classicPyodideAsm, noInlinedWasm, pyodideAssets } from './scripts/vite-pyodide.mjs';
@@ -37,7 +38,7 @@ const packages = bundledPackages(); // one record across the page build and its 
 
 export default defineConfig({
   define: { __DCM2NIIX_VERSION__: JSON.stringify(dcm2niixVersion()) },
-  plugins: [viteSingleFile(), pyodideAssets(), dcm2niixWasmBlock(), noticesBlock(), noInlinedWasm(), packages.page, pageName()],
+  plugins: [buildInfo(), viteSingleFile(), pyodideAssets(), dcm2niixWasmBlock(), noticesBlock(), noInlinedWasm(), packages.page, pageName()],
   build: {
     modulePreload: { polyfill: false }, // useless in a single-file build
     rolldownOptions: { onLog: quietPyodide }, // Vite routes the worker build's logs through this one too
