@@ -10,6 +10,7 @@ const WEB = fileURLToPath(new URL('../', import.meta.url));
 const PAGE_URL = pathToFileURL(`${WEB}dist/fmri-qa.html`).href;
 const NOTICES = fs.readFileSync(`${WEB}THIRD_PARTY_NOTICES.md`, 'utf8');
 const HEADINGS = ['## Pyodide ', '## CPython ', '## dcm2niix ', '## numpy '];
+const BOOT_TIMEOUT_MS = 180_000; // as boot.test.mjs
 
 for (const name of selectedBrowsers()) {
   describe(name, () => {
@@ -22,7 +23,7 @@ for (const name of selectedBrowsers()) {
     });
     after(() => browser?.close());
 
-    test('"About & licences" shows the notices, with no network and no CSP violation', { timeout: 120_000 }, async () => {
+    test('"About & licences" shows the notices, with no network and no CSP violation', { timeout: BOOT_TIMEOUT_MS + 60_000 }, async () => {
       await page.goto(PAGE_URL);
       // Lazy: nothing is unpacked until the section is opened.
       const before = await page.evaluate(() => ({
@@ -31,6 +32,9 @@ for (const name of selectedBrowsers()) {
         notices: document.getElementById('about').dataset.notices ?? null,
       }));
       assert.deepEqual(before, { block: true, text: '', notices: null });
+      // The click is aimed at where the summary is, and while Python boots the stages above the footer keep pushing it
+      // down (by some 200 px in Chrome), so a click then can land beside it. Once booted the page holds still.
+      await page.waitFor(() => document.body.dataset.python !== 'booting', undefined, BOOT_TIMEOUT_MS);
       await page.click('#about > summary');
       await page.waitFor(() => document.getElementById('about').dataset.notices !== undefined);
       const state = await page.evaluate(() => ({
