@@ -7,7 +7,7 @@
 # stack is a separate group, `make sync-notebooks`.
 
 .PHONY: all format format-check lint typecheck pyright test test-cov license check sync sync-notebooks \
-	sync-docs docs docs-clean build bundle web-vendor web-notices web-check web web-e2e
+	sync-docs docs docs-clean build bundle web-vendor web-notices web-check web web-e2e pages
 
 all: lint typecheck pyright test
 
@@ -138,6 +138,17 @@ web: web-vendor
 
 web-e2e: web
 	npm --prefix web run e2e
+
+# The GitHub Pages site, as CI's `pages` job publishes it from main: the
+# documentation at the root and the browser page under app/
+# (scripts/pages_site.py). The link check runs again over the whole, so the
+# landing page under app/ is checked too.
+PAGES := build/pages
+
+pages: docs web
+	rm -rf $(PAGES)
+	uv run python scripts/pages_site.py $(SITE) web/dist/fmri-qa.html $(PAGES)
+	uv run python scripts/check_site_links.py $(PAGES)
 
 # CI-style gate: check each package ships the right LICENSE, then fail on any
 # formatting drift or lint hit, then run both type checkers and the tests with a

@@ -19,6 +19,7 @@ From the repo root:
 | `make web-notices` | `make web-vendor`, then `uv run python scripts/web_notices.py`: rewrites the committed `web/THIRD_PARTY_NOTICES.md` ("Notices" below) |
 | `make web` | `make web-vendor`, then `vite build` to `web/dist/fmri-qa.html`; the build first runs `scripts/web_notices.py --check` and fails if the notices are stale, and `scripts/size-check.mjs` then fails it over 72 MB ("Limits" below) |
 | `make web-e2e` | `make web`, then `node --test e2e/**/*.test.mjs` (`boot.test.mjs`, `intake.test.mjs`, `run.test.mjs`, `about.test.mjs`) in Chrome and Firefox (`E2E_BROWSERS=chrome,firefox,webkit` to choose) |
+| `make pages` | `make docs` and `make web`, then `scripts/pages_site.py` puts them together in `build/pages`: the documentation at the root, the page at `app/fmri-qa.html` with a landing page at `app/index.html` ("Publishing" below) |
 
 `scripts/web_vendor.py` collects:
 
@@ -388,6 +389,21 @@ untested. An older browser than those, or a real hospital machine, has not been 
 `web/vendor` present, and the e2e tests in Chrome (the runner's) and Firefox (installed with
 `npx browsers install firefox@<build> --path ~/.cache/dicom-util/browsers` from `web/`, which is puppeteer's
 downloader, and cached). It uploads the page as an artifact on a tag.
+
+## Publishing
+
+Every push to `main` publishes https://jstorrs.github.io/fmri-qa/: the documentation at the root, and the page at
+[`app/`](https://jstorrs.github.io/fmri-qa/app/), a landing page that opens or saves `app/fmri-qa.html`. The `pages` job
+in `.github/workflows/ci.yml` runs only after `check` and `web` both pass, and publishes what they built (the docs site
+and the e2e-tested page, passed on as workflow artifacts), assembled by `scripts/pages_site.py`. `make pages` builds the
+same site locally in `build/pages`.
+
+The page's footer says which build it is: `fmri-qa <version>, built from <commit> (<date>)`, where the version is
+fmri-qa-web's and the date the commit's, so two builds of one commit are the same file. "With local changes" follows the
+date when tracked files differed from that commit. It links that commit, the latest page on the site, the documentation
+and the repository, each opening in a new tab so the work on the page is kept. `scripts/vite-build-info.mjs` writes it
+in place of `<!--build-info-->` in `index.html`; someone with a saved copy compares it with the footer of the one on
+the site.
 
 ## Known gaps
 

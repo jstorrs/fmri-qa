@@ -6,6 +6,11 @@ SNR, SFNR, the Weisskoff radius of decorrelation (RDC), drift, temporal
 fluctuation, and two Nyquist-ghost measures (FBIRN percent ghost and the ACR/AAPM
 ghosting ratio). It renders a self-contained offline HTML report per scan.
 
+It also runs in a browser, with nothing to install:
+[open fmri-qa in your browser](https://jstorrs.github.io/fmri-qa/app/), or read
+the [documentation](https://jstorrs.github.io/fmri-qa/). Both are published
+from `main` (see `web/README.md`, "Publishing").
+
 ## The packages
 
 The project ships as five installable packages, plus a private sixth. Core calculates and reads no

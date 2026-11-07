@@ -7,6 +7,12 @@ Weisskoff radius of decorrelation, drift, temporal fluctuation and Nyquist
 ghosting. It publishes the result as a single netCDF-4 file that a report, a
 spreadsheet, or a trend database can read.
 
+To try it without installing anything, [open fmri-qa in your
+browser](https://jstorrs.github.io/fmri-qa/app/). It is a single HTML file:
+give it DICOM, choose the series, and it converts them with dcm2niix and
+analyzes each one on your machine, sending nothing anywhere. You can save the file and
+run it offline. The source is [on GitHub](https://github.com/jstorrs/fmri-qa).
+
 ```{toctree}
 :hidden:
 
