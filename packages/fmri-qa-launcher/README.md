@@ -8,85 +8,21 @@ on [`fmri-qa-core`](../fmri-qa-core) (analysis),
 parsers from [`fmri-qa-cli`](../fmri-qa-cli). It adds no third-party dependency
 of its own.
 
-The workspace's [user guide](../../docs/user-guide/index.md) covers the command
-line, the panel, and what a run writes. Build it from the workspace root with
-`make sync-docs && make docs`. It lands under `build/site`.
-
-## `fmri-qa-run`
-
-```
-fmri-qa-run DICOM_DIR OUTPUT_DIR [options]
+```console
+$ fmri-qa-run DICOM_DIR OUTPUT_DIR [options]
 ```
 
-Imports every series under `DICOM_DIR`, analyzes each, and writes one folder per
-series under `OUTPUT_DIR`, named for the series. Each folder holds the converted
-scan, its sidecar (when dcm2niix produced one), the `.qa.nc` analysis artifact,
-and a self-contained HTML report. `OUTPUT_DIR` is created if it does not exist. A
-series whose folder already exists is never overwritten. It is refused and
-reported, at no cost beyond the import it shared with the rest of the run.
+`fmri-qa-run` imports every series under `DICOM_DIR`, analyzes each, and writes
+one folder per series under `OUTPUT_DIR` with the converted scan, its sidecar,
+the `.qa.nc` analysis file and a self-contained HTML report. With no arguments,
+or as `fmri-qa-panel`, it opens a desktop panel that does the same. The user
+guide documents [the command](https://jstorrs.github.io/fmri-qa/user-guide/fmri-qa-run.html), including
+its options, output and exit codes, [the panel](https://jstorrs.github.io/fmri-qa/user-guide/panel.html)
+and [what a run writes](https://jstorrs.github.io/fmri-qa/user-guide/run-output.html).
 
-Options (`--help` documents each in full and reads from the same constants as the
-desktop panel's advanced-options fields):
-
-- `--trim-sec SECONDS`: initial volumes to drop as non-steady-state.
-- `--detrend {poly,spline}`: detrending method.
-- `--center {image,phantom}`: slice and ROI localization.
-- `--roi-size N`: fixed summary/Weisskoff ROI side, in voxels.
-- `--anonymize {pii,all,none}`: what the published sidecar keeps.
-- `--dcm2niix PATH`: use this dcm2niix executable instead of the bundled one.
-- `--open`: once the run finishes, open the report in a browser if exactly one
-  series was published, else the output directory (so a browser can list the
-  series folders).
-- `--version`: print the installed version and exit.
-
-With neither `DICOM_DIR` nor `OUTPUT_DIR`, `fmri-qa-run` opens the desktop panel
-described below. If `tkinter` has no display (no `$DISPLAY`) or this Python was
-built without `tkinter`, it prints a message and exits `2`. Giving only one
-directory, or any option without both, is a usage error, since the panel takes no
-command-line options.
-
-## The desktop panel
-
-Start it with `fmri-qa-run` and no arguments, or with `fmri-qa-panel`. That is a
-`gui-scripts` entry point, so on Windows it runs under `pythonw` with no console
-window. The panel is one window, titled "fMRI QA":
-
-- **DICOM folder** / **Output folder**: a text field and a "Browse…" button
-  (`tkinter.filedialog.askdirectory`) for each.
-- **Open the report when done**: checked by default (unlike `--open`, which
-  defaults off). When a run publishes anything, its report (or the output folder,
-  for several series) opens in a browser. An "Open results" button next to Run
-  does the same on demand and is enabled whenever anything was published.
-- **Show advanced options**: collapsed by default. It shows Trim, Detrend method,
-  ROI center, and ROI size, worded as in `--help`, with a note that these change
-  the numbers and are recorded in every report.
-- **Run** reads the form. If anything is wrong (a bad number, a missing
-  directory), a pop-up shows every problem at once. Otherwise it starts the run
-  on a background thread so the window stays responsive. A progress bar and
-  status line track each stage. A scrolling log records what `fmri-qa-run` sends
-  to stderr, plus the finish summary (how many series published, and one line per
-  refusal, failure, or warning). Cleanup warnings name any temporary directories
-  left behind. They do not change the progress bar or the run result.
-- **Closing the window** during a run asks it to stop after the series in
-  progress finishes, and says so on the status line. It never stops mid-series.
-  If no series has started, it stops after the import. Closing again before that
-  closes the window immediately, and the run finishes unwinding in the background,
-  so nothing partial is written to the output folder. Closing while idle closes
-  immediately. A crash is always reported on the status line and in the log before
-  any dialog, so the detail survives dismissing it.
-
-### stdout / stderr / exit codes
-
-- **stdout** carries only the path of each published report's HTML file, one per
-  line, so the command composes (for example, piped into a viewer).
-- **stderr** carries everything else: one progress line per stage of each series,
-  one per refused series, one per failed series and its reason, one per warning,
-  cleanup warnings naming leftover temporary directories (including after an
-  error), and a final summary line (`# N of M series published to OUTPUT_DIR`).
-- **Exit code** is `0` when every series found was published. It is `1` when any
-  series was refused or failed, when the DICOM directory had no series to import,
-  or when the run could not start (a bad request, a converter that could not
-  run). It is `2` for a usage error. Cleanup warnings do not change it.
+`--help` and the panel's advanced-options fields read their wording from the same
+constants. `fmri-qa-panel` is a `gui-scripts` entry point, so on Windows it runs
+under `pythonw` with no console window.
 
 ## What's here
 

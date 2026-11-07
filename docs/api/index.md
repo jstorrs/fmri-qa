@@ -11,13 +11,16 @@ subpackage's own `__all__`. There is one page each for {doc}`fmri-qa-core`,
 The **building blocks** are the names a module lists in its own `__all__` but its
 package does not re-export: the individual metrics, the preparation steps, the
 launcher's panel state. {doc}`building-blocks` documents them concisely, module
-by module, for readers who want one step of the pipeline. The command-line entry
-points are listed on {doc}`fmri-qa-cli`, which covers only `fmri-qa`,
-`fmri-qa-hilo`, `fmri-qa-import` and `fmri-qa-report`, and without their
-options. Each command's `--help` has those, and the repository's `README.md`
-covers them. The
-{doc}`user guide </user-guide/index>` covers `fmri-qa-report`, `fmri-qa-run` and
-the desktop panel.
+by module, for readers who want one step of the pipeline.
+
+The commands' options are not listed here. The user guide covers each command:
+{doc}`fmri-qa-run </user-guide/fmri-qa-run>`,
+{doc}`the panel </user-guide/panel>`,
+{doc}`fmri-qa-import </user-guide/fmri-qa-import>`,
+{doc}`fmri-qa and fmri-qa-hilo </user-guide/fmri-qa>` and
+{doc}`fmri-qa-report </user-guide/fmri-qa-report>`.
+{doc}`/user-guide/developers` gives an overview of the packages and the
+pipeline.
 
 ```{toctree}
 fmri-qa-core

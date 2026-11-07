@@ -1,45 +1,33 @@
-# The analysis artifact
+# The analysis file
 
-One `.qa.nc` file is the whole published result of analyzing one series: the
+The analysis file, a `.qa.nc`, is the whole result of analyzing one series. The
+analysis pages and the Python API call it the analysis artifact. It holds the
 settings the run was asked for, where the data came from, every scalar
 measurement, every curve, and the summary images with the geometry drawn on them.
-The calculation half produces it and the report half accepts nothing else. It is
-fully resolved, so a consumer never recomputes a metric.
+`fmri-qa --artifact` and `fmri-qa-run` write it, and a report is rendered from it
+alone. Every value is already computed, so a reader never recomputes a metric.
 
-This page documents the file. What each analysis puts into it is on that
-analysis's own page. The [analysis index](analyses/index.md) maps names to
-pages.
+To open one in MATLAB, R, Python or `ncdump`, see
+[reading an artifact elsewhere](#reading-an-artifact-elsewhere). The rest of this
+page documents the file. What each analysis puts into it is on that analysis's
+own page, and the [list of analyses](analyses/index.md) maps names to pages.
 
 ## The container
 
 The file is netCDF-4, written through the `netCDF4` package, which wraps the
-Unidata C library that MATLAB, R and Octave link against. What is written is what
-those readers were tested on.
+Unidata C library that MATLAB, R and Octave use. MATLAB needs no toolbox to read
+it, and R needs only `ncdf4` from CRAN. Each array is stored with:
 
-It is netCDF instead of a NumPy archive because a QA archive outlives the Python
-environment that wrote it, and the site reading it may have none. MATLAB's
-`ncread`, `ncinfo`, `ncdisp` and `ncreadatt` need no toolbox. R's `ncdf4` is on
-CRAN. `ncdump` ships with the netCDF tools, and xarray opens one in a call. A
-`.npz` needs npy-matlab, which someone has to find and install, and gives R only
-numeric arrays.
+- **compression**: zlib level 4 with the byte shuffle filter;
+- **a checksum**: `fletcher32`, verified on every read, so a flipped bit inside
+  an array's stored bytes is an error and not a plausible number;
+- **its own dimensions**, which may be zero-length: `images.phantom_hull` is
+  $(0, 2)$ when the mask is too small to have an outline.
 
-Version 4 rather than the classic version 1 buys three things this layout needs:
-
-- **Per-variable compression**: zlib level 4 with the byte shuffle filter, which
-  reorders a float64's bytes so like-magnitude exponents sit together.
-- **A per-variable checksum**: `fletcher32`, stored with every array and verified
-  on every read, so a flipped bit inside an array's stored bytes is an error and
-  not a plausible number.
-- **Zero-length dimensions**: `images.phantom_hull` is legitimately $(0, 2)$ when
-  the mask is too small to have an outline. netCDF-3 spells a zero-length
-  dimension as the unlimited one, and a file may have only one.
-
-Everything sits in the root group, because `xr.open_dataset` sees only the root
-group and Octave's group support is uneven. `Conventions` is claimed as CF-1.10, which the
-mask flags and labeled units follow. The dotted variable names deviate from CF's
-recommendation of letters, digits and underscores. They stay because the dotted
-path is the artifact's own vocabulary: a reader who sees `images.sfnr` in
-`ncdisp` can look it up in these pages.
+Everything is in the root group. `Conventions` is CF-1.10, which the mask flags
+and labeled units follow. Variable names are dotted paths, such as
+`images.sfnr`, the names these pages use. {doc}`developers` explains these
+choices.
 
 ## Dimensions and coordinates
 

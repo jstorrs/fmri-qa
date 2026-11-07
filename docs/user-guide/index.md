@@ -1,111 +1,81 @@
 # User guide
 
-## What is calculated, and how
+## Running QA
 
-Phantom fMRI quality-assurance metrics, following the Glover/FBIRN stability
-protocol. Given a 4-D phantom time series, `fmri-qa` measures how stable the
-scanner was during the acquisition and publishes the result as a single netCDF-4
-file that a report, a spreadsheet, or a trend database can read.
+fmri-qa takes a phantom fMRI series as DICOM and gives back a report and its
+numbers. Three ways to run it:
 
-These pages document the calculation, which belongs to `fmri-qa-core`. Reading the
-scan and writing the file belong to `fmri-qa-io`, and the `fmri-qa` command to
-`fmri-qa-cli`. Each analysis has a page covering what it is for, the computation
-with its equations and settings, a figure, and a table of what it adds to the
-artifact, under the names you will find in the file.
+- **{doc}`In the browser <browser>`**, with nothing to install. Good for trying
+  it, or for a machine where nothing can be installed.
+- **{doc}`The desktop panel <panel>`**, a window that runs a DICOM folder into
+  one report folder per series.
+- **{doc}`fmri-qa-run`**, the same run from a terminal or a script.
 
-```{toctree}
-:maxdepth: 2
-
-analyses/index
-artifact
-```
-
-- **"What does this number mean?"**: find it in the
-  [analysis index](analyses/index.md), which lists every measurement against the
-  page that publishes it.
-- **"How do I open this file?"**: [the analysis artifact](artifact.md) has the
-  MATLAB, R, Python and `ncdump` recipes, the dimensions and coordinates, and
-  the rule that separates a NaN from an absent value.
-- **"Can I trust this figure?"**: every figure on these pages is rendered when
-  the documentation is built, by running the installed pipeline on a synthetic
-  phantom (`docs/phantom.py`). A figure that stopped matching the package would
-  fail the build instead of going stale.
-
-## Rendering the result
-
-`fmri-qa-report` is the presentation half of fmri-qa. It renders one
-{doc}`analysis artifact <artifact>` into a single self-contained HTML page that
-opens by double-click, with no network and no companion file. Its command comes
-with `fmri-qa-cli`.
-
-The artifact is its only input. `fmri-qa-core` computed and stored every number,
-curve, mask and image the report draws, so a report can be rendered on another
-machine, long after the scan, with no acquisition data. An artifact read from
-disk renders the same as a fresh one. Nothing here recomputes a metric.
-
-Inside, content is separate from format. `summary` and `content` build the text,
-`panels` draws the matplotlib figures, and `formats/` holds one driver per output
-format. HTML is the only format today. Another would be a new driver reusing the
-same content and panels.
+The panel and the commands need {doc}`installing <install>` first.
 
 ```{toctree}
-:maxdepth: 2
+:maxdepth: 1
 
-fmri-qa-report
-report-page
-report-library
-```
-
-- **"How do I turn a `.qa.nc` into a page?"**: {doc}`fmri-qa-report`.
-- **"Can I put this on our website, or attach it to a QA record?"**:
-  {doc}`report-page` says what the file contains, what it needs from the
-  browser, and what an embedding site's Content-Security-Policy has to allow.
-- **"Can I render one from my own code, in our colors?"**:
-  {doc}`report-library`.
-
-## DICOM in, reports out
-
-`fmri-qa-launcher` is the application shell of fmri-qa. In one step, it takes a
-directory of DICOM files and writes one folder per series. Each folder holds the
-converted scan, its {doc}`analysis artifact <artifact>` and a self-contained HTML
-report.
-
-It computes and draws nothing itself. Conversion belongs to `fmri-qa-io`,
-analysis to `fmri-qa-core` and rendering to `fmri-qa-report`. Settings default
-to core's, so the numbers match a `fmri-qa` run by hand. This package adds the
-sequence (import, then analyze, archive, render and publish each series) and
-guarantees a series appears in the output folder only once all its files are
-finished. It adds no third-party dependency. The desktop panel uses the
-standard library's `tkinter`.
-
-### Two entry points
-
-- **`fmri-qa-run`** is the console command. Given a DICOM directory and an
-  output directory it runs once and reports on stdout and stderr; given
-  neither, it opens the desktop panel.
-- **`fmri-qa-panel`** opens the panel directly. It is installed as a GUI script,
-  so on Windows it runs under `pythonw` with no console window. `fmri-qa-run`
-  stays a console program because its output contract needs one.
-
-### The single-file executable
-
-`make bundle` builds `fmri-qa-run` as one executable, with the interpreter,
-all five packages and dcm2niix inside, for a machine with no Python. It is
-built with PyInstaller from an environment resolved from `uv.lock`, into
-`dist/bundle`. PyInstaller does not cross-compile, so the executable only runs
-on the platform it was built on. On Windows, where there is no `make`,
-`scripts/bundle.ps1` runs the same commands. Run with no arguments, the
-executable opens the panel like the installed command.
-
-```{toctree}
-:maxdepth: 2
-
-fmri-qa-run
+install
+browser
 panel
+fmri-qa-run
 run-output
 ```
 
-- **"How do I run it from a terminal or a script?"**: {doc}`fmri-qa-run`.
-- **"How do I run it without a terminal?"**: {doc}`panel`.
-- **"What ends up in the output folder, and what if a run is interrupted?"**:
-  {doc}`run-output`.
+## Reading the results
+
+The report is one HTML page per series: the headline numbers, any localization
+or clipping warning, the settings, the figures, and how each metric is defined.
+It applies no pass or fail thresholds. Each analysis has a page with its
+purpose, method and equations, and a figure from a synthetic phantom.
+
+```{toctree}
+:maxdepth: 2
+
+report-page
+analyses/index
+```
+
+- **"What does this number mean?"**: find it in the
+  [list of analyses](analyses/index.md), which names every measurement.
+- **"Can I trust this figure?"**: every figure on these pages is drawn when the
+  documentation is built, by running the pipeline on a synthetic phantom. A
+  figure that stopped matching the code would fail the build.
+
+## Step by step, and trending
+
+`fmri-qa-run` converts, analyzes and reports in one go. The steps are also
+commands of their own, for keeping the numbers over time or building your own
+workflow:
+
+```{toctree}
+:maxdepth: 1
+
+fmri-qa-import
+fmri-qa
+fmri-qa-report
+artifact
+```
+
+- **{doc}`fmri-qa-import`** converts DICOM to NIfTI with QA-safe dcm2niix
+  settings and names that sort.
+- **{doc}`fmri-qa`** analyzes NIfTI scans into a table, JSON for a trend
+  database, or analysis files. `fmri-qa-hilo` is on the same page.
+- **{doc}`fmri-qa-report`** renders an analysis file as a report.
+- **{doc}`The analysis file <artifact>`** (`.qa.nc`) holds every number, curve and
+  image, and opens in MATLAB, R and Python.
+
+## From Python
+
+```{toctree}
+:maxdepth: 1
+
+report-library
+developers
+```
+
+- **{doc}`report-library`**: render a report from your own code, in your own
+  colors.
+- **{doc}`developers`**: the packages, calculating from Python, building the
+  project, and the design notes.

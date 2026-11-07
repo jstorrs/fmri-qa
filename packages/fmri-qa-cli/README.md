@@ -7,8 +7,9 @@ pair, `fmri-qa-import` converts a DICOM directory into QA-ready NIfTI, and
 page itself is drawn by [`fmri-qa-report`](../fmri-qa-report), which installs as
 a dependency.
 
+Not on PyPI yet: see [installing](https://jstorrs.github.io/fmri-qa/user-guide/install.html).
+
 ```bash
-pip install fmri-qa-cli
 fmri-qa-import STUDY_DIR --out nifti/
 fmri-qa nifti/*.nii.gz --artifact artifacts/
 fmri-qa-report artifacts/scan.qa.nc --html report.html
@@ -30,6 +31,5 @@ Rendering an artifact into a report is
 [`fmri-qa-report`](../fmri-qa-report)'s job. The one-step pipeline from DICOM to
 report is [`fmri-qa-launcher`](../fmri-qa-launcher)'s.
 
-The workspace's [user guide](../../docs/user-guide/index.md) documents the
-analyses these commands run. Build it from the workspace root with
-`make sync-docs && make docs`. It lands under `build/site`.
+The [user guide](https://jstorrs.github.io/fmri-qa/user-guide/index.html) documents each command and the
+analyses they run.

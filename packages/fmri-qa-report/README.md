@@ -40,6 +40,6 @@ uses CSS alone. Dark mode follows the reader's OS setting, and figures stay on a
 white plate so plotted data keeps its colors. The page is print-ready. `--html`
 takes one artifact. A wildcard pattern that matches several is a usage error.
 
-The workspace's [user guide](../../docs/user-guide/index.md) covers the command,
-the page, and the Python API. Build it from the workspace root with
-`make sync-docs && make docs`. It lands under `build/site`.
+The user guide covers [the command](https://jstorrs.github.io/fmri-qa/user-guide/fmri-qa-report.html),
+[the page](https://jstorrs.github.io/fmri-qa/user-guide/report-page.html) and
+[rendering from Python](https://jstorrs.github.io/fmri-qa/user-guide/report-library.html).

@@ -7,8 +7,10 @@ scans, the `.qa.nc` artifact file, and DICOM import.
 native-library dependency, so it can run in the browser under Pyodide. Anything
 that touches a file or an external program lives here instead.
 
+Not on PyPI yet. Install it from GitHub, which brings `fmri-qa-core` with it:
+
 ```bash
-pip install fmri-qa-io
+uv pip install "fmri-qa-io @ git+https://github.com/jstorrs/fmri-qa#subdirectory=packages/fmri-qa-io"
 ```
 
 ```python
@@ -51,6 +53,5 @@ them. There the artifact container and DICOM import are unavailable, and
 The package root is lazy. Importing a Pyodide-safe submodule never imports the
 filesystem-bound ones.
 
-The workspace's [user guide](../../docs/user-guide/index.md) documents the
-artifact file in [`artifact.md`](../../docs/user-guide/artifact.md). Build the
-site from the workspace root with `make sync-docs && make docs`.
+[The analysis file](https://jstorrs.github.io/fmri-qa/user-guide/artifact.html) documents the `.qa.nc`
+format.

@@ -1,6 +1,9 @@
 # Rendering a report
 
-The `fmri-qa-report` command is installed by `fmri-qa-cli`.
+`fmri-qa-report` renders an {doc}`analysis file </user-guide/artifact>` as a
+self-contained HTML report ({doc}`report-page`). `fmri-qa-run` does this for
+every series it publishes, so you need it only for files saved with
+`fmri-qa --artifact`.
 
 ```console
 $ fmri-qa-report ARTIFACT --html FILE
@@ -55,9 +58,7 @@ also catches the same file reached through a relative path or a link.
 
 ## How the page is written
 
-The page is rendered fully in memory, written to a temporary file beside `FILE`,
-and renamed onto it. A reader never sees a partial page, and a failed render or
-write leaves an existing `FILE` as it was. The process umask applies instead of
-the owner-only mode a temporary file usually gets, so the page has the
-permissions of any new file (0644 under the usual umask of 022). Missing parent
-directories of `FILE` are created.
+The page is written in one step, so a reader never sees half of one, and a
+failed render leaves an existing `FILE` as it was. It gets the permissions of
+any new file (0644 under the usual umask of 022). Missing parent directories of
+`FILE` are created.

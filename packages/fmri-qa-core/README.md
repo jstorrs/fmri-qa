@@ -42,12 +42,10 @@ depends on nothing that draws and nothing that reads a file.
 
 ## What it calculates
 
-The workspace's [user guide](../../docs/user-guide/index.md) has a page per
+The [user guide](https://jstorrs.github.io/fmri-qa/user-guide/analyses/index.html) has a page per
 analysis: what it is for, the computation with its equations, a figure from
-running this package on a synthetic phantom, and the netCDF names it adds. It
-also has [`artifact.md`](../../docs/user-guide/artifact.md) on the file itself.
-Build the HTML from the workspace root with `make sync-docs && make docs`. The
-site lands in `build/site`.
+running this package on a synthetic phantom, and the netCDF names it adds. [The
+analysis file](https://jstorrs.github.io/fmri-qa/user-guide/artifact.html) documents the file itself.
 
 ## Commands
 
