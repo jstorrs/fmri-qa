@@ -6,6 +6,8 @@ name: CI
 on:
   push:
   pull_request:
+  # A "Run workflow" button in the Actions tab, to start a run without a push.
+  workflow_dispatch:
 
 # Cancel superseded runs on the same ref (e.g. a force-push mid-run).
 concurrency:
