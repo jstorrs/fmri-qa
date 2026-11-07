@@ -27,7 +27,7 @@ __all__ = [
 # of truth for the row/col label the metadata, report and CLI all show.
 #
 # Keyed by `PeAxis`, so a caller holding one can index straight in and the
-# artifact builder needs no lookup default for a case that cannot arise (see
+# analysis file builder needs no lookup default for a case that cannot arise (see
 # `analysis.build._pe_label`).
 PE_ROWCOL: dict[PeAxis, PeLabel] = {0: "row", 1: "col"}
 

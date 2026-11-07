@@ -55,7 +55,7 @@ workflow:
 fmri-qa-import
 fmri-qa
 fmri-qa-report
-artifact
+analysis-file
 ```
 
 - **{doc}`fmri-qa-import`** converts DICOM to NIfTI with QA-safe dcm2niix
@@ -63,7 +63,7 @@ artifact
 - **{doc}`fmri-qa`** analyzes NIfTI scans into a table, JSON for a trend
   database, or analysis files. `fmri-qa-hilo` is on the same page.
 - **{doc}`fmri-qa-report`** renders an analysis file as a report.
-- **{doc}`The analysis file <artifact>`** (`.qa.nc`) holds every number, curve and
+- **{doc}`The analysis file <analysis-file>`** (`.qa.nc`) holds every number, curve and
   image, and opens in MATLAB, R and Python.
 
 ## From Python

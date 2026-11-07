@@ -1,9 +1,9 @@
-"""`fmri-qa-report`: render a saved artifact into a one-file HTML report.
+"""`fmri-qa-report`: render a saved analysis file into a one-file HTML report.
 
 The presentation half's command, installed with this distribution. It reads
-`.qa.nc` artifacts written by `fmri-qa --artifact`, never a NIfTI series, so it
-can run on another machine, long after the calculation, without the acquisition
-data.
+`.qa.nc` analysis files written by `fmri-qa --analysis-file`, never a NIfTI
+series, so it can run on another machine, long after the calculation, without
+the acquisition data.
 """
 
 import argparse
@@ -19,7 +19,7 @@ from fmriqa_report.summary import package_version
 
 
 def _title(artifact: QAArtifact, path: str) -> str:
-    """Choose the section title for one artifact: its scan name, else the file."""
+    """Choose the section title for one analysis file: its scan name, else the file."""
     return artifact.provenance.scan or Path(path).name
 
 
@@ -27,7 +27,7 @@ def _parser() -> argparse.ArgumentParser:
     """Build the parser for the command line this command accepts."""
     parser = argparse.ArgumentParser(
         prog="fmri-qa-report",
-        description="Render an fmri-qa analysis artifact (.qa.nc) into a "
+        description="Render an fmri-qa analysis file (.qa.nc) into a "
         "single-file HTML report.",
     )
     parser.add_argument(
@@ -36,8 +36,9 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "artifacts",
         nargs="+",
-        metavar="ARTIFACT",
-        help="One analysis artifact from `fmri-qa --artifact`, or a pattern naming one",
+        metavar="ANALYSIS_FILE",
+        help="One analysis file from `fmri-qa --analysis-file`, "
+        "or a pattern naming one",
     )
     parser.add_argument(
         "--html",
@@ -49,7 +50,7 @@ def _parser() -> argparse.ArgumentParser:
 
 
 def report_main(argv: Sequence[str] | None = None) -> int:
-    """Render one artifact to a self-contained HTML report; return the status."""
+    """Render one analysis file to a self-contained HTML report; return the status."""
     parser = _parser()
     args = parser.parse_args(argv)
 
@@ -57,7 +58,7 @@ def report_main(argv: Sequence[str] | None = None) -> int:
     # doesn't.
     artifacts = expand_globs(args.artifacts)
     if len(artifacts) != 1:
-        parser.error("--html renders one artifact to one file")
+        parser.error("--html renders one analysis file into one page")
     (path,) = artifacts
 
     # Refuse before reading anything, while the input is still intact.

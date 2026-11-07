@@ -4,11 +4,11 @@ The type primitives every layer uses: the three numpy array aliases, the
 `Literal` sets passed and published as options, and the `Sidecar` mapping type.
 Nearly every module annotates against them, and a closed option set defined once
 can't drift. `FBIRN_ROI_SIZE` is here because both the layer that resolves an
-ROI and the artifact that records the requested size use it, and the artifact
+ROI and the analysis file that records the requested size use it, and the analysis file
 may not import the prep layer.
 
 `readout_axis` is the one function. It operates on a closed set defined here,
-and the three layers that need it (ghost, smoothness, artifact) would otherwise
+and the three layers that need it (ghost, smoothness, analysis file) would otherwise
 each spell `1 - pe_axis` and lose the type.
 
 The frozen dataclass value objects live with the operation that produces them:
@@ -100,7 +100,7 @@ def readout_axis(pe_axis: PeAxis) -> PeAxis:
     `1 - pe_axis` is shorter but evaluates to a plain `int`, which has to be
     re-narrowed at each use. This keeps the pair closed and gives the readout
     baseline one definition: the ghost's RO mask pair, `SmoothnessResult.ro_axis`
-    and the artifact's RO point-spread curve are all this same fact.
+    and the analysis file's RO point-spread curve are all this same fact.
     """
     return 1 if pe_axis == 0 else 0
 

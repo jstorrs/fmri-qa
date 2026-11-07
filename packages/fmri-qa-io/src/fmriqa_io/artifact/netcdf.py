@@ -1,4 +1,4 @@
-r"""The netCDF-4 container: the artifact's arrays as a self-describing file.
+r"""The netCDF-4 container: the analysis file's arrays as a self-describing file.
 
 Every array `decompose` produces is a netCDF variable under its dotted path
 (`curves.weisskoff.cv`, `images.ghost.pe_ghost`). A dot is a legal netCDF name
@@ -33,7 +33,7 @@ wheel is ~10 MB (libhdf5 and libnetcdf). Version 4 over classic version 1 buys:
 * **A checksum per variable.** `fletcher32` is verified on every read, so a
   flipped bit in an array is an error, not a plausible number. The `.npz` had
   this through its zip CRC. In netCDF-3 a single corrupted byte loads as a valid
-  artifact with wrong data almost half the time.
+  analysis file with wrong data almost half the time.
 * **Zero-length dimensions.** `images.phantom_hull` is `(0, 2)` when the mask is
   too small to outline. netCDF-3 spells a zero-length dimension as the unlimited
   one, and a file may have only one.
@@ -65,7 +65,7 @@ Layout:
 * **Masks are `u1`**, since netCDF-4 has no boolean type either. CF `flag_values`
   and `flag_meanings` mark them, which is how `read` turns them back into `bool`.
 * **Units and long names where certain.** Seconds, hertz, percent and
-  dimensionless ratios are labeled. Anything whose unit depends on the artifact
+  dimensionless ratios are labeled. Anything whose unit depends on the analysis file
   (PSF abscissas, mm or voxels per `curves.psf.unit`) or has none (raw image
   intensity) is not.
 
@@ -113,7 +113,7 @@ Costs:
   that would disable locking for the whole process, including code it knows
   nothing about.
 * Damage is only partly caught, and not by us. Of 408 single-byte flips over a
-  stored artifact, 153 were refused and 247 landed in slack space where they
+  stored analysis file, 153 were refused and 247 landed in slack space where they
   change nothing a reader can see. One sent a variable to another variable's
   intact chunk, which passes its own checksum and reads back as the wrong image.
   Seven aborted the process inside libhdf5, below any exception this module could
@@ -155,7 +155,7 @@ _FORMAT: Literal["NETCDF4"] = "NETCDF4"
 
 # Deflate level for every array variable. This is netCDF4's own default, kept
 # because the level hardly matters on this data. A QA image is mostly noise, so
-# levels 1 through 9 span under half a percent of an artifact's size. What moves
+# levels 1 through 9 span under half a percent of an analysis file's size. What moves
 # the size is the byte shuffle and the fact that the masks are bytes.
 _COMPLEVEL: Final = 4
 
@@ -166,7 +166,7 @@ _DOCUMENT = "document"
 
 # The rest of the global attributes, for a reader that never decodes the JSON.
 _CONVENTIONS = "CF-1.10"
-_TITLE = "fmri-qa phantom fMRI quality-assurance artifact"
+_TITLE = "fmri-qa phantom fMRI quality-assurance analysis file"
 
 # The range NC_INT holds, which every integer measurement has to fit.
 _INT32 = np.iinfo(np.int32)
@@ -208,7 +208,7 @@ class _Layout:
     """How one array is declared: its axes and what a reader should be told.
 
     `units` is omitted where the unit is not a fact about the layout (an
-    artifact's PSF abscissas are mm or voxels depending on what its header gave)
+    analysis file's PSF abscissas are mm or voxels depending on what its header gave)
     or where there is no unit to state, as for raw image intensity.
     """
 
@@ -309,7 +309,7 @@ class _Index:
     """An axis whose coordinate is the position along it: 0..n-1, as NC_INT.
 
     This is the index a reader would otherwise have to invent. It is published
-    so that two artifacts align on it and a plot has an abscissa. `comment` is
+    so that two analysis files align on it and a plot has an abscissa. `comment` is
     where an index that means more than its own position says so.
     """
 
@@ -319,7 +319,7 @@ class _Index:
 
 @dataclass(frozen=True, slots=True)
 class _Values:
-    """An axis labeled by an array the artifact already publishes.
+    """An axis labeled by an array the analysis file already publishes.
 
     That array stays where it is under its own dotted name. The coordinate is
     the same numbers again under the dimension's name, which is the only
@@ -341,7 +341,7 @@ class _Labels:
     poorly; the flag vocabulary matches what the masks use.
 
     `meanings` is either the names as one space-separated string, or a path into
-    the document to this artifact's list of names. The PSF directions need the
+    the document to this analysis file's list of names. The PSF directions need the
     second form: they are PE and RO, or axis0 and axis1 when no PE axis resolved,
     and a coordinate that said "PE RO" regardless would publish a claim the
     document contradicts.
@@ -361,7 +361,8 @@ _COORDINATES: dict[str, _Index | _Values | _Labels] = {
         "index of the analyzed frame",
         comment=(
             "0-based index into the analyzed series, which is what every frame "
-            "index in this artifact counts along: measurements.outlier_worst_frame "
+            "index in this analysis file counts along: "
+            "measurements.outlier_worst_frame "
             "indexes this axis directly, and the acquired volume number is this "
             "index plus provenance.n_trimmed, the warm-up volumes the run dropped."
         ),
@@ -409,14 +410,14 @@ class _NetcdfContent:
     """A whole netCDF-4 file, as a value: dimensions, variables, attributes.
 
     `encode` produces it and `write` pours it into a file. The split keeps
-    every way the layout can refuse an artifact before any file is opened, so a
+    every way the layout can refuse an analysis file before any file is opened, so a
     refusal cannot leave a partly written one behind. Those refusals are an
     array it does not declare, a rank that disagrees with the declaration, two
     arrays claiming one dimension at two lengths, an axis with no coordinate
     declared for it, and a measurement or provenance field no attribute can
     hold.
 
-    `variables` are the artifact's own arrays. `coordinates` are the axes
+    `variables` are the analysis file's own arrays. `coordinates` are the axes
     derived from them, kept apart because they are stored differently and
     nothing reads them back.
     """
@@ -430,7 +431,7 @@ class _NetcdfContent:
 def encode(
     text: str, stored: dict[str, Any], arrays: Mapping[str, Member]
 ) -> _NetcdfContent:
-    """Lay out an artifact's document and arrays as a netCDF-4 file.
+    """Lay out an analysis file's document and arrays as a netCDF-4 file.
 
     `text` is the document's JSON, stored verbatim, and `stored` is that same
     text parsed back: the caller round-trips once and hands over both.
@@ -552,7 +553,7 @@ def _index_coordinate(axis: str, length: int, declared: _Index) -> _Variable:
 def _global_attributes(text: str, stored: dict[str, Any]) -> dict[str, _AttributeValue]:
     """Build the whole file's attributes: the JSON document, plus what it says.
 
-    The document is the artifact's own record, unchanged from the `.npz` layout
+    The document is the analysis file's own record, unchanged from the `.npz` layout
     and still the only one `read` consults. Beside it are two conveniences for a
     reader that never decodes JSON: a cheap header, so it can tell what the file
     is and refuse a version it does not know, and every scalar the document
@@ -666,7 +667,7 @@ def _nc_int(name: str, value: int) -> np.int32:
     """Convert an integer to NC_INT, refusing rather than wrapping on overflow.
 
     Validation bounds counts below but not above, so a count past NC_INT is a
-    valid artifact that this layout cannot publish faithfully.
+    valid analysis file that this layout cannot publish faithfully.
     """
     if not _INT32.min <= value <= _INT32.max:
         raise ValueError(f"{name} is {value}, which does not fit a netCDF integer")
@@ -699,7 +700,7 @@ def _variable(
     """
     layout = _LAYOUT.get(name)
     if layout is None:
-        raise ValueError(f"{name} is not an array this artifact layout declares")
+        raise ValueError(f"{name} is not an array this analysis file layout declares")
     if array.ndim != len(layout.dimensions):
         raise ValueError(
             f"{name} has rank {array.ndim}, but the layout declares it over "
@@ -807,9 +808,9 @@ def _write_coordinate(dataset: "Dataset", axis: str, coordinate: _Variable) -> N
 
     A filtered variable costs HDF5 a fixed couple of kilobytes of filter and
     chunk-index metadata whatever it holds. Eleven coordinates deflated and
-    checksummed add 27,265 B to the test phantom's artifact (20%), against 3,322 B
+    checksummed add 27,265 B to the test phantom's analysis file (20%), against 3,322 B
     (2.5%) stored contiguously and plain. The checksum is not missed, because
-    `read` skips coordinates, so damage to an axis cannot reach a loaded artifact.
+    `read` skips coordinates, so damage to an axis cannot reach a loaded analysis file.
 
     An empty axis (`hull_vertex` for a mask too small to outline) stays chunked,
     since HDF5 has no contiguous layout for a dataset with no elements and
@@ -845,7 +846,7 @@ def _write_variable(dataset: "Dataset", name: str, variable: _Variable) -> None:
 
 
 def read(path: Path) -> tuple[str, dict[str, NDArray[Any]]]:
-    """Read the JSON text and every stored array from a netCDF artifact.
+    """Read the JSON text and every stored array from a netCDF analysis file.
 
     Masks come back as `bool`. The global attributes and coordinate variables
     are derived copies and are not read (a provenance string with no UTF-8 form
@@ -897,7 +898,7 @@ def read(path: Path) -> tuple[str, dict[str, NDArray[Any]]]:
 def _document_text(dataset: "Dataset", path: Path) -> str:
     """Read the JSON document carried by the file's `document` attribute."""
     if _DOCUMENT not in dataset.ncattrs():
-        raise InvalidArtifactError(path, "not an fmri-qa artifact archive")
+        raise InvalidArtifactError(path, "not an fmri-qa analysis file")
     text = dataset.getncattr(_DOCUMENT)
     if not isinstance(text, str):
         raise InvalidArtifactError(path, f"the {_DOCUMENT} attribute is not text")

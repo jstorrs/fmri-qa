@@ -3,7 +3,7 @@
 The command-line shell for [fmri-qa](../../README.md): `fmri-qa` analyzes
 scans, `fmri-qa-hilo` separates thermal from instability noise on a flip-angle
 pair, `fmri-qa-import` converts a DICOM directory into QA-ready NIfTI, and
-`fmri-qa-report` renders a saved artifact into a one-file HTML report. The report
+`fmri-qa-report` renders a saved analysis file into a one-file HTML report. The report
 page itself is drawn by [`fmri-qa-report`](../fmri-qa-report), which installs as
 a dependency.
 
@@ -11,11 +11,11 @@ Not on PyPI yet: see [installing](https://jstorrs.github.io/fmri-qa/user-guide/i
 
 ```bash
 fmri-qa-import STUDY_DIR --out nifti/
-fmri-qa nifti/*.nii.gz --artifact artifacts/
-fmri-qa-report artifacts/scan.qa.nc --html report.html
+fmri-qa nifti/*.nii.gz --analysis-file results/
+fmri-qa-report results/scan.qa.nc --html report.html
 ```
 
-With one scan, `--artifact` names the file to write, unless it is an existing
+With one scan, `--analysis-file` names the file to write, unless it is an existing
 directory. With several scans it is a directory, and each scan gets
 `<scan stem>.qa.nc` inside it.
 
@@ -27,7 +27,7 @@ entry points. `python -m fmriqa_cli` runs `fmri-qa`.
 Startup is cheap. `--help` and `--version` do not import scipy or scikit-image.
 
 It depends on `fmri-qa-core` and `fmri-qa-io` and on nothing that draws.
-Rendering an artifact into a report is
+Rendering an analysis file into a report is
 [`fmri-qa-report`](../fmri-qa-report)'s job. The one-step pipeline from DICOM to
 report is [`fmri-qa-launcher`](../fmri-qa-launcher)'s.
 

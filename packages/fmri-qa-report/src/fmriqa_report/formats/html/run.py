@@ -1,4 +1,4 @@
-"""Compose one self-contained, offline HTML page from a completed artifact.
+"""Compose one self-contained, offline HTML page from a completed analysis file.
 
 The stylesheet is inlined and every figure is embedded as a ``data:`` URI, so
 the page opens from ``file://`` with no network or sibling asset. A physicist
@@ -213,7 +213,7 @@ def _provenance(artifact: QAArtifact, report_version: str) -> str:
         ("Acquired at", provenance.datetime or "Unknown"),
         ("Analyzed at", provenance.created or "Unknown"),
         ("Core version", provenance.core_version or "Unknown"),
-        ("Loaded artifact schema", str(artifact.schema_version)),
+        ("Loaded analysis file schema", str(artifact.schema_version)),
         ("Report version", report_version or "Unknown"),
     )
     return "\n".join(_kv_row(label, value) for label, value in rows)

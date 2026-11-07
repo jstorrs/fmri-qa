@@ -6,7 +6,7 @@ fields, the ROI series and residual spectrum are extracted, the ghost regions
 and phantom outline are materialized, and the PSF model is sampled. No consumer
 has to re-derive anything from raw arrays or import `metrics`, `prep` or `load`.
 
-`analyze` is the one-call front door: series in, artifact out.
+`analyze` is the one-call front door: series in, analysis file out.
 """
 
 from dataclasses import replace
@@ -46,7 +46,7 @@ def analyze(
     name: str = "",
     source: str = "",
 ) -> QAArtifact:
-    """Run the QA pipeline on one series and publish the artifact.
+    """Run the QA pipeline on one series and publish the analysis file.
 
     `scan` in, `QAArtifact` out, with the heavy intermediates discarded.
     `settings` is the analysis request and carries the defaults. `name` and
@@ -265,7 +265,7 @@ def _convex_hull(mask: BoolArray) -> FloatArray:
     no area however many pixels it holds and which Qhull refuses ("initial
     simplex is flat"). It is a degenerate segmentation that shows up after the
     whole analysis has run, so it gets the empty polygon instead of losing the
-    artifact to a geometry library error.
+    analysis file to a geometry library error.
     """
     ys, xs = np.nonzero(mask)
     if xs.size < 3:

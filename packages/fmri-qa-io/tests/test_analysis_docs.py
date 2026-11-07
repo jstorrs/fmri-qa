@@ -10,7 +10,7 @@ erode one edit at a time.
 Every variable in the serializer's `_LAYOUT`, every coordinate in
 `_COORDINATES`, and every `Measurements` field must appear in exactly one
 analysis page's contribution table, and every `Provenance` field must be named
-in `artifact.md`.
+in `analysis-file.md`.
 
 Both tables are private to `fmriqa_io.artifact.netcdf`, and this imports them
 anyway. They are the layout the pages are checked against, and a public accessor
@@ -46,7 +46,7 @@ DOCS = Path(fmriqa_io.__file__).parents[4] / "docs" / "user-guide"
 ANALYSES = DOCS / "analyses"
 
 # The heading whose table is the page's ownership claim.
-CONTRIBUTION_HEADING = "## What it contributes to the artifact"
+CONTRIBUTION_HEADING = "## What it contributes to the analysis file"
 
 # A dotted name in backticks, anywhere on a page. The four prefixes are the ones
 # that name something the artifact actually holds.
@@ -127,7 +127,7 @@ def test_the_analysis_pages_are_there_to_check() -> None:
     """Guard the guard: an empty scan must not pass silently."""
     pages = _pages()
     assert len(pages) >= 8, f"expected one page per analysis, found {len(pages)}"
-    assert (DOCS / "artifact.md").is_file()
+    assert (DOCS / "analysis-file.md").is_file()
     tabled = [p.name for p in pages if _contribution_names(p)]
     assert len(tabled) >= 7, f"only {tabled} carry a contribution table"
 
@@ -161,7 +161,7 @@ def test_pages_never_spell_a_name_that_does_not_exist() -> None:
     known |= {f"provenance.{f.name}" for f in fields(Provenance)}
     known |= {f"settings.{f.name}" for f in fields(AnalysisSettings)}
     offenders: dict[str, list[str]] = {}
-    for page in [*_pages(), DOCS / "artifact.md"]:
+    for page in [*_pages(), DOCS / "analysis-file.md"]:
         text = page.read_text()
         for section, rest in DOTTED.findall(text):
             name = f"{section}.{rest}"
@@ -171,20 +171,20 @@ def test_pages_never_spell_a_name_that_does_not_exist() -> None:
 
 
 def test_every_setting_is_named_in_the_artifact_page() -> None:
-    text = (DOCS / "artifact.md").read_text()
+    text = (DOCS / "analysis-file.md").read_text()
     undocumented = [
         f.name for f in fields(AnalysisSettings) if f"`settings.{f.name}`" not in text
     ]
-    assert not undocumented, f"settings missing from artifact.md: {undocumented}"
+    assert not undocumented, f"settings missing from analysis-file.md: {undocumented}"
 
 
 def test_every_provenance_field_is_named_in_the_artifact_page() -> None:
-    text = (DOCS / "artifact.md").read_text()
+    text = (DOCS / "analysis-file.md").read_text()
     undocumented = [
         f.name for f in fields(Provenance) if f"`provenance.{f.name}`" not in text
     ]
     assert not undocumented, (
-        f"provenance fields missing from artifact.md: {undocumented}"
+        f"provenance fields missing from analysis-file.md: {undocumented}"
     )
 
 

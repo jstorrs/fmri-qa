@@ -32,7 +32,7 @@ api/index
   every measurement, with a page per analysis giving its method and equations.
 - **"What is in the report?"**: {doc}`/user-guide/report-page`.
 - **"How do I track the numbers over time?"**: {doc}`/user-guide/fmri-qa`
-  writes JSON for a trend database, and {doc}`/user-guide/artifact` shows how to
+  writes JSON for a trend database, and {doc}`/user-guide/analysis-file` shows how to
   open an analysis file in MATLAB, R or Python.
 - **"Can I put a report on our website?"**: {doc}`/user-guide/report-page`
   says what the file contains and what an embedding site has to allow.

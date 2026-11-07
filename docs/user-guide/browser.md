@@ -32,7 +32,7 @@ identifiers are left out of the sidecar and the dates are kept, as with
 `--anonymize pii`. The analysis uses the default settings.
 
 The JSON record is the document {doc}`fmri-qa --json <fmri-qa>` prints for that
-scan. The browser cannot write the netCDF {doc}`analysis file <artifact>`
+scan. The browser cannot write the netCDF {doc}`analysis file <analysis-file>`
 (`.qa.nc`). For that, run the installed commands.
 
 ## Large series

@@ -5,7 +5,7 @@ column comments say what each abbreviation means, since the header has no room.
 The machine-readable form of the same numbers is `record`.
 """
 
-# The `q.*` parameter annotations below name artifact types behind `fmriqa`'s
+# The `q.*` parameter annotations below name analysis file types behind `fmriqa`'s
 # lazy re-exports. Evaluated at `def` time, they would load `fmriqa.analysis`
 # just to import this module. Deferring them avoids that. That `--help` stays
 # off scipy and scikit-image is checked by `tests/test_startup.py`.
@@ -25,7 +25,7 @@ def localization_flag(m: q.Measurements) -> str:
     ordinary. No other column shows that, so it gets a column of its own, in
     capitals, ahead of the metrics it invalidates.
 
-    `?` is the third answer. An artifact migrated from a schema that predates
+    `?` is the third answer. An analysis file migrated from a schema that predates
     the check carries no verdict, which is not the same as passing it.
     """
     verdicts = (("MASK", m.phantom_mask_ok), ("ROI", m.roi_inside_phantom))

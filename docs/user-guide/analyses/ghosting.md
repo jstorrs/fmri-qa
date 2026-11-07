@@ -41,7 +41,7 @@ precedence over the weaker ones.
 plane, so the direction must be in-plane (NIfTI axis `0`/`i` or `1`/`j`). A
 through-plane (`2`/`k`) acquisition raises an input error. When no axis
 resolves, all four ghost measurements are NaN and the region masks are absent
-from the artifact.
+from the analysis file.
 
 ### The region-matched masks
 
@@ -145,7 +145,7 @@ Blue is the signal region, red the ghost region matched to it. The synthetic
 phantom has no real N/2 ghost, so both directions measure the background floor
 and the ACR difference is near zero, as in a well-calibrated acquisition.
 
-## What it contributes to the artifact
+## What it contributes to the analysis file
 
 | Name | Where it lives | Meaning |
 | --- | --- | --- |

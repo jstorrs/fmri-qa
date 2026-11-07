@@ -1,6 +1,6 @@
 """The installed distribution's version.
 
-A leaf module below every layer. `Provenance.core_version` stamps each artifact
+A leaf module below every layer. `Provenance.core_version` stamps each analysis file
 with the build that computed it, and `fmri-qa --version` prints it. The version
 comes from installed package metadata, so it needs nothing this package
 computes with. Kept beside `analyze`, which reaches the whole metrics stack,

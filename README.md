@@ -70,7 +70,7 @@ details, including using your own dcm2niix build.
 - **The numbers**: `fmri-qa` prints a table, or JSON for a trend database, and
   the `.qa.nc` analysis file holds every number, curve and image for MATLAB, R
   or Python. [Analyzing NIfTI scans](https://jstorrs.github.io/fmri-qa/user-guide/fmri-qa.html)
-  and [the analysis file](https://jstorrs.github.io/fmri-qa/user-guide/artifact.html).
+  and [the analysis file](https://jstorrs.github.io/fmri-qa/user-guide/analysis-file.html).
 
 ## What it measures
 

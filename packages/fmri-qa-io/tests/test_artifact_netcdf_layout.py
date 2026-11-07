@@ -26,7 +26,7 @@ def test_the_layout_declares_every_array_the_artifact_publishes(
 
 def test_encode_refuses_an_array_the_layout_does_not_declare(artifact, encode) -> None:
     document, arrays = decompose(artifact)
-    with pytest.raises(ValueError, match="not an array this artifact layout"):
+    with pytest.raises(ValueError, match="not an array this analysis file layout"):
         encode(document, arrays | {"curves.invented": np.zeros(3)})
 
 

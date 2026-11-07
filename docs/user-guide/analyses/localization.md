@@ -2,13 +2,13 @@
 
 ## What it is for
 
-Every other number in the artifact is measured through two pieces of geometry:
+Every other number in the analysis file is measured through two pieces of geometry:
 the phantom mask and the square summary ROI. Localization finds them and says
 whether they landed where they should.
 
 Both can fail quietly. A watershed that never separated phantom from background
 still returns a mask, and an ROI in air still yields an average. So the analysis
-publishes a verdict with the geometry. A reader of a stored artifact can then
+publishes a verdict with the geometry. A reader of a stored analysis file can then
 tell "the estimator declined" (a NaN beside a good mask) from "the analysis
 measured background" (a number beside a failed one). A bad mask raises nothing.
 A batch reports the scan and keeps going, and the affected metrics resolve to
@@ -26,7 +26,7 @@ phantom but is not the standard protocol. A slice with no recognizable phantom
 scores zero area, so a prescription running past the phantom cannot win by
 segmenting its own air. If no slice holds a phantom, the middle slice is used
 and a warning says so. The plane is recorded in provenance (`provenance.slice_index`
-of `provenance.n_slices`); without it, two artifacts of one series cannot be told
+of `provenance.n_slices`); without it, two analysis files of one series cannot be told
 apart.
 
 ### Segmenting the phantom
@@ -96,7 +96,7 @@ the phantom center under `--center phantom`. The phantom center is the mask
 voxel farthest from any background (the maximum of the Euclidean distance
 transform), which a ragged boundary disturbs less than a centroid. The side is
 clamped to the image bounds and the center shifted to keep the box on-image. The
-settings publish the *requested* side, and the artifact carries the box actually
+settings publish the *requested* side, and the analysis file carries the box actually
 used.
 
 Whether the box lies wholly inside the phantom is a separate field. An
@@ -154,7 +154,7 @@ $(0, 2)$ outline, not an error.
 Blue is the segmentation, orange its convex outline, red the summary ROI every
 scalar on the [stability](stability.md) page is averaged over.
 
-## What it contributes to the artifact
+## What it contributes to the analysis file
 
 | Name | Where it lives | Meaning |
 | --- | --- | --- |
@@ -176,10 +176,10 @@ The summary ROI is not an array, so it is four attributes: half-open bounds in
 array order, indexing the `row` and `col` axes.
 
 `analyze` always answers the two verdicts, so an absent verdict can only come
-from an artifact written before the field existed. It means *not recorded*,
+from an analysis file written before the field existed. It means *not recorded*,
 which is neither a pass nor a failure. A reader who treats it as either draws a
 conclusion the data does not support. `phantom_fraction` and `phantom_contrast`
-are NaN on those artifacts.
+are NaN on those analysis files.
 
 ## References
 

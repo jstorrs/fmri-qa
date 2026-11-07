@@ -1,6 +1,6 @@
 """The `QAArtifact` value objects: the calculation half's published output.
 
-An artifact holds what a reader (report, plot, spreadsheet, trend database)
+An analysis file holds what a reader (report, plot, spreadsheet, trend database)
 needs about one analyzed series and nothing more. The heavy inputs (the 4-D
 series, the trimmed center slice, the per-voxel fluctuations) stay in
 `pipeline.QAResult`. What crosses the seam is small, self-describing and
@@ -9,13 +9,13 @@ serializable (see `serialize`).
 Five sections, in the order a reader consumes them:
 
 * `AnalysisSettings` -- the knobs the run was asked for, plus what they resolved to
-  (defined in `settings`, since both `run_qa` and this artifact use it)
-* `Provenance`       -- where the data came from and what produced this artifact
+  (defined in `settings`, since both `run_qa` and this analysis file use it)
+* `Provenance`       -- where the data came from and what produced this analysis file
 * `Measurements`     -- the settled scalars (the numbers a table or a threshold reads)
 * `Curves`           -- the 1-D traces a stability plot draws
 * `ArtifactImages`   -- the four FBIRN summary images plus the overlays drawn on them
 
-Nothing here imports the metric, prep or load layers. An artifact is inert data.
+Nothing here imports the metric, prep or load layers. An analysis file is inert data.
 `build` projects a `QAResult` into one. `serialize` reads and writes it on disk.
 """
 
@@ -41,7 +41,7 @@ from ..types import BoolArray, FloatArray, LengthUnit, PeAxis, PeLabel
 # 7: the whole clipping block is now optional. `n_clipped_kept`,
 #    `n_clipped_pre`, `clipped_kept` and `clipped_any` are None together when
 #    the series was not stored as integers and the rail test could not be run.
-#: On-disk schema version of the QA artifact. Bumped on every incompatible layout
+#: On-disk schema version of the analysis file. Bumped on every incompatible layout
 #: change.
 ARTIFACT_SCHEMA_VERSION = 7
 
@@ -53,20 +53,20 @@ def _require(condition: bool, message: str) -> None:
 
 @dataclass(frozen=True, slots=True)
 class Provenance:
-    """Where the analyzed series came from, and what produced the artifact.
+    """Where the analyzed series came from, and what produced the analysis file.
 
     `scan` is the display name, `source` the path it was read from, `created` an
     ISO-8601 UTC timestamp, and `core_version` the calculating package's version.
     `tr` and `n_frames` describe the analyzed series, after the warm-up trim.
     `n_trimmed` is how many volumes the trim dropped. Every frame index in the
-    artifact (`Measurements.outlier_worst_frame`, `Curves.time`) counts from the
+    analysis file (`Measurements.outlier_worst_frame`, `Curves.time`) counts from the
     trimmed series, and `n_trimmed` maps one back to an acquired volume number.
     `slice_index` (0-based) and `n_slices` say which plane the images and every
     metric describe: the middle one under `center="image"`, the largest phantom
     cross-section under `center="phantom"`.
 
     `None` on `n_trimmed`, `slice_index` or `n_slices` means not recorded. The
-    artifact was migrated from a schema that predates the field. `scan`,
+    analysis file was migrated from a schema that predates the field. `scan`,
     `source`, `created`, `core_version`, `tr` and `n_frames` are required. The
     rest is acquisition metadata from the BIDS sidecar and NIfTI header, all
     optional because a scan without a sidecar still analyzes.
@@ -141,7 +141,7 @@ class Measurements:
 
     The localization fields say whether the other numbers can be trusted. A
     collapsed segmentation still yields a mask, and an ROI in background still
-    yields an average, so these let a stored artifact distinguish "the estimator
+    yields an average, so these let a stored analysis file distinguish "the estimator
     declined" (NaN with good localization) from "the analysis measured
     background". `phantom_mask_ok` is the verdict on the segmentation:
     `phantom_fraction` is a share a phantom can cover, and `phantom_contrast`
@@ -151,7 +151,7 @@ class Measurements:
     another distribution cannot import. The two numbers stay so a report can say
     which test failed.
 
-    Both verdicts are `None`, and the fraction and contrast NaN, in an artifact
+    Both verdicts are `None`, and the fraction and contrast NaN, in an analysis file
     migrated from a schema that predates them (see `serialize`). That means "not
     recorded", neither a pass nor a failure. `analyze` never produces it.
 
@@ -161,14 +161,14 @@ class Measurements:
     artifact (see `metrics.saturation`). The other three clipping fields are None
     with it. `clip_ceiling` and `clip_bits` are also None for a determinable
     series with no rail, so test `clipped_any` first. Treating None as "clean"
-    reports a scanner verified by a check that never ran. An artifact from
+    reports a scanner verified by a check that never ran. An analysis file from
     schema <= 6 always answers True or False here, because the build that wrote
     it always answered. That False means "found no rail", not "the storage was
     checked".
 
     `displacement_unit` covers both `max_translation` and `max_com_displacement`,
     since `run_qa` gives both estimators the same in-plane `VoxelSize`. A migrated
-    artifact can differ from `fwhm_unit`: schema <= 5 published these peaks in
+    analysis file can differ from `fwhm_unit`: schema <= 5 published these peaks in
     voxels even when the voxel size was known, so `displacement_unit` is "vox"
     beside a `fwhm_unit` of "mm" (see `serialize.migrate`).
 
@@ -260,7 +260,7 @@ class Measurements:
         )
         # `clipped_any`/`clipped_kept` are properties of the counts in
         # `metrics.saturation.SaturationResult`, stored again only because the
-        # artifact is flat. The check above guarantees all clipping fields are
+        # analysis file is flat. The check above guarantees all clipping fields are
         # None or none are. The guard below only narrows the type.
         if self.n_clipped_kept is None or self.n_clipped_pre is None:
             return
@@ -375,7 +375,7 @@ class RoiBox:
     def __post_init__(self) -> None:
         """Refuse a box unless square, with a positive side and non-negative origin."""
         # The same message the image-shape half uses, so a reader of a refused
-        # artifact learns which box is wrong, not which check caught it.
+        # analysis file learns which box is wrong, not which check caught it.
         _require(
             0 <= self.row0 < self.row1
             and 0 <= self.col0 < self.col1
@@ -432,8 +432,10 @@ class ArtifactImages(ArrayValue):
 class QAArtifact:
     """One analyzed series, as everything downstream needs and nothing more.
 
-    The output of the calculation half (`analyze`) and the only input the report
-    half accepts. Immutable, self-describing and round-trippable through
+    The contents of an analysis file (`.qa.nc`), in memory. The docs call both
+    the analysis file; the type keeps its older name. It is the output of the
+    calculation half (`analyze`) and the only input the report half accepts.
+    Immutable, self-describing and round-trippable through
     `fmriqa_io.save_artifact`/`load_artifact`. The class constant
     `schema_version` is the layout those two agree on (loading migrates every
     file up to it).

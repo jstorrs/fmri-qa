@@ -46,7 +46,7 @@ def same_file(a: str | Path, b: str | Path) -> bool:
     """Whether two paths name one file, through relative forms and links.
 
     An output that names one of its inputs, or a report's `--html` that names the
-    artifact it reads, destroys that file when the writer moves its result into
+    analysis file it reads, destroys that file when the writer moves its result into
     place. Spelling doesn't reveal it (`./scan.nii.gz` and an absolute path, a
     symlink and its target, two hard links). Existing files are compared by
     identity; a path that doesn't exist yet by where it would be created.

@@ -1,13 +1,13 @@
 """Bring a stored document up to the current schema, one version step at a time.
 
-An artifact outlives the build that wrote it, so a schema bump must not orphan a
+An analysis file outlives the build that wrote it, so a schema bump must not orphan a
 QA archive a trend database has filled for months. Every older layout this build
 knows a route from is migrated forward here, in memory, on read.
 
 Each `_vN_to_vN1` handles one version bump, and `migrated` applies them in
 sequence. A field the older schema did not carry comes back unknown, never
 reconstructed, because a value this build derives would be a fact about this
-build, not about the artifact.
+build, not about the analysis file.
 
 Bumping `ARTIFACT_SCHEMA_VERSION` is not done until the outgoing version has a
 committed fixture. Run the old code (a `git worktree` checkout of the last commit
@@ -50,7 +50,7 @@ def _v2_to_v3(document: dict[str, Any]) -> dict[str, Any]:
     The verdict is not re-derived from the stored fraction. The bounds belong to
     the segmentation in `prep`, which this module does not import at read time
     (see `analysis`), and a verdict from another build's bounds would describe
-    this build, not the artifact.
+    this build, not the analysis file.
     """
     document["measurements"]["phantom_mask_ok"] = None
     return document
@@ -74,7 +74,7 @@ def _v4_to_v5(document: dict[str, Any]) -> dict[str, Any]:
 
     The writing build made both measurements and did not write them down. The
     slice cannot be re-derived, since it depends on the volume, which the
-    artifact does not carry. The contrast could only be recomputed with this
+    analysis file does not carry. The contrast could only be recomputed with this
     build's definition. Schema 4 also stored `settings.roi_size` already clamped
     to the image. That value still reproduces the run, so it is left as it is.
     """
@@ -90,13 +90,13 @@ def _v5_to_v6(document: dict[str, Any]) -> dict[str, Any]:
     reconstructed", because there is nothing to reconstruct.
     `MotionResult.max_translation` and `CenterOfMassResult.max_displacement` used
     to compute a voxel `np.hypot` unconditionally, whether or not the voxel size
-    was known. So every schema <= 5 artifact's stored numbers *are* voxels. That
+    was known. So every schema <= 5 analysis file's stored numbers *are* voxels. That
     is a documented fact about the old format, not a value only this build could
     derive. `displacement_unit` is recorded as "vox" outright. `LengthUnit` has
     no unknown state to fall back on.
 
-    A migrated artifact can therefore have `displacement_unit` "vox" beside a
-    `fwhm_unit` of "mm". That is real history, not a bug. Only an artifact this
+    A migrated analysis file can therefore have `displacement_unit` "vox" beside a
+    `fwhm_unit` of "mm". That is real history, not a bug. Only an analysis file this
     build produces is guaranteed to have both agree (see
     `Measurements.displacement_unit`). The stored values are left untouched.
     Converting them to mm with `Provenance.voxel_mm` would publish this build's
@@ -114,9 +114,9 @@ def _v6_to_v7(document: dict[str, Any]) -> dict[str, Any]:
     value, because the build that wrote it ran the test unconditionally and
     recorded a bool. This step edits nothing.
 
-    It cannot audit those bools. A schema 6 artifact built from a
+    It cannot audit those bools. A schema 6 analysis file built from a
     float-converted NIfTI carries `clipped_any` False, which this build would
-    call not determinable, but the artifact does not record the storage datatype.
+    call not determinable, but the analysis file does not record the storage datatype.
     Rewriting to None would condemn every genuinely clean scan with them, so the
     values stay, as with the steps above. `Measurements` says what a schema <= 6
     False is worth.
@@ -171,7 +171,7 @@ def migrated(document: dict[str, Any], path: Path) -> dict[str, Any]:
     document["schema_version"] = ARTIFACT_SCHEMA_VERSION
 
     warn(
-        f"{path}: artifact written under schema {found}, migrated to "
+        f"{path}: analysis file written under schema {found}, migrated to "
         f"{ARTIFACT_SCHEMA_VERSION}; fields the older schema did not carry are "
         f"recorded as unknown, not as measurements.",
     )

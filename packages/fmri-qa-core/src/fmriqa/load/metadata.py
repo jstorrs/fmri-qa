@@ -146,7 +146,7 @@ def scan_meta(
     NIfTI header, which `fmriqa_io` decodes. `tr` is passed in already resolved,
     so the report shows the TR the pipeline ran on. The sidecar's optional
     fields are type-checked here at the boundary, so a malformed value is
-    diagnosed against its file and doesn't surface as an unreadable artifact
+    diagnosed against its file and doesn't surface as an unreadable analysis file
     months later. A field that fails is recorded as unknown, with a warning.
 
     Raises

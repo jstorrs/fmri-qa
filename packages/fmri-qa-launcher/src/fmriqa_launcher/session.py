@@ -1,6 +1,6 @@
 """The functional core: one DICOM directory in, one report per series out.
 
-`run_session` is the whole pipeline: import, analyze, save the artifact,
+`run_session` is the whole pipeline: import, analyze, save the analysis file,
 render the report. It runs once per series in a staging directory and
 publishes a series only once all its files exist. A series lands in
 `output_dir` complete or never appears there, whatever failed. This matters
@@ -303,7 +303,7 @@ def _publish_series(
         warnings.simplefilter("always")
         try:
             scan = fmriqa_io.load_scan(scan_path)
-            # Use the published path: it goes into the artifact's provenance
+            # Use the published path: it goes into the analysis file's provenance
             # and the report's "Source" row, and the staging path vanishes.
             artifact = fmriqa.analyze(
                 scan,

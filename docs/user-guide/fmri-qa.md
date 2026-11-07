@@ -2,7 +2,7 @@
 
 `fmri-qa` analyzes phantom series that are already NIfTI, such as those
 {doc}`fmri-qa-import` writes. It prints one table row per scan, and can also
-write the numbers as JSON or save each scan's {doc}`analysis file <artifact>`
+write the numbers as JSON or save each scan's {doc}`analysis file <analysis-file>`
 for a report. {doc}`fmri-qa-run` does the import, analysis and report in one
 step; use `fmri-qa` when you want the numbers.
 
@@ -58,23 +58,23 @@ are.
 | `--center` | `image` | localization: the middle slice and the image center (the Glover convention), or `phantom`: the slice with the largest phantom cross-section and the phantom's detected center |
 | `--roi-size` | `21` | side of the summary and Weisskoff ROI, in voxels |
 | `--json` | — | write the numbers as JSON on stdout instead of the table |
-| `--artifact PATH` | — | save each scan's analysis file, for a report or for trending |
+| `--analysis-file PATH` | — | save each scan's analysis file, for a report or for trending |
 | `--version` | — | print the version and exit |
 
 {doc}`fmri-qa-run` explains where each analysis setting is used.
 
 ## Saving the analysis file
 
-`--artifact PATH` saves everything the analysis produced (the settings, where the
+`--analysis-file PATH` saves everything the analysis produced (the settings, where the
 data came from, every measurement and curve, and the summary images) as one
 compressed netCDF-4 file. {doc}`fmri-qa-report` renders it as a report, and
-MATLAB, R and Python read it directly ({doc}`artifact`).
+MATLAB, R and Python read it directly ({doc}`analysis-file`).
 
 With one scan, `PATH` is the file to write. With several, or when `PATH` is an
 existing directory, it gets one `<scan>.qa.nc` per scan:
 
 ```console
-$ fmri-qa data/*_fMRI_*.nii.gz --artifact artifacts/
+$ fmri-qa data/*_fMRI_*.nii.gz --analysis-file results/
 ```
 
 An existing file is replaced in one step, so a reader never sees half of one. An

@@ -1,4 +1,4 @@
-"""Annotation-driven helpers for the frozen records the artifact publishes.
+"""Annotation-driven helpers for the frozen records the analysis file publishes.
 
 Two things every scalar record needs from its own annotations: reading them
 reliably (`resolved_annotations`), and holding a float field to a float
@@ -35,7 +35,7 @@ def resolved_annotations(cls: type) -> dict[str, Any]:
     class becomes a string, and a reader comparing against `float` would see
     `"float"` and misread every field. `get_type_hints` evaluates annotations in
     the class's own module however they're stored. It runs on every record built
-    and every artifact loaded or saved, so the result is cached.
+    and every analysis file loaded or saved, so the result is cached.
     """
     return get_type_hints(cls)
 

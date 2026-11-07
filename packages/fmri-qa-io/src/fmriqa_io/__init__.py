@@ -1,7 +1,7 @@
 """File formats and filesystem IO for fmri-qa.
 
 This package holds what touches files or external programs: NIfTI decoding,
-the netCDF artifact container, the dcm2niix runner and atomic file writes.
+the netCDF analysis file container, the dcm2niix runner and atomic file writes.
 `fmri-qa-core` stays pure so it can run in the browser under Pyodide.
 
 Import rule: the package root is lazy, so importing one Pyodide-safe submodule

@@ -100,14 +100,14 @@ InstabilityFraction          0.0412
 
 There is no figure. The analysis reduces a pair of runs to ten scalars.
 
-## What it contributes to the artifact
+## What it contributes to the analysis file
 
-**Nothing.** `fmri-qa-hilo` writes no artifact. It has no `--artifact` flag,
+**Nothing.** `fmri-qa-hilo` writes no analysis file. It has no `--analysis-file` flag,
 it produces a `HiLoResult` instead of a `QAArtifact`, and none of the
 quantities above appears in a `.qa.nc` file. Its output is the text table above,
 on stdout.
 
-This is by design. The artifact describes **one analyzed series**: its
+This is by design. The analysis file describes **one analyzed series**: its
 provenance names one scan, one source, one TR, one frame count. A hi/lo result
 describes a *pair*, and two scans, two flip angles, and two variances have no
 home in that layout. It also stays out of the per-scan batch table, where a

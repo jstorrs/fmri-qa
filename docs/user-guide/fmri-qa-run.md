@@ -23,7 +23,7 @@ missing and must not be `DICOM_DIR`.
 | `--version` | — | print the installed version and exit |
 
 The four analysis settings match `fmri-qa`'s, with the same defaults. Each is
-recorded in the artifact and shown in the report, and explained where it is
+recorded in the analysis file and shown in the report, and explained where it is
 used:
 
 - `--trim-sec`: {doc}`/user-guide/analyses/stability` describes the trim every

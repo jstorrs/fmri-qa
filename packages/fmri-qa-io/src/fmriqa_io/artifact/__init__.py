@@ -53,7 +53,7 @@ __all__ = ["load_artifact", "save_artifact"]
 # reader that understands it stay in one file.
 _MAGIC_BYTES = max(len(netcdf.MAGIC), len(npz.MAGIC))
 
-# How a malformed artifact or document fails in decompose, compose, validate or
+# How a malformed analysis file or document fails in decompose, compose, validate or
 # encode: a missing key, a field of the wrong shape or type, a closed-set string
 # from outside its set, an int too large for its container. One set serves both
 # directions, because a member added to one side alone would let the other
@@ -80,17 +80,17 @@ def save_artifact(artifact: QAArtifact, path: str | Path) -> Path:
     something that never saw the run, so an interrupted write must leave the
     destination untouched.
 
-    The artifact is checked against the reader's contract before anything is
+    The analysis file is checked against the reader's contract before anything is
     written, so a write that succeeds is one `load_artifact` will accept.
     Otherwise a bad value (a malformed sidecar field, say) would survive saving,
-    fail only when a report opens the file, and replace any valid artifact
+    fail only when a report opens the file, and replace any valid analysis file
     already at `path`. The whole file is laid out before anything is opened, so
-    an artifact the container cannot hold is refused just as early.
+    an analysis file the container cannot hold is refused just as early.
 
     Raises
     ------
     InvalidArtifactError
-        If the artifact would not read back. Nothing is written, and an existing
+        If the analysis file would not read back. Nothing is written, and an existing
         file at `path` is left as it was.
     """
     out = Path(path)
@@ -107,7 +107,7 @@ def save_artifact(artifact: QAArtifact, path: str | Path) -> Path:
         content = netcdf.encode(text, stored, arrays)
     except _MALFORMED as exc:
         raise InvalidArtifactError(
-            out, f"refusing to write an artifact that would not read back: {exc}"
+            out, f"refusing to write an analysis file that would not read back: {exc}"
         ) from exc
     out.parent.mkdir(parents=True, exist_ok=True)
     with atomic_file(out) as temporary:
@@ -118,7 +118,7 @@ def save_artifact(artifact: QAArtifact, path: str | Path) -> Path:
 def _read_container(path: Path) -> tuple[str, dict[str, NDArray[Any]]]:
     """Read the JSON text and arrays from whichever container the file is.
 
-    Decided by the leading bytes, not the suffix. `--artifact` writes the name
+    Decided by the leading bytes, not the suffix. `--analysis-file` writes the name
     the user asked for, so the suffix is only a convention. The schema version
     that might otherwise settle it is inside a document that cannot be read
     until the container holding it has been opened.
@@ -129,7 +129,7 @@ def _read_container(path: Path) -> tuple[str, dict[str, NDArray[Any]]]:
         return netcdf.read(path)
     if magic.startswith(npz.MAGIC):
         return npz.read(path)
-    raise InvalidArtifactError(path, "not an fmri-qa artifact archive")
+    raise InvalidArtifactError(path, "not an fmri-qa analysis file")
 
 
 def load_artifact(path: str | Path) -> QAArtifact:
@@ -144,7 +144,7 @@ def load_artifact(path: str | Path) -> QAArtifact:
     Raises
     ------
     InvalidArtifactError
-        If the file is not a readable artifact, is malformed, or carries a
+        If the file is not a readable analysis file, is malformed, or carries a
         `schema_version` this build cannot reach.
     """
     src = Path(path)
@@ -153,7 +153,7 @@ def load_artifact(path: str | Path) -> QAArtifact:
         document = json.loads(text)
         if not isinstance(document, dict):
             raise InvalidArtifactError(
-                src, "malformed artifact: expected a JSON object"
+                src, "malformed analysis file: expected a JSON object"
             )
     except InvalidArtifactError:
         raise
@@ -176,4 +176,4 @@ def load_artifact(path: str | Path) -> QAArtifact:
     except InvalidArtifactError:
         raise
     except _MALFORMED as exc:
-        raise InvalidArtifactError(src, f"malformed artifact: {exc}") from exc
+        raise InvalidArtifactError(src, f"malformed analysis file: {exc}") from exc

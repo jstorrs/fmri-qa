@@ -1,6 +1,6 @@
 """Map a `QAArtifact` to and from the document and arrays its file holds.
 
-This is the schema half of the artifact file: pure functions between the value
+This is the schema half of the analysis file: pure functions between the value
 objects and a JSON document plus named arrays, with no file in sight. The file
 those travel in (the netCDF-4 container, and the retired `.npz` one) lives in
 `fmriqa_io.artifact`, so a reader with no filesystem (the browser) can use this.
@@ -17,8 +17,8 @@ that says the quantity does not apply, so NaN is preserved.
 
 `ls` this package to find a concern:
 
-* `decompose` -- artifact -> (JSON document, named arrays)
-* `compose`   -- (JSON document, named arrays) -> artifact
+* `decompose` -- analysis file -> (JSON document, named arrays)
+* `compose`   -- (JSON document, named arrays) -> analysis file
 * `migrate`   -- an older document's layout, brought forward on read
 """
 

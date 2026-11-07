@@ -167,14 +167,14 @@ def test_load_rejects_a_netcdf_file_that_is_not_an_artifact(tmp_path) -> None:
     """A well-formed netCDF carrying no document is a file, not an artifact."""
     path = tmp_path / "weather.nc"
     _write_netcdf(path, {"temperature": np.arange(3.0)}, attributes={})
-    with pytest.raises(q.InvalidArtifactError, match="not an fmri-qa artifact"):
+    with pytest.raises(q.InvalidArtifactError, match="not an fmri-qa analysis file"):
         fmriqa_io.load_artifact(path)
 
 
 def test_load_rejects_an_npz_that_is_not_an_artifact(tmp_path) -> None:
     plain = tmp_path / "plain.npz"
     np.savez_compressed(plain, values=np.arange(3))
-    with pytest.raises(q.InvalidArtifactError, match="not an fmri-qa artifact"):
+    with pytest.raises(q.InvalidArtifactError, match="not an fmri-qa analysis file"):
         fmriqa_io.load_artifact(plain)
 
 
@@ -668,7 +668,7 @@ def test_load_rejects_a_document_missing_a_section(
 ) -> None:
     path = fmriqa_io.save_artifact(artifact, tmp_path / "qa.nc")
     rewrite_document(path, lambda doc: {**doc, "images": {}})
-    with pytest.raises(q.InvalidArtifactError, match="malformed artifact"):
+    with pytest.raises(q.InvalidArtifactError, match="malformed analysis file"):
         fmriqa_io.load_artifact(path)
 
 
@@ -689,7 +689,7 @@ def test_load_rejects_a_schema_1_archive_missing_its_measurements(
             | {"schema_version": 1}
         ),
     )
-    with pytest.raises(q.InvalidArtifactError, match="malformed artifact"):
+    with pytest.raises(q.InvalidArtifactError, match="malformed analysis file"):
         fmriqa_io.load_artifact(path)
 
 

@@ -1,12 +1,12 @@
 # The analyses
 
 Eight analyses run over a phantom series. Seven of them publish into the
-[analysis artifact](../artifact.md); the eighth takes a pair of scans and
+[analysis file](../analysis-file.md); the eighth takes a pair of scans and
 publishes nothing.
 
 Each page covers what the analysis is for, how it works, a figure drawn by the
 real pipeline on a synthetic phantom when the docs are built, and a table of
-what it adds to the artifact under its netCDF names.
+what it adds to the analysis file under its netCDF names.
 
 | Analysis | What it measures | Publishes |
 | --- | --- | --- |

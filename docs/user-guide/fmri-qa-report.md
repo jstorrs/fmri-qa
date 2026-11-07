@@ -1,21 +1,21 @@
 # Rendering a report
 
-`fmri-qa-report` renders an {doc}`analysis file </user-guide/artifact>` as a
+`fmri-qa-report` renders an {doc}`analysis file </user-guide/analysis-file>` as a
 self-contained HTML report ({doc}`report-page`). `fmri-qa-run` does this for
 every series it publishes, so you need it only for files saved with
-`fmri-qa --artifact`.
+`fmri-qa --analysis-file`.
 
 ```console
-$ fmri-qa-report ARTIFACT --html FILE
+$ fmri-qa-report ANALYSIS_FILE --html FILE
 ```
 
-`ARTIFACT` is the `.qa.nc` file written by `fmri-qa --artifact`, the
-{doc}`analysis artifact </user-guide/artifact>`. Older artifacts still work: the
+`ANALYSIS_FILE` is the `.qa.nc` file written by `fmri-qa --analysis-file`, the
+{doc}`analysis file </user-guide/analysis-file>`. Older analysis files still work: the
 loader reads the old `.qa.npz` format and upgrades older schemas, with a warning.
 `FILE` is the HTML page to write. `--html` is required.
 
 ```console
-$ fmri-qa scan.nii.gz --artifact qa.nc
+$ fmri-qa scan.nii.gz --analysis-file qa.nc
 $ fmri-qa-report qa.nc --html report.html
 ```
 
@@ -25,32 +25,32 @@ On success it prints one line to stdout:
 # wrote report.html (1 scan)
 ```
 
-The page is titled with the scan name recorded in the artifact, or the
-artifact's file name when none was recorded.
+The page is titled with the scan name recorded in the analysis file, or the
+analysis file's file name when none was recorded.
 
-## One artifact, one page
+## One analysis file, one page
 
-`--html` renders one artifact. `ARTIFACT` may be a wildcard pattern. The command
+`--html` renders one analysis file. `ANALYSIS_FILE` may be a wildcard pattern. The command
 expands it itself, since PowerShell and cmd pass `*.qa.nc` through unexpanded, so
-`fmri-qa-report artifacts\*-0924.qa.nc --html report.html` works on Windows as in
-a POSIX shell. A pattern or list of names that matches more than one artifact is
+`fmri-qa-report results\*-0924.qa.nc --html report.html` works on Windows as in
+a POSIX shell. A pattern or list of names that matches more than one analysis file is
 a usage error:
 
 ```text
-fmri-qa-report: error: --html renders one artifact to one file
+fmri-qa-report: error: --html renders one analysis file into one page
 ```
 
 A pattern that matches nothing is kept as a literal name, and so fails as an
-unreadable artifact (below).
+unreadable analysis file (below).
 
 ## Errors and exit codes
 
 | Exit | When | Message on stderr |
 | --- | --- | --- |
 | 0 | the page was written | — (`# wrote FILE (1 scan)` on stdout) |
-| 2 | a usage error: no `--html`, no artifact, or more than one artifact | argparse's usage line and `fmri-qa-report: error: …` |
-| 1 | `--html` names the artifact itself | `ERROR: --html FILE would overwrite the input ARTIFACT` |
-| 1 | the artifact cannot be read, is not an artifact, or is from a schema this build cannot reach | `ERROR: cannot read artifact …` |
+| 2 | a usage error: no `--html`, no analysis file, or more than one analysis file | argparse's usage line and `fmri-qa-report: error: …` |
+| 1 | `--html` names the analysis file itself | `ERROR: --html FILE would overwrite the input ANALYSIS_FILE` |
+| 1 | the analysis file cannot be read, is not an analysis file, or is from a schema this build cannot reach | `ERROR: cannot read analysis file …` |
 | 1 | rendering or writing the page failed | `ERROR: could not write HTML FILE: …` |
 
 The overwrite check runs before anything is read. It compares file identity, so it

@@ -3,7 +3,7 @@
 ``render_figures`` renders the fixed image and stability figure set of a
 completed :class:`fmriqa.analysis.QAArtifact` as standalone SVG documents in
 memory. A run page embeds each as a ``data:`` URI, so nothing is written to
-disk. Rendering only draws values already in the artifact.
+disk. Rendering only draws values already in the analysis file.
 """
 
 import io

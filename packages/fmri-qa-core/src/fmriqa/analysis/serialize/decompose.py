@@ -24,7 +24,7 @@ type Member = FloatArray | BoolArray
 
 
 def decompose(artifact: QAArtifact) -> tuple[dict[str, Any], dict[str, Member]]:
-    """Split an artifact into its JSON document and its named arrays."""
+    """Split an analysis file into its JSON document and its named arrays."""
     curves, curve_arrays = _curves_section(artifact.curves)
     images, image_arrays = _images_section(artifact.images)
     document = {

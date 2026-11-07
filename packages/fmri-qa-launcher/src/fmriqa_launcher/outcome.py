@@ -16,7 +16,7 @@ __all__ = ["Failed", "Published", "Refused", "RunResult", "SeriesOutcome"]
 class Published:
     """One series filed under `output_dir / name`.
 
-    Holds its scan, artifact and report, and its sidecar when dcm2niix wrote
+    Holds its scan, analysis file and report, and its sidecar when dcm2niix wrote
     one.
     """
 

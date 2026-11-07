@@ -1,8 +1,8 @@
 """`AnalysisSettings`: the record of what a run was asked for.
 
 A leaf module below every layer. Both the pipeline that honors the request
-(`pipeline.run_qa`) and the artifact that publishes it
-(`analysis.artifact.QAArtifact`) use it, and reading an artifact must not load
+(`pipeline.run_qa`) and the analysis file that publishes it
+(`analysis.artifact.QAArtifact`) use it, and reading an analysis file must not load
 the pipeline just to name a type.
 """
 
@@ -28,7 +28,7 @@ class AnalysisSettings:
     to reproduce its run, is accepted, and the order the new run resolves
     overwrites it.
 
-    `run_qa` writes this record onto its `QAResult`, so an artifact built from a
+    `run_qa` writes this record onto its `QAResult`, so an analysis file built from a
     result publishes the settings it was computed with, never a default filled
     in afterwards.
 

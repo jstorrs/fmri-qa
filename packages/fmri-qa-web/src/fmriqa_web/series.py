@@ -26,8 +26,8 @@ class SeriesReport:
     """A series that analyzed and rendered.
 
     `html` is the complete report page. `record` is `metric_record` of the
-    artifact, already free of non-finite floats, so it is strict JSON. The
-    artifact itself is not kept: the page has no use for it and it is large.
+    analysis file, already free of non-finite floats, so it is strict JSON. The
+    analysis file itself is not kept: the page has no use for it and it is large.
     `warnings` is the text of every warning decode and analysis raised.
     """
 

@@ -64,7 +64,7 @@ def test_run_page_contains_complete_offline_report_content(standalone_page) -> N
     assert page.count('class="fig"') == len(FIGURE_ASSETS) == 14
     assert "Image diagnostics" in page and "Temporal and spatial diagnostics" in page
     assert "Definitions and methods" in page
-    assert "Core version" in page and "Loaded artifact schema" in page
+    assert "Core version" in page and "Loaded analysis file schema" in page
     assert "Report version" in page and "report-test" in page
     assert "Trim duration" in page and "PE axis override" in page
     assert "Resolved detrend order" in page and "Requested ROI side" in page

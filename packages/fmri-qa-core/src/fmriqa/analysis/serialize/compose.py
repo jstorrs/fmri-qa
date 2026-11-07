@@ -46,7 +46,7 @@ def _bools(arrays: Mapping[str, NDArray[Any]], key: str) -> BoolArray:
 
 
 def compose(document: dict[str, Any], arrays: Mapping[str, NDArray[Any]]) -> QAArtifact:
-    """Rebuild an artifact from its JSON document and named arrays."""
+    """Rebuild an analysis file from its JSON document and named arrays."""
     provenance = dict(document["provenance"])
     for field in _PROVENANCE_TUPLES:
         if provenance.get(field) is not None:

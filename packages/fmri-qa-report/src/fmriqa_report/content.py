@@ -1,7 +1,7 @@
 """Per-metric vocabulary: the label, definition, method and display recipe.
 
 One `MetricDoc` per reported metric is the single source for its name, display
-format, meaning and method. Values come from the artifact's flat
+format, meaning and method. Values come from the analysis file's flat
 `Measurements`. The run page's metric tiles and definitions list both read this
 catalog, so a metric's name and formatting can't drift between them.
 

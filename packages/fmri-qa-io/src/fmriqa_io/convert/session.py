@@ -10,7 +10,7 @@ existing file. That order has three consequences:
   previous import left in the destination.
 * **A destination collision costs nothing.** The names depend on the DICOM
   content, so they can't be checked before converting the way
-  `fmriqa_cli.destinations` checks `--artifact` paths. They are checked before
+  `fmriqa_cli.destinations` checks `--analysis-file` paths. They are checked before
   the move instead: the import refuses with every conflict named and the
   destination untouched.
 * **A move that fails part-way is undone.** Filing is a sequence of renames, and

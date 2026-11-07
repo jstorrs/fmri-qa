@@ -126,7 +126,7 @@ The synthetic phantom is blurred isotropically, so its two directions nearly
 coincide. On a real acquisition they separate by however much the reconstruction
 filters the two axes differently.
 
-## What it contributes to the artifact
+## What it contributes to the analysis file
 
 | Name | Where it lives | Meaning |
 | --- | --- | --- |
@@ -147,7 +147,7 @@ filters the two axes differently.
 | `curves.psf.xmax` | attribute, double | the plotting range the analysis chose, so a plot draws the curve it meant |
 
 The two PSF abscissas carry no `units` attribute, because the unit depends on
-the artifact's header (millimeters or voxels), and `curves.psf.unit` records it.
+the analysis file's header (millimeters or voxels), and `curves.psf.unit` records it.
 
 `measurements.fwhm` is NaN when the estimator could not resolve smoothness at
 all. `fwhm_pe` and `fwhm_ro` go *absent* rather than NaN only when no

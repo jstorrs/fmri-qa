@@ -16,7 +16,7 @@ In the order they appear:
    number. The values are descriptive, and the report applies no acceptance
    thresholds. Beneath the tiles, a note carries any
    {doc}`localization </user-guide/analyses/localization>` or
-   {doc}`clipping </user-guide/analyses/saturation>` warning the artifact
+   {doc}`clipping </user-guide/analyses/saturation>` warning the analysis file
    recorded, or says that none was.
 2. **Acquisition and analysis settings**: what was acquired (series, times,
    trimmed frames, recorded phase-encode direction) and how the analysis was
@@ -25,12 +25,12 @@ In the order they appear:
 4. **Definitions and methods**: each metric's definition and method, one
    collapsible entry per metric.
 5. **Source and provenance**: the source, scan name, acquisition and analysis
-   times, the core version that wrote the artifact, the artifact schema version
+   times, the core version that wrote the analysis file, the analysis file schema version
    loaded, and the report version.
 
 ## The figures
 
-Every figure is drawn from values stored in the artifact, and each is listed with
+Every figure is drawn from values stored in the analysis file, and each is listed with
 the analysis that computes what it plots. The phantom outline and summary ROI on
 the image figures, and the invalid image edge marked on the ghost figure when
 there is one, come from {doc}`/user-guide/analyses/localization`.

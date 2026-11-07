@@ -38,6 +38,15 @@ versioning when the first stable public interface is released.
 
 ### Changed
 
+- **The `.qa.nc` file is called the analysis file, not the analysis artifact,
+  and `fmri-qa --artifact` is now `--analysis-file`.** "Artifact" means an image
+  artifact to an MR physicist. The commands' help, their messages, the report
+  page, the docs and the title stored in a new `.qa.nc` all say "analysis file".
+  `fmri-qa-report` names its argument `ANALYSIS_FILE`. `--artifact` is gone, so
+  a script that passes it fails with a usage error. Files written before the
+  change load unchanged. The Python names (`QAArtifact`, `save_artifact`,
+  `load_artifact`, `InvalidArtifactError`) are unchanged. The docs page moved
+  to `user-guide/analysis-file.html`.
 - **The `--json` record is built in `fmri-qa-core`
   (`fmriqa.analysis.record`), not in `fmri-qa-cli`.** `metric_record`,
   `config_record`, `JSON_SCHEMA_VERSION` and the new `record_document`, which
@@ -86,9 +95,9 @@ versioning when the first stable public interface is released.
 - **The import packages are renamed to match the project: `fmriqc` is now
   `fmriqa`, `fmriqc_report` is `fmriqa_report`, and `fmriqc_launcher` is
   `fmriqa_launcher`.** `FmriqcError` is `FmriqaError`. The distribution and
-  command names are unchanged, and saved artifacts still load. The SVG element
+  command names are unchanged, and saved analysis files still load. The SVG element
   ids in rendered reports change with the name, so a report re-rendered from an
-  old artifact differs from the original in those ids only.
+  old analysis file differs from the original in those ids only.
 - **The motion registration covers the whole phantom edge.** The watershed
   phantom mask ends at the steepest point of the phantom boundary, so the fit
   saw only the inner half of the edge, about half the gradient it runs on. It
@@ -149,7 +158,7 @@ versioning when the first stable public interface is released.
   again, in a second spelling, by `validate_artifact` at the archive door, so a
   record built for either and used for neither carried a knob nothing could
   honour. `AnalysisSettings.__post_init__` holds all three now, as the three
-  artifact records above hold theirs, and both validators keep only what they
+  analysis file records above hold theirs, and both validators keep only what they
   alone can see — for `validate_qa_run`, what the request means for *this* scan.
   `InvalidScanError` rather than the `ValueError` those records raise, because
   it is the error the pipeline already refused these values with and it carries
@@ -166,7 +175,7 @@ versioning when the first stable public interface is released.
   analysis default, and the record a run answered is the record it publishes. A breaking change to
   a pre-release API: `q.run_qa(scan, roi_size=9)` becomes
   `q.run_qa(scan, q.AnalysisSettings(roi_size=9))`, and `pe_axis` is the
-  record's `pe_axis_override`. The CLI, its flags and the on-disk artifact are
+  record's `pe_axis_override`. The CLI, its flags and the on-disk analysis file are
   unchanged.
 - **`phantom_plausible` now takes `fraction` and `contrast` as keyword-only
   arguments.** The two are same-typed floats on different scales — a share of
@@ -174,7 +183,7 @@ versioning when the first stable public interface is released.
   above 1 — with an order nothing at a call site revealed, so a swap
   type-checked and silently inverted the single definition of "this
   segmentation held": the figure slice selection ranks slices by and the
-  artifact publishes as `phantom_mask_ok`. All three call sites now name both
+  analysis file publishes as `phantom_mask_ok`. All three call sites now name both
   arguments.
 - **An impossible `Provenance` or `RoiBox` is now a `ValueError` at
   construction too.** The same, for the two records that describe the run and
@@ -191,7 +200,7 @@ versioning when the first stable public interface is released.
   `pe_axis` that resolved, a clipping block answered as a unit, each flag
   agreeing with its count, a `phantom_contrast` that is non-negative or
   unrecorded — were checked
-  only by `validate_artifact`, which runs at the archive door; an artifact
+  only by `validate_artifact`, which runs at the archive door; an analysis file
   built in-process and printed or rendered without ever being saved was never
   checked at all. `Measurements.__post_init__` holds them now, so the illegal
   record cannot be built. What is refused is unchanged, down to the message
@@ -203,7 +212,7 @@ versioning when the first stable public interface is released.
   polynomial degree or an interior-knot count depending on the method, so a
   `QAImages` could claim a fit that never ran (spline, degree 3 from a poly
   fit). `preprocess` now sets `detrender` to the exact `Detrender` it applied;
-  `AnalysisSettings.detrend_order`, the published artifact value, is
+  `AnalysisSettings.detrend_order`, the published analysis file value, is
   unchanged.
 - **`estimate_motion`, `estimate_center_of_mass` and `estimate_smoothness` take
   a `VoxelSize` instead of a raw `voxel_mm` tuple.** Each rebuilt its own
@@ -213,9 +222,9 @@ versioning when the first stable public interface is released.
   settled once. The parameter is now `voxel: VoxelSize = UNKNOWN_VOXEL_SIZE`,
   and the header triple is sliced exactly once, by the new
   `VoxelSize.in_plane(voxel_mm)` classmethod, and threaded through from there.
-- **Reading or rendering an artifact no longer loads the calculation stack.**
+- **Reading or rendering an analysis file no longer loads the calculation stack.**
   `fmriqa.analysis` re-exported `analyze` and `build_artifact` eagerly, so
-  importing anything from the artifact facade — `load_artifact`, or any of the
+  importing anything from the analysis file facade — `load_artifact`, or any of the
   value objects the `fmri-qa-report` package reads — executed the pipeline and
   behind it scikit-image, scipy, nibabel and the metrics. Those two names are
   now resolved on first access instead, and nothing else about the facade
@@ -232,7 +241,7 @@ versioning when the first stable public interface is released.
   now read directly instead of threaded through as overridable defaults.
 - **`Provenance`'s six identity fields — `scan`, `source`, `created`,
   `core_version`, `tr`, and `n_frames` — are required.** They defaulted to
-  `""` and `0`, values the artifact validator rejects outright — so
+  `""` and `0`, values the analysis file validator rejects outright — so
   `Provenance()` built an object nothing downstream could use. Every real
   constructor already supplied all six; only the useless default is gone.
 - **`separate_noise` and `detect_saturation` now take their numeric parameters
@@ -266,7 +275,7 @@ versioning when the first stable public interface is released.
   `valid_mask` is now a required keyword on all three, and `ghost_ratio`'s
   `pe_axis` has no default: pass `QAImages.valid_mask` or
   `edge_valid_mask(image, zero=...)`, and the axis the run resolved.
-- **The analysis artifact is written as a netCDF-4 file (`<scan>.qa.nc`), not a
+- **The analysis file is written as a netCDF-4 file (`<scan>.qa.nc`), not a
   compressed `.npz`**, so the readers a site already has can open it with
   nothing installed. MATLAB's `ncread`, `ncinfo`, `ncdisp` and `ncreadatt` are
   built in and need no toolbox; R has `ncdf4`; `ncdump` is a shell command;
@@ -313,7 +322,7 @@ versioning when the first stable public interface is released.
   `HDF5_USE_FILE_LOCKING=FALSE` in its environment where a plain read would have
   worked, and this package deliberately does not set it for the whole process.
   And HDF5 carries about 110 KB of fixed metadata for a layout this size, so the
-  test phantom's artifact is 135 KB against the `.npz`'s 24 KB; the overhead does
+  test phantom's analysis file is 135 KB against the `.npz`'s 24 KB; the overhead does
   not grow with the scan (a 128×128×300 acquisition is 441 KB against 230 KB),
   and compression keeps the rest close.
 
@@ -326,7 +335,7 @@ versioning when the first stable public interface is released.
   the document's own PSF labels -- "PE RO", or "axis0 axis1" on a run where no
   phase-encode axis resolved) rather than as netCDF strings, which Octave and
   older readers handle poorly. `frame` counts from the *analyzed* series, as every frame index in the
-  artifact does, and its `comment` says so — the acquired volume number is the
+  analysis file does, and its `comment` says so — the acquired volume number is the
   index plus `provenance.n_trimmed`. Where an axis's real values cannot be a
   coordinate variable — the seconds along `frame` are `curves.time`, and the PSF
   lags differ by direction and so are 2-D — the variables point at them with a
@@ -334,9 +343,9 @@ versioning when the first stable public interface is released.
   quantity and `ds["curves.roi_signal"].plot()` draws against seconds. The axes
   are derived when the file is written and never read back, exactly as the
   `measurements.*` attributes are; they are stored unfiltered and contiguous,
-  and add 3,322 B to the test phantom's artifact.
+  and add 3,322 B to the test phantom's analysis file.
 
-- **The artifact's `__document__` member is stored as UTF-8 bytes (`uint8`),
+- **The analysis file's `__document__` member is stored as UTF-8 bytes (`uint8`),
   not a NumPy `<U` string**, so the readers a site is likely to already have can
   open it. npy-matlab maps exactly `u1 u2 u4 u8 i1 i2 i4 i8 f4 f8 b1` and errors
   on anything else, and RcppCNPy reads numeric types only — so a `<U` document
@@ -367,9 +376,9 @@ versioning when the first stable public interface is released.
   still reported as a missing input rather than dropped, so a mistyped pattern
   cannot quietly analyze fewer scans than were asked for.
 
-- **`--artifact` files into a directory that already exists**, instead of
+- **`--analysis-file` files into a directory that already exists**, instead of
   failing after the analysis. With one scan `PATH` was taken literally, so the
-  natural `mkdir results` followed by `--artifact results` ran the whole
+  natural `mkdir results` followed by `--analysis-file results` ran the whole
   analysis and then failed moving the finished file onto the directory --
   `[WinError 5] Access is denied` on Windows, `IsADirectoryError` elsewhere,
   neither naming the actual mistake, and the metrics table printed just above
@@ -377,7 +386,7 @@ versioning when the first stable public interface is released.
   `<scan>.qa.nc` the same way a batch does. A `PATH` that is not an existing
   directory is still the output file name, so nothing that worked changes: a
   file and a directory cannot share a name, and the old behavior in this case
-  was an error, never a written artifact.
+  was an error, never a written analysis file.
 
 - **dcm2niix is now a dependency of `fmri-qa-core`, not the `dicom` extra.**
   The extra spared a ~3 MB compiled binary to people who only analyze NIfTI,
@@ -397,7 +406,7 @@ versioning when the first stable public interface is released.
   `ScanMeta.pe_dir` (published as `Provenance.pe_dir`) took the sidecar's
   `InPlanePhaseEncodingDirectionDICOM` wording when it was present, while the
   *axis* came from whichever source ranked highest — so a sidecar whose DICOM
-  tag contradicted its BIDS fields produced an artifact naming one axis and
+  tag contradicted its BIDS fields produced an analysis file naming one axis and
   labelling it as the other, and the report showed a direction the ghost masks
   were not built on. `pe_dir` is now the word for the axis the loader resolved,
   and is `None` when it resolved none (including a through-plane `k`, where the
@@ -405,7 +414,7 @@ versioning when the first stable public interface is released.
   follows the same rule and names the axis the run measured on, whatever
   settled it; an explicit `--pe-axis` is still the one thing that may separate
   the two, since they answer different questions. No schema change: no field is
-  added, removed or retyped, and an existing artifact keeps the value its build
+  added, removed or retyped, and an existing analysis file keeps the value its build
   measured. Unaffected unless a sidecar contradicted itself.
 
 - **The phase-encode axis now reads dcm2niix's `PhaseEncodingAxis`**, between
@@ -431,7 +440,7 @@ versioning when the first stable public interface is released.
   instance `__dict__` to cache into.
 - `analysis.build._provenance` no longer re-lists the nine identifying
   `Provenance` fields to add the sidecar block to them; `dataclasses.replace`
-  carries them. Every sidecar field is still spelled out, since the artifact's
+  carries them. Every sidecar field is still spelled out, since the analysis file's
   acquisition block is a published contract.
 
 - **The detrender is a value object, not an anonymous `(callable, int)` pair.**
@@ -466,7 +475,7 @@ versioning when the first stable public interface is released.
   `worst_count` as four independently-optional fields that `detect_saturation`
   always set together or not at all; they now sit behind a single
   `rail: ClipRail | None`. `ceiling` and `bits` remain readable as properties,
-  so the artifact's flat `clip_ceiling`/`clip_bits` fields are unchanged, as are
+  so the analysis file's flat `clip_ceiling`/`clip_bits` fields are unchanged, as are
   `suspected`, `clipped`, `clipped_kept` and the two trim-split counts --
   those stay on the result because zero is a true answer for them, where
   "which volume was worst" has none without a rail. `ClipRail` is exported
@@ -483,25 +492,25 @@ versioning when the first stable public interface is released.
   functions still take a plain `voxel_mm=` tuple, so call sites are unchanged.
   This removes two byte-identical `displacement` implementations, a third
   per-axis scaling helper, and the three separate spellings of
-  `"mm" if voxel_mm is not None else "vox"` in the artifact builder;
+  `"mm" if voxel_mm is not None else "vox"` in the analysis file builder;
   `prep.imaging.normalize_voxel_mm` is superseded by the constructor, which
   coerces the header's numpy scalars to plain floats. No metric value, unit, or
-  artifact field changed. `Provenance.voxel_mm` and `ScanMeta.voxel_mm` are a
+  analysis file field changed. `Provenance.voxel_mm` and `ScanMeta.voxel_mm` are a
   different thing (the full three-axis header zooms) and are untouched.
 
 - **The phase-encode axis is a closed type, not a bare `int`.** `PeAxis`
   (`Literal[0, 1]`) and its derived `PE_AXES` tuple join the option `Literal`s
   already in `fmriqa.types`, and everything from `preprocess` inward is
   annotated with it: the ghost family, the smoothness result, the pipeline's
-  resolution, and the artifact's `settings.pe_axis_override` /
+  resolution, and the analysis file's `settings.pe_axis_override` /
   `measurements.pe_axis`. The loader still reads a plain `int | None`, because
   a BIDS sidecar may legitimately name the through-plane axis; the single
   narrowing point between the two is the new `load.pe_axis.in_plane`. Three
   runtime domain checks fall out as a result — `SUPPORTED_PE_AXES` (now
-  `PE_AXES`) and the two `pe_axis in (None, 0, 1)` assertions in the artifact
+  `PE_AXES`) and the two `pe_axis in (None, 0, 1)` assertions in the analysis file
   validator, which the field annotations now carry on both save and load.
   `PE_ROWCOL` is keyed by `PeAxis` and so is total, retiring the two-step
-  lookup the artifact builder used to reach a `PeLabel` through. The readout
+  lookup the analysis file builder used to reach a `PeLabel` through. The readout
   axis has one definition, `types.readout_axis`, in place of three inline
   `1 - pe_axis` spellings. `fmri-qa --pe-axis` takes the same `{0,1}` it always
   did, and no metric value changed.
@@ -521,7 +530,7 @@ versioning when the first stable public interface is released.
   `decompose` / `compose` / `migrate`. At the time, every import path a caller
   used was unchanged (`fmriqa.cli:main`, `fmriqa.cli:hilo_main`,
   `fmriqa.save_artifact`/`load_artifact`) and no rendered output changed. The
-  commands and the artifact functions have since moved; see the `fmri-qa-cli`
+  commands and the analysis file functions have since moved; see the `fmri-qa-cli`
   and `fmri-qa-io` bullets above.
 - `fmriqa.hilo` (307 lines) is now a subpackage by the same rule: `result`
   holds `HiLoResult` and the pure `separate_noise` algebra that fills it,
@@ -556,7 +565,7 @@ versioning when the first stable public interface is released.
 - `Measurements.fwhm_unit`, `Measurements.pe_label`, and `PsfCurves.unit` are
   closed sets (`LengthUnit`, `PeLabel` in `fmriqa.types`), and `load_artifact`
   refuses a stored value outside them. `FBIRN_ROI_SIZE` lives in
-  `fmriqa.types`, shared by the ROI resolver and the artifact's default.
+  `fmriqa.types`, shared by the ROI resolver and the analysis file's default.
 - `QAImages` caches its derived summary images instead of recomputing each
   full-slice reduction on every access.
 - The `notebooks` extra is no longer published with `fmri-qa-core`; the
@@ -596,7 +605,7 @@ versioning when the first stable public interface is released.
   directory to a report per series.** `fmri-qa-run DICOM_DIR OUTPUT_DIR`
   converts, analyzes, and renders every series it finds, writing one folder
   per series under `OUTPUT_DIR` — named for the series and holding the
-  converted scan, its sidecar, the `.qa.nc` artifact, and a self-contained
+  converted scan, its sidecar, the `.qa.nc` analysis file, and a self-contained
   HTML report — with the four appearing together only once every one of them
   is written. A series whose folder already exists is refused, never
   replaced; a failure in one series is reported and every other series is
@@ -618,9 +627,9 @@ versioning when the first stable public interface is released.
   third-party dependency of its own — the panel is built on stdlib
   `tkinter` — and a layering test keeps `tkinter` out of `fmri-qa-core` and
   `fmri-qa-report`.
-- **`fmri-qa-report`, the reporting command: one artifact in, one
+- **`fmri-qa-report`, the reporting command: one analysis file in, one
   self-contained HTML page out.** `fmri-qa-report ARTIFACT --html FILE` renders
-  a saved artifact to a single file that opens by double-click from `file://`
+  a saved analysis file to a single file that opens by double-click from `file://`
   with no network and no sibling asset: the stylesheet is inlined in a
   `<style>` block, all fourteen figures are embedded as
   `data:image/svg+xml;base64,...` sources, and the page carries no JavaScript.
@@ -629,7 +638,7 @@ versioning when the first stable public interface is released.
   setting (figures stay on a white plate so plotted data keeps its colors), a
   print stylesheet lays the report out for paper, and a figure enlarges to fill
   the viewport through a CSS-only `:target` toggle. `--html` is required and
-  takes exactly one artifact; a wildcard that matches several is a usage
+  takes exactly one analysis file; a wildcard that matches several is a usage
   error. The write is atomic and honours the umask: a reader never observes a
   partial file, and a failed render or write never disturbs an existing
   destination. From Python, `render_run_page` returns the document and
@@ -638,7 +647,7 @@ versioning when the first stable public interface is released.
 - **`InvalidArtifactError` is now reachable from `fmriqa.analysis`.** It is the
   one error `load_artifact` raises, and it was previously only reachable
   through `fmriqa.exceptions` — off limits to `fmri-qa-report`, which may
-  import only `fmriqa.analysis` and `fmriqa.types`. A reader of an artifact can
+  import only `fmriqa.analysis` and `fmriqa.types`. A reader of an analysis file can
   now catch it by name instead of a blanket `except Exception`.
 - **`fmri-qa-hilo --version` now works.** `fmri-qa` and `fmri-qa-import` each
   carried their own copy of the flag and `fmri-qa-hilo` had none, so asking it
@@ -666,20 +675,20 @@ versioning when the first stable public interface is released.
   integer artifact of the receiver, so the check requires a series that still
   carries the scanner's integers. `QAScan.from_nifti` reads the NIfTI datatype,
   records it as `QAScan.stored_integer`, and warns on a float-stored file naming
-  the fix; `detect_saturation` returns `None` there, and the artifact publishes
+  the fix; `detect_saturation` returns `None` there, and the analysis file publishes
   the whole clipping block (`clipped_any`, `clipped_kept`, `n_clipped_kept`,
   `n_clipped_pre`) as `None` — *not determinable*, which is a third answer
   distinct from "no clipping found". Shown as `?` in the `clip`/`clipPre`
   columns, `null` in `fmri-qa --json`, and a `clip not determinable` note in the
-  report. Artifact schema version 7; an artifact from schema ≤ 6 keeps its stored
+  report. Analysis file schema version 7; an analysis file from schema ≤ 6 keeps its stored
   bool, which that build did measure. Previously a float-converted NIfTI of a
   genuinely saturated acquisition reported clean, silently. Every other metric
   is unaffected. See the user guide's *Saturation* page for the
   conversion policy this makes explicit.
 
 - `Provenance.slice_index` / `n_slices` record which plane of the volume the
-  artifact describes, and `Measurements.phantom_contrast` the mask's
-  interior-over-background ratio beside the verdict reached from it. Artifact
+  analysis file describes, and `Measurements.phantom_contrast` the mask's
+  interior-over-background ratio beside the verdict reached from it. Analysis file
   schema version 5; an older archive reads them back as unknown. The report's
   acquisition line shows the slice, and its BAD PHANTOM MASK note names the
   contrast so a reader can see which test the mask failed. `fmri-qa --json`
@@ -692,7 +701,7 @@ versioning when the first stable public interface is released.
 - **The whole Nyquist-ghost family from one set of masks.** `estimate_ghost`
   builds the region-matched signal/ghost masks once per in-plane axis and
   returns a `GhostResult` carrying the masks and every ratio measured on them;
-  `QAMetrics.ghost` holds it, and the artifact's ghost regions are copied from
+  `QAMetrics.ghost` holds it, and the analysis file's ghost regions are copied from
   it rather than rebuilt. The four percentages a table shows are unchanged.
 - The BIDS sidecar is optional. A NIfTI exported without one (a scanner export
   that never went through dcm2niix) now analyzes with a warning and empty
@@ -702,7 +711,7 @@ versioning when the first stable public interface is released.
   unit; a disagreement between the two warns and names both values.
 - `Provenance.n_trimmed` records how many warm-up volumes the analysis dropped,
   so `outlier_worst_frame` and the curve time axis map back to acquired volume
-  numbers. Artifact schema version 4; older archives read it back as unknown.
+  numbers. Analysis file schema version 4; older archives read it back as unknown.
 - `fmri-qa --json` records now carry `source`, `datetime`, `tr`, `n_frames`,
   `n_trimmed`, `outlier_worst_frame`, the combined `fwhm`, and `fwhm_unit`.
   JSON schema version 3.
@@ -712,31 +721,31 @@ versioning when the first stable public interface is released.
 - Both distributions ship the MIT license text, and CI asserts it is installed
   with each wheel.
 
-- **The analysis artifact.** `QAArtifact` publishes one analyzed series — its
+- **The analysis file.** `QAArtifact` publishes one analyzed series — its
   settings, provenance, scalar measurements, stability curves, and the four
   fBIRN summary images — fully resolved, so no consumer recomputes a metric.
   `analyze(scan)` produces one; `save_artifact`/`load_artifact` move it through
   a single versioned netCDF-4 file.
-- `fmri-qa --artifact PATH` saves the artifact for each analyzed scan (a file
+- `fmri-qa --analysis-file PATH` saves the analysis file for each analyzed scan (a file
   for one scan, a directory of `<scan>.qa.nc` for a batch).
 - Structured validation for scan data, analysis parameters, and high/low pairs.
 - A versioned, standards-compliant JSON output contract.
 - Build-artifact smoke tests in CI.
 - MIT licensing and distributable package-license metadata.
-- Localization diagnostics in the artifact. `Measurements` now carries
+- Localization diagnostics in the analysis file. `Measurements` now carries
   `phantom_fraction` (the share of the frame the phantom mask covers) and
-  `roi_inside_phantom`, so a stored artifact says whether the segmentation and
+  `roi_inside_phantom`, so a stored analysis file says whether the segmentation and
   the summary ROI held — the difference between "the estimator declined" and
   "the analysis was measuring background". A report calls either failure out on
   the acquisition line, `fmri-qa` in a `loc` column, and `--json` in three
   fields (`phantom_fraction`, `phantom_mask_ok`, `roi_inside_phantom`) so a
-  trend database can tell a measurement from a measurement of air. Artifact
+  trend database can tell a measurement from a measurement of air. Analysis file
   schema version 3; JSON schema version 2.
-- Artifacts written under an older schema are migrated forward on read, with a
+- Analysis files written under an older schema are migrated forward on read, with a
   warning, instead of being refused: a QA archive outlives the build that wrote
   it. Fields the older schema did not carry come back as "not recorded" — `None`
   for the localization verdicts, which `fmri-qa` shows as `loc ?` and a report
-  as a quiet note — never as a fabricated pass. Only an artifact from a *newer*
+  as a quiet note — never as a fabricated pass. Only an analysis file from a *newer*
   build, whose layout this one cannot know, is still refused.
 - `python -m fmriqa_report`, matching `python -m fmriqa`.
 
@@ -773,12 +782,12 @@ versioning when the first stable public interface is released.
 - **Imported series names stay unique even when a QA name matches a retained
   dcm2niix name.** Colliding series fall back to their original names until all
   collisions are resolved, preventing one scan from silently replacing another.
-- **`fmri-qa --artifact ''` is now a usage error instead of a silent no-op.**
+- **`fmri-qa --analysis-file ''` is now a usage error instead of a silent no-op.**
   `qa.py` only ever tested `args.artifact` by truthiness, so an empty string
   passed both `if` checks as false: the whole analysis ran, nothing was
-  written, and the command exited 0 as if `--artifact` had never been given.
-  `--artifact` now carries `arguments.nonempty` as its `type`, so an empty
-  value is rejected at parse time with a usage error naming `--artifact`,
+  written, and the command exited 0 as if `--analysis-file` had never been given.
+  `--analysis-file` now carries `arguments.nonempty` as its `type`, so an empty
+  value is rejected at parse time with a usage error naming `--analysis-file`,
   before any scan is read; a run without the flag is unaffected.
 - **`fmri-qa-import` no longer prints a traceback when its destination cannot
   be created.** `import_dicom` called `destination.mkdir(parents=True,
@@ -822,20 +831,20 @@ versioning when the first stable public interface is released.
   really in the analyzed data. Such a document now loads only if its
   duplicated fields agree; a self-contradictory one is refused.
 - **`save_artifact` now checks the one field `load_artifact` checks first.**
-  It already held a written artifact to the reader's other checks, but let any
+  It already held a written analysis file to the reader's other checks, but let any
   `schema_version` through uncaught — 99, 0, a float, a string, even `True` —
   so a bad value was written successfully, replaced whatever valid archive
   already stood at the path, and was refused only when something later tried
   to read it back. A `schema_version` that is not exactly the version this
   build writes is now refused before anything is written, the same way every
-  other mismatch between the artifact and the reader's contract already was.
+  other mismatch between the analysis file and the reader's contract already was.
 - The report's metric catalog (its definitions and methods) describes the
   calculations as implemented. SFNR is the ROI average
   of voxelwise temporal-mean over detrended-SD ratios, not the ratio of the
   ROI-mean series (which is what `fluct` uses, and now says); the ghost
   denominator is the matched signal region, not the whole phantom; ACRg is
   the absolute difference; RDC is read at the full ROI.
-- `save_artifact` holds an artifact to the same contract `load_artifact`
+- `save_artifact` holds an analysis file to the same contract `load_artifact`
   applies, and refuses (`InvalidArtifactError`, nothing written, an existing
   archive untouched) one that would not read back. `fmri-qa` reports the
   refusal as a per-scan write error and continues the batch. The optional
@@ -848,11 +857,11 @@ versioning when the first stable public interface is released.
   does: the mask must cover a plausible share of the frame *and* stand at
   least 4x above the background it was cut from. A scan holding no phantom
   segments to roughly half the frame, so the share test alone passed it, and
-  a run could warn that no slice held a phantom and then save an artifact
+  a run could warn that no slice held a phantom and then save an analysis file
   recording the mask as good. `PhantomGeometry` carries the measured
   `contrast`, and the warning names which test failed.
-- `fmri-qa --artifact` and `fmri-qa-report --html` refuse an output path that
-  names one of the run's inputs — the scan, its sidecar, or an artifact — and
+- `fmri-qa --analysis-file` and `fmri-qa-report --html` refuse an output path that
+  names one of the run's inputs — the scan, its sidecar, or an analysis file — and
   exit 1 before reading anything. Both writers move a finished file over the
   destination, so an output aliasing an input used to succeed and leave an
   archive where the NIfTI was, or a report where the archive was. Relative
@@ -860,14 +869,14 @@ versioning when the first stable public interface is released.
 - Preserve NIfTI proxy scaling for clipping detection and nulled-edge masks.
   Convert meter/micron voxel sizes to millimeters; unknown spatial units retain
   the millimeter assumption with an explicit warning.
-- Validate artifact scalar types, settings, array shapes, coordinates, masks,
+- Validate analysis file scalar types, settings, array shapes, coordinates, masks,
   and ROI bounds on load; malformed archives raise `InvalidArtifactError`.
 - Preprocessed images own read-only arrays so the full input volume can be
   freed and caller mutations cannot invalidate cached summaries. Published
-  artifact arrays also own read-only copies.
+  analysis file arrays also own read-only copies.
 - Singular, non-finite, and unconverged motion fits now warn and publish NaN
   traces and peak metrics. `MotionResult.converged` identifies usable frames;
-  motion plots label unresolved frames. Existing artifact layouts remain readable.
+  motion plots label unresolved frames. Existing analysis file layouts remain readable.
 - Reject polynomial and spline detrending with no residual degrees of freedom.
 
 - **A TR stored in milliseconds was read as seconds.** The loader took pixdim
@@ -885,12 +894,12 @@ versioning when the first stable public interface is released.
   different question. The table shows `?` and `--json` emits `null`.
 - A phantom mask that is a single row or column crashed `analyze` after the
   whole analysis had run, from inside the convex-hull step; it now yields the
-  empty outline the artifact already allowed for.
+  empty outline the analysis file already allowed for.
 - `fmri-qa-hilo` raised a bare `ZeroDivisionError` on a zero low-flip mean.
 - The ROI-fit warning suggested `center='image'` even when that was the mode in
   use; it names the other mode now.
 - `save_artifact` wrote the destination in place, so an interrupted write left
-  a truncated artifact in the archive. It writes a temporary file beside the
+  a truncated analysis file in the archive. It writes a temporary file beside the
   destination and moves it into place. A malformed document that failed inside
   a schema migration escaped as a bare `KeyError` instead of
   `InvalidArtifactError`.
@@ -932,10 +941,10 @@ versioning when the first stable public interface is released.
   pointed, and an axis measurable on only one side could be resolved to the
   other. Only measurable axes are candidates now, and when neither is,
   `estimate_pe_axis` returns `None`: the run continues with the ghost metrics
-  undefined and a warning, the artifact records no axis, and a report labels the
+  undefined and a warning, the analysis file records no axis, and a report labels the
   direction "?" and draws no ghost regions.
-- **`fmri-qa --artifact` silently discarding a scan.** A batch names each
-  artifact after the scan's stem, so inputs sharing a file name across
+- **`fmri-qa --analysis-file` silently discarding a scan.** A batch names each
+  analysis file after the scan's stem, so inputs sharing a file name across
   directories (`a/scan.nii.gz`, `b/scan.nii.gz`) overwrote one another and the
   batch was quietly missing scans. Such a batch is now refused before any
   analysis runs.
@@ -955,7 +964,7 @@ versioning when the first stable public interface is released.
 - **`QAImages.pe_axis`.** Nothing read it since `validate_qa_run` began
   returning the resolved axis; the narrowing (`load.pe_axis.in_plane`) still
   happens, once, in `validate_qa_run`.
-- **`OutlierResult.mean_fraction`.** Nothing read it: the artifact publishes
+- **`OutlierResult.mean_fraction`.** Nothing read it: the analysis file publishes
   the worst frame, `max_fraction` (as `outlier_max_pct`) and `worst_volume`,
   never the mean across frames.
 - `MissingSidecarError`: a missing sidecar is a warning now, not an error.

@@ -54,7 +54,7 @@ class PhantomGeometry(ArrayValue):
 
         A sanity figure for the segmentation. A real phantom occupies a middling
         fraction of the FOV, so an extreme value means the watershed collapsed
-        (see `detect_phantom`). Carried into the artifact so a reader months
+        (see `detect_phantom`). Carried into the analysis file so a reader months
         later can tell a NaN metric from a bad mask.
         """
         return float(self.phantom_mask.mean())
@@ -66,7 +66,7 @@ class PhantomGeometry(ArrayValue):
         `phantom_plausible` over `fraction` and `contrast`, the same test slice
         selection uses, so a run can't report "no slice holds a phantom" and then
         record its segmented phantom as good. `detect_phantom` warns on it, and
-        `build` records it in the artifact so a reader in another distribution
+        `build` records it in the analysis file so a reader in another distribution
         gets the verdict and not the bounds to re-apply.
         """
         return phantom_plausible(fraction=self.fraction, contrast=self.contrast)
@@ -106,7 +106,7 @@ def detect_phantom(images: QAImages) -> PhantomGeometry:
     and erodes the N/2 ghost region to nothing, and a noise partition covers an
     ordinary share of the frame, so nothing else would flag either. The geometry
     is still returned, not raised on, so a batch reports the bad scan and keeps
-    going. The caller records the verdict in the artifact and the affected
+    going. The caller records the verdict in the analysis file and the affected
     metrics resolve to NaN.
     """
     phantom_mask = images.phantom_mask

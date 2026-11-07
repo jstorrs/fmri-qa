@@ -43,7 +43,9 @@ def test_main_reports_bad_file_and_continues_batch(
 
 def test_main_saves_a_loadable_artifact(tmp_path, write_scan, capsys) -> None:
     out = tmp_path / "qa.nc"
-    rc = cli.main([write_scan(tmp_path), "--roi-size", "9", "--artifact", str(out)])
+    rc = cli.main(
+        [write_scan(tmp_path), "--roi-size", "9", "--analysis-file", str(out)]
+    )
     assert rc == 0
     assert f"# wrote {out}" in capsys.readouterr().out
     artifact = fmriqa_io.load_artifact(out)
@@ -55,7 +57,7 @@ def test_main_saves_a_loadable_artifact(tmp_path, write_scan, capsys) -> None:
 def test_main_files_one_scan_into_an_existing_artifact_directory(
     tmp_path, write_scan, capsys
 ) -> None:
-    """`mkdir results` then `--artifact results` files the scan, not fails.
+    """`mkdir results` then `--analysis-file results` files the scan, not fails.
 
     Taking the base literally made the run finish the analysis and then fail
     renaming the result onto the directory, a bare permission error on Windows
@@ -63,7 +65,9 @@ def test_main_files_one_scan_into_an_existing_artifact_directory(
     """
     out = tmp_path / "results"
     out.mkdir()
-    rc = cli.main([write_scan(tmp_path), "--roi-size", "9", "--artifact", str(out)])
+    rc = cli.main(
+        [write_scan(tmp_path), "--roi-size", "9", "--analysis-file", str(out)]
+    )
     assert rc == 0
     written = out / "scan.qa.nc"
     assert f"# wrote {written}" in capsys.readouterr().out
@@ -75,7 +79,9 @@ def test_main_still_writes_one_scan_to_a_plain_path(
 ) -> None:
     """A base that is not an existing directory is still the file name itself."""
     out = tmp_path / "results"  # deliberately not created
-    rc = cli.main([write_scan(tmp_path), "--roi-size", "9", "--artifact", str(out)])
+    rc = cli.main(
+        [write_scan(tmp_path), "--roi-size", "9", "--analysis-file", str(out)]
+    )
     assert rc == 0
     assert out.is_file()
     assert fmriqa_io.load_artifact(out).provenance.scan == "scan.nii.gz"
@@ -87,7 +93,7 @@ def test_main_saves_one_artifact_per_scan_in_a_batch(
     first = write_scan(tmp_path, name="first")
     second = write_scan(tmp_path, name="second", seed=3)
     out = tmp_path / "artifacts"
-    rc = cli.main([first, second, "--roi-size", "9", "--artifact", str(out)])
+    rc = cli.main([first, second, "--roi-size", "9", "--analysis-file", str(out)])
     assert rc == 0
     written = sorted(p.name for p in out.glob("*.nc"))
     assert written == ["first.qa.nc", "second.qa.nc"]
@@ -111,7 +117,7 @@ def test_main_refuses_a_batch_whose_artifacts_would_collide(
     second = write_scan(tmp_path / "b", name="scan", seed=3)
     out = tmp_path / "artifacts"
 
-    rc = cli.main([first, second, "--roi-size", "9", "--artifact", str(out)])
+    rc = cli.main([first, second, "--roi-size", "9", "--analysis-file", str(out)])
 
     assert rc == 1
     err = capsys.readouterr().err
@@ -130,7 +136,7 @@ def test_main_refuses_the_same_scan_named_twice_with_an_artifact_directory(
     scan = write_scan(tmp_path)
     out = tmp_path / "artifacts"
 
-    rc = cli.main([scan, scan, "--roi-size", "9", "--artifact", str(out)])
+    rc = cli.main([scan, scan, "--roi-size", "9", "--analysis-file", str(out)])
 
     assert rc == 1
     err = capsys.readouterr().err
@@ -141,7 +147,7 @@ def test_main_refuses_the_same_scan_named_twice_with_an_artifact_directory(
 def test_main_refuses_an_artifact_that_would_overwrite_the_scan(
     tmp_path, write_scan, capsys, monkeypatch
 ) -> None:
-    """`--artifact` naming the input must fail before anything is read or written.
+    """`--analysis-file` naming the input must fail before anything is read or written.
 
     The scan is loaded first and the archive moved over its destination last, so
     without the guard the run succeeds and leaves an artifact where the NIfTI
@@ -152,7 +158,7 @@ def test_main_refuses_an_artifact_that_would_overwrite_the_scan(
     before = scan.read_bytes()
     monkeypatch.chdir(tmp_path)
 
-    rc = cli.main([str(scan), "--roi-size", "9", "--artifact", f"./{scan.name}"])
+    rc = cli.main([str(scan), "--roi-size", "9", "--analysis-file", f"./{scan.name}"])
 
     assert rc == 1
     captured = capsys.readouterr()
@@ -168,7 +174,7 @@ def test_main_refuses_an_artifact_that_would_overwrite_the_sidecar(
     scan = write_scan(tmp_path)
     sidecar = tmp_path / "scan.json"
     before = sidecar.read_bytes()
-    rc = cli.main([scan, "--roi-size", "9", "--artifact", str(sidecar)])
+    rc = cli.main([scan, "--roi-size", "9", "--analysis-file", str(sidecar)])
     assert rc == 1
     assert "would overwrite the input" in capsys.readouterr().err
     assert sidecar.read_bytes() == before
@@ -187,7 +193,9 @@ def test_main_refuses_a_batch_destination_that_is_another_input(
     other = tmp_path / "a.qa.nc"  # named like the batch's output for `a`
     other.write_bytes(b"not a scan, but an input all the same")
 
-    rc = cli.main([scan, str(other), "--roi-size", "9", "--artifact", str(tmp_path)])
+    rc = cli.main(
+        [scan, str(other), "--roi-size", "9", "--analysis-file", str(tmp_path)]
+    )
 
     assert rc == 1
     assert "would overwrite the input" in capsys.readouterr().err
@@ -203,7 +211,7 @@ def test_main_allows_a_batch_of_distinctly_named_scans(
     first = write_scan(tmp_path / "a", name="run1")
     second = write_scan(tmp_path / "b", name="run2", seed=3)
     out = tmp_path / "artifacts"
-    rc = cli.main([first, second, "--roi-size", "9", "--artifact", str(out)])
+    rc = cli.main([first, second, "--roi-size", "9", "--analysis-file", str(out)])
     assert rc == 0
     assert sorted(p.name for p in out.glob("*.nc")) == ["run1.qa.nc", "run2.qa.nc"]
 
@@ -218,13 +226,13 @@ def test_main_reports_artifact_failure_without_a_traceback(
             write_scan(tmp_path),
             "--roi-size",
             "9",
-            "--artifact",
+            "--analysis-file",
             str(blocked / "qa.nc"),
         ]
     )
     captured = capsys.readouterr()
     assert rc == 1
-    assert "ERROR: could not write artifact" in captured.err
+    assert "ERROR: could not write analysis file" in captured.err
     assert "Traceback" not in captured.err
 
 
@@ -245,10 +253,12 @@ def test_main_reports_a_refused_artifact_without_a_traceback(
 
     monkeypatch.setattr(q, "analyze", broken)
     out = tmp_path / "qa.nc"
-    rc = cli.main([write_scan(tmp_path), "--roi-size", "9", "--artifact", str(out)])
+    rc = cli.main(
+        [write_scan(tmp_path), "--roi-size", "9", "--analysis-file", str(out)]
+    )
     captured = capsys.readouterr()
     assert rc == 1
-    assert "ERROR: could not write artifact" in captured.err
+    assert "ERROR: could not write analysis file" in captured.err
     assert "provenance.te" in captured.err
     assert "Traceback" not in captured.err
     assert not out.exists()
@@ -453,7 +463,7 @@ def _reject_json_constant(value: str) -> None:
 def test_json_stdout_stays_pure_with_an_artifact(tmp_path, write_scan, capsys) -> None:
     out = tmp_path / "qa.nc"
     rc = cli.main(
-        [write_scan(tmp_path), "--roi-size", "9", "--json", "--artifact", str(out)]
+        [write_scan(tmp_path), "--roi-size", "9", "--json", "--analysis-file", str(out)]
     )
     captured = capsys.readouterr()
     assert rc == 0
@@ -511,9 +521,9 @@ def test_a_bare_command_line_asks_for_the_records_defaults() -> None:
 
 def test_main_rejects_an_empty_artifact_path(capsys) -> None:
     with pytest.raises(SystemExit) as info:
-        cli.main(["scan.nii.gz", "--artifact", ""])
+        cli.main(["scan.nii.gz", "--analysis-file", ""])
     assert info.value.code == 2
-    assert "--artifact" in capsys.readouterr().err
+    assert "--analysis-file" in capsys.readouterr().err
 
 
 def test_hilo_main_succeeds_on_a_pair(tmp_path, write_scan, capsys) -> None:
@@ -591,7 +601,7 @@ def test_a_wildcard_argument_is_expanded(tmp_path, write_scan, capsys) -> None:
 def test_a_wildcard_matching_one_scan_is_not_a_batch(
     tmp_path, write_scan, capsys
 ) -> None:
-    """The pattern the user actually typed: one scan, so `--artifact` is a file.
+    """The pattern the user actually typed: one scan, so `--analysis-file` is a file.
 
     Expansion happens before the scan count is taken, so a pattern matching one
     file behaves as naming that file does.
@@ -599,7 +609,7 @@ def test_a_wildcard_matching_one_scan_is_not_a_batch(
     write_scan(tmp_path, name="only")
     out = tmp_path / "one.nc"
     rc = cli.main(
-        [f"{tmp_path}/*only*.nii.gz", "--roi-size", "9", "--artifact", str(out)]
+        [f"{tmp_path}/*only*.nii.gz", "--roi-size", "9", "--analysis-file", str(out)]
     )
     assert rc == 0
     assert out.is_file()

@@ -88,7 +88,7 @@ OUTPUT_DIR_LABEL = "Output directory"
 #: Help text of the output directory field.
 OUTPUT_DIR_HELP = (
     "Where to write one folder per series -- the converted scan, its sidecar, "
-    "the QA artifact, and the report. Created if missing; an existing series "
+    "the analysis file, and the report. Created if missing; an existing series "
     "folder is never overwritten."
 )
 #: Label of the output directory field in the panel.

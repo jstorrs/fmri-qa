@@ -69,17 +69,17 @@ class IncompatibleScansError(FmriqaError, ValueError):
 
 
 class InvalidArtifactError(FmriqaError, ValueError):
-    """An analysis artifact on disk cannot be read back, or would not be.
+    """An analysis file on disk cannot be read back, or would not be.
 
-    Raised by `fmriqa_io.load_artifact` for a file that is not an artifact
+    Raised by `fmriqa_io.load_artifact` for a file that is not an analysis file
     archive, is malformed, or was written under a schema version this build does
-    not understand; and by `fmriqa_io.save_artifact` for an artifact that fails
+    not understand; and by `fmriqa_io.save_artifact` for an analysis file that fails
     the same contract, before anything is written. Also a `ValueError`, the
     natural stdlib type for unusable input. `path` is the file that failed (or
     would have been written) and `reason` states what was wrong.
     """
 
     def __init__(self, path: Path, reason: str) -> None:
-        super().__init__(f"cannot read artifact {path}: {reason}")
+        super().__init__(f"cannot read analysis file {path}: {reason}")
         self.path = path
         self.reason = reason

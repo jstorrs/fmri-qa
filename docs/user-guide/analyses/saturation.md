@@ -69,7 +69,7 @@ is present but wrong.
 There is no figure: the check produces counts and a ceiling, not a curve or an
 image.
 
-## What it contributes to the artifact
+## What it contributes to the analysis file
 
 | Name | Where it lives | Meaning |
 | --- | --- | --- |
@@ -80,7 +80,7 @@ image.
 | `measurements.clip_ceiling` | attribute, double | the inferred rail in image units; **absent** when no rail was found |
 | `measurements.clip_bits` | attribute, int | $n$ such that the stored ceiling is $2^n - 1$; **absent** with the ceiling |
 
-This block is the artifact's clearest case of *absent* rather than NaN. All six
+This block is the analysis file's clearest case of *absent* rather than NaN. All six
 fields are absent together when the series did not arrive as integers, because
 the estimator never ran. Test `clipped_any` first. `clip_ceiling` and
 `clip_bits` are also absent on a determinable series with no rail, so their

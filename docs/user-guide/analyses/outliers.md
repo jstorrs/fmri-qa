@@ -64,7 +64,7 @@ $$\text{tcOut} = \frac{\max_t \lvert \bar r(t) \rvert}
 {\operatorname{mad}\big(\lvert \mathcal{F}\{\bar r\} \rvert\big)}$$
 
 with the DC bin dropped from the magnitude spectrum before the peak or the
-spread is taken, as in the spectrum the artifact publishes and the
+spread is taken, as in the spectrum the analysis file publishes and the
 [stability](stability.md) page plots. Both scores are unitless peak-over-spread
 ratios, so a clean, stationary phantom sits near a Gaussian's level (a few) and
 a transient stands well above it. **tcOut** is large when one volume spikes.
@@ -106,7 +106,7 @@ empty series or one with no spread.
 The phantom has no injected transient. The marker identifies the frame with
 the largest measured fraction; the plot supplies no calibrated chance baseline.
 
-## What it contributes to the artifact
+## What it contributes to the analysis file
 
 | Name | Where it lives | Meaning |
 | --- | --- | --- |

@@ -1,10 +1,10 @@
 # From Python
 
-The command loads the artifact, renders it with `render_run_page` from
+The command loads the analysis file, renders it with `render_run_page` from
 `fmriqa_report`, and writes the string it returns. `fmriqa_report` itself reads and
-writes no file, so the load and the write are yours. Load an artifact with
+writes no file, so the load and the write are yours. Load an analysis file with
 `fmriqa_io.load_artifact`, which reads any file the command would (see
-{doc}`/user-guide/artifact`). `fmriqa_io.rename.write_text_atomically` writes the
+{doc}`/user-guide/analysis-file`). `fmriqa_io.rename.write_text_atomically` writes the
 page the way the command does: through a temporary file moved into place, with
 missing parent directories created, so a reader never sees a partial page.
 
@@ -31,7 +31,7 @@ returns the complete page as a string. Nothing is written. The
 The keyword arguments:
 
 - `title`: the page's heading and `<title>`. Without one, the scan name recorded
-  in the artifact, else the file name of the series it was computed from.
+  in the analysis file, else the file name of the series it was computed from.
 - `report_version`: the version the page names in its provenance table and
   footer. Without one, the installed `fmri-qa-report` version.
 - `theme`: how the figures are drawn (below).

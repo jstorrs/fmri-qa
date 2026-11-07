@@ -40,7 +40,7 @@ def acquisition_line(artifact: QAArtifact) -> str:
     if prov.matrix is not None:
         parts.append(f"{prov.matrix[0]}×{prov.matrix[1]} px")
     if prov.slice_index is not None:
-        # The stored 0-based index, so it matches the artifact and JSON record.
+        # The stored 0-based index, so it matches the analysis file and JSON record.
         total = f"/{prov.n_slices}" if prov.n_slices is not None else ""
         parts.append(f"slice index {prov.slice_index}{total}")
     parts.append(f"{prov.n_frames} frames")
@@ -68,11 +68,11 @@ def _localization_note(artifact: QAArtifact) -> str:
     Both failures make every mask-based number meaningless while leaving it
     looking like an ordinary measurement. So they are called out in capitals
     next to the metrics they invalidate, instead of being left for a reader to
-    infer from a NaN. The verdict comes from the artifact (`phantom_mask_ok`); the
+    infer from a NaN. The verdict comes from the analysis file (`phantom_mask_ok`); the
     bounds belong to the segmentation in the calculation half, which isn't
     importable from here.
 
-    A verdict of `None` means the artifact was migrated from a schema that
+    A verdict of `None` means the analysis file was migrated from a schema that
     predates the check. It is reported quietly, since nothing is known to be
     wrong, but the page must not imply the checks ran and passed.
     """
@@ -80,7 +80,7 @@ def _localization_note(artifact: QAArtifact) -> str:
     notes = []
     if m.phantom_mask_ok is False:
         # Show both numbers so the reader sees which failed: a collapse shows in
-        # the share, a segmentation of noise in the contrast. Artifacts that
+        # the share, a segmentation of noise in the contrast. Analysis files that
         # predate the contrast don't have it.
         why = f"{100 * m.phantom_fraction:.0f}% of frame"
         if not math.isnan(m.phantom_contrast):

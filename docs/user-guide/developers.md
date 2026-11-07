@@ -11,10 +11,10 @@ applications sit on top.
 
 | Package | Import | Does | Needs |
 | --- | --- | --- | --- |
-| `fmri-qa-core` | `fmriqa` | the metrics, the pipeline, and the analysis artifact they produce. Pure calculation: it reads no files | numpy, scipy, scikit-image |
-| `fmri-qa-io` | `fmriqa_io` | scans (`load_scan`), the artifact's netCDF-4 file (`save_artifact`, `load_artifact`), and DICOM import through dcm2niix (`import_dicom`) | core, nibabel, numpy; netCDF4 and dcm2niix outside a browser |
+| `fmri-qa-core` | `fmriqa` | the metrics, the pipeline, and the analysis file they produce. Pure calculation: it reads no files | numpy, scipy, scikit-image |
+| `fmri-qa-io` | `fmriqa_io` | scans (`load_scan`), the analysis file's netCDF-4 file (`save_artifact`, `load_artifact`), and DICOM import through dcm2niix (`import_dicom`) | core, nibabel, numpy; netCDF4 and dcm2niix outside a browser |
 | `fmri-qa-cli` | `fmriqa_cli` | the `fmri-qa`, `fmri-qa-hilo`, `fmri-qa-import` and `fmri-qa-report` commands | core, io, report |
-| `fmri-qa-report` | `fmriqa_report` | the figures and the HTML report, rendered from an artifact. A library: its command is in `fmri-qa-cli` | core, matplotlib |
+| `fmri-qa-report` | `fmriqa_report` | the figures and the HTML report, rendered from an analysis file. A library: its command is in `fmri-qa-cli` | core, matplotlib |
 | `fmri-qa-launcher` | `fmriqa_launcher` | `fmri-qa-run` and the desktop panel | cli, core, io, report; the standard library's `tkinter` for the panel |
 | `fmri-qa-web` (private) | `fmriqa_web` | the browser page's Python: bytes in, file names, report and record out | core, io, report |
 
@@ -65,7 +65,7 @@ QAScan → preprocess → QAImages → detect_phantom → resolve_roi
   Its five sections are `settings`, `provenance`, `measurements`, `curves` and
   `images`. Every value is computed, so a reader never recomputes a metric.
 
-`QAImages` and the artifact hold read-only copies of their arrays, so changing an
+`QAImages` and the analysis file hold read-only copies of their arrays, so changing an
 input cannot change a cached result. Copy an array when you need to write to it.
 
 {doc}`report-library` covers rendering a report from Python. The
@@ -117,7 +117,7 @@ the site reading it may have none. MATLAB's `ncread`, `ncinfo`, `ncdisp` and
 netCDF tools, and xarray opens one in a call. A NumPy `.npz` needs npy-matlab in
 MATLAB and gives R only numeric arrays. Version 4, rather than the classic
 format, gives per-variable compression, a per-variable checksum, and
-zero-length dimensions ({doc}`artifact` has the details). Everything is in the
+zero-length dimensions ({doc}`analysis-file` has the details). Everything is in the
 root group, because `xr.open_dataset` reads only the root group and Octave's
 group support is uneven. The dotted variable names (`images.sfnr`) break CF's
 naming advice, on purpose: the dotted path is the name these pages use, so a

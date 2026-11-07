@@ -32,7 +32,7 @@ def test_main_reports_a_write_failure_without_a_traceback(
 
 
 def test_main_creates_the_html_destination_directory(tmp_path, saved) -> None:
-    """A missing output directory is created, as `--artifact` already does."""
+    """A missing output directory is created, as `--analysis-file` already does."""
     html = tmp_path / "reports" / "2026-01" / "qa.html"
     assert report.report_main([saved, "--html", str(html)]) == 0
     assert html.is_file()
@@ -58,7 +58,7 @@ def test_html_refuses_more_than_one_artifact(tmp_path, saved, capsys) -> None:
         report.report_main([saved, saved, "--html", str(html)])
     assert info.value.code == 2
     err = capsys.readouterr().err
-    assert "--html renders one artifact to one file" in err
+    assert "--html renders one analysis file into one page" in err
     assert not html.exists()
 
 

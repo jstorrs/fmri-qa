@@ -91,11 +91,11 @@ def _parser() -> argparse.ArgumentParser:
         "(informational lines move to stderr).",
     )
     parser.add_argument(
-        "--artifact",
+        "--analysis-file",
         type=nonempty,
         metavar="PATH",
         default=None,
-        help="Save the full analysis artifact (settings, provenance, curves, "
+        help="Save the full analysis file (settings, provenance, curves, "
         "images) for later reporting. With one scan PATH is the output file, "
         "unless it is a directory that already exists; with several, or into "
         f"an existing directory, it takes one <scan>{ARTIFACT_SUFFIX} per "
@@ -115,10 +115,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     # destination here, but such a run is already refused below, so nothing is
     # lost collapsing it.
     destinations: dict[str, Path] = {}
-    if args.artifact:
-        pairs = artifact_destinations(args.artifact, args.paths)
+    if args.analysis_file:
+        pairs = artifact_destinations(args.analysis_file, args.paths)
         # Refuse before analyzing anything. A destination that lands on an
-        # input or on another scan's artifact would silently discard a completed
+        # input or on another scan's analysis file would silently discard a completed
         # analysis or the data it came from, so it is a usage error, not a
         # per-scan failure.
         if report_destination_problems(pairs):
@@ -169,7 +169,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             records.append(metric_record(artifact))
         else:
             print(format_row(artifact))
-        if args.artifact:
+        if args.analysis_file:
             problem = write_artifact(artifact, destinations[path], info)
             if problem:
                 errors.append({"scan": name, "source": str(path), "error": problem})

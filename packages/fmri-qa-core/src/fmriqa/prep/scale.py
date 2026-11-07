@@ -13,7 +13,7 @@ and one was wrong. Now the unit comes from the object that decides it, so a
 caller can't pair a length with the wrong unit.
 
 `LengthUnit` stays in `types`, like `RoiCenter`: it is a published option set
-that an artifact reader switches on, and the code acting on it lives here.
+that an analysis file reader switches on, and the code acting on it lives here.
 """
 
 from dataclasses import dataclass

@@ -1,11 +1,11 @@
-"""Read the retired `.npz` container: every artifact written before netCDF.
+"""Read the retired `.npz` container: every analysis file written before netCDF.
 
 The reader half of the layout this package used to write: one compressed NumPy
 archive, each array a member under its dotted path and the JSON document in a
 member named `__document__`. Nothing writes it any more (see `netcdf` for what
 replaced it and why), and this module has no writer, following "support reading
 old versions, write the new one only" from style/stability.md. It is kept
-because an artifact outlives the build that wrote it. A trend database filled
+because an analysis file outlives the build that wrote it. A trend database filled
 over months is a directory of these files, and they must keep opening.
 
 A file's container is decided by its leading bytes, not its name (see
@@ -30,7 +30,7 @@ _DOCUMENT = "__document__"
 
 
 def read(path: Path) -> tuple[str, dict[str, NDArray[Any]]]:
-    """Read the JSON text and every stored array from an `.npz` artifact.
+    """Read the JSON text and every stored array from an `.npz` analysis file.
 
     Raises
     ------
@@ -42,7 +42,7 @@ def read(path: Path) -> tuple[str, dict[str, NDArray[Any]]]:
         with np.load(path, allow_pickle=False) as archive:
             names = list(archive.files)
             if _DOCUMENT not in names:
-                raise InvalidArtifactError(path, "not an fmri-qa artifact archive")
+                raise InvalidArtifactError(path, "not an fmri-qa analysis file")
             text = _document_text(archive[_DOCUMENT])
             arrays = {name: archive[name] for name in names if name != _DOCUMENT}
     except InvalidArtifactError:

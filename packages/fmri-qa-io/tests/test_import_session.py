@@ -229,7 +229,7 @@ def test_an_import_refuses_a_destination_it_would_overwrite(
 ) -> None:
     """And leaves every existing file as it was.
 
-    The names come from the DICOM, so unlike an `--artifact` path (see
+    The names come from the DICOM, so unlike an `--analysis-file` path (see
     `cli.destinations`) they cannot be checked before converting. Checking them
     before the move keeps the destination all-or-nothing.
     """

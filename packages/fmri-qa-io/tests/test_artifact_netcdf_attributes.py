@@ -29,7 +29,7 @@ def test_the_file_is_netcdf4(tmp_path, artifact) -> None:
     """HDF5's signature: what a netCDF-4 file starts with, and what is sniffed.
 
     Also what `load_artifact` dispatches on: these bytes decide the container,
-    never the file's name, since `--artifact` writes whatever name the user
+    never the file's name, since `--analysis-file` writes whatever name the user
     gave.
     """
     saved = fmriqa_io.save_artifact(artifact, tmp_path / "scan.qa.nc")

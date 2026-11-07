@@ -1,9 +1,9 @@
 """A single-page QA report rendered from a `fmriqa.analysis.QAArtifact`.
 
-This is the presentation half of fmri-qa. Its only input is the artifact the
+This is the presentation half of fmri-qa. Its only input is the analysis file the
 calculation half publishes, with everything precomputed. Nothing here
 recomputes a metric or reaches into the `load`/`prep`/`metrics`/`pipeline`
-layers, so an artifact read back from disk renders the same as a fresh one.
+layers, so an analysis file read back from disk renders the same as a fresh one.
 
 `summary` builds the header text, `content` the per-metric vocabulary, `panels`
 the matplotlib figures, and `formats.html` composes them into one

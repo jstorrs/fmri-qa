@@ -150,7 +150,7 @@ The traces are stored in voxels. The *peak* measurements are converted to
 millimeters when the header gave a voxel size, and
 `measurements.displacement_unit` records which.
 
-## What it contributes to the artifact
+## What it contributes to the analysis file
 
 | Name | Where it lives | Meaning |
 | --- | --- | --- |

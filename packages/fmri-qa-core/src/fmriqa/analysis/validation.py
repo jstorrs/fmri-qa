@@ -1,7 +1,7 @@
-"""Validate the published artifact contract at the archive boundary.
+"""Validate the published analysis file contract at the archive boundary.
 
 Single-record invariants live in the value objects' own constructors
-(`AnalysisSettings`, `Provenance`, `Measurements`, `RoiBox`), because an artifact
+(`AnalysisSettings`, `Provenance`, `Measurements`, `RoiBox`), because an analysis file
 built in-process and never saved does not reach this module, and an invariant
 added here would go unchecked for everyone but the archive. This module checks
 what a constructor cannot see: facts spanning two records (`displacement_unit`
@@ -99,7 +99,7 @@ def _validate_parameters(artifact: QAArtifact) -> None:
     # reads the `PeAxis | None` annotations and refuses any other axis, on save
     # and on load alike. Repeating the domain as a literal `(None, 0, 1)` would
     # be a second place to update when a third axis appears.
-    # A migrated (schema <= 5) artifact can have a known voxel size with
+    # A migrated (schema <= 5) analysis file can have a known voxel size with
     # `displacement_unit` still "vox", since the old peaks were always voxels
     # (see `serialize.migrate`). "mm" without a known voxel size is never valid.
     _require(

@@ -6,9 +6,9 @@ still means something months later. The layout is a published contract pinned
 by `JSON_SCHEMA_VERSION`. Adding or renaming a field means editing it here and
 bumping the version.
 
-Pure: it maps an artifact and settings to plain data and does no IO, so the
+Pure: it maps an analysis file and settings to plain data and does no IO, so the
 command line and any other front end build the identical record. Only the
-artifact, settings and version modules are imported, so importing this does not
+analysis file, settings and version modules are imported, so importing this does not
 load the pipeline (see `fmriqa.analysis`).
 """
 
@@ -33,7 +33,7 @@ def metric_record(artifact: QAArtifact) -> dict[str, object]:
     A directional FWHM the run could not name (no phase-encode axis) is `null`,
     with the combined `fwhm` and its `fwhm_unit` alongside. `motn` and `com`
     carry their unit in `displacement_unit`: "mm" when the header's voxel size
-    is known, else "vox". An artifact migrated from schema <= 5 always reads
+    is known, else "vox". An analysis file migrated from schema <= 5 always reads
     "vox", since those schemas published both peaks in voxels whatever the voxel
     size (see `analysis.serialize.migrate`).
 
@@ -47,7 +47,7 @@ def metric_record(artifact: QAArtifact) -> dict[str, object]:
     prov = artifact.provenance
     record: dict[str, object] = {
         "scan": prov.scan,
-        # Enough provenance to key and date a row without opening the artifact:
+        # Enough provenance to key and date a row without opening the analysis file:
         # the path analyzed and the acquisition timestamp (null without a
         # sidecar), then the shape of the series the numbers were measured on.
         "source": prov.source,

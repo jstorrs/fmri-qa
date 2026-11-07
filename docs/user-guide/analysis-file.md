@@ -1,14 +1,14 @@
 # The analysis file
 
 The analysis file, a `.qa.nc`, is the whole result of analyzing one series. The
-analysis pages and the Python API call it the analysis artifact. It holds the
+analysis pages and the Python API call it the analysis file. It holds the
 settings the run was asked for, where the data came from, every scalar
 measurement, every curve, and the summary images with the geometry drawn on them.
-`fmri-qa --artifact` and `fmri-qa-run` write it, and a report is rendered from it
+`fmri-qa --analysis-file` and `fmri-qa-run` write it, and a report is rendered from it
 alone. Every value is already computed, so a reader never recomputes a metric.
 
 To open one in MATLAB, R, Python or `ncdump`, see
-[reading an artifact elsewhere](#reading-an-artifact-elsewhere). The rest of this
+[reading an analysis file elsewhere](#reading-an-analysis-file-elsewhere). The rest of this
 page documents the file. What each analysis puts into it is on that analysis's
 own page, and the [list of analyses](analyses/index.md) maps names to pages.
 
@@ -76,7 +76,7 @@ netCDF-4 has no boolean type, so each mask (`images.phantom_mask`,
 `images.invalid_mask`, and the four `images.ghost.*` regions) is stored as `uint8`
 0/1 bytes carrying CF's `flag_values = [0, 1]` and
 `flag_meanings = "outside inside"`. That makes the bytes self-describing enough to
-be turned back into `bool` on read. The artifact in memory is the same either
+be turned back into `bool` on read. The analysis file in memory is the same either
 way.
 
 ## Global attributes
@@ -187,7 +187,7 @@ with no ADC rail is absent. A ghost ratio whose region came back empty is NaN.
 See [saturation](analyses/saturation.md) for the first case and
 [ghosting](analyses/ghosting.md) for the second.
 
-## Reading an artifact elsewhere
+## Reading an analysis file elsewhere
 
 The readers a site already has can open netCDF-4 without a package that
 understands NumPy's format. Each array is a variable under its dotted name
@@ -237,7 +237,7 @@ disables locking for its whole process decides that for code it knows nothing
 about.
 
 Damage is caught, but not in every form. A sweep of 408 single-byte flips over a
-stored artifact refused 153 and left 247 in slack space, where they changed
+stored analysis file refused 153 and left 247 in slack space, where they changed
 nothing a reader can see. One flip sent a variable to another variable's intact
 chunk, which passes its own checksum and so reads back as the wrong image. Seven
 aborted the process inside libhdf5, a C library that reads files it was not
@@ -248,10 +248,10 @@ does not make the file tamper-proof.
 
 The file records the schema it was written under. A later build upgrades an older
 layout on load, with a warning, and any field that schema lacked comes back as
-*not recorded*, not as a value nothing measured. Only an artifact from a
+*not recorded*, not as a value nothing measured. Only an analysis file from a
 **newer** build than the reader is refused, because its layout cannot be known.
 
-Artifacts written by earlier builds as compressed `.qa.npz` archives still load.
+Analysis files written by earlier builds as compressed `.qa.npz` archives still load.
 The container is recognized from the file's leading bytes, not its name, so a
 directory filled before the netCDF change keeps opening. Nothing writes an `.npz`
 any more.

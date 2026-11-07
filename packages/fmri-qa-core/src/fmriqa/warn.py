@@ -6,7 +6,7 @@ entry points (`run_qa` directly, or via `analyze`). Instead this skips every
 frame whose file lives in this package, so the warning points at the first
 frame outside it, however deep the call.
 
-`fmriqa_io` reaches these warnings too (loading an old artifact migrates it, and
+`fmriqa_io` reaches these warnings too (loading an old analysis file migrates it, and
 decoding a scan warns through here), so its frames are skipped as well when it
 is loaded. It is named only as a string: core never imports io.
 """

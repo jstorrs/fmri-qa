@@ -2,7 +2,7 @@
 
 Each `plot_*` (`plot_weisskoff`, `plot_rdc`, `plot_signal`, `plot_residual`,
 `plot_outliers`, `plot_motion`, `plot_com`, `plot_spectrum`, `plot_psf`) draws
-one stability panel onto a matplotlib `Axes` from the artifact's `Curves`.
+one stability panel onto a matplotlib `Axes` from the analysis file's `Curves`.
 Every trace arrives precomputed, so these functions only choose colors, labels
 and limits. `plot_fig` wraps a draw callback into a fresh `Figure` that a
 format driver can embed.
@@ -35,7 +35,7 @@ def plot_weisskoff(ax: Axes, wk: WeisskoffCurve, rdc: float) -> None:
     the whole ROI), not at the single-voxel `cv[0]`. That makes the graphical
     RDC, where the measured plateau meets this line, equal the reported RDC, and
     resists the intensity non-uniformity that biases a single-voxel anchor. The
-    artifact carries the line as `cv_ideal`.
+    analysis file carries the line as `cv_ideal`.
     """
     # Measured data on top (zorder), but first in the legend (call order).
     ax.loglog(wk.roi_sizes, wk.cv, "o-", ms=3, label="measured", zorder=3)

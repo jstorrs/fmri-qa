@@ -11,7 +11,7 @@ OUTPUT_DIR/
   <series>/
     <series>.nii.gz   converted scan
     <series>.json     acquisition sidecar
-    <series>.qa.nc    analysis artifact
+    <series>.qa.nc    analysis file
     <series>.html     report
 ```
 
@@ -20,11 +20,11 @@ OUTPUT_DIR/
 - **`<series>.json`** is the BIDS sidecar dcm2niix wrote beside it, anonymized as
   `--anonymize` says. It is there when dcm2niix wrote one. Any other file the
   import filed under the series' name travels with the scan the same way.
-- **`<series>.qa.nc`** is the {doc}`analysis artifact </user-guide/artifact>`:
+- **`<series>.qa.nc`** is the {doc}`analysis file </user-guide/analysis-file>`:
   every number, curve and image the analysis produced, and the settings it used.
   Its recorded source is the scan's path in this folder, not the temporary one it
   was analyzed from.
-- **`<series>.html`** is the report rendered from that artifact, titled with the
+- **`<series>.html`** is the report rendered from that analysis file, titled with the
   series name. It is a single self-contained file, described in
   {doc}`the report page </user-guide/report-page>`. It opens by double-click.
 
@@ -56,7 +56,7 @@ no run, and no series folder is written.
 
 Nothing is worked on in the output directory. A run converts, analyzes and
 renders in a staging directory, `fmri-qa-run.<random>`, in the system's
-temporary directory (where `TMPDIR`, or `TEMP` on Windows, points). It needs room for the whole converted session plus the artifact and
+temporary directory (where `TMPDIR`, or `TEMP` on Windows, points). It needs room for the whole converted session plus the analysis file and
 report of the series in progress. Each series' files leave it once published. If
 the temporary directory is small or in memory, point `TMPDIR` somewhere larger.
 The staging directory is removed when the run ends, whether or not it succeeded.

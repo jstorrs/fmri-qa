@@ -30,7 +30,7 @@ $$n_{\text{trim}} = \max\!\left(\operatorname{round}\!\left(
 \frac{t_{\text{trim}}}{\mathrm{TR}}\right),\, 0\right)$$
 
 with $t_{\text{trim}}$ the `--trim-sec` setting (5 s by default). Every frame
-index in the artifact counts from the *trimmed* series. Add `provenance.n_trimmed`
+index in the analysis file counts from the *trimmed* series. Add `provenance.n_trimmed`
 for the acquired volume number.
 
 One slice is then selected (the middle slice under `--center image`) and each
@@ -224,7 +224,7 @@ SFNR, the fluctuation noise, and the static (odd/even difference) noise.
        fig.colorbar(shown, ax=panel, shrink=0.82)
 ```
 
-## What it contributes to the artifact
+## What it contributes to the analysis file
 
 | Name | Where it lives | Meaning |
 | --- | --- | --- |
@@ -257,7 +257,7 @@ Any of the five measurements can be NaN. NaN always means the estimator ran and
 could not resolve the value, never that the quantity does not apply, and none is
 ever absent. The settings that produced them (`trim_sec`, `detrend`, the
 resolved `detrend_order`, `roi_size`, `center`) ride in the JSON document's
-`settings` section; see [the artifact](../artifact.md).
+`settings` section; see [the analysis file](../analysis-file.md).
 
 ## References
 

@@ -6,7 +6,7 @@ centroid, the FBIRN ROI metrics, ghost ratios and smoothness) and returns one
 `QAResult`. The metric modules do the real work. This module is the glue, so it
 also holds the `QAMetrics` and `QAResult` objects that gather their output.
 `run_qa` stores the `AnalysisSettings` it was given in `QAResult.settings`. That
-record is defined in `settings`, not here, so the artifact types can carry it
+record is defined in `settings`, not here, so the analysis file types can carry it
 without loading this module.
 """
 
@@ -304,7 +304,7 @@ def _build_ghost_family(
     Every ghost statistic is defined relative to an axis. With none resolved the
     result is None, not a default axis, which would publish four numbers sampled
     from wherever it happened to point. Otherwise the whole family comes off one
-    build of the region-matched masks, which the result carries so the artifact
+    build of the region-matched masks, which the result carries so the analysis file
     can publish the sampled regions.
     """
     if pe_axis is None:

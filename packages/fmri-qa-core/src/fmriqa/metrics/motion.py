@@ -67,7 +67,7 @@ class MotionResult(ArrayValue):
         """Frames with an identifiable, finite fit that met the tolerance.
 
         Failed frames have all-NaN parameters. Their traces stay NaN in the
-        saved artifact, and any failed frame makes the run's peak metrics NaN,
+        saved analysis file, and any failed frame makes the run's peak metrics NaN,
         so no peak is published over an incomplete series.
         """
         return np.isfinite(self.params).all(axis=1)

@@ -118,7 +118,7 @@ def phantom_plausible(*, fraction: float, contrast: float) -> bool:
     collapse covers none or all of it), and it stands `MIN_PHANTOM_CONTRAST`
     above the background it was separated from, which a partition of noise never
     does. This is the single definition of "this segmentation held": slice
-    selection ranks slices by it and the artifact's phantom verdict is it.
+    selection ranks slices by it and the analysis file's phantom verdict is it.
     """
     return (
         DEGENERATE_PHANTOM_MIN < fraction < DEGENERATE_PHANTOM_MAX

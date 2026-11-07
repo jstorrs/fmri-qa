@@ -2,7 +2,7 @@
 
 Each builder returns a labeled matplotlib `Figure`: a square-ish `imshow` panel
 with the phantom outline and ROI on top. `panel_figs` assembles the row a report
-shows. Every image, mask and outline comes ready-made from the artifact, so
+shows. Every image, mask and outline comes ready-made from the analysis file, so
 this module only draws, and a format driver embeds the figures.
 """
 
@@ -62,7 +62,7 @@ def _draw_roi(ax: Axes, roi: RoiBox) -> None:
 
 
 def _draw_hull(ax: Axes, hull: FloatArray) -> None:
-    """Stroke the phantom's convex outline, a closed polygon from the artifact.
+    """Stroke the phantom's convex outline, a closed polygon from the analysis file.
 
     The hull smooths the ragged mask boundary into a convex outline. It arrives
     closed and in plot order (`imshow` maps column -> x and row -> y), so this is
@@ -122,7 +122,7 @@ def _ghost_panel_fig(images: ArtifactImages) -> Figure:
     background-relative baseline whose difference from ghost% is ACRg. That way
     both reported percentages can be checked against where they are sampled. A
     zeroed image edge dropped from the statistics (magenta) is marked when
-    present. If the PE axis is unknown, the artifact has no ghost pairs and the
+    present. If the PE axis is unknown, the analysis file has no ghost pairs and the
     panel is blank.
     """
     fig = Figure(figsize=(2.0, 2.0 * _PANEL_ASPECT))
