@@ -40,6 +40,7 @@ def test_the_docs_are_the_root_and_the_page_is_under_app(tmp_path: Path) -> None
     landing = (out / "app" / "index.html").read_text(encoding="utf-8")
     assert "fmri-qa 0.1.0, built from 8ec80a3." in landing
     assert '<a href="fmri-qa.html" download="fmri-qa.html">' in landing
+    assert '<a href="https://github.com/jstorrs/fmri-qa">' in landing
     assert broken_links(out) == []
 
 

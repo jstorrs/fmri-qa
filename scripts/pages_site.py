@@ -4,7 +4,7 @@ The documentation (`make docs`, build/site) is the site's root. The page
 (`make web`, web/dist/fmri-qa.html) goes under `app/`, where its footer says
 the latest version is (web/scripts/vite-build-info.mjs): `app/fmri-qa.html` is
 the page itself, and `app/index.html` a short page that names that build and
-offers to open or save it.
+offers to open or save it, with links to the documentation and the source.
 
 Usage: python scripts/pages_site.py DOCS_SITE PAGE OUT
 """
@@ -16,6 +16,8 @@ import sys
 from pathlib import Path
 
 APP = "app"
+# The source, as the page's footer names it (web/scripts/vite-build-info.mjs).
+REPOSITORY = "https://github.com/jstorrs/fmri-qa"
 PAGE_NAME = "fmri-qa.html"
 
 # The footer line the build writes, which starts
@@ -69,6 +71,7 @@ It runs in your browser, offline, and sends nothing anywhere.</p>
 <li><a href="{PAGE_NAME}" download="{PAGE_NAME}">Save it</a>
   to run from your own disk, with no network</li>
 <li><a href="../">Documentation</a></li>
+<li><a href="{REPOSITORY}">Source code on GitHub</a></li>
 </ul>
 </body>
 </html>
