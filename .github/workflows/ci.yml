@@ -18,10 +18,10 @@ jobs:
   check:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v6
+        uses: astral-sh/setup-uv@v10
         with:
           version: "0.9.8"
           enable-cache: true
@@ -43,7 +43,7 @@ jobs:
       # The documentation `make check` just built, for the `pages` job to publish.
       - name: Keep the documentation site for Pages
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: docs-site
           path: build/site
@@ -168,10 +168,10 @@ jobs:
       # Chrome is the runner's own google-chrome (/usr/bin/google-chrome, e2e's default).
       FIREFOX_BUILD: stable_159.0
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v6
+        uses: astral-sh/setup-uv@v10
         with:
           version: "0.9.8"
           enable-cache: true
@@ -180,7 +180,7 @@ jobs:
         run: uv python install
 
       - name: Install Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: "22.22.2"
           cache: npm
@@ -198,7 +198,7 @@ jobs:
       # packages and nibabel. The workspace wheels are rebuilt (and the stale ones deleted)
       # on every run, so the package sources are deliberately not in the key.
       - name: Cache web/vendor
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: web/vendor
           key: web-vendor-${{ runner.os }}-${{ hashFiles('uv.lock', 'web/package-lock.json', 'scripts/web_vendor.py') }}
@@ -207,7 +207,7 @@ jobs:
 
       - name: Cache Firefox
         id: firefox
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.cache/dicom-util/browsers/firefox
           key: firefox-${{ runner.os }}-${{ env.FIREFOX_BUILD }}
@@ -235,7 +235,7 @@ jobs:
       # The page the e2e tests just passed, for the `pages` job to publish.
       - name: Keep the page for Pages
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: page
           path: web/dist/fmri-qa.html
@@ -244,7 +244,7 @@ jobs:
 
       - name: Keep the page from a tag
         if: startsWith(github.ref, 'refs/tags/')
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: fmri-qa.html
           path: web/dist/fmri-qa.html
@@ -265,16 +265,16 @@ jobs:
       name: github-pages
       url: ${{ steps.deploy.outputs.page_url }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Fetch the documentation site
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: docs-site
           path: build/site
 
       - name: Fetch the page
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: page
           path: web/dist
@@ -285,12 +285,12 @@ jobs:
           python3 scripts/pages_site.py build/site web/dist/fmri-qa.html build/pages
           python3 scripts/check_site_links.py build/pages
 
-      - uses: actions/configure-pages@v5
+      - uses: actions/configure-pages@v6
 
-      - uses: actions/upload-pages-artifact@v4
+      - uses: actions/upload-pages-artifact@v5
         with:
           path: build/pages
 
       - name: Publish
         id: deploy
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
