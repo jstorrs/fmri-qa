@@ -98,8 +98,14 @@ for (const name of selectedBrowsers()) {
         instances,
         60_000,
       );
+      // A click is aimed at where the button is, and while Python boots the stages above keep moving it, so a click
+      // then can land beside it (as in about.test.mjs). Once booted the page holds still.
+      await page.waitFor(() => document.body.dataset.python !== 'booting', undefined, BOOT_TIMEOUT_MS);
       await page.click('#select-all');
+      await page.waitFor(() => !document.getElementById('run').disabled, undefined, 10_000);
       await page.click('#run');
+      // Rows appear as the click lands, so a missed click fails here rather than as an empty table.
+      await page.waitFor(() => document.querySelectorAll('#results-body tr').length > 0, undefined, 10_000);
       await page.waitFor(() => document.body.dataset.state === 'ready', undefined, BOOT_TIMEOUT_MS + 120_000);
       return page.evaluate(() =>
         [...document.querySelectorAll('#results-body tr')].map((tr) => ({
