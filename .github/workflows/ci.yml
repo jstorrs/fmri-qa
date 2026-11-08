@@ -66,7 +66,7 @@ jobs:
           .venv-core-smoke/bin/python -c "from importlib.resources import files; assert files('fmriqa').joinpath('py.typed').is_file()"
           # The seam, checked against the installed artifact: no drawing stack.
           .venv-core-smoke/bin/python -c "import importlib.util as u; assert u.find_spec('matplotlib') is None"
-          # Nor the artifact file's native library: the container is fmri-qa-io's.
+          # Nor the analysis file's native library: the container is fmri-qa-io's.
           .venv-core-smoke/bin/python -c "import importlib.util as u; assert u.find_spec('netCDF4') is None, 'the core wheel pulled in netCDF4'"
           # Nor the DICOM converter: running dcm2niix is fmri-qa-io's.
           .venv-core-smoke/bin/python -c "import importlib.util as u; assert u.find_spec('dcm2niix') is None, 'the core wheel pulled in dcm2niix'"
@@ -153,7 +153,7 @@ jobs:
           uv pip install --python .venv-web-smoke/bin/python "${core[0]}" "${io[0]}" "${report[0]}" "${web[0]}"
           .venv-web-smoke/bin/python -c "from importlib.resources import files; assert files('fmriqa_web').joinpath('py.typed').is_file()"
           .venv-web-smoke/bin/python -c "import fmriqa_web, fmriqa_web.bridge, fmriqa_web.document, fmriqa_web.exceptions, fmriqa_web.naming, fmriqa_web.series"
-          # The browser seam, checked against the installed artifact: no commands, no launcher, no artifact file.
+          # The browser seam, checked against the installed artifact: no commands, no launcher, no analysis file.
           .venv-web-smoke/bin/python -c "import importlib.util as u, sys; import fmriqa_web; assert fmriqa_web.contract()['json_schema_version'], 'no contract'; assert u.find_spec('fmriqa_cli') is None and u.find_spec('fmriqa_launcher') is None, 'the web wheel pulled in a command line or the launcher'; assert 'netCDF4' not in sys.modules, 'importing fmriqa_web loaded netCDF4'"
           .venv-web-smoke/bin/python -c "from importlib.metadata import distribution; text = distribution('fmri-qa-web').read_text('licenses/LICENSE'); assert text and 'MIT License' in text, 'the web wheel ships no license text'"
 

@@ -121,9 +121,9 @@ $(0, 2)$ outline, not an error.
 
    import phantom
 
-   artifact = phantom.artifact()
-   images = artifact.images
-   measurements = artifact.measurements
+   analysis = phantom.analysis()
+   images = analysis.images
+   measurements = analysis.measurements
    box = images.roi
 
    fig, axes = plt.subplots(figsize=(5.4, 5.2), layout="constrained")

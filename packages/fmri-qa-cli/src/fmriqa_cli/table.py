@@ -66,7 +66,7 @@ class Column:
 
     title: str
     width: int
-    cell: Callable[[q.QAArtifact], str]
+    cell: Callable[[q.QAAnalysis], str]
     left: bool = False
 
     def pad(self, text: str) -> str:
@@ -74,7 +74,7 @@ class Column:
         return f"{text:<{self.width}s}" if self.left else f"{text:>{self.width}s}"
 
 
-def _clip_kept(a: q.QAArtifact) -> str:
+def _clip_kept(a: q.QAAnalysis) -> str:
     m = a.measurements
     return clip_cell(m.n_clipped_kept, flag=bool(m.clipped_kept))
 
@@ -145,6 +145,6 @@ def header_lines() -> tuple[str, str]:
     return header, "-" * len(header)
 
 
-def format_row(artifact: q.QAArtifact) -> str:
+def format_row(analysis: q.QAAnalysis) -> str:
     """Format one fixed-width metrics row for the human table."""
-    return " ".join(c.pad(c.cell(artifact)) for c in COLUMNS)
+    return " ".join(c.pad(c.cell(analysis)) for c in COLUMNS)

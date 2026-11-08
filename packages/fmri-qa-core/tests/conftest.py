@@ -1,7 +1,7 @@
 """Shared fixtures for the calculation-half tests.
 
 The phantom every test measures against is `fmriqa.testing.synthetic_series`.
-Core reads no files, so every scan here is built in memory. `artifact` runs the
+Core reads no files, so every scan here is built in memory. `analysis` runs the
 whole pipeline over the phantom once per session.
 """
 
@@ -42,10 +42,10 @@ def _arrays(obj: object) -> Iterator[np.ndarray]:
 
 
 @pytest.fixture(scope="session")
-def artifact() -> q.QAArtifact:
-    """An artifact from the synthetic phantom, at a small ROI.
+def analysis() -> q.QAAnalysis:
+    """An analysis from the synthetic phantom, at a small ROI.
 
-    Built once per session and shared. The artifact is frozen with read-only
+    Built once per session and shared. The analysis is frozen with read-only
     arrays, so no test can change it for another. The assertion below checks
     that.
     """
@@ -53,6 +53,6 @@ def artifact() -> q.QAArtifact:
     settings = q.AnalysisSettings(roi_size=9)
     result = q.analyze(scan, settings, name="scan.nii.gz", source="scan.nii.gz")
     assert not any(a.flags.writeable for a in _arrays(result)), (
-        "shared artifact has a writeable array"
+        "shared analysis has a writeable array"
     )
     return result

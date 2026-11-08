@@ -1,7 +1,7 @@
 """The analysis pages and the netCDF layout, checked against each other.
 
 `docs/user-guide/analyses/` documents what each analysis contributes to the
-artifact, under the names a reader sees in the file. A claim in prose rots
+analysis file, under the names a reader sees in the file. A claim in prose rots
 silently: a variable added to `_LAYOUT` with no page is undocumented, a page
 naming a renamed variable misleads, and the same name on two pages means neither
 owns it. Like `test_layering.py`, this checks mechanically what would otherwise
@@ -12,7 +12,7 @@ Every variable in the serializer's `_LAYOUT`, every coordinate in
 analysis page's contribution table, and every `Provenance` field must be named
 in `analysis-file.md`.
 
-Both tables are private to `fmriqa_io.artifact.netcdf`, and this imports them
+Both tables are private to `fmriqa_io.analysis_file.netcdf`, and this imports them
 anyway. They are the layout the pages are checked against, and a public accessor
 would exist only for this test. If a second consumer needs them, they become
 public then.
@@ -20,7 +20,7 @@ public then.
 Two spellings are checked, for two different mistakes:
 
 * **The contribution tables** (the first column of the table under "What it
-  contributes to the artifact") are the ownership claim, so coverage and
+  contributes to the analysis file") are the ownership claim, so coverage and
   uniqueness are measured there. A dimension name like `frame` is an ordinary
   word that appears in half the prose, so only the table column can say which
   page owns it.
@@ -38,9 +38,9 @@ from functools import cache
 from pathlib import Path
 
 import fmriqa_io
-from fmriqa.analysis.artifact import AnalysisSettings, Measurements, Provenance
 from fmriqa.analysis.serialize.decompose import decompose
-from fmriqa_io.artifact.netcdf import _COORDINATES, _LAYOUT, _leaves
+from fmriqa.analysis.values import AnalysisSettings, Measurements, Provenance
+from fmriqa_io.analysis_file.netcdf import _COORDINATES, _LAYOUT, _leaves
 
 DOCS = Path(fmriqa_io.__file__).parents[4] / "docs" / "user-guide"
 ANALYSES = DOCS / "analyses"
@@ -49,7 +49,7 @@ ANALYSES = DOCS / "analyses"
 CONTRIBUTION_HEADING = "## What it contributes to the analysis file"
 
 # A dotted name in backticks, anywhere on a page. The four prefixes are the ones
-# that name something the artifact actually holds.
+# that name something the analysis file actually holds.
 DOTTED = re.compile(
     r"`(curves|images|measurements|provenance|settings)\.([A-Za-z0-9_.]+)`"
 )
@@ -66,7 +66,7 @@ def _pages() -> list[Path]:
 def _contribution_names(page: Path) -> list[str]:
     """The backticked names in the first column of `page`'s contribution table.
 
-    An analysis that contributes nothing to the artifact (the hi/lo flip-angle
+    An analysis that contributes nothing to the analysis file (the hi/lo flip-angle
     pair) has the heading and no table, and yields nothing.
     """
     body = page.read_text().split(CONTRIBUTION_HEADING, 1)
@@ -105,7 +105,7 @@ def _document_scalars() -> set[str]:
     newest = max(fixtures.glob("schema_v*.qa.npz"), key=lambda p: int(p.stem[8:-3]))
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")  # an older schema migrates, with a note
-        document, _ = decompose(fmriqa_io.load_artifact(newest))
+        document, _ = decompose(fmriqa_io.load_analysis(newest))
     return {
         path
         for section in ("curves", "images")
@@ -114,7 +114,7 @@ def _document_scalars() -> set[str]:
 
 
 def _expected() -> dict[str, set[str]]:
-    """Every name the artifact publishes, grouped by what kind of name it is."""
+    """Every name the analysis file publishes, grouped by what kind of name it is."""
     return {
         "variable": set(_LAYOUT),
         "coordinate": set(_COORDINATES),
@@ -147,7 +147,7 @@ def test_every_published_name_is_documented_exactly_once() -> None:
     assert not duplicated, f"claimed by more than one analysis page: {duplicated}"
 
 
-def test_no_page_claims_a_name_the_artifact_does_not_publish() -> None:
+def test_no_page_claims_a_name_the_analysis_does_not_publish() -> None:
     known = set().union(*_expected().values())
     unknown = {name: pages for name, pages in _owners().items() if name not in known}
     assert not unknown, (
@@ -167,10 +167,10 @@ def test_pages_never_spell_a_name_that_does_not_exist() -> None:
             name = f"{section}.{rest}"
             if name not in known:
                 offenders.setdefault(page.name, []).append(name)
-    assert not offenders, f"named in the docs but not in the artifact: {offenders}"
+    assert not offenders, f"named in the docs but not in the analysis file: {offenders}"
 
 
-def test_every_setting_is_named_in_the_artifact_page() -> None:
+def test_every_setting_is_named_in_the_analysis_page() -> None:
     text = (DOCS / "analysis-file.md").read_text()
     undocumented = [
         f.name for f in fields(AnalysisSettings) if f"`settings.{f.name}`" not in text
@@ -178,7 +178,7 @@ def test_every_setting_is_named_in_the_artifact_page() -> None:
     assert not undocumented, f"settings missing from analysis-file.md: {undocumented}"
 
 
-def test_every_provenance_field_is_named_in_the_artifact_page() -> None:
+def test_every_provenance_field_is_named_in_the_analysis_page() -> None:
     text = (DOCS / "analysis-file.md").read_text()
     undocumented = [
         f.name for f in fields(Provenance) if f"`provenance.{f.name}`" not in text

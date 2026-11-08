@@ -1,4 +1,4 @@
-"""Split a `QAArtifact` into the JSON document and the named arrays.
+"""Split a `QAAnalysis` into the JSON document and the named arrays.
 
 The write half of the archive layout: every array becomes a member keyed by its
 dotted path (`curves.weisskoff.cv`, `images.ghost.pe_ghost`), and everything
@@ -7,7 +7,7 @@ Read the two together: a field added here needs a reader there.
 
 The mapping is written out section by section, not derived by reflection over
 the dataclasses. The layout is a published contract pinned by
-`ARTIFACT_SCHEMA_VERSION`, so adding a field should be a deliberate edit, not a
+`ANALYSIS_SCHEMA_VERSION`, so adding a field should be a deliberate edit, not a
 silent change of file format.
 """
 
@@ -15,7 +15,7 @@ from dataclasses import asdict
 from typing import Any
 
 from ...types import BoolArray, FloatArray
-from ..artifact import ArtifactImages, Curves, QAArtifact
+from ..values import Curves, QAAnalysis, SummaryImages
 
 # An archive member: a float image/curve or a boolean mask, addressed by its
 # dotted path. The two dtypes share one alias because the archive is keyed by
@@ -23,15 +23,15 @@ from ..artifact import ArtifactImages, Curves, QAArtifact
 type Member = FloatArray | BoolArray
 
 
-def decompose(artifact: QAArtifact) -> tuple[dict[str, Any], dict[str, Member]]:
+def decompose(analysis: QAAnalysis) -> tuple[dict[str, Any], dict[str, Member]]:
     """Split an analysis file into its JSON document and its named arrays."""
-    curves, curve_arrays = _curves_section(artifact.curves)
-    images, image_arrays = _images_section(artifact.images)
+    curves, curve_arrays = _curves_section(analysis.curves)
+    images, image_arrays = _images_section(analysis.images)
     document = {
-        "schema_version": artifact.schema_version,
-        "settings": asdict(artifact.settings),
-        "provenance": asdict(artifact.provenance),
-        "measurements": asdict(artifact.measurements),
+        "schema_version": analysis.schema_version,
+        "settings": asdict(analysis.settings),
+        "provenance": asdict(analysis.provenance),
+        "measurements": asdict(analysis.measurements),
         "curves": curves,
         "images": images,
     }
@@ -75,7 +75,7 @@ def _curves_section(curves: Curves) -> tuple[dict[str, Any], dict[str, Member]]:
 
 
 def _images_section(
-    images: ArtifactImages,
+    images: SummaryImages,
 ) -> tuple[dict[str, Any], dict[str, Member]]:
     """Split the image scalars from every image/mask keyed by its dotted path."""
     document = {"roi": asdict(images.roi), "has_ghost": images.ghost is not None}

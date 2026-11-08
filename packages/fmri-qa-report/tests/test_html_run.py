@@ -38,9 +38,9 @@ def _tiny_rendered_figures() -> tuple[RenderedFigure, ...]:
 
 
 @pytest.fixture(scope="module")
-def standalone_page(artifact) -> str:
+def standalone_page(analysis) -> str:
     """One real rendering, shared across read-only tests."""
-    return render_run_page(artifact, title="Test run", report_version="report-test")
+    return render_run_page(analysis, title="Test run", report_version="report-test")
 
 
 def test_run_page_contains_complete_offline_report_content(standalone_page) -> None:
@@ -174,33 +174,33 @@ def test_run_page_carries_no_script_or_event_handlers(standalone_page) -> None:
     assert re.search(r"\son[a-z]+\s*=", page) is None
 
 
-def test_run_page_is_byte_reproducible(artifact) -> None:
-    first = render_run_page(artifact, title="Test run", report_version="report-test")
-    second = render_run_page(artifact, title="Test run", report_version="report-test")
+def test_run_page_is_byte_reproducible(analysis) -> None:
+    first = render_run_page(analysis, title="Test run", report_version="report-test")
+    second = render_run_page(analysis, title="Test run", report_version="report-test")
 
     assert first == second
 
 
 def test_a_blank_scan_with_an_unresolved_rdc_still_renders() -> None:
     """Every panel must degrade to a page, not an exception, on a degenerate run."""
-    artifact = q.analyze(
+    analysis = q.analyze(
         q.QAScan(data=np.zeros((16, 16, 1, 10)), tr=2.0, pe_axis=1),
         q.AnalysisSettings(roi_size=3, trim_sec=0, detrend_order=0),
     )
-    assert not np.isfinite(artifact.curves.weisskoff.rdc).any()
-    page = render_run_page(artifact, title="blank", report_version="report-test")
+    assert not np.isfinite(analysis.curves.weisskoff.rdc).any()
+    page = render_run_page(analysis, title="blank", report_version="report-test")
     assert "Unavailable — estimator unresolved" in page
 
 
 def test_run_page_marks_nonfinite_values_and_analysis_warnings(
-    artifact, monkeypatch
+    analysis, monkeypatch
 ) -> None:
     monkeypatch.setattr(
         "fmriqa_report.formats.html.run.render_figures",
-        lambda _artifact, **_kwargs: _tiny_rendered_figures(),
+        lambda _analysis, **_kwargs: _tiny_rendered_figures(),
     )
     measurements = replace(
-        artifact.measurements,
+        analysis.measurements,
         snr=float("nan"),
         sfnr=float("inf"),
         rdc=float("-inf"),
@@ -214,7 +214,7 @@ def test_run_page_marks_nonfinite_values_and_analysis_warnings(
         clip_ceiling=4095.0,
         clip_bits=12,
     )
-    page = render_run_page(replace(artifact, measurements=measurements))
+    page = render_run_page(replace(analysis, measurements=measurements))
 
     assert page.count("Unavailable — estimator unresolved") >= 3
     assert (
@@ -229,10 +229,10 @@ def test_run_page_marks_nonfinite_values_and_analysis_warnings(
 
 
 def test_run_page_puts_metric_units_in_small_and_leaves_bare_numbers(
-    standalone_page, artifact
+    standalone_page, analysis
 ) -> None:
     page = standalone_page
-    measurements = artifact.measurements
+    measurements = analysis.measurements
     # "ghost" always carries a "%" unit and "SNR" never does. Pick by label so
     # the test names what it expects.
     unit_bearing = next(doc for doc in METRIC_DOCS if doc.label == "ghost")
@@ -243,13 +243,13 @@ def test_run_page_puts_metric_units_in_small_and_leaves_bare_numbers(
 
 
 def test_run_page_handles_missing_metadata_without_inventing_acquisition_time(
-    bare_artifact, monkeypatch
+    bare_analysis, monkeypatch
 ) -> None:
     monkeypatch.setattr(
         "fmriqa_report.formats.html.run.render_figures",
-        lambda _artifact, **_kwargs: _tiny_rendered_figures(),
+        lambda _analysis, **_kwargs: _tiny_rendered_figures(),
     )
-    page = render_run_page(bare_artifact)
+    page = render_run_page(bare_analysis)
 
     assert "Scanner</dt><dd>Unknown" in page
     assert "Coil</dt><dd>Unknown" in page
@@ -258,20 +258,20 @@ def test_run_page_handles_missing_metadata_without_inventing_acquisition_time(
     assert "Analyzed at</th><td>" in page
     assert "Scanner and acquisition details</th><td>Unavailable" in page
     assert "Series</th><td>Unknown" in page
-    assert f"Trimmed frames</th><td>{bare_artifact.provenance.n_trimmed}" in page
+    assert f"Trimmed frames</th><td>{bare_analysis.provenance.n_trimmed}" in page
     assert "Recorded PE direction</th><td>Unknown" in page
 
 
-def test_run_page_escapes_hostile_metadata_and_long_text(artifact, monkeypatch) -> None:
+def test_run_page_escapes_hostile_metadata_and_long_text(analysis, monkeypatch) -> None:
     monkeypatch.setattr(
         "fmriqa_report.formats.html.run.render_figures",
-        lambda _artifact, **_kwargs: _tiny_rendered_figures(),
+        lambda _analysis, **_kwargs: _tiny_rendered_figures(),
     )
     hostile = '<script>alert("x")</script>'
     long_source = f"{hostile}/" + "very-long-source-" * 40
-    provenance = replace(artifact.provenance, scan=hostile, source=long_source)
+    provenance = replace(analysis.provenance, scan=hostile, source=long_source)
     page = render_run_page(
-        replace(artifact, provenance=provenance),
+        replace(analysis, provenance=provenance),
         title=hostile,
     )
     parsed = _Page()
@@ -289,11 +289,11 @@ def test_run_template_and_stylesheet_are_packaged_resources() -> None:
 
 
 def test_run_page_refuses_a_stylesheet_that_could_break_out_of_its_style_block(
-    artifact, monkeypatch
+    analysis, monkeypatch
 ) -> None:
     monkeypatch.setattr(
         "fmriqa_report.formats.html.run.render_figures",
-        lambda _artifact, **_kwargs: _tiny_rendered_figures(),
+        lambda _analysis, **_kwargs: _tiny_rendered_figures(),
     )
 
     original_read_resource = resources.read_resource
@@ -308,4 +308,4 @@ def test_run_page_refuses_a_stylesheet_that_could_break_out_of_its_style_block(
     )
 
     with pytest.raises(ValueError, match="style"):
-        render_run_page(artifact)
+        render_run_page(analysis)

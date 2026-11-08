@@ -6,7 +6,7 @@ and the shared option types. Helpers live in their subpackages; import them
 from there (`fmriqa.prep.geometry`, `fmriqa.metrics.ghost`, ...).
 
 This package is the calculation half of fmri-qa. Reports and plots live in the
-separate `fmri-qa-report` distribution, which consumes a `QAArtifact` and never
+separate `fmri-qa-report` distribution, which consumes a `QAAnalysis` and never
 imports the layers above.
 
 Every name in `__all__` is re-exported lazily, so this module has no eager
@@ -26,23 +26,23 @@ if TYPE_CHECKING:
     # Plain imports, not the lazy `_EXPORTS` map below, so mypy and pyright
     # resolve every name statically. Never executed at runtime.
     from .analysis import (
-        ARTIFACT_SCHEMA_VERSION,
-        ArtifactImages,
+        ANALYSIS_SCHEMA_VERSION,
         Curves,
         GhostRegions,
         Measurements,
         Provenance,
         PsfCurves,
-        QAArtifact,
+        QAAnalysis,
         RoiBox,
+        SummaryImages,
         WeisskoffCurve,
         analyze,
-        build_artifact,
+        build_analysis,
     )
     from .exceptions import (
         FmriqaError,
         IncompatibleScansError,
-        InvalidArtifactError,
+        InvalidAnalysisFileError,
         InvalidChoiceError,
         InvalidScanError,
     )
@@ -53,12 +53,6 @@ if TYPE_CHECKING:
     )
     from .load.metadata import ScanMeta
     from .load.scan import QAScan
-    from .metrics.artifacts import (
-        OutlierResult,
-        SpikeResult,
-        outlier_fraction,
-        spike_scores,
-    )
     from .metrics.center_of_mass import CenterOfMassResult, estimate_center_of_mass
     from .metrics.fbirn import (
         WeisskoffResult,
@@ -75,6 +69,12 @@ if TYPE_CHECKING:
         estimate_pe_axis,
     )
     from .metrics.motion import MotionResult, estimate_motion
+    from .metrics.outliers import (
+        OutlierResult,
+        SpikeResult,
+        outlier_fraction,
+        spike_scores,
+    )
     from .metrics.saturation import ClipRail, SaturationResult, detect_saturation
     from .metrics.smoothness import SmoothnessResult, estimate_smoothness
     from .pipeline import QAMetrics, QAResult, preprocess, run_qa
@@ -109,8 +109,8 @@ if TYPE_CHECKING:
 logging.getLogger(__name__).addHandler(logging.NullHandler())
 
 __all__ = [
+    "ANALYSIS_SCHEMA_VERSION",
     "ANONYMIZE_MODES",
-    "ARTIFACT_SCHEMA_VERSION",
     "DETREND_METHODS",
     "FBIRN_ROI_SIZE",
     "GHOST_RADIUS",
@@ -121,7 +121,6 @@ __all__ = [
     "ROI_CENTER_MODES",
     "AnalysisSettings",
     "Anonymize",
-    "ArtifactImages",
     "CenterOfMassResult",
     "ClipRail",
     "Curves",
@@ -132,7 +131,7 @@ __all__ = [
     "GhostResult",
     "HiLoResult",
     "IncompatibleScansError",
-    "InvalidArtifactError",
+    "InvalidAnalysisFileError",
     "InvalidChoiceError",
     "InvalidScanError",
     "Measurements",
@@ -143,7 +142,7 @@ __all__ = [
     "PhantomGeometry",
     "Provenance",
     "PsfCurves",
-    "QAArtifact",
+    "QAAnalysis",
     "QAImages",
     "QAMetrics",
     "QAResult",
@@ -154,11 +153,12 @@ __all__ = [
     "ScanMeta",
     "SmoothnessResult",
     "SpikeResult",
+    "SummaryImages",
     "VoxelSize",
     "WeisskoffCurve",
     "WeisskoffResult",
     "analyze",
-    "build_artifact",
+    "build_analysis",
     "core_version",
     "detect_phantom",
     "detect_saturation",
@@ -184,23 +184,23 @@ __all__ = [
 # entry mirrors one `from .x import (...)` block above.
 _EXPORTS: dict[str, tuple[str, ...]] = {
     ".analysis": (
-        "ARTIFACT_SCHEMA_VERSION",
-        "ArtifactImages",
+        "ANALYSIS_SCHEMA_VERSION",
+        "SummaryImages",
         "Curves",
         "GhostRegions",
         "Measurements",
         "Provenance",
         "PsfCurves",
-        "QAArtifact",
+        "QAAnalysis",
         "RoiBox",
         "WeisskoffCurve",
         "analyze",
-        "build_artifact",
+        "build_analysis",
     ),
     ".exceptions": (
         "FmriqaError",
         "IncompatibleScansError",
-        "InvalidArtifactError",
+        "InvalidAnalysisFileError",
         "InvalidChoiceError",
         "InvalidScanError",
     ),
@@ -211,7 +211,7 @@ _EXPORTS: dict[str, tuple[str, ...]] = {
     ),
     ".load.metadata": ("ScanMeta",),
     ".load.scan": ("QAScan",),
-    ".metrics.artifacts": (
+    ".metrics.outliers": (
         "OutlierResult",
         "SpikeResult",
         "outlier_fraction",

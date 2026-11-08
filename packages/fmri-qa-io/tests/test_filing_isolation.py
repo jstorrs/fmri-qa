@@ -30,7 +30,7 @@ _FORBIDDEN_AT_RUNTIME = (
     "tempfile",
     "fmriqa_io.convert.session",
     "fmriqa_io.convert.dcm2niix",
-    "fmriqa_io.artifact",
+    "fmriqa_io.analysis_file",
     "fmriqa_io.load",
     "fmriqa_io.rename",
 )

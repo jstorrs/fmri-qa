@@ -3,19 +3,19 @@
 The command loads the analysis file, renders it with `render_run_page` from
 `fmriqa_report`, and writes the string it returns. `fmriqa_report` itself reads and
 writes no file, so the load and the write are yours. Load an analysis file with
-`fmriqa_io.load_artifact`, which reads any file the command would (see
+`fmriqa_io.load_analysis`, which reads any file the command would (see
 {doc}`/user-guide/analysis-file`). `fmriqa_io.rename.write_text_atomically` writes the
 page the way the command does: through a temporary file moved into place, with
 missing parent directories created, so a reader never sees a partial page.
 
 ```python
-from fmriqa_io import load_artifact
+from fmriqa_io import load_analysis
 from fmriqa_io.rename import write_text_atomically
 from fmriqa_report import Theme, render_run_page
 
-artifact = load_artifact("qa.nc")
+analysis = load_analysis("qa.nc")
 page = render_run_page(
-    artifact,
+    analysis,
     title="Bay 2 weekly phantom",
     theme=Theme(panel_accent="#8a1538"),
 )
@@ -24,7 +24,7 @@ write_text_atomically("reports/2026-09-24.html", page)
 
 ## The function
 
-`render_run_page(artifact, *, title=None, report_version=None, theme=DEFAULT_THEME)`
+`render_run_page(analysis, *, title=None, report_version=None, theme=DEFAULT_THEME)`
 returns the complete page as a string. Nothing is written. The
 {doc}`API reference </api/fmri-qa-report>` has the signature and parameters.
 
@@ -36,7 +36,7 @@ The keyword arguments:
   footer. Without one, the installed `fmri-qa-report` version.
 - `theme`: how the figures are drawn (below).
 
-`load_artifact` raises `fmriqa.analysis.InvalidArtifactError` for a file it
+`load_analysis` raises `fmriqa.analysis.InvalidAnalysisFileError` for a file it
 cannot read, and a caller catches that, as the command does.
 
 ## Themes

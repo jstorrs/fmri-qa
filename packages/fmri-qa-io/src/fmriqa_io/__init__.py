@@ -18,7 +18,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     # Plain imports, not the lazy `_EXPORTS` map below, so mypy and pyright
     # resolve every name statically. Never executed at runtime.
-    from .artifact import load_artifact, save_artifact
+    from .analysis_file import load_analysis, save_analysis
     from .convert.session import ImportedSeries, ImportResult, import_dicom
     from .decode import scan_from_bytes
     from .exceptions import ConversionError
@@ -31,16 +31,16 @@ __all__ = [
     "ImportResult",
     "ImportedSeries",
     "import_dicom",
-    "load_artifact",
+    "load_analysis",
     "load_scan",
-    "save_artifact",
+    "save_analysis",
     "scan_from_bytes",
 ]
 
 # Which submodule defines each name in `__all__`, keyed by module path so one
 # import serves every name it owns.
 _EXPORTS: dict[str, tuple[str, ...]] = {
-    ".artifact": ("load_artifact", "save_artifact"),
+    ".analysis_file": ("load_analysis", "save_analysis"),
     ".convert.session": ("ImportResult", "ImportedSeries", "import_dicom"),
     ".decode": ("scan_from_bytes",),
     ".exceptions": ("ConversionError",),

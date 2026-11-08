@@ -1,4 +1,4 @@
-"""The `fmri-qa-report` command line: a saved artifact in, one HTML page out."""
+"""The `fmri-qa-report` command line: a saved analysis in, one HTML page out."""
 
 from pathlib import Path
 
@@ -12,9 +12,9 @@ from fmriqa_report import render_run_page
 
 
 @pytest.fixture
-def saved(tmp_path, artifact) -> str:
-    """The shared artifact written to disk, as the CLI would receive it."""
-    return str(fmriqa_io.save_artifact(artifact, tmp_path / "scan.qa.nc"))
+def saved(tmp_path, analysis) -> str:
+    """The shared analysis written to disk, as the CLI would receive it."""
+    return str(fmriqa_io.save_analysis(analysis, tmp_path / "scan.qa.nc"))
 
 
 def test_main_reports_a_write_failure_without_a_traceback(
@@ -39,7 +39,7 @@ def test_main_creates_the_html_destination_directory(tmp_path, saved) -> None:
 
 
 def test_main_writes_a_single_file_html_report(tmp_path, saved, capsys) -> None:
-    """The end-to-end render: a saved artifact in, one self-contained page out."""
+    """The end-to-end render: a saved analysis in, one self-contained page out."""
     html = tmp_path / "qa.html"
     rc = report.report_main([saved, "--html", str(html)])
     captured = capsys.readouterr()
@@ -52,7 +52,7 @@ def test_main_writes_a_single_file_html_report(tmp_path, saved, capsys) -> None:
     assert "<script" not in text
 
 
-def test_html_refuses_more_than_one_artifact(tmp_path, saved, capsys) -> None:
+def test_html_refuses_more_than_one_analysis(tmp_path, saved, capsys) -> None:
     html = tmp_path / "qa.html"
     with pytest.raises(SystemExit) as info:
         report.report_main([saved, saved, "--html", str(html)])
@@ -65,9 +65,9 @@ def test_html_refuses_more_than_one_artifact(tmp_path, saved, capsys) -> None:
 def test_html_refuses_to_overwrite_an_input(
     tmp_path, saved, capsys, monkeypatch
 ) -> None:
-    """`--html` naming an input must fail before the artifact is read or replaced.
+    """`--html` naming an input must fail before the analysis is read or replaced.
 
-    The artifact is loaded first and the HTML is moved into place last, so
+    The analysis is loaded first and the HTML is moved into place last, so
     without the guard the run would replace the archive with a report. The
     relative spelling is the one a shell produces.
     """
@@ -80,7 +80,7 @@ def test_html_refuses_to_overwrite_an_input(
     assert archive.read_bytes() == before
 
 
-def test_main_fails_when_the_artifact_cannot_be_read(tmp_path, capsys) -> None:
+def test_main_fails_when_the_analysis_cannot_be_read(tmp_path, capsys) -> None:
     html = tmp_path / "qa.html"
     rc = report.report_main([str(tmp_path / "missing.nc"), "--html", str(html)])
     captured = capsys.readouterr()
@@ -89,20 +89,20 @@ def test_main_fails_when_the_artifact_cannot_be_read(tmp_path, capsys) -> None:
     assert not html.exists()
 
 
-def test_main_titles_a_section_from_the_artifact_provenance(tmp_path, artifact) -> None:
+def test_main_titles_a_section_from_the_analysis_provenance(tmp_path, analysis) -> None:
     """The recorded scan name is the section title, whatever the file is called."""
-    path = fmriqa_io.save_artifact(artifact, tmp_path / "unrelated-name.nc")
-    assert report._title(fmriqa_io.load_artifact(path), str(path)) == "scan.nii.gz"
+    path = fmriqa_io.save_analysis(analysis, tmp_path / "unrelated-name.nc")
+    assert report._title(fmriqa_io.load_analysis(path), str(path)) == "scan.nii.gz"
 
 
-def test_main_falls_back_to_the_file_name(tmp_path, bare_artifact) -> None:
+def test_main_falls_back_to_the_file_name(tmp_path, bare_analysis) -> None:
     from dataclasses import replace
 
     anonymous = replace(
-        bare_artifact, provenance=replace(bare_artifact.provenance, scan="")
+        bare_analysis, provenance=replace(bare_analysis.provenance, scan="")
     )
-    path = fmriqa_io.save_artifact(anonymous, tmp_path / "run-7.qa.nc")
-    assert report._title(fmriqa_io.load_artifact(path), str(path)) == "run-7.qa.nc"
+    path = fmriqa_io.save_analysis(anonymous, tmp_path / "run-7.qa.nc")
+    assert report._title(fmriqa_io.load_analysis(path), str(path)) == "run-7.qa.nc"
 
 
 def test_version_flag_prints_and_exits(capsys) -> None:
@@ -129,9 +129,9 @@ def test_help_renders(capsys) -> None:
     assert "usage:" in capsys.readouterr().out
 
 
-def test_a_wildcard_argument_is_expanded(tmp_path, artifact) -> None:
-    """PowerShell hands `artifacts/*.qa.nc` over with the `*` still in it."""
-    fmriqa_io.save_artifact(artifact, tmp_path / "scan.qa.nc")
+def test_a_wildcard_argument_is_expanded(tmp_path, analysis) -> None:
+    """PowerShell hands `analyses/*.qa.nc` over with the `*` still in it."""
+    fmriqa_io.save_analysis(analysis, tmp_path / "scan.qa.nc")
     html = tmp_path / "qa.html"
     rc = report.report_main([f"{tmp_path}/*.qa.nc", "--html", str(html)])
     assert rc == 0
@@ -139,7 +139,7 @@ def test_a_wildcard_argument_is_expanded(tmp_path, artifact) -> None:
 
 
 def test_a_wildcard_matching_nothing_is_reported_not_dropped(tmp_path, capsys) -> None:
-    """A pattern that names no artifact must fail, not render an empty report."""
+    """A pattern that names no analysis must fail, not render an empty report."""
     rc = report.report_main(
         [f"{tmp_path}/*.qa.nc", "--html", str(tmp_path / "qa.html")]
     )
@@ -147,12 +147,12 @@ def test_a_wildcard_matching_nothing_is_reported_not_dropped(tmp_path, capsys) -
     assert "*.qa.nc" in capsys.readouterr().err
 
 
-def test_a_reloaded_artifact_renders_identically(tmp_path, artifact) -> None:
-    """The seam's payoff: a saved artifact is as good as a freshly computed one."""
-    reloaded = fmriqa_io.load_artifact(
-        fmriqa_io.save_artifact(artifact, tmp_path / "qa.nc")
+def test_a_reloaded_analysis_renders_identically(tmp_path, analysis) -> None:
+    """The seam's payoff: a saved analysis is as good as a freshly computed one."""
+    reloaded = fmriqa_io.load_analysis(
+        fmriqa_io.save_analysis(analysis, tmp_path / "qa.nc")
     )
-    live = render_run_page(artifact, title="Test run", report_version="report-test")
+    live = render_run_page(analysis, title="Test run", report_version="report-test")
     disk = render_run_page(reloaded, title="Test run", report_version="report-test")
     assert live == disk
 
@@ -161,11 +161,11 @@ def test_a_blank_scan_with_an_unresolved_rdc_survives_the_file_and_renders(
     tmp_path,
 ) -> None:
     """An NaN curve is saved, loaded and drawn: the command writes a page."""
-    artifact = q.analyze(
+    analysis = q.analyze(
         q.QAScan(data=np.zeros((16, 16, 1, 10)), tr=2.0, pe_axis=1),
         q.AnalysisSettings(roi_size=3, trim_sec=0, detrend_order=0),
     )
-    path = fmriqa_io.save_artifact(artifact, tmp_path / "blank.nc")
+    path = fmriqa_io.save_analysis(analysis, tmp_path / "blank.nc")
     html = tmp_path / "blank.html"
     assert report.report_main([str(path), "--html", str(html)]) == 0
     assert "Unavailable — estimator unresolved" in html.read_text(encoding="utf-8")

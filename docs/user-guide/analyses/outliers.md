@@ -9,7 +9,7 @@ something happened, not when everything is slightly worse.
 
 Two look for a single bad volume: the share of phantom voxels that are outliers
 in each frame, and the peak of the ROI-mean residual against its own robust
-spread. The third looks for a *periodic* artifact (vibration, a bad interleave,
+spread. The third looks for a *periodic* analysis (vibration, a bad interleave,
 physiological-like pickup) as one dominant line in the residual spectrum.
 
 ## Method
@@ -82,9 +82,9 @@ empty series or one with no spread.
 
    import phantom
 
-   artifact = phantom.artifact()
-   curves = artifact.curves
-   measurements = artifact.measurements
+   analysis = phantom.analysis()
+   curves = analysis.curves
+   measurements = analysis.measurements
 
    fig, axes = plt.subplots(figsize=(6.6, 3.2), layout="constrained")
    axes.plot(curves.time, 100 * curves.outlier_fraction, lw=0.9)

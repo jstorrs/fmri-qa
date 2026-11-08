@@ -1,69 +1,69 @@
 """The analysis file: the calculation half's published, serializable output.
 
-`artifact` defines the value objects. `build` projects a computed `QAResult`
+`analysis` defines the value objects. `build` projects a computed `QAResult`
 into one (`analyze` runs the whole thing from a scan). `validation` checks them
 against the published contract. `serialize` maps an analysis file to and from the
-JSON document and named arrays its file holds. `fmriqa_io.artifact` is the file
-itself (`save_artifact`, `load_artifact`). Everything else a report, a plot or a
+JSON document and named arrays its file holds. `fmriqa_io.analysis_file` is the file
+itself (`save_analysis`, `load_analysis`). Everything else a report, a plot or a
 trend database needs is here. Nothing in this subpackage reaches back into the
 metric, prep, or load layers at read time.
 
 The two halves are imported differently. The analysis file and its validator are
-cheap, so they load eagerly. So does `InvalidArtifactError`, the one error
-`fmriqa_io.load_artifact` raises. `fmriqa.exceptions` imports nothing, and a
+cheap, so they load eagerly. So does `InvalidAnalysisFileError`, the one error
+`fmriqa_io.load_analysis` raises. `fmriqa.exceptions` imports nothing, and a
 reader that crosses only this seam must be able to catch it by name. `build` is
 not eager: projecting a `QAResult` imports the pipeline, and behind it the whole
 metric, prep and load stack, including scikit-image and scipy.
-Re-exporting `analyze` and `build_artifact` eagerly would charge that cost to
+Re-exporting `analyze` and `build_analysis` eagerly would charge that cost to
 every reader of a finished analysis file, which is the dependency the
-published-artifact seam exists to prevent. So `__getattr__` below (PEP 562)
+published-analysis seam exists to prevent. So `__getattr__` below (PEP 562)
 imports `build` on first access to either name. Reading an analysis file never pays
 for the machinery that computes one.
 """
 
 from typing import TYPE_CHECKING
 
-from ..exceptions import InvalidArtifactError
+from ..exceptions import InvalidAnalysisFileError
 from ..settings import AnalysisSettings
 from ..version import core_version
-from .artifact import (
-    ARTIFACT_SCHEMA_VERSION,
-    ArtifactImages,
+from .values import (
+    ANALYSIS_SCHEMA_VERSION,
     Curves,
     GhostRegions,
     Measurements,
     Provenance,
     PsfCurves,
-    QAArtifact,
+    QAAnalysis,
     RoiBox,
+    SummaryImages,
     WeisskoffCurve,
 )
 
 if TYPE_CHECKING:
     # Imported directly (not through the lazy `__getattr__` below) so mypy and
     # pyright resolve both names statically. Never executed at runtime.
-    from .build import analyze, build_artifact
+    from .build import analyze, build_analysis
 
 __all__ = [
-    "ARTIFACT_SCHEMA_VERSION",
+    "ANALYSIS_SCHEMA_VERSION",
     "AnalysisSettings",
-    "ArtifactImages",
     "Curves",
     "GhostRegions",
-    "InvalidArtifactError",
+    "InvalidAnalysisFileError",
     "Measurements",
     "Provenance",
     "PsfCurves",
-    "QAArtifact",
+    "QAAnalysis",
     "RoiBox",
+    "SummaryImages",
     "WeisskoffCurve",
     "analyze",
-    "build_artifact",
+    "build_analysis",
     "core_version",
 ]
 
 # The two names `build` defines, and the only ones resolved on first access.
-_LAZY = frozenset({"analyze", "build_artifact"})
+_LAZY = frozenset({"analyze", "build_analysis"})
 
 
 def __getattr__(name: str) -> object:

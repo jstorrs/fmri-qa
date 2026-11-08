@@ -47,7 +47,7 @@ def staging_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     return root
 
 
-def _fail_render(_artifact: object, **_kwargs: object) -> str:
+def _fail_render(_analysis: object, **_kwargs: object) -> str:
     """A render that always fails -- pairs an analysis warning with a later failure."""
     raise RuntimeError("stub render failure")
 
@@ -115,7 +115,7 @@ def test_one_series_is_imported_analyzed_and_published(
     assert (series_dir / f"{name}.html").is_file()
     assert published.scan == series_dir / f"{name}.nii.gz"
     assert published.sidecar == series_dir / f"{name}.json"
-    assert published.artifact == series_dir / f"{name}.qa.nc"
+    assert published.analysis == series_dir / f"{name}.qa.nc"
     assert published.report == series_dir / f"{name}.html"
 
     # What is published honors the umask (0o755 and 0o644), not the 0o700 of
@@ -129,7 +129,7 @@ def test_one_series_is_imported_analyzed_and_published(
     assert [p.name for p in output_dir.iterdir()] == [name]
     assert list(staging_root.iterdir()) == []
 
-    reloaded = fmriqa_io.load_artifact(published.artifact)
+    reloaded = fmriqa_io.load_analysis(published.analysis)
     assert reloaded.provenance.source == str(series_dir / f"{name}.nii.gz")
     assert ".fmri-qa-run." not in reloaded.provenance.source
     assert Path(reloaded.provenance.source).is_absolute()
@@ -382,7 +382,7 @@ def test_a_target_that_appears_mid_run_fails_that_series(
     converter, (name,) = stub_series()
     output_dir = tmp_path / "output"
 
-    def _render_then_collide(artifact: object, **_kwargs: object) -> str:
+    def _render_then_collide(analysis: object, **_kwargs: object) -> str:
         (output_dir / name).mkdir(parents=True)
         return "<html></html>"
 
@@ -459,9 +459,9 @@ def test_a_series_whose_directory_appears_mid_run_is_refused_not_analyzed(
     converter, (first_name, second_name) = stub_series(frames=(40, 40))
     output_dir = tmp_path / "output"
 
-    def render_then_race(artifact: object, **kwargs: object) -> str:
+    def render_then_race(analysis: object, **kwargs: object) -> str:
         (output_dir / second_name).mkdir()
-        return fast_render(artifact, **kwargs)
+        return fast_render(analysis, **kwargs)
 
     monkeypatch.setattr("fmriqa_launcher.session.render_run_page", render_then_race)
     request = RunRequest(
@@ -576,9 +576,9 @@ def test_a_warning_during_render_is_not_captured(
     fires (`pytest.warns` around the call) but nothing lands on the outcome.
     """
 
-    def _warn_then_render(artifact: object, **_kwargs: object) -> str:
+    def _warn_then_render(analysis: object, **_kwargs: object) -> str:
         warnings.warn("a stub warning from the render step", stacklevel=2)
-        return fast_render(artifact)
+        return fast_render(analysis)
 
     monkeypatch.setattr("fmriqa_launcher.session.render_run_page", _warn_then_render)
     converter, _ = stub_series()
@@ -652,21 +652,21 @@ def test_a_warning_during_analysis_lands_on_the_failed_outcome(
 
 
 @pytest.mark.usefixtures("warn_during_analysis")
-def test_a_failure_saving_the_artifact_is_a_failed_outcome_with_its_warnings(
+def test_a_failure_saving_the_analysis_is_a_failed_outcome_with_its_warnings(
     tmp_path: Path,
     dicom_dir: Path,
     stub_series: StubSeries,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """A `save_artifact` failure is `Failed`, with the analysis warnings kept.
+    """A `save_analysis` failure is `Failed`, with the analysis warnings kept.
 
     Nothing is left over in staging.
     """
 
     def _failing_save(*_args: object, **_kwargs: object) -> None:
-        raise OSError("disk full while saving the artifact")
+        raise OSError("disk full while saving the analysis")
 
-    monkeypatch.setattr(fmriqa_io, "save_artifact", _failing_save)
+    monkeypatch.setattr(fmriqa_io, "save_analysis", _failing_save)
     converter, _ = stub_series()
 
     output_dir = tmp_path / "output"
@@ -680,7 +680,7 @@ def test_a_failure_saving_the_artifact_is_a_failed_outcome_with_its_warnings(
 
     outcome = result.outcomes[0]
     assert isinstance(outcome, Failed)
-    assert "disk full while saving the artifact" in outcome.reason
+    assert "disk full while saving the analysis" in outcome.reason
     assert any("stub warning from the analysis" in w for w in outcome.warnings)
     assert output_dir.is_dir()
     assert list(output_dir.iterdir()) == []
@@ -697,17 +697,17 @@ def test_the_output_directory_holds_no_intermediates_while_a_series_is_worked_on
     """What a sync client watching `output_dir` would have been handed to upload.
 
     Checked from inside the render, the last step before publishing, when the
-    import has run, the scan is filed and the artifact is written. The old
+    import has run, the scan is filed and the analysis is written. The old
     staging-in-`output_dir` design left all of that in `output_dir`; it is now
     in the temporary directory.
     """
     output_dir = tmp_path / "output"
     seen: dict[str, list[str]] = {}
 
-    def _look_then_render(artifact: object, **kwargs: object) -> str:
+    def _look_then_render(analysis: object, **kwargs: object) -> str:
         seen["output"] = sorted(p.name for p in output_dir.rglob("*"))
         seen["staging"] = sorted(p.name for p in staging_root.rglob("*") if p.is_file())
-        return fast_render(artifact, **kwargs)
+        return fast_render(analysis, **kwargs)
 
     monkeypatch.setattr("fmriqa_launcher.session.render_run_page", _look_then_render)
     converter, (name,) = stub_series()
@@ -744,9 +744,9 @@ def test_a_published_series_is_dropped_from_staging_before_the_next_one_starts(
     """
     staged_at_each_render: list[set[str]] = []
 
-    def _look_then_render(artifact: object, **kwargs: object) -> str:
+    def _look_then_render(analysis: object, **kwargs: object) -> str:
         staged_at_each_render.append({p.name for p in staging_root.rglob("*.qa.nc")})
-        return fast_render(artifact, **kwargs)
+        return fast_render(analysis, **kwargs)
 
     monkeypatch.setattr("fmriqa_launcher.session.render_run_page", _look_then_render)
     converter, (first_name, second_name) = stub_series(frames=(40, 40))
@@ -760,7 +760,7 @@ def test_a_published_series_is_dropped_from_staging_before_the_next_one_starts(
     result = run_session(request)
 
     assert [o.name for o in result.published] == [first_name, second_name]
-    # Each render sees its own series' artifact in staging, and only that one.
+    # Each render sees its own series' analysis in staging, and only that one.
     assert staged_at_each_render == [
         {f"{first_name}.qa.nc"},
         {f"{second_name}.qa.nc"},

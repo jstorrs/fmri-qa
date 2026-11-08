@@ -74,7 +74,7 @@ LengthUnit = Literal["mm", "vox"]
 
 # Phase-encode direction as displayed: the two DICOM in-plane words, or "?"
 # when no axis resolved. "?" is a real answer, not a missing one (see
-# `analysis.artifact.Measurements`).
+# `analysis.values.Measurements`).
 PeLabel = Literal["row", "col", "?"]
 
 # The phase-encode axis as a resolved, in-plane NIfTI voxel-array index. The

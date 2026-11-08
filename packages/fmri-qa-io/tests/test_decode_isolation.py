@@ -41,7 +41,7 @@ _ALLOWED_ROOTS = frozenset(
 _FORBIDDEN_AT_RUNTIME = (
     "netCDF4",
     "dcm2niix",
-    "fmriqa_io.artifact",
+    "fmriqa_io.analysis_file",
     "fmriqa_io.convert",
     "fmriqa_io.load",
     "fmriqa_io.rename",

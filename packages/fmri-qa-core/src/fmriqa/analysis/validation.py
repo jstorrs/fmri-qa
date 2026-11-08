@@ -21,12 +21,12 @@ import numpy as np
 
 from .._records import UNIONS, resolved_annotations
 from ..settings import AnalysisSettings
-from .artifact import (
+from .values import (
     Curves,
     Measurements,
     Provenance,
     PsfCurves,
-    QAArtifact,
+    QAAnalysis,
     RoiBox,
     _require,
 )
@@ -85,16 +85,16 @@ def validate_document(document: dict[str, Any]) -> None:
         raise ValueError("curves.outlier_qthr must be numeric")
 
 
-def validate_artifact(artifact: QAArtifact) -> None:
+def validate_analysis(analysis: QAAnalysis) -> None:
     """Require coherent settings, dimensions and coordinates after composition."""
-    _validate_parameters(artifact)
-    _validate_timeseries(artifact)
-    _validate_images(artifact)
-    _validate_spatial_curves(artifact)
+    _validate_parameters(analysis)
+    _validate_timeseries(analysis)
+    _validate_images(analysis)
+    _validate_spatial_curves(analysis)
 
 
-def _validate_parameters(artifact: QAArtifact) -> None:
-    p, m = artifact.provenance, artifact.measurements
+def _validate_parameters(analysis: QAAnalysis) -> None:
+    p, m = analysis.provenance, analysis.measurements
     # `pe_axis_override` and `pe_axis` need no check here: `validate_document`
     # reads the `PeAxis | None` annotations and refuses any other axis, on save
     # and on load alike. Repeating the domain as a literal `(None, 0, 1)` would
@@ -109,8 +109,8 @@ def _validate_parameters(artifact: QAArtifact) -> None:
     _require(0 <= m.outlier_worst_frame < p.n_frames, "invalid outlier_worst_frame")
 
 
-def _validate_timeseries(artifact: QAArtifact) -> None:
-    c, p = artifact.curves, artifact.provenance
+def _validate_timeseries(analysis: QAAnalysis) -> None:
+    c, p = analysis.curves, analysis.provenance
     _require(0 < c.outlier_qthr < 1, "invalid curves.outlier_qthr")
     for name in (
         "time",
@@ -142,9 +142,9 @@ def _validate_timeseries(artifact: QAArtifact) -> None:
     )
 
 
-def _validate_images(artifact: QAArtifact) -> None:
-    images = artifact.images
-    s, p, m = artifact.settings, artifact.provenance, artifact.measurements
+def _validate_images(analysis: QAAnalysis) -> None:
+    images = analysis.images
+    s, p, m = analysis.settings, analysis.provenance, analysis.measurements
     shape = images.signal.shape
     _require(
         len(shape) == 2 and min(shape) > 0, "images.signal must be a nonempty 2-D image"
@@ -188,8 +188,8 @@ def _validate_images(artifact: QAArtifact) -> None:
     _require(bool(np.isfinite(hull).all()), "images.phantom_hull must be finite")
 
 
-def _validate_spatial_curves(artifact: QAArtifact) -> None:
-    c, m, roi = artifact.curves, artifact.measurements, artifact.images.roi
+def _validate_spatial_curves(analysis: QAAnalysis) -> None:
+    c, m, roi = analysis.curves, analysis.measurements, analysis.images.roi
     wk = c.weisskoff
     for name in ("roi_sizes", "cv", "cv_ideal", "rdc"):
         _require(

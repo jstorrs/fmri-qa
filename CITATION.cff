@@ -4,8 +4,8 @@ title: "fmri-qa"
 type: software
 abstract: >-
   Phantom fMRI quality assurance, distributed as five packages: fmri-qa-core
-  (metrics and the analysis artifact; pure calculation), fmri-qa-io (scan and
-  artifact files, DICOM import), fmri-qa-cli (the fmri-qa commands),
+  (metrics and the analysis file; pure calculation), fmri-qa-io (scan and
+  analysis files, DICOM import), fmri-qa-cli (the fmri-qa commands),
   fmri-qa-report (plots and a self-contained HTML report), and fmri-qa-launcher
   (a one-step DICOM-in, report-out application shell).
 authors:

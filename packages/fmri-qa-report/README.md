@@ -1,7 +1,7 @@
 # fmri-qa-report
 
 The presentation half of [fmri-qa](../../README.md): a single self-contained
-offline HTML report rendered from a `fmriqa.analysis.QAArtifact`, or from the
+offline HTML report rendered from a `fmriqa.analysis.QAAnalysis`, or from the
 `.qa.nc` file that holds one.
 
 ```console
@@ -18,8 +18,8 @@ every number, curve, mask, and image the report draws. A report can therefore be
 produced on another machine, long after the acquisition, with no access to the
 series. An analysis file read back from disk renders the same as one just computed.
 
-It depends on `fmri-qa-core` for the `QAArtifact` types, plus matplotlib to
-draw. `render_run_page(artifact)` takes an analysis file in memory and returns the
+It depends on `fmri-qa-core` for the `QAAnalysis` types, plus matplotlib to
+draw. `render_run_page(analysis)` takes an analysis file in memory and returns the
 page as a string. It reads and writes no file: the application loads the
 analysis file and writes the page (`fmriqa_io` does both). It never runs the
 pipeline and never reads a scan.

@@ -17,12 +17,12 @@ from collections.abc import Mapping, Sequence
 
 from ..settings import AnalysisSettings
 from ..version import core_version
-from .artifact import QAArtifact
+from .values import QAAnalysis
 
 JSON_SCHEMA_VERSION = 6
 
 
-def metric_record(artifact: QAArtifact) -> dict[str, object]:
+def metric_record(analysis: QAAnalysis) -> dict[str, object]:
     """Build the scalar metrics for one scan as a JSON-serializable record.
 
     Mirrors the human table's columns as raw numbers, so downstream tools can
@@ -43,8 +43,8 @@ def metric_record(artifact: QAArtifact) -> dict[str, object]:
     Without them the frame index in `outlier_worst_frame` names a volume nobody
     can find again.
     """
-    m = artifact.measurements
-    prov = artifact.provenance
+    m = analysis.measurements
+    prov = analysis.provenance
     record: dict[str, object] = {
         "scan": prov.scan,
         # Enough provenance to key and date a row without opening the analysis file:

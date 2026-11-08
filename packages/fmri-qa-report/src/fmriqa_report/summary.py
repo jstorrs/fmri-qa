@@ -1,6 +1,6 @@
 """Format-agnostic scan-level text: the acquisition/provenance metadata lines.
 
-The strings a report shows about a scan, derived from a `QAArtifact` with no
+The strings a report shows about a scan, derived from a `QAAnalysis` with no
 dependency on any output format. The `*_line` helpers return the acquisition,
 provenance and device strings, and `package_version` the renderer version.
 Tile labels and value formatting live in `content`; a format driver (see
@@ -10,7 +10,7 @@ Tile labels and value formatting live in `content`; a format driver (see
 import math
 from importlib.metadata import PackageNotFoundError, version
 
-from fmriqa.analysis import Provenance, QAArtifact
+from fmriqa.analysis import Provenance, QAAnalysis
 
 # The separator between fields on a metadata line.
 _SEP = "   ·   "
@@ -24,9 +24,9 @@ def package_version() -> str:
         return "unknown"
 
 
-def acquisition_line(artifact: QAArtifact) -> str:
+def acquisition_line(analysis: QAAnalysis) -> str:
     """Build the sequence/geometry metadata string, omitting absent fields."""
-    prov, m, settings = artifact.provenance, artifact.measurements, artifact.settings
+    prov, m, settings = analysis.provenance, analysis.measurements, analysis.settings
     parts = [f"TR {prov.tr:.3g}s"]
     if prov.te is not None:
         parts.append(f"TE {prov.te * 1000:.0f}ms")
@@ -53,16 +53,16 @@ def acquisition_line(artifact: QAArtifact) -> str:
     return _SEP.join(parts)
 
 
-def acquisition_notes(artifact: QAArtifact) -> str:
+def acquisition_notes(analysis: QAAnalysis) -> str:
     """Clipping and localization notes, separate from acquisition metadata."""
     return _SEP.join(
         note
-        for note in (_clipping_note(artifact), _localization_note(artifact))
+        for note in (_clipping_note(analysis), _localization_note(analysis))
         if note
     )
 
 
-def _localization_note(artifact: QAArtifact) -> str:
+def _localization_note(analysis: QAAnalysis) -> str:
     """Build the phantom/ROI localization warning for the notes; empty if fine.
 
     Both failures make every mask-based number meaningless while leaving it
@@ -76,7 +76,7 @@ def _localization_note(artifact: QAArtifact) -> str:
     predates the check. It is reported quietly, since nothing is known to be
     wrong, but the page must not imply the checks ran and passed.
     """
-    m = artifact.measurements
+    m = analysis.measurements
     notes = []
     if m.phantom_mask_ok is False:
         # Show both numbers so the reader sees which failed: a collapse shows in
@@ -93,7 +93,7 @@ def _localization_note(artifact: QAArtifact) -> str:
     return _SEP.join(notes)
 
 
-def _clipping_note(artifact: QAArtifact) -> str:
+def _clipping_note(analysis: QAAnalysis) -> str:
     """Build the ADC-saturation warning for the notes block; empty if none.
 
     Clipping inside the analyzed data biases every metric and is called out in
@@ -104,7 +104,7 @@ def _clipping_note(artifact: QAArtifact) -> str:
     test couldn't run. It gets its own line, since silence would read as "no
     clipping found".
     """
-    m = artifact.measurements
+    m = analysis.measurements
     if m.clipped_any is None:
         return "clip not determinable (non-integer storage)"
     if not m.clipped_any or m.clip_ceiling is None:

@@ -61,7 +61,7 @@ Layout:
   direction), each variable's CF `coordinates` attribute points at them, so
   xarray offers `ds["curves.roi_signal"].coords["curves.time"]`. Coordinates, like
   the `measurements.*` attributes, are derived at encode time and **never read
-  back**. The arrays and the document are the only source for `load_artifact`.
+  back**. The arrays and the document are the only source for `load_analysis`.
 * **Masks are `u1`**, since netCDF-4 has no boolean type either. CF `flag_values`
   and `flag_meanings` mark them, which is how `read` turns them back into `bool`.
 * **Units and long names where certain.** Seconds, hertz, percent and
@@ -92,14 +92,14 @@ is lossy there and the document is not, which is the right trade for a
 convenience copy.
 
 `read` never consults the attributes. The JSON document stays the single source
-of truth for `load_artifact`. The attributes are derived from the document's
+of truth for `load_analysis`. The attributes are derived from the document's
 text, so the two can only disagree if the document does. `Conventions` is
 claimed because the masks follow CF's flag convention and the labeled units are
 CF's. The dotted variable names deviate from CF (letters, digits and
 underscores), so that a reader who learns `images.sfnr` from `ncdisp` can find
 it in this package's docs.
 
-**No schema bump.** `ARTIFACT_SCHEMA_VERSION` pins the document's layout, and no
+**No schema bump.** `ANALYSIS_SCHEMA_VERSION` pins the document's layout, and no
 field changed; only the envelope did, as with the `uint8` member. The loader
 sniffs leading bytes because the version lives inside the file. A bump would tell
 older builds "this file is from the future" about a document they understand,
@@ -139,12 +139,12 @@ import numpy as np
 from numpy.typing import NDArray
 
 from fmriqa.analysis.serialize.decompose import Member
-from fmriqa.exceptions import InvalidArtifactError
+from fmriqa.exceptions import InvalidAnalysisFileError
 
 if TYPE_CHECKING:  # the import itself is deferred; see `write`
     from netCDF4 import Dataset, Variable
 
-# What a netCDF-4 file starts with, and so how `artifact` recognizes one. A
+# What a netCDF-4 file starts with, and so how `analysis` recognizes one. A
 # netCDF-4 file is an HDF5 file and carries HDF5's own signature.
 MAGIC: Final = b"\x89HDF\r\n\x1a\n"
 
@@ -681,7 +681,7 @@ def _escaped(text: str) -> str:
     and any other encodable text pass through unchanged. The one string with no
     UTF-8 form, the lone surrogate an undecodable byte in a Windows file name
     becomes in Python, is escaped instead of failing the save. The document
-    beside it still spells the name exactly, and `load_artifact` reads that.
+    beside it still spells the name exactly, and `load_analysis` reads that.
     """
     return text.encode("utf-8", errors="backslashreplace").decode("utf-8")
 
@@ -765,7 +765,7 @@ def write(content: _NetcdfContent, path: Path) -> None:
     """Write `content` to `path` as a netCDF-4 file and close it.
 
     Exactly one file is written. The handle is closed before this returns, so a
-    caller can fsync and rename the result (how `save_artifact` is atomic;
+    caller can fsync and rename the result (how `save_analysis` is atomic;
     Windows will not rename an open file).
 
     Array variables are deflated with a `fletcher32` checksum, and the float ones
@@ -788,7 +788,7 @@ def write(content: _NetcdfContent, path: Path) -> None:
         # 2.5 deprecated setting `.shape`. There is no way to hand it an array
         # it will not reshape. The warning names a line in a Cython module that
         # a caller cannot act on, so it is dropped here, not at every caller of
-        # `save_artifact`.
+        # `save_analysis`.
         warnings.filterwarnings(
             "ignore",
             message="Setting the shape on a NumPy array",
@@ -855,7 +855,7 @@ def read(path: Path) -> tuple[str, dict[str, NDArray[Any]]]:
 
     Raises
     ------
-    InvalidArtifactError
+    InvalidAnalysisFileError
         If the file is not readable as netCDF-4, carries no `document`
         attribute, or carries one that is not text.
     """
@@ -882,7 +882,7 @@ def read(path: Path) -> tuple[str, dict[str, NDArray[Any]]]:
                 # excluded by the same reasoning that included it.
                 if name not in dataset.dimensions
             }
-    except InvalidArtifactError:
+    except InvalidAnalysisFileError:
         raise
     except Exception as exc:
         # Broad on purpose, and only around the library calls. netCDF4 answers a
@@ -891,17 +891,17 @@ def read(path: Path) -> tuple[str, dict[str, NDArray[Any]]]:
         # through the same call. A list of a C library's failure modes goes
         # stale the next time it is rebuilt, and every one of them means the
         # same thing here.
-        raise InvalidArtifactError(path, f"unreadable netCDF file: {exc}") from exc
+        raise InvalidAnalysisFileError(path, f"unreadable netCDF file: {exc}") from exc
     return text, arrays
 
 
 def _document_text(dataset: "Dataset", path: Path) -> str:
     """Read the JSON document carried by the file's `document` attribute."""
     if _DOCUMENT not in dataset.ncattrs():
-        raise InvalidArtifactError(path, "not an fmri-qa analysis file")
+        raise InvalidAnalysisFileError(path, "not an fmri-qa analysis file")
     text = dataset.getncattr(_DOCUMENT)
     if not isinstance(text, str):
-        raise InvalidArtifactError(path, f"the {_DOCUMENT} attribute is not text")
+        raise InvalidAnalysisFileError(path, f"the {_DOCUMENT} attribute is not text")
     return text
 
 

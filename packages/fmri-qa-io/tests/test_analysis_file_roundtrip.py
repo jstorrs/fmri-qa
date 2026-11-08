@@ -1,7 +1,7 @@
-"""Verdicts the artifact publishes survive the trip through the file.
+"""Verdicts the analysis publishes survive the trip through the file.
 
-Core's `test_artifact.py` and io's `test_load_scan.py` pin what `analyze` and
-`load_scan` put in an artifact. These check the same values read back
+Core's `test_analysis_values.py` and io's `test_load_scan.py` pin what `analyze` and
+`load_scan` put in an analysis. These check the same values read back
 from disk, and that a value the reader would refuse is refused on the way in.
 """
 
@@ -23,9 +23,9 @@ def test_a_noise_only_scan_keeps_its_failed_mask_verdict(tmp_path) -> None:
     noise = np.abs(np.random.default_rng(0).normal(size=(32, 32, 1, 40)))
     settings = q.AnalysisSettings(trim_sec=0, center="phantom", roi_size=3)
     with pytest.warns(UserWarning, match="no slice holds a recognizable phantom"):
-        artifact = q.analyze(q.QAScan(data=noise, tr=2.0), settings)
-    path = fmriqa_io.save_artifact(artifact, tmp_path / "noise.qa.nc")
-    m = fmriqa_io.load_artifact(path).measurements
+        analysis = q.analyze(q.QAScan(data=noise, tr=2.0), settings)
+    path = fmriqa_io.save_analysis(analysis, tmp_path / "noise.qa.nc")
+    m = fmriqa_io.load_analysis(path).measurements
     assert 0.0 < m.phantom_fraction < 0.95  # the share alone would have passed
     assert m.phantom_mask_ok is False
 
@@ -35,11 +35,11 @@ def test_undeterminable_clipping_survives_the_archive(tmp_path) -> None:
     scan = q.QAScan(data=synthetic_series(), tr=2.0, pe_axis=1, stored_integer=False)
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        artifact = q.analyze(scan, q.AnalysisSettings(roi_size=9))
-    assert artifact.measurements.clipped_any is None  # the answer before saving
+        analysis = q.analyze(scan, q.AnalysisSettings(roi_size=9))
+    assert analysis.measurements.clipped_any is None  # the answer before saving
 
-    path = fmriqa_io.save_artifact(artifact, tmp_path / "undet.qa.nc")
-    loaded = fmriqa_io.load_artifact(path)
+    path = fmriqa_io.save_analysis(analysis, tmp_path / "undet.qa.nc")
+    loaded = fmriqa_io.load_analysis(path)
     assert loaded.measurements.clipped_any is None
     assert loaded.measurements.n_clipped_kept is None
 
@@ -68,18 +68,18 @@ def test_a_malformed_sidecar_field_reads_back_as_unknown(
     assert getattr(scan.meta, field) is None  # dropped before it reaches the file
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        artifact = q.analyze(scan, q.AnalysisSettings(trim_sec=0, roi_size=3))
-    path = fmriqa_io.save_artifact(artifact, tmp_path / "qa.nc")
-    assert getattr(fmriqa_io.load_artifact(path).provenance, field) is None
+        analysis = q.analyze(scan, q.AnalysisSettings(trim_sec=0, roi_size=3))
+    path = fmriqa_io.save_analysis(analysis, tmp_path / "qa.nc")
+    assert getattr(fmriqa_io.load_analysis(path).provenance, field) is None
 
 
 def test_a_bool_in_a_float_field_is_kept_for_the_archive_to_refuse(
-    tmp_path, artifact
+    tmp_path, analysis
 ) -> None:
     """`True` is an int to Python but not a measurement; it is not made 1.0."""
-    measurements = replace(artifact.measurements, snr=True)
+    measurements = replace(analysis.measurements, snr=True)
     assert measurements.snr is True
-    with pytest.raises(q.InvalidArtifactError, match=r"measurements\.snr"):
-        fmriqa_io.save_artifact(
-            replace(artifact, measurements=measurements), tmp_path / "qa.nc"
+    with pytest.raises(q.InvalidAnalysisFileError, match=r"measurements\.snr"):
+        fmriqa_io.save_analysis(
+            replace(analysis, measurements=measurements), tmp_path / "qa.nc"
         )

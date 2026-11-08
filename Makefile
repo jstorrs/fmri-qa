@@ -2,7 +2,7 @@
 #
 # The repo is a uv workspace of six distributions (fmri-qa-core, fmri-qa-io,
 # fmri-qa-cli, fmri-qa-report, fmri-qa-launcher and the private fmri-qa-web).
-# Every target runs against the whole workspace, so a change to the analysis artifact is checked on every side.
+# Every target runs against the whole workspace, so a change to the analysis file is checked on every side.
 # Sync the workspace once first (see style/tooling.md). The heavy notebook
 # stack is a separate group, `make sync-notebooks`.
 

@@ -1,4 +1,4 @@
-"""A single-page QA report rendered from a `fmriqa.analysis.QAArtifact`.
+"""A single-page QA report rendered from a `fmriqa.analysis.QAAnalysis`.
 
 This is the presentation half of fmri-qa. Its only input is the analysis file the
 calculation half publishes, with everything precomputed. Nothing here

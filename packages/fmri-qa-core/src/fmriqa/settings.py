@@ -2,7 +2,7 @@
 
 A leaf module below every layer. Both the pipeline that honors the request
 (`pipeline.run_qa`) and the analysis file that publishes it
-(`analysis.artifact.QAArtifact`) use it, and reading an analysis file must not load
+(`analysis.values.QAAnalysis`) use it, and reading an analysis file must not load
 the pipeline just to name a type.
 """
 

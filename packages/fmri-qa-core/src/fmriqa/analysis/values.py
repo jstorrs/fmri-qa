@@ -1,4 +1,4 @@
-"""The `QAArtifact` value objects: the calculation half's published output.
+"""The `QAAnalysis` value objects: the calculation half's published output.
 
 An analysis file holds what a reader (report, plot, spreadsheet, trend database)
 needs about one analyzed series and nothing more. The heavy inputs (the 4-D
@@ -13,7 +13,7 @@ Five sections, in the order a reader consumes them:
 * `Provenance`       -- where the data came from and what produced this analysis file
 * `Measurements`     -- the settled scalars (the numbers a table or a threshold reads)
 * `Curves`           -- the 1-D traces a stability plot draws
-* `ArtifactImages`   -- the four FBIRN summary images plus the overlays drawn on them
+* `SummaryImages`   -- the four FBIRN summary images plus the overlays drawn on them
 
 Nothing here imports the metric, prep or load layers. An analysis file is inert data.
 `build` projects a `QAResult` into one. `serialize` reads and writes it on disk.
@@ -43,7 +43,7 @@ from ..types import BoolArray, FloatArray, LengthUnit, PeAxis, PeLabel
 #    the series was not stored as integers and the rail test could not be run.
 #: On-disk schema version of the analysis file. Bumped on every incompatible layout
 #: change.
-ARTIFACT_SCHEMA_VERSION = 7
+ANALYSIS_SCHEMA_VERSION = 7
 
 
 def _require(condition: bool, message: str) -> None:
@@ -406,7 +406,7 @@ class GhostRegions(ArrayValue):
 
 
 @dataclass(frozen=True, eq=False, slots=True)
-class ArtifactImages(ArrayValue):
+class SummaryImages(ArrayValue):
     """The four FBIRN summary images plus the geometry drawn on top of them.
 
     `signal`, `sfnr`, `fluctuation_noise` and `static_noise` are the FBIRN
@@ -429,14 +429,14 @@ class ArtifactImages(ArrayValue):
 
 
 @dataclass(frozen=True, eq=False, slots=True)
-class QAArtifact:
+class QAAnalysis:
     """One analyzed series, as everything downstream needs and nothing more.
 
     The contents of an analysis file (`.qa.nc`), in memory. The docs call both
     the analysis file; the type keeps its older name. It is the output of the
     calculation half (`analyze`) and the only input the report half accepts.
     Immutable, self-describing and round-trippable through
-    `fmriqa_io.save_artifact`/`load_artifact`. The class constant
+    `fmriqa_io.save_analysis`/`load_analysis`. The class constant
     `schema_version` is the layout those two agree on (loading migrates every
     file up to it).
     """
@@ -445,5 +445,5 @@ class QAArtifact:
     provenance: Provenance
     measurements: Measurements
     curves: Curves
-    images: ArtifactImages
-    schema_version: ClassVar[int] = ARTIFACT_SCHEMA_VERSION
+    images: SummaryImages
+    schema_version: ClassVar[int] = ANALYSIS_SCHEMA_VERSION

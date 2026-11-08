@@ -44,9 +44,16 @@ versioning when the first stable public interface is released.
   page, the docs and the title stored in a new `.qa.nc` all say "analysis file".
   `fmri-qa-report` names its argument `ANALYSIS_FILE`. `--artifact` is gone, so
   a script that passes it fails with a usage error. Files written before the
-  change load unchanged. The Python names (`QAArtifact`, `save_artifact`,
-  `load_artifact`, `InvalidArtifactError`) are unchanged. The docs page moved
-  to `user-guide/analysis-file.html`.
+  change load unchanged. The docs page moved to
+  `user-guide/analysis-file.html`.
+- **The Python API says "analysis" too, with no aliases for the old names.**
+  `QAArtifact` is `QAAnalysis`, `ArtifactImages` is `SummaryImages`, and
+  `InvalidArtifactError` is `InvalidAnalysisFileError`. `save_artifact`,
+  `load_artifact` and `build_artifact` end in `_analysis`, and
+  `ARTIFACT_SCHEMA_VERSION` is `ANALYSIS_SCHEMA_VERSION`. The modules moved:
+  `fmriqa.analysis.artifact` is `fmriqa.analysis.values`, `fmriqa_io.artifact` is
+  `fmriqa_io.analysis_file`, and `fmriqa.metrics.artifacts` (outliers and spikes)
+  is `fmriqa.metrics.outliers`. The file format is unchanged.
 - **The `--json` record is built in `fmri-qa-core`
   (`fmriqa.analysis.record`), not in `fmri-qa-cli`.** `metric_record`,
   `config_record`, `JSON_SCHEMA_VERSION` and the new `record_document`, which
@@ -66,8 +73,8 @@ versioning when the first stable public interface is released.
   `fmri-qa-import` and `fmri-qa-hilo` are no longer installed by
   `fmri-qa-core`; install `fmri-qa-cli`. `python -m fmriqa` is now
   `python -m fmriqa_cli`. The commands themselves are unchanged.
-- **`save_artifact` and `load_artifact` moved from `fmriqa` to `fmriqa_io`.**
-  Import them from `fmriqa_io` (or `fmriqa_io.artifact`); `fmriqa` and
+- **`save_analysis` and `load_analysis` moved from `fmriqa` to `fmriqa_io`.**
+  Import them from `fmriqa_io` (or `fmriqa_io.analysis_file`); `fmriqa` and
   `fmriqa.analysis` no longer export them. The file format is unchanged.
   `fmri-qa-core` no longer depends on netCDF4; `fmri-qa-io` does, except under
   Pyodide.
@@ -155,7 +162,7 @@ versioning when the first stable public interface is released.
   at construction.** The record that is the run's request held none of its own
   domains: a non-finite or negative `trim_sec`, a `roi_size` of zero or less,
   and a negative `detrend_order` were checked by `validate_qa_run` for a run and
-  again, in a second spelling, by `validate_artifact` at the archive door, so a
+  again, in a second spelling, by `validate_analysis` at the archive door, so a
   record built for either and used for neither carried a knob nothing could
   honour. `AnalysisSettings.__post_init__` holds all three now, as the three
   analysis file records above hold theirs, and both validators keep only what they
@@ -163,8 +170,8 @@ versioning when the first stable public interface is released.
   `InvalidScanError` rather than the `ValueError` those records raise, because
   it is the error the pipeline already refused these values with and it carries
   the field and value; it is a `ValueError` too, so a stored document that
-  breaks a domain still fails its load as an `InvalidArtifactError`. The
-  on-disk layout, `ARTIFACT_SCHEMA_VERSION` and the CLI are untouched.
+  breaks a domain still fails its load as an `InvalidAnalysisFileError`. The
+  on-disk layout, `ANALYSIS_SCHEMA_VERSION` and the CLI are untouched.
 - **`run_qa` and `preprocess` take an `AnalysisSettings` record instead of loose
   knobs.** The five request knobs and every one of their defaults were spelled
   in `AnalysisSettings`, again in `run_qa`'s signature, and three of them a
@@ -190,23 +197,23 @@ versioning when the first stable public interface is released.
   the ROI box: a series with no frames, a non-positive or non-finite `tr`, a
   `slice_index` past the `n_slices` beside it, a voxel with no size, and a ROI
   box that is not square or whose bounds run backwards are refused by
-  `Provenance.__post_init__` and `RoiBox.__post_init__`. `validate_artifact`
+  `Provenance.__post_init__` and `RoiBox.__post_init__`. `validate_analysis`
   keeps only what it alone can see — that the box also lies inside the image it
-  is drawn on. Messages, the on-disk layout, and `ARTIFACT_SCHEMA_VERSION` are
+  is drawn on. Messages, the on-disk layout, and `ANALYSIS_SCHEMA_VERSION` are
   unchanged.
 - **A `Measurements` that contradicts itself is now a `ValueError` at
-  construction, not an `InvalidArtifactError` at save.** The record's
+  construction, not an `InvalidAnalysisFileError` at save.** The record's
   single-record invariants — a directional `fwhm_pe`/`fwhm_ro` beside a
   `pe_axis` that resolved, a clipping block answered as a unit, each flag
   agreeing with its count, a `phantom_contrast` that is non-negative or
   unrecorded — were checked
-  only by `validate_artifact`, which runs at the archive door; an analysis file
+  only by `validate_analysis`, which runs at the archive door; an analysis file
   built in-process and printed or rendered without ever being saved was never
   checked at all. `Measurements.__post_init__` holds them now, so the illegal
   record cannot be built. What is refused is unchanged, down to the message
   text: a stored document that breaks one still fails its load as an
-  `InvalidArtifactError`, and the on-disk layout and
-  `ARTIFACT_SCHEMA_VERSION` are untouched.
+  `InvalidAnalysisFileError`, and the on-disk layout and
+  `ANALYSIS_SCHEMA_VERSION` are untouched.
 - **`QAImages.detrend_method` and `.detrend_order` are one field, `detrender:
   Detrender | None`.** The pair was one fact split in two — the order means a
   polynomial degree or an interior-knot count depending on the method, so a
@@ -223,8 +230,8 @@ versioning when the first stable public interface is released.
   and the header triple is sliced exactly once, by the new
   `VoxelSize.in_plane(voxel_mm)` classmethod, and threaded through from there.
 - **Reading or rendering an analysis file no longer loads the calculation stack.**
-  `fmriqa.analysis` re-exported `analyze` and `build_artifact` eagerly, so
-  importing anything from the analysis file facade — `load_artifact`, or any of the
+  `fmriqa.analysis` re-exported `analyze` and `build_analysis` eagerly, so
+  importing anything from the analysis file facade — `load_analysis`, or any of the
   value objects the `fmri-qa-report` package reads — executed the pipeline and
   behind it scikit-image, scipy, nibabel and the metrics. Those two names are
   now resolved on first access instead, and nothing else about the facade
@@ -309,7 +316,7 @@ versioning when the first stable public interface is released.
   surrogate, which has no UTF-8 form at all, rides as its `\udcff` escape in the
   attribute, with the document beside it still spelling the name exactly. No schema
   change — the document's fields and their meanings are identical, only the
-  envelope differs — and `load_artifact` still opens every `.qa.npz` an earlier
+  envelope differs — and `load_analysis` still opens every `.qa.npz` an earlier
   build wrote, telling the two containers apart by the file's leading bytes
   rather than by its suffix, since the schema version lives *inside* the
   container and cannot be consulted first. Nothing a site already has on disk is
@@ -356,7 +363,7 @@ versioning when the first stable public interface is released.
   converts it directly. It is also 3.8× smaller (7,436 → 1,955 bytes on a
   fixture): `<U` is UCS-4 and was spending four bytes on each ASCII character.
   No schema change — the document's content and layout are identical, only the
-  envelope differs — and `load_artifact` reads both forms, telling them apart by
+  envelope differs — and `load_analysis` reads both forms, telling them apart by
   dtype, because the schema version lives *inside* the document and cannot be
   consulted first. Archives written by earlier builds load unchanged. The
   container has since changed again — the document now rides in a netCDF global
@@ -434,7 +441,7 @@ versioning when the first stable public interface is released.
   everything it decides that can be a pure function already lives in
   `worker.py`/`panel_state.py`/`request.parse_form` and is covered there.
 - Every frozen value object in `fmriqa` now declares `slots=True`, as the
-  artifact-side ones already did — an attribute a typo invents is rejected
+  analysis-side ones already did — an attribute a typo invents is rejected
   rather than silently created. `QAImages` is the one exception and now says so
   at its decorator: its summary images are `cached_property`, which needs a real
   instance `__dict__` to cache into.
@@ -529,7 +536,7 @@ versioning when the first stable public interface is released.
   and `fmriqa.analysis.serialize` splits at its own section banners into
   `decompose` / `compose` / `migrate`. At the time, every import path a caller
   used was unchanged (`fmriqa.cli:main`, `fmriqa.cli:hilo_main`,
-  `fmriqa.save_artifact`/`load_artifact`) and no rendered output changed. The
+  `fmriqa.save_analysis`/`load_analysis`) and no rendered output changed. The
   commands and the analysis file functions have since moved; see the `fmri-qa-cli`
   and `fmri-qa-io` bullets above.
 - `fmriqa.hilo` (307 lines) is now a subpackage by the same rule: `result`
@@ -550,7 +557,7 @@ versioning when the first stable public interface is released.
   is the same. Likewise `prep.imaging.clamp_center` / `geomean`, which the
   geometry and smoothness modules already imported across module lines.
 - `run_qa` writes the settings it was called with onto `QAResult.settings`
-  (with the detrend order it resolved), and `build_artifact(result)` publishes
+  (with the detrend order it resolved), and `build_analysis(result)` publishes
   those; its `settings` parameter is gone. It used to fill in defaults when
   none were passed, so a result computed with no trim, phantom centering, or
   a forced PE axis could be published as the default run. `AnalysisSettings`
@@ -563,7 +570,7 @@ versioning when the first stable public interface is released.
   the sidecar and header say, so the load layer no longer depends on the metrics
   layer.
 - `Measurements.fwhm_unit`, `Measurements.pe_label`, and `PsfCurves.unit` are
-  closed sets (`LengthUnit`, `PeLabel` in `fmriqa.types`), and `load_artifact`
+  closed sets (`LengthUnit`, `PeLabel` in `fmriqa.types`), and `load_analysis`
   refuses a stored value outside them. `FBIRN_ROI_SIZE` lives in
   `fmriqa.types`, shared by the ROI resolver and the analysis file's default.
 - `QAImages` caches its derived summary images instead of recomputing each
@@ -577,7 +584,7 @@ versioning when the first stable public interface is released.
 - **The single `fmri-qa` distribution is split in two: calculation and
   presentation.** `fmri-qa-core` (import `fmriqa`) holds the calculation half
   and depends on nothing that draws; `fmri-qa-report` (import `fmriqa_report`)
-  holds the plots and the HTML report and consumes only a `QAArtifact`. This was
+  holds the plots and the HTML report and consumes only a `QAAnalysis`. This was
   the first step toward the five-distribution layout described in the first
   Added bullet; see `notes/analysis_report_split.md`.
 - A report header now shows the phase-encode direction that was actually used.
@@ -628,7 +635,7 @@ versioning when the first stable public interface is released.
   `tkinter` — and a layering test keeps `tkinter` out of `fmri-qa-core` and
   `fmri-qa-report`.
 - **`fmri-qa-report`, the reporting command: one analysis file in, one
-  self-contained HTML page out.** `fmri-qa-report ARTIFACT --html FILE` renders
+  self-contained HTML page out.** `fmri-qa-report ANALYSIS_FILE --html FILE` renders
   a saved analysis file to a single file that opens by double-click from `file://`
   with no network and no sibling asset: the stylesheet is inlined in a
   `<style>` block, all fourteen figures are embedded as
@@ -644,8 +651,8 @@ versioning when the first stable public interface is released.
   destination. From Python, `render_run_page` returns the document and
   `write_run_page` writes it; `render_figures` and `RenderedFigure` are the
   in-memory figures every page builds on.
-- **`InvalidArtifactError` is now reachable from `fmriqa.analysis`.** It is the
-  one error `load_artifact` raises, and it was previously only reachable
+- **`InvalidAnalysisFileError` is now reachable from `fmriqa.analysis`.** It is the
+  one error `load_analysis` raises, and it was previously only reachable
   through `fmriqa.exceptions` — off limits to `fmri-qa-report`, which may
   import only `fmriqa.analysis` and `fmriqa.types`. A reader of an analysis file can
   now catch it by name instead of a blanket `except Exception`.
@@ -721,10 +728,10 @@ versioning when the first stable public interface is released.
 - Both distributions ship the MIT license text, and CI asserts it is installed
   with each wheel.
 
-- **The analysis file.** `QAArtifact` publishes one analyzed series — its
+- **The analysis file.** `QAAnalysis` publishes one analyzed series — its
   settings, provenance, scalar measurements, stability curves, and the four
   fBIRN summary images — fully resolved, so no consumer recomputes a metric.
-  `analyze(scan)` produces one; `save_artifact`/`load_artifact` move it through
+  `analyze(scan)` produces one; `save_analysis`/`load_analysis` move it through
   a single versioned netCDF-4 file.
 - `fmri-qa --analysis-file PATH` saves the analysis file for each analyzed scan (a file
   for one scan, a directory of `<scan>.qa.nc` for a batch).
@@ -757,7 +764,7 @@ versioning when the first stable public interface is released.
   steps, so a second run's bounce collapsed into a flicker between the two
   ends. The range is now reset whenever the bar goes indeterminate.
 - **A saved `.qa.nc` archive no longer comes out `0600` regardless of the
-  umask.** `save_artifact` reserved its temporary name with `tempfile.mkstemp`,
+  umask.** `save_analysis` reserved its temporary name with `tempfile.mkstemp`,
   so the archive kept that private mode while the NIfTI and sidecar beside it
   did not, and a colleague on a shared drive could open the scan but not its
   results. The temporary is now created with the umask-filtered default; the
@@ -783,7 +790,7 @@ versioning when the first stable public interface is released.
   dcm2niix name.** Colliding series fall back to their original names until all
   collisions are resolved, preventing one scan from silently replacing another.
 - **`fmri-qa --analysis-file ''` is now a usage error instead of a silent no-op.**
-  `qa.py` only ever tested `args.artifact` by truthiness, so an empty string
+  `qa.py` only ever tested `args.analysis_file` by truthiness, so an empty string
   passed both `if` checks as false: the whole analysis ran, nothing was
   written, and the command exited 0 as if `--analysis-file` had never been given.
   `--analysis-file` now carries `arguments.nonempty` as its `type`, so an empty
@@ -820,7 +827,7 @@ versioning when the first stable public interface is released.
   anything is staged or dcm2niix is even looked up. The CLI was never
   affected — `--names`/`--anonymize` already restrict both flags with
   `choices=`.
-- **`validate_artifact` now checks that a duplicated fact agrees with itself.**
+- **`validate_analysis` now checks that a duplicated fact agrees with itself.**
   Two groups of published fields are derived copies of others — `clipped_any`/
   `clipped_kept` from the clipping counts, and the None-ness of `fwhm_pe`/
   `fwhm_ro` from `pe_axis` — and nothing compared them. A hand-edited or
@@ -830,7 +837,7 @@ versioning when the first stable public interface is released.
   also left false) or printed a "pre-SS only" line for clipping that was
   really in the analyzed data. Such a document now loads only if its
   duplicated fields agree; a self-contradictory one is refused.
-- **`save_artifact` now checks the one field `load_artifact` checks first.**
+- **`save_analysis` now checks the one field `load_analysis` checks first.**
   It already held a written analysis file to the reader's other checks, but let any
   `schema_version` through uncaught — 99, 0, a float, a string, even `True` —
   so a bad value was written successfully, replaced whatever valid archive
@@ -844,8 +851,8 @@ versioning when the first stable public interface is released.
   ROI-mean series (which is what `fluct` uses, and now says); the ghost
   denominator is the matched signal region, not the whole phantom; ACRg is
   the absolute difference; RDC is read at the full ROI.
-- `save_artifact` holds an analysis file to the same contract `load_artifact`
-  applies, and refuses (`InvalidArtifactError`, nothing written, an existing
+- `save_analysis` holds an analysis file to the same contract `load_analysis`
+  applies, and refuses (`InvalidAnalysisFileError`, nothing written, an existing
   archive untouched) one that would not read back. `fmri-qa` reports the
   refusal as a per-scan write error and continues the batch. The optional
   BIDS sidecar fields are now typed at the loader: a value of the wrong kind
@@ -870,7 +877,7 @@ versioning when the first stable public interface is released.
   Convert meter/micron voxel sizes to millimeters; unknown spatial units retain
   the millimeter assumption with an explicit warning.
 - Validate analysis file scalar types, settings, array shapes, coordinates, masks,
-  and ROI bounds on load; malformed archives raise `InvalidArtifactError`.
+  and ROI bounds on load; malformed archives raise `InvalidAnalysisFileError`.
 - Preprocessed images own read-only arrays so the full input volume can be
   freed and caller mutations cannot invalidate cached summaries. Published
   analysis file arrays also own read-only copies.
@@ -898,11 +905,11 @@ versioning when the first stable public interface is released.
 - `fmri-qa-hilo` raised a bare `ZeroDivisionError` on a zero low-flip mean.
 - The ROI-fit warning suggested `center='image'` even when that was the mode in
   use; it names the other mode now.
-- `save_artifact` wrote the destination in place, so an interrupted write left
+- `save_analysis` wrote the destination in place, so an interrupted write left
   a truncated analysis file in the archive. It writes a temporary file beside the
   destination and moves it into place. A malformed document that failed inside
   a schema migration escaped as a bare `KeyError` instead of
-  `InvalidArtifactError`.
+  `InvalidAnalysisFileError`.
 - A vendor-nulled image edge went undetected when the NIfTI carried a nonzero
   `scl_inter`, since a stored zero reads back as the intercept.
 - `snr` and `sfnr` now return NaN, rather than infinity with a NumPy warning,

@@ -2,7 +2,7 @@
 
 One project builds the whole site: the landing page and a user guide covering
 every package. The analysis pages describe what each analysis computes and what
-it adds to the netCDF artifact. So equations must render as equations, and
+it adds to the netCDF analysis. So equations must render as equations, and
 figures must be real output, not illustrations. MyST renders the math (`$$`
 blocks go to MathJax). matplotlib's `plot_directive` draws the figures by
 running each figure's code against the installed package, over the synthetic

@@ -94,8 +94,8 @@ full 2-D array, not a shared axis.
 
    import phantom
 
-   artifact = phantom.artifact()
-   psf = artifact.curves.psf
+   analysis = phantom.analysis()
+   psf = analysis.curves.psf
 
    fig, axes = plt.subplots(figsize=(5.8, 4.0), layout="constrained")
    for index, label in enumerate(psf.labels):

@@ -11,16 +11,16 @@ import sys
 from collections.abc import Sequence
 from pathlib import Path
 
-from fmriqa.analysis import InvalidArtifactError, QAArtifact
-from fmriqa_io.artifact import load_artifact
+from fmriqa.analysis import InvalidAnalysisFileError, QAAnalysis
+from fmriqa_io.analysis_file import load_analysis
 from fmriqa_io.path_arguments import expand_globs, same_file
 from fmriqa_io.rename import write_text_atomically
 from fmriqa_report.summary import package_version
 
 
-def _title(artifact: QAArtifact, path: str) -> str:
+def _title(analysis: QAAnalysis, path: str) -> str:
     """Choose the section title for one analysis file: its scan name, else the file."""
-    return artifact.provenance.scan or Path(path).name
+    return analysis.provenance.scan or Path(path).name
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -34,7 +34,7 @@ def _parser() -> argparse.ArgumentParser:
         "--version", action="version", version=f"%(prog)s {package_version()}"
     )
     parser.add_argument(
-        "artifacts",
+        "analyses",
         nargs="+",
         metavar="ANALYSIS_FILE",
         help="One analysis file from `fmri-qa --analysis-file`, "
@@ -56,10 +56,10 @@ def report_main(argv: Sequence[str] | None = None) -> int:
 
     # Expand patterns before the overwrite check counts them. The Windows shell
     # doesn't.
-    artifacts = expand_globs(args.artifacts)
-    if len(artifacts) != 1:
+    analyses = expand_globs(args.analyses)
+    if len(analyses) != 1:
         parser.error("--html renders one analysis file into one page")
-    (path,) = artifacts
+    (path,) = analyses
 
     # Refuse before reading anything, while the input is still intact.
     if same_file(args.html, path):
@@ -70,8 +70,8 @@ def report_main(argv: Sequence[str] | None = None) -> int:
         return 1
 
     try:
-        artifact = load_artifact(path)
-    except InvalidArtifactError as exc:
+        analysis = load_analysis(path)
+    except InvalidAnalysisFileError as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
 
@@ -81,7 +81,7 @@ def report_main(argv: Sequence[str] | None = None) -> int:
     # Render before touching the destination, so a failed render leaves an
     # existing report alone and creates no directory.
     try:
-        page = render_run_page(artifact, title=_title(artifact, path))
+        page = render_run_page(analysis, title=_title(analysis, path))
         write_text_atomically(args.html, page)
     except Exception as exc:  # noqa: BLE001 - CLI boundary reports cleanly
         print(f"ERROR: could not write HTML {args.html}: {exc}", file=sys.stderr)

@@ -38,7 +38,7 @@ hiddenimports = [
 # (`formats/html/resources.py`), so they must be files in the bundle.
 datas = collect_data_files("fmriqa_report")
 
-# `--version` and the artifact's provenance come from `importlib.metadata`,
+# `--version` and the analysis's provenance come from `importlib.metadata`,
 # which needs each distribution's dist-info. Without it `version()` raises
 # PackageNotFoundError and every version reads "unknown".
 for distribution in FIRST_PARTY:

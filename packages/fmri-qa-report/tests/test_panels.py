@@ -74,18 +74,18 @@ def test_rdc_panel_uses_finite_limits(values, maximum, upper, unresolved) -> Non
 
 
 @pytest.mark.parametrize("failed", [0, 1, 38])
-def test_motion_panel_marks_unresolved_frames(artifact, failed) -> None:
+def test_motion_panel_marks_unresolved_frames(analysis, failed) -> None:
     from matplotlib.figure import Figure
 
     from fmriqa_report.panels.timeseries import plot_motion
 
-    translation = np.zeros_like(artifact.curves.translation)
+    translation = np.zeros_like(analysis.curves.translation)
     translation[:failed] = np.nan
     curves = replace(
-        artifact.curves,
+        analysis.curves,
         translation=translation,
-        scale_pct=np.zeros_like(artifact.curves.scale_pct),
-        shear_pct=np.zeros_like(artifact.curves.shear_pct),
+        scale_pct=np.zeros_like(analysis.curves.scale_pct),
+        shear_pct=np.zeros_like(analysis.curves.shear_pct),
     )
     ax = Figure().add_subplot(111)
     plot_motion(ax, curves)
@@ -95,14 +95,14 @@ def test_motion_panel_marks_unresolved_frames(artifact, failed) -> None:
 
 
 def test_outlier_panel_shows_measured_percentages_without_a_chance_line(
-    artifact,
+    analysis,
 ) -> None:
     from matplotlib.figure import Figure
 
     from fmriqa_report.panels.timeseries import plot_outliers
 
-    fractions = np.linspace(0.0, 0.02, artifact.curves.time.size)
-    curves = replace(artifact.curves, outlier_fraction=fractions)
+    fractions = np.linspace(0.0, 0.02, analysis.curves.time.size)
+    curves = replace(analysis.curves, outlier_fraction=fractions)
     ax = Figure().add_subplot(111)
     plot_outliers(ax, curves)
 

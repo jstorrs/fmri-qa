@@ -1,7 +1,7 @@
-"""The artifact round trip: a saved artifact reads back as the one written.
+"""The analysis round trip: a saved analysis reads back as the one written.
 
-The other half of the artifact contract (`test_artifact.py` pins what goes in
-one). These tests check that `save_artifact`/`load_artifact` preserve every
+The other half of the analysis contract (`test_analysis_values.py` pins what goes in
+one). These tests check that `save_analysis`/`load_analysis` preserve every
 section, that the netCDF-4 file says what it holds, that a malformed or foreign
 file is refused instead of half-read, that the `.npz` container of earlier
 builds still opens, and that a file under an older schema is migrated forward
@@ -26,7 +26,7 @@ from dataclasses import asdict, replace
 # `netCDF4` is imported here, not in each test. The two "without a warning"
 # tests below run under `simplefilter("error")`, and importing the wheel raises
 # its own Cython `RuntimeWarning`, so every test must enter that filter with the
-# library already loaded. What the filter can catch is what opening the artifact
+# library already loaded. What the filter can catch is what opening the analysis
 # does and nothing else.
 import netCDF4
 import numpy as np
@@ -34,77 +34,77 @@ import pytest
 
 import fmriqa as q
 import fmriqa_io
-from fmriqa.analysis import ARTIFACT_SCHEMA_VERSION
+from fmriqa.analysis import ANALYSIS_SCHEMA_VERSION
 from fmriqa.analysis.serialize.compose import _floats
 
 
-def test_save_load_round_trips_every_section(tmp_path, artifact) -> None:
-    path = fmriqa_io.save_artifact(artifact, tmp_path / "qa.nc")
-    loaded = fmriqa_io.load_artifact(path)
+def test_save_load_round_trips_every_section(tmp_path, analysis) -> None:
+    path = fmriqa_io.save_analysis(analysis, tmp_path / "qa.nc")
+    loaded = fmriqa_io.load_analysis(path)
 
-    assert loaded.schema_version == ARTIFACT_SCHEMA_VERSION
-    assert loaded.settings == artifact.settings
-    assert loaded.provenance == artifact.provenance
-    assert _same_scalars(loaded.measurements, artifact.measurements)
-    assert loaded.curves.psf.labels == artifact.curves.psf.labels
-    assert loaded.curves.outlier_qthr == artifact.curves.outlier_qthr
-    assert loaded.images.roi == artifact.images.roi
+    assert loaded.schema_version == ANALYSIS_SCHEMA_VERSION
+    assert loaded.settings == analysis.settings
+    assert loaded.provenance == analysis.provenance
+    assert _same_scalars(loaded.measurements, analysis.measurements)
+    assert loaded.curves.psf.labels == analysis.curves.psf.labels
+    assert loaded.curves.outlier_qthr == analysis.curves.outlier_qthr
+    assert loaded.images.roi == analysis.images.roi
 
     for section, names in (
         ("curves", ["time", "roi_signal", "roi_residual", "com_deviation"]),
         ("images", ["signal", "sfnr", "static_noise", "phantom_hull"]),
     ):
         for name in names:
-            before = getattr(getattr(artifact, section), name)
+            before = getattr(getattr(analysis, section), name)
             after = getattr(getattr(loaded, section), name)
             assert np.array_equal(before, after), f"{section}.{name}"
-    assert np.array_equal(loaded.images.phantom_mask, artifact.images.phantom_mask)
+    assert np.array_equal(loaded.images.phantom_mask, analysis.images.phantom_mask)
     assert loaded.images.phantom_mask.dtype == np.bool_
     assert loaded.images.ghost is not None
-    assert np.array_equal(loaded.images.ghost.pe_ghost, artifact.images.ghost.pe_ghost)
+    assert np.array_equal(loaded.images.ghost.pe_ghost, analysis.images.ghost.pe_ghost)
 
 
-def test_analysis_reexports_the_one_error_load_artifact_raises() -> None:
-    """`fmriqa.analysis.InvalidArtifactError` is the same object as `q`'s.
+def test_analysis_reexports_the_one_error_load_analysis_raises() -> None:
+    """`fmriqa.analysis.InvalidAnalysisFileError` is the same object as `q`'s.
 
-    A reader that may only cross the published-artifact seam (`fmri-qa-report`)
-    still needs to catch the one error `load_artifact` raises by name.
+    A reader that may only cross the published-analysis seam (`fmri-qa-report`)
+    still needs to catch the one error `load_analysis` raises by name.
     """
-    from fmriqa.analysis import InvalidArtifactError
+    from fmriqa.analysis import InvalidAnalysisFileError
 
-    assert InvalidArtifactError is q.InvalidArtifactError
+    assert InvalidAnalysisFileError is q.InvalidAnalysisFileError
 
 
-def test_save_uses_the_exact_path_given(tmp_path, artifact) -> None:
+def test_save_uses_the_exact_path_given(tmp_path, analysis) -> None:
     """A caller's name is used as given, with or without a suffix."""
-    path = fmriqa_io.save_artifact(artifact, tmp_path / "nested" / "run1.artifact")
-    assert path.is_file() and path.name == "run1.artifact"
-    assert fmriqa_io.load_artifact(path).measurements.snr == artifact.measurements.snr
+    path = fmriqa_io.save_analysis(analysis, tmp_path / "nested" / "run1.analysis")
+    assert path.is_file() and path.name == "run1.analysis"
+    assert fmriqa_io.load_analysis(path).measurements.snr == analysis.measurements.snr
 
 
-def test_save_refuses_an_artifact_the_reader_would_reject(tmp_path, artifact) -> None:
-    """What `save_artifact` writes, `load_artifact` reads: one contract, both ends.
+def test_save_refuses_an_analysis_the_reader_would_reject(tmp_path, analysis) -> None:
+    """What `save_analysis` writes, `load_analysis` reads: one contract, both ends.
 
-    The producer used to skip the checks the reader applies, so an artifact
+    The producer used to skip the checks the reader applies, so an analysis
     carrying a value no analysis touches -- here a text echo time -- was written
     without complaint and refused on the way back in.
     """
-    broken = replace(artifact, provenance=replace(artifact.provenance, te="0.03"))
-    with pytest.raises(q.InvalidArtifactError, match=r"provenance\.te"):
-        fmriqa_io.save_artifact(broken, tmp_path / "qa.nc")
+    broken = replace(analysis, provenance=replace(analysis.provenance, te="0.03"))
+    with pytest.raises(q.InvalidAnalysisFileError, match=r"provenance\.te"):
+        fmriqa_io.save_analysis(broken, tmp_path / "qa.nc")
     assert not (tmp_path / "qa.nc").exists()
 
 
 def test_save_refuses_an_roi_box_that_is_square_but_off_the_image(
-    tmp_path, artifact
+    tmp_path, analysis
 ) -> None:
     """A legal box is still wrong if it is drawn where the image is not.
 
     `RoiBox` checks that it is square with a positive side. Whether it lies inside
     the image is a fact about the image, so the archive boundary checks that.
     """
-    roi = artifact.images.roi
-    offset = artifact.images.signal.shape[0]
+    roi = analysis.images.roi
+    offset = analysis.images.signal.shape[0]
     moved = replace(
         roi,
         row0=roi.row0 + offset,
@@ -112,36 +112,36 @@ def test_save_refuses_an_roi_box_that_is_square_but_off_the_image(
         col0=roi.col0 + offset,
         col1=roi.col1 + offset,
     )
-    broken = replace(artifact, images=replace(artifact.images, roi=moved))
-    with pytest.raises(q.InvalidArtifactError, match="inside the image"):
-        fmriqa_io.save_artifact(broken, tmp_path / "qa.nc")
+    broken = replace(analysis, images=replace(analysis.images, roi=moved))
+    with pytest.raises(q.InvalidAnalysisFileError, match="inside the image"):
+        fmriqa_io.save_analysis(broken, tmp_path / "qa.nc")
     assert not (tmp_path / "qa.nc").exists()
 
 
 @pytest.mark.skipif(sys.platform == "win32", reason="POSIX permission bits only")
-def test_a_saved_archive_respects_the_umask(tmp_path, artifact) -> None:
+def test_a_saved_archive_respects_the_umask(tmp_path, analysis) -> None:
     """An archive is handed to colleagues, so it must not come out owner-only."""
     old_umask = os.umask(0o022)
     try:
-        path = fmriqa_io.save_artifact(artifact, tmp_path / "qa.nc")
+        path = fmriqa_io.save_analysis(analysis, tmp_path / "qa.nc")
     finally:
         os.umask(old_umask)
     assert stat.S_IMODE(path.stat().st_mode) == 0o644
 
 
-def test_a_refused_save_preserves_the_archive_already_there(tmp_path, artifact) -> None:
+def test_a_refused_save_preserves_the_archive_already_there(tmp_path, analysis) -> None:
     """A rejected write leaves the valid file it would have replaced untouched."""
-    path = fmriqa_io.save_artifact(artifact, tmp_path / "qa.nc")
+    path = fmriqa_io.save_analysis(analysis, tmp_path / "qa.nc")
     before = path.read_bytes()
-    broken = replace(artifact, provenance=replace(artifact.provenance, te="0.03"))
-    with pytest.raises(q.InvalidArtifactError, match=r"provenance\.te"):
-        fmriqa_io.save_artifact(broken, path)
+    broken = replace(analysis, provenance=replace(analysis.provenance, te="0.03"))
+    with pytest.raises(q.InvalidAnalysisFileError, match=r"provenance\.te"):
+        fmriqa_io.save_analysis(broken, path)
     assert path.read_bytes() == before
     assert not list(tmp_path.glob(".*.tmp"))  # and no temporary beside it
 
 
 def test_a_failed_save_leaves_neither_a_file_nor_a_temporary(
-    tmp_path, artifact, monkeypatch
+    tmp_path, analysis, monkeypatch
 ) -> None:
     """An interrupted write must not leave debris in a QA archive.
 
@@ -159,23 +159,27 @@ def test_a_failed_save_leaves_neither_a_file_nor_a_temporary(
     monkeypatch.setattr(os, "fsync", fails)
     archive_dir = tmp_path / "archive"
     with pytest.raises(OSError, match="no space left on device"):
-        fmriqa_io.save_artifact(artifact, archive_dir / "qa.nc")
+        fmriqa_io.save_analysis(analysis, archive_dir / "qa.nc")
     assert list(archive_dir.iterdir()) == []
 
 
-def test_load_rejects_a_netcdf_file_that_is_not_an_artifact(tmp_path) -> None:
-    """A well-formed netCDF carrying no document is a file, not an artifact."""
+def test_load_rejects_a_netcdf_file_that_is_not_an_analysis(tmp_path) -> None:
+    """A well-formed netCDF carrying no document is a file, not an analysis file."""
     path = tmp_path / "weather.nc"
     _write_netcdf(path, {"temperature": np.arange(3.0)}, attributes={})
-    with pytest.raises(q.InvalidArtifactError, match="not an fmri-qa analysis file"):
-        fmriqa_io.load_artifact(path)
+    with pytest.raises(
+        q.InvalidAnalysisFileError, match="not an fmri-qa analysis file"
+    ):
+        fmriqa_io.load_analysis(path)
 
 
-def test_load_rejects_an_npz_that_is_not_an_artifact(tmp_path) -> None:
+def test_load_rejects_an_npz_that_is_not_an_analysis(tmp_path) -> None:
     plain = tmp_path / "plain.npz"
     np.savez_compressed(plain, values=np.arange(3))
-    with pytest.raises(q.InvalidArtifactError, match="not an fmri-qa analysis file"):
-        fmriqa_io.load_artifact(plain)
+    with pytest.raises(
+        q.InvalidAnalysisFileError, match="not an fmri-qa analysis file"
+    ):
+        fmriqa_io.load_analysis(plain)
 
 
 def test_load_rejects_a_document_attribute_that_is_not_text(tmp_path) -> None:
@@ -183,8 +187,10 @@ def test_load_rejects_a_document_attribute_that_is_not_text(tmp_path) -> None:
     path = tmp_path / "numeric.nc"
     signal = {"images.signal": np.ones((2, 2))}
     _write_netcdf(path, signal, attributes={"document": np.int32(7)})
-    with pytest.raises(q.InvalidArtifactError, match="document attribute is not text"):
-        fmriqa_io.load_artifact(path)
+    with pytest.raises(
+        q.InvalidAnalysisFileError, match="document attribute is not text"
+    ):
+        fmriqa_io.load_analysis(path)
 
 
 @pytest.mark.parametrize(
@@ -193,16 +199,16 @@ def test_load_rejects_a_document_attribute_that_is_not_text(tmp_path) -> None:
         ("junk.bin", b"not an archive"),
         ("plain.npy", None),  # a NumPy array file: neither container
         ("empty.nc", b""),
-        ("truncated.nc", None),  # a real artifact, cut off mid-file
+        ("truncated.nc", None),  # a real analysis, cut off mid-file
     ],
 )
 def test_load_rejects_a_file_that_is_neither_container(
-    tmp_path, artifact, name, content
+    tmp_path, analysis, name, content
 ) -> None:
     """The container is decided by the leading bytes, and nothing else matches.
 
     This includes the key archive case: a file that starts with HDF5's signature
-    because it is an artifact, and stops mid-file because the write did not
+    because it is an analysis, and stops mid-file because the write did not
     finish.
     """
     path = tmp_path / name
@@ -211,22 +217,22 @@ def test_load_rejects_a_file_that_is_neither_container(
     elif name.endswith(".npy"):
         np.save(path, np.ones(3))
     else:
-        whole = fmriqa_io.save_artifact(artifact, tmp_path / "whole.nc").read_bytes()
+        whole = fmriqa_io.save_analysis(analysis, tmp_path / "whole.nc").read_bytes()
         path.write_bytes(whole[: len(whole) // 2])
-    with pytest.raises(q.InvalidArtifactError):
-        fmriqa_io.load_artifact(path)
+    with pytest.raises(q.InvalidAnalysisFileError):
+        fmriqa_io.load_analysis(path)
 
 
 def test_load_rejects_a_path_that_is_not_a_readable_file(tmp_path) -> None:
-    """A name that is a directory, or nothing at all, is not an artifact either.
+    """A name that is a directory, or nothing at all, is not an analysis file either.
 
     Both fail at the open that sniffs the leading bytes, before any container
-    reader is chosen. A caller of `load_artifact` still has one exception type.
+    reader is chosen. A caller of `load_analysis` still has one exception type.
     """
     (tmp_path / "archive").mkdir()
     for path in (tmp_path / "archive", tmp_path / "absent.qa.nc"):
-        with pytest.raises(q.InvalidArtifactError):
-            fmriqa_io.load_artifact(path)
+        with pytest.raises(q.InvalidAnalysisFileError):
+            fmriqa_io.load_analysis(path)
 
 
 def test_load_rejects_non_object_documents(tmp_path) -> None:
@@ -234,12 +240,12 @@ def test_load_rejects_non_object_documents(tmp_path) -> None:
         path = tmp_path / "bad.nc"
         signal = {"images.signal": np.ones((2, 2))}
         _write_netcdf(path, signal, attributes={"document": json.dumps(document)})
-        with pytest.raises(q.InvalidArtifactError, match="JSON object"):
-            fmriqa_io.load_artifact(path)
+        with pytest.raises(q.InvalidAnalysisFileError, match="JSON object"):
+            fmriqa_io.load_analysis(path)
 
 
 def test_load_rejects_invalid_scalar_records(
-    tmp_path, artifact, rewrite_document
+    tmp_path, analysis, rewrite_document
 ) -> None:
     edits = (
         ("schema_version", 4.0),
@@ -276,7 +282,7 @@ def test_load_rejects_invalid_scalar_records(
         ("curves.psf.unit", "cm"),
     )
     for field, value in edits:
-        path = fmriqa_io.save_artifact(artifact, tmp_path / "bad.nc")
+        path = fmriqa_io.save_analysis(analysis, tmp_path / "bad.nc")
 
         def edit(doc, field=field, value=value):
             target = doc
@@ -287,15 +293,15 @@ def test_load_rejects_invalid_scalar_records(
             return doc
 
         rewrite_document(path, edit)
-        with pytest.raises(q.InvalidArtifactError):
-            fmriqa_io.load_artifact(path)
+        with pytest.raises(q.InvalidAnalysisFileError):
+            fmriqa_io.load_analysis(path)
 
 
-def test_load_rejects_inconsistent_arrays(tmp_path, artifact, read_netcdf) -> None:
+def test_load_rejects_inconsistent_arrays(tmp_path, analysis, read_netcdf) -> None:
     """An array whose shape contradicts the document is refused, not reshaped.
 
     Each replacement gets private dimensions, not the shared one it no longer
-    fits, so the loader sees well-formed netCDF holding a wrong artifact. Only
+    fits, so the loader sees well-formed netCDF holding a wrong analysis. Only
     the shape check in `validation` catches it.
     """
     edits = (
@@ -317,15 +323,15 @@ def test_load_rejects_inconsistent_arrays(tmp_path, artifact, read_netcdf) -> No
         ("images.phantom_hull", np.full((3, 2), np.nan)),
     )
     for field, value in edits:
-        path = fmriqa_io.save_artifact(artifact, tmp_path / "bad.nc")
+        path = fmriqa_io.save_analysis(analysis, tmp_path / "bad.nc")
         document, arrays = read_netcdf(path)
         _write_netcdf(
             path,
             arrays | {field: value},
             attributes={"document": json.dumps(document)},
         )
-        with pytest.raises(q.InvalidArtifactError):
-            fmriqa_io.load_artifact(path)
+        with pytest.raises(q.InvalidAnalysisFileError):
+            fmriqa_io.load_analysis(path)
 
 
 def test_load_rejects_an_array_that_is_not_real_numbers() -> None:
@@ -340,15 +346,15 @@ def test_load_rejects_an_array_that_is_not_real_numbers() -> None:
             _floats({"images.signal": value}, "images.signal")
 
 
-def test_artifact_arrays_own_readonly_copies(tmp_path, artifact) -> None:
-    signal = artifact.images.signal.copy()
-    images = replace(artifact.images, signal=signal)
+def test_analysis_arrays_own_readonly_copies(tmp_path, analysis) -> None:
+    signal = analysis.images.signal.copy()
+    images = replace(analysis.images, signal=signal)
     signal[:] = 0
     assert images.signal.any()
-    loaded = fmriqa_io.load_artifact(
-        fmriqa_io.save_artifact(artifact, tmp_path / "qa.nc")
+    loaded = fmriqa_io.load_analysis(
+        fmriqa_io.save_analysis(analysis, tmp_path / "qa.nc")
     )
-    for obj in (artifact, loaded):
+    for obj in (analysis, loaded):
         assert obj.images.ghost is not None
         for array in (
             obj.images.signal,
@@ -363,103 +369,103 @@ def test_artifact_arrays_own_readonly_copies(tmp_path, artifact) -> None:
                 array.flat[0] = 0
 
 
-def test_failed_motion_survives_the_artifact_round_trip(tmp_path, artifact) -> None:
-    n = artifact.provenance.n_frames
+def test_failed_motion_survives_the_analysis_round_trip(tmp_path, analysis) -> None:
+    n = analysis.provenance.n_frames
     broken = replace(
-        artifact,
+        analysis,
         measurements=replace(
-            artifact.measurements,
+            analysis.measurements,
             max_translation=float("nan"),
             max_scale_pct=float("nan"),
             max_shear_pct=float("nan"),
         ),
         curves=replace(
-            artifact.curves,
+            analysis.curves,
             translation=np.full((n, 2), np.nan),
             scale_pct=np.full((n, 2), np.nan),
             shear_pct=np.full(n, np.nan),
         ),
     )
-    loaded = fmriqa_io.load_artifact(
-        fmriqa_io.save_artifact(broken, tmp_path / "failed-motion.nc")
+    loaded = fmriqa_io.load_analysis(
+        fmriqa_io.save_analysis(broken, tmp_path / "failed-motion.nc")
     )
     assert np.isnan(loaded.curves.translation).all()
     assert np.isnan(loaded.measurements.max_translation)
 
 
-def test_load_rejects_an_artifact_from_a_newer_build(
-    tmp_path, artifact, rewrite_document
+def test_load_rejects_an_analysis_from_a_newer_build(
+    tmp_path, analysis, rewrite_document
 ) -> None:
     """A future layout is refused by name, not misread field by field.
 
     This direction cannot be migrated: this build does not know what a later
     schema put in the file, and guessing is worse than refusing.
     """
-    path = fmriqa_io.save_artifact(artifact, tmp_path / "qa.nc")
+    path = fmriqa_io.save_analysis(analysis, tmp_path / "qa.nc")
     rewrite_document(path, lambda doc: doc | {"schema_version": 99})
-    with pytest.raises(q.InvalidArtifactError, match="schema version 99, newer"):
-        fmriqa_io.load_artifact(path)
+    with pytest.raises(q.InvalidAnalysisFileError, match="schema version 99, newer"):
+        fmriqa_io.load_analysis(path)
 
 
 def test_load_rejects_an_old_version_it_cannot_migrate_from(
-    tmp_path, artifact, rewrite_document
+    tmp_path, analysis, rewrite_document
 ) -> None:
     """An older version with no route forward is named, not mangled."""
-    path = fmriqa_io.save_artifact(artifact, tmp_path / "qa.nc")
+    path = fmriqa_io.save_analysis(analysis, tmp_path / "qa.nc")
     rewrite_document(path, lambda doc: doc | {"schema_version": 0})
-    with pytest.raises(q.InvalidArtifactError, match="no migration from 0"):
-        fmriqa_io.load_artifact(path)
+    with pytest.raises(q.InvalidAnalysisFileError, match="no migration from 0"):
+        fmriqa_io.load_analysis(path)
 
 
-def test_load_migrates_a_schema_1_artifact(
-    tmp_path, artifact, rewrite_document
+def test_load_migrates_a_schema_1_analysis(
+    tmp_path, analysis, rewrite_document
 ) -> None:
     """An archive predating the localization diagnostics still reads back.
 
-    An artifact outlives the build that wrote it, so a schema bump must not orphan
+    An analysis outlives the build that wrote it, so a schema bump must not orphan
     an archive a trend database has been filling for months. Everything schema 1
     carried survives. The two diagnostics it lacked are unknown, not invented,
     since a fabricated pass would vouch for numbers nothing here can vouch for.
     """
-    path = fmriqa_io.save_artifact(artifact, tmp_path / "qa.nc")
+    path = fmriqa_io.save_analysis(analysis, tmp_path / "qa.nc")
     rewrite_document(path, _as_schema(1))
 
     with pytest.warns(UserWarning, match="migrated to"):
-        loaded = fmriqa_io.load_artifact(path)
+        loaded = fmriqa_io.load_analysis(path)
 
-    assert loaded.schema_version == ARTIFACT_SCHEMA_VERSION
+    assert loaded.schema_version == ANALYSIS_SCHEMA_VERSION
     assert loaded.measurements.phantom_mask_ok is None
     assert loaded.measurements.roi_inside_phantom is None
     assert np.isnan(loaded.measurements.phantom_fraction)
     # everything schema 1 did carry is untouched
-    assert loaded.measurements.snr == artifact.measurements.snr
-    assert loaded.provenance.scan == artifact.provenance.scan
-    assert loaded.provenance.n_frames == artifact.provenance.n_frames
-    assert np.array_equal(loaded.images.phantom_mask, artifact.images.phantom_mask)
+    assert loaded.measurements.snr == analysis.measurements.snr
+    assert loaded.provenance.scan == analysis.provenance.scan
+    assert loaded.provenance.n_frames == analysis.provenance.n_frames
+    assert np.array_equal(loaded.images.phantom_mask, analysis.images.phantom_mask)
 
 
-def test_load_migrating_a_schema_2_artifact_keeps_what_it_recorded(
-    tmp_path, artifact, rewrite_document
+def test_load_migrating_a_schema_2_analysis_keeps_what_it_recorded(
+    tmp_path, analysis, rewrite_document
 ) -> None:
     """Only the field the older schema lacked comes back unknown.
 
     Schema 2 measured the phantom fraction and the ROI fit but had no verdict
     field. The migration must keep the two it has.
     """
-    path = fmriqa_io.save_artifact(artifact, tmp_path / "qa.nc")
+    path = fmriqa_io.save_analysis(analysis, tmp_path / "qa.nc")
     rewrite_document(path, _as_schema(2))
 
     with pytest.warns(UserWarning, match="schema 2, migrated"):
-        loaded = fmriqa_io.load_artifact(path)
+        loaded = fmriqa_io.load_analysis(path)
 
-    m, before = loaded.measurements, artifact.measurements
+    m, before = loaded.measurements, analysis.measurements
     assert m.phantom_mask_ok is None  # the one field schema 2 lacked
     assert m.phantom_fraction == before.phantom_fraction
     assert m.roi_inside_phantom is True
 
 
-def test_load_migrating_a_schema_3_artifact_leaves_the_trim_unrecorded(
-    tmp_path, artifact, rewrite_document
+def test_load_migrating_a_schema_3_analysis_leaves_the_trim_unrecorded(
+    tmp_path, analysis, rewrite_document
 ) -> None:
     """Schema 3 trimmed warm-up volumes but never wrote down how many.
 
@@ -468,69 +474,69 @@ def test_load_migrating_a_schema_3_artifact_leaves_the_trim_unrecorded(
     mapped through a guess is worse than one a reader knows it cannot map.
     Everything schema 3 recorded survives.
     """
-    path = fmriqa_io.save_artifact(artifact, tmp_path / "qa.nc")
+    path = fmriqa_io.save_analysis(analysis, tmp_path / "qa.nc")
     rewrite_document(path, _as_schema(3))
 
     with pytest.warns(UserWarning, match="schema 3, migrated"):
-        loaded = fmriqa_io.load_artifact(path)
+        loaded = fmriqa_io.load_analysis(path)
 
     assert loaded.provenance.n_trimmed is None  # the one field schema 3 lacked
-    assert loaded.provenance.n_frames == artifact.provenance.n_frames
-    assert loaded.provenance.tr == artifact.provenance.tr
+    assert loaded.provenance.n_frames == analysis.provenance.n_frames
+    assert loaded.provenance.tr == analysis.provenance.tr
     assert loaded.measurements.phantom_mask_ok is True
 
 
-def test_load_migrating_a_schema_4_artifact_leaves_slice_and_contrast_unrecorded(
-    tmp_path, artifact, rewrite_document
+def test_load_migrating_a_schema_4_analysis_leaves_slice_and_contrast_unrecorded(
+    tmp_path, analysis, rewrite_document
 ) -> None:
     """Schema 4 chose a slice and judged a mask without writing either down.
 
-    Neither is re-derived. The slice depends on a volume the artifact does not
+    Neither is re-derived. The slice depends on a volume the analysis does not
     carry, and a recomputed contrast would pass off this build's definition as
     the writing build's measurement. The verdict schema 4 recorded is kept.
     """
-    path = fmriqa_io.save_artifact(artifact, tmp_path / "qa.nc")
+    path = fmriqa_io.save_analysis(analysis, tmp_path / "qa.nc")
     rewrite_document(path, _as_schema(4))
 
     with pytest.warns(UserWarning, match="schema 4, migrated"):
-        loaded = fmriqa_io.load_artifact(path)
+        loaded = fmriqa_io.load_analysis(path)
 
     assert loaded.provenance.slice_index is None
     assert loaded.provenance.n_slices is None
     assert np.isnan(loaded.measurements.phantom_contrast)
     assert loaded.measurements.phantom_mask_ok is True
-    assert loaded.settings.roi_size == artifact.settings.roi_size
+    assert loaded.settings.roi_size == analysis.settings.roi_size
 
 
-def test_load_migrating_a_schema_5_artifact_reports_displacement_in_voxels(
-    tmp_path, artifact, rewrite_document
+def test_load_migrating_a_schema_5_analysis_reports_displacement_in_voxels(
+    tmp_path, analysis, rewrite_document
 ) -> None:
     """Schema 5 always measured peak motion/COM displacement in voxels.
 
     Unlike other migrated fields this is not "unknown". Schema <= 5 never
     converted these two peaks to mm even when the voxel size was known, so "vox"
     is a fact about the old format. This fixture's `fwhm_unit` is "mm", so the
-    two units can disagree on a migrated artifact, never on a fresh one.
+    two units can disagree on a migrated analysis, never on a fresh one.
     """
-    path = fmriqa_io.save_artifact(artifact, tmp_path / "qa.nc")
+    path = fmriqa_io.save_analysis(analysis, tmp_path / "qa.nc")
     rewrite_document(path, _as_schema(5))
 
     with pytest.warns(UserWarning, match="schema 5, migrated"):
-        loaded = fmriqa_io.load_artifact(path)
+        loaded = fmriqa_io.load_analysis(path)
 
     assert loaded.measurements.displacement_unit == "vox"
     assert loaded.measurements.fwhm_unit == "mm"  # this fixture's voxel size is known
     # The migration leaves the stored numbers untouched.
     assert loaded.measurements.max_translation == (
-        artifact.measurements.max_translation
+        analysis.measurements.max_translation
     )
     assert loaded.measurements.max_com_displacement == (
-        artifact.measurements.max_com_displacement
+        analysis.measurements.max_com_displacement
     )
 
 
-def test_load_migrating_a_schema_6_artifact_keeps_its_clipping_answers(
-    tmp_path, artifact, rewrite_document
+def test_load_migrating_a_schema_6_analysis_keeps_its_clipping_answers(
+    tmp_path, analysis, rewrite_document
 ) -> None:
     """Schema 6 always answered the clipping question, and its answers stand.
 
@@ -538,16 +544,16 @@ def test_load_migrating_a_schema_6_artifact_keeps_its_clipping_answers(
     and the rail test could not run. No schema 6 document needs that, since that
     build ran the test unconditionally and recorded a bool. Rewriting them to
     unknown would condemn every clean scan along with the uncheckable ones, and
-    the artifact does not record the storage datatype to tell them apart. So the
+    the analysis does not record the storage datatype to tell them apart. So the
     step carries them through untouched, which this pins.
     """
-    path = fmriqa_io.save_artifact(artifact, tmp_path / "qa.nc")
+    path = fmriqa_io.save_analysis(analysis, tmp_path / "qa.nc")
     rewrite_document(path, _as_schema(6))
 
     with pytest.warns(UserWarning, match="schema 6, migrated"):
-        loaded = fmriqa_io.load_artifact(path)
+        loaded = fmriqa_io.load_analysis(path)
 
-    before, after = artifact.measurements, loaded.measurements
+    before, after = analysis.measurements, loaded.measurements
     assert after.clipped_any == before.clipped_any is not None
     assert after.clipped_kept == before.clipped_kept is not None
     assert after.n_clipped_kept == before.n_clipped_kept
@@ -557,7 +563,7 @@ def test_load_migrating_a_schema_6_artifact_keeps_its_clipping_answers(
 # Fields each schema version introduced, per document section, so a current
 # document can be rewritten as the older one it grew out of (the reverse of
 # `serialize.migrate._MIGRATIONS`). Division of labor with
-# `test_artifact_fixtures.py`: this file's migration tests check each step in
+# `test_analysis_file_fixtures.py`: this file's migration tests check each step in
 # isolation against this hand-maintained description of the schema history.
 # That file loads real `.npz` archives an old build wrote, which this table
 # cannot stand in for (see its module docstring). Keep both.
@@ -607,7 +613,7 @@ def _with_psf_unit(value: object):
 
 
 def test_load_rejects_a_closed_set_value_from_outside_the_set(
-    tmp_path, artifact, rewrite_document
+    tmp_path, analysis, rewrite_document
 ) -> None:
     """A stored string must be held to the set its field promises.
 
@@ -622,58 +628,58 @@ def test_load_rejects_a_closed_set_value_from_outside_the_set(
         ("pe_label", _with_measurement("pe_label", "diagonal")),
         ("psf.unit", _with_psf_unit("cm")),
     ):
-        path = fmriqa_io.save_artifact(artifact, tmp_path / f"{field}.nc")
+        path = fmriqa_io.save_analysis(analysis, tmp_path / f"{field}.nc")
         rewrite_document(path, edit)
-        with pytest.raises(q.InvalidArtifactError, match=field):
-            fmriqa_io.load_artifact(path)
+        with pytest.raises(q.InvalidAnalysisFileError, match=field):
+            fmriqa_io.load_analysis(path)
 
 
 def test_load_rejects_clipped_kept_disagreeing_with_its_count(
-    tmp_path, artifact, rewrite_document
+    tmp_path, analysis, rewrite_document
 ) -> None:
     """A document must not say the count is 5 but the flag is False.
 
     `clipped_kept` is a property of `n_clipped_kept` in the type that measures
-    it, not an independent fact. Only the flat artifact stores both.
+    it, not an independent fact. Only the flat analysis stores both.
     """
-    path = fmriqa_io.save_artifact(artifact, tmp_path / "qa.nc")
+    path = fmriqa_io.save_analysis(analysis, tmp_path / "qa.nc")
     rewrite_document(path, _with_measurement("n_clipped_kept", 5))
-    with pytest.raises(q.InvalidArtifactError, match="clipped_kept"):
-        fmriqa_io.load_artifact(path)
+    with pytest.raises(q.InvalidAnalysisFileError, match="clipped_kept"):
+        fmriqa_io.load_analysis(path)
 
 
 def test_load_rejects_clipped_any_disagreeing_with_its_counts(
-    tmp_path, artifact, rewrite_document
+    tmp_path, analysis, rewrite_document
 ) -> None:
     """`clipped_any` is derived from both clipping counts, and must still hold."""
-    path = fmriqa_io.save_artifact(artifact, tmp_path / "qa.nc")
+    path = fmriqa_io.save_analysis(analysis, tmp_path / "qa.nc")
     rewrite_document(path, _with_measurement("n_clipped_pre", 3))
-    with pytest.raises(q.InvalidArtifactError, match="clipped_any"):
-        fmriqa_io.load_artifact(path)
+    with pytest.raises(q.InvalidAnalysisFileError, match="clipped_any"):
+        fmriqa_io.load_analysis(path)
 
 
 def test_load_rejects_fwhm_pe_null_when_pe_axis_is_known(
-    tmp_path, artifact, rewrite_document
+    tmp_path, analysis, rewrite_document
 ) -> None:
     """`fwhm_pe` is None when `pe_axis` is None, and only then."""
-    assert artifact.measurements.pe_axis is not None
-    path = fmriqa_io.save_artifact(artifact, tmp_path / "qa.nc")
+    assert analysis.measurements.pe_axis is not None
+    path = fmriqa_io.save_analysis(analysis, tmp_path / "qa.nc")
     rewrite_document(path, _with_measurement("fwhm_pe", None))
-    with pytest.raises(q.InvalidArtifactError, match="fwhm_pe"):
-        fmriqa_io.load_artifact(path)
+    with pytest.raises(q.InvalidAnalysisFileError, match="fwhm_pe"):
+        fmriqa_io.load_analysis(path)
 
 
 def test_load_rejects_a_document_missing_a_section(
-    tmp_path, artifact, rewrite_document
+    tmp_path, analysis, rewrite_document
 ) -> None:
-    path = fmriqa_io.save_artifact(artifact, tmp_path / "qa.nc")
+    path = fmriqa_io.save_analysis(analysis, tmp_path / "qa.nc")
     rewrite_document(path, lambda doc: {**doc, "images": {}})
-    with pytest.raises(q.InvalidArtifactError, match="malformed analysis file"):
-        fmriqa_io.load_artifact(path)
+    with pytest.raises(q.InvalidAnalysisFileError, match="malformed analysis file"):
+        fmriqa_io.load_analysis(path)
 
 
 def test_load_rejects_a_schema_1_archive_missing_its_measurements(
-    tmp_path, artifact, read_netcdf, rewrite_document
+    tmp_path, analysis, read_netcdf, rewrite_document
 ) -> None:
     """A migration reads the stored document, so its failures are read failures.
 
@@ -681,7 +687,7 @@ def test_load_rejects_a_schema_1_archive_missing_its_measurements(
     does not is malformed and must be refused as such, not raise the bare
     KeyError of whichever migration step reached for it.
     """
-    path = fmriqa_io.save_artifact(artifact, tmp_path / "qa.nc")
+    path = fmriqa_io.save_analysis(analysis, tmp_path / "qa.nc")
     rewrite_document(
         path,
         lambda doc: (
@@ -689,8 +695,8 @@ def test_load_rejects_a_schema_1_archive_missing_its_measurements(
             | {"schema_version": 1}
         ),
     )
-    with pytest.raises(q.InvalidArtifactError, match="malformed analysis file"):
-        fmriqa_io.load_artifact(path)
+    with pytest.raises(q.InvalidAnalysisFileError, match="malformed analysis file"):
+        fmriqa_io.load_analysis(path)
 
 
 def _same_scalars(left, right) -> bool:
@@ -712,7 +718,7 @@ def _both_nan(x: float, y: float) -> bool:
     return bool(np.isnan(x) and np.isnan(y))
 
 
-# Every test above that corrupts a stored artifact does it through these two,
+# Every test above that corrupts a stored analysis does it through these two,
 # which drive `netCDF4` directly, not the package's own `netcdf` module. Writing
 # through the package's writer could only produce files it permits, which is no
 # use for a rejection test. Reading the file back through a plain netCDF reader

@@ -39,7 +39,7 @@ def test_saturation_ceiling_and_bits_are_present_or_absent_together() -> None:
     allowed and only `detect_saturation` kept from arising. Behind one optional
     `rail` the pair cannot come apart, and neither can the worst-clipped volume,
     which is meaningless without a rail. The convenience properties read off the
-    rail, so the artifact's flat `clip_ceiling`/`clip_bits` contract is
+    rail, so the analysis's flat `clip_ceiling`/`clip_bits` contract is
     unchanged.
     """
     names = {f.name for f in fields(SaturationResult)}

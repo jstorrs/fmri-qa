@@ -1,7 +1,7 @@
 [project]
 name = "fmri-qa-io"
 version = "0.1.0"
-description = "File formats and filesystem IO for fmri-qa: scans, the .qa.nc artifact file, DICOM import"
+description = "File formats and filesystem IO for fmri-qa: scans, the .qa.nc analysis file, DICOM import"
 readme = "README.md"
 requires-python = ">=3.13"
 license = "MIT"
@@ -36,7 +36,7 @@ dependencies = [
     # marker leaves it out of a browser install.
     "dcm2niix>=1.0.20250506; sys_platform != 'emscripten'",
     "nibabel>=5.3.2",
-    # The artifact's container. It is worth a ~10 MB wheel carrying libhdf5 and
+    # The analysis file's container. It is worth a ~10 MB wheel carrying libhdf5 and
     # libnetcdf: this is the Unidata C library that MATLAB's `ncread`, R's
     # `ncdf4`, `ncdump` and xarray read through, so a file it writes is a file
     # those were tested against. Writing netCDF-4 by hand or with a pure-Python
@@ -44,7 +44,7 @@ dependencies = [
     # implementation we declined to link.
     # Pyodide reports sys_platform "emscripten" and micropip evaluates markers,
     # so a browser install of this package skips the native netCDF library and
-    # only the artifact container is unavailable there.
+    # only the analysis-file container is unavailable there.
     "netCDF4>=1.7; sys_platform != 'emscripten'",
     "numpy>=2.3.4",
 ]

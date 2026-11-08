@@ -2,7 +2,7 @@
 
 `fmri-qa-core` runs under Pyodide in a browser page, handed decoded scans, so
 it must stand up on numpy, scipy and scikit-image alone. Decoding NIfTI is
-`fmriqa_io`'s, and so are the artifact container and the DICOM converter. This
+`fmriqa_io`'s, and so are the analysis-file container and the DICOM converter. This
 checks the rule three ways: statically, over every import in every source file
 (function-local ones included); at runtime, by importing every module in a
 fresh interpreter; and in the installed distribution's declared requirements.

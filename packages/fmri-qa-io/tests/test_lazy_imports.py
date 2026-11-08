@@ -54,13 +54,13 @@ def test_bare_import_loads_no_submodule() -> None:
     assert result.stdout.strip() == "[]", result.stdout + result.stderr
 
 
-def test_importing_the_artifact_module_does_not_load_netcdf4() -> None:
+def test_importing_the_analysis_module_does_not_load_netcdf4() -> None:
     """`netCDF4` loads libhdf5 and libnetcdf, so it waits for a file.
 
-    The report CLI imports `fmriqa_io.artifact` to read one artifact, and
+    The report CLI imports `fmriqa_io.analysis_file` to read one analysis, and
     `--help` must not pay for the native libraries first.
     """
-    probe = "import sys, fmriqa_io.artifact; print('netCDF4' in sys.modules)"
+    probe = "import sys, fmriqa_io.analysis_file; print('netCDF4' in sys.modules)"
     result = subprocess.run(  # noqa: S603 - fixed literal script, not untrusted input
         [sys.executable, "-c", probe],
         capture_output=True,

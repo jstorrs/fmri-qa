@@ -15,7 +15,7 @@ import pytest
 import fmriqa
 
 # Modules a bare `import fmriqa` must never pull in. Each is expensive with one
-# call site in the package (see `analysis/build.py`, `metrics/artifacts.py`), or
+# call site in the package (see `analysis/build.py`, `metrics/outliers.py`), or
 # is a real dependency (`skimage`) that a name access should trigger.
 _HEAVY_MODULES = ("skimage", "scipy.special", "scipy.spatial")
 

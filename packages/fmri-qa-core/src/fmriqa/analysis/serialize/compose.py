@@ -1,9 +1,9 @@
-"""Rebuild a `QAArtifact` from its JSON document and named arrays.
+"""Rebuild a `QAAnalysis` from its JSON document and named arrays.
 
 The read half of the archive layout, mirroring `decompose`. Besides assembling
 the value objects, it checks each array member for the dtype its field is
 declared with (`_floats`, `_bools`). The document's own fields, closed-set
-strings included, are not re-checked here. `fmriqa_io.load_artifact` runs
+strings included, are not re-checked here. `fmriqa_io.load_analysis` runs
 `validate_document` first, so `compose` trusts what it is handed.
 """
 
@@ -15,15 +15,15 @@ from numpy.typing import NDArray
 
 from ...settings import AnalysisSettings
 from ...types import BoolArray, FloatArray
-from ..artifact import (
-    ArtifactImages,
+from ..values import (
     Curves,
     GhostRegions,
     Measurements,
     Provenance,
     PsfCurves,
-    QAArtifact,
+    QAAnalysis,
     RoiBox,
+    SummaryImages,
     WeisskoffCurve,
 )
 
@@ -45,14 +45,14 @@ def _bools(arrays: Mapping[str, NDArray[Any]], key: str) -> BoolArray:
     return np.asarray(arrays[key], dtype=np.bool_)
 
 
-def compose(document: dict[str, Any], arrays: Mapping[str, NDArray[Any]]) -> QAArtifact:
+def compose(document: dict[str, Any], arrays: Mapping[str, NDArray[Any]]) -> QAAnalysis:
     """Rebuild an analysis file from its JSON document and named arrays."""
     provenance = dict(document["provenance"])
     for field in _PROVENANCE_TUPLES:
         if provenance.get(field) is not None:
             provenance[field] = tuple(provenance[field])
     measurements = dict(document["measurements"])
-    return QAArtifact(
+    return QAAnalysis(
         settings=AnalysisSettings(**document["settings"]),
         provenance=Provenance(**provenance),
         measurements=Measurements(**measurements),
@@ -102,7 +102,7 @@ def _curves_section(
 
 def _images_section(
     document: dict[str, Any], arrays: Mapping[str, NDArray[Any]]
-) -> ArtifactImages:
+) -> SummaryImages:
     """Rebuild the image section."""
     ghost = None
     if document["has_ghost"]:
@@ -112,7 +112,7 @@ def _images_section(
             ro_signal=_bools(arrays, "images.ghost.ro_signal"),
             ro_ghost=_bools(arrays, "images.ghost.ro_ghost"),
         )
-    return ArtifactImages(
+    return SummaryImages(
         signal=_floats(arrays, "images.signal"),
         sfnr=_floats(arrays, "images.sfnr"),
         fluctuation_noise=_floats(arrays, "images.fluctuation_noise"),

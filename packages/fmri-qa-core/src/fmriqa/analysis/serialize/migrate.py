@@ -9,13 +9,13 @@ sequence. A field the older schema did not carry comes back unknown, never
 reconstructed, because a value this build derives would be a fact about this
 build, not about the analysis file.
 
-Bumping `ARTIFACT_SCHEMA_VERSION` is not done until the outgoing version has a
+Bumping `ANALYSIS_SCHEMA_VERSION` is not done until the outgoing version has a
 committed fixture. Run the old code (a `git worktree` checkout of the last commit
 at that version) over the shared synthetic phantom and save the file to
 fmri-qa-io's `tests/fixtures/schema_v{N}.qa.nc`, or `.qa.npz` if that build still
-wrote that container. `test_artifact_fixtures.py` finds either, and the loader
+wrote that container. `test_analysis_file_fixtures.py` finds either, and the loader
 tells them apart by leading bytes. A migration tested only against a same-build document
-synthesized to look old (as `test_artifact_archive.py` does) proves the step
+synthesized to look old (as `test_analysis_file_archive.py` does) proves the step
 matches its docstring, not that a real file from that version still parses.
 """
 
@@ -23,9 +23,9 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-from ...exceptions import InvalidArtifactError
+from ...exceptions import InvalidAnalysisFileError
 from ...warn import warn
-from ..artifact import ARTIFACT_SCHEMA_VERSION
+from ..values import ANALYSIS_SCHEMA_VERSION
 
 
 def _v1_to_v2(document: dict[str, Any]) -> dict[str, Any]:
@@ -147,32 +147,34 @@ def migrated(document: dict[str, Any], path: Path) -> dict[str, Any]:
     """
     found = document.get("schema_version")
     if not isinstance(found, int) or isinstance(found, bool):
-        raise InvalidArtifactError(path, f"schema version {found!r} is not a version")
-    if found == ARTIFACT_SCHEMA_VERSION:
+        raise InvalidAnalysisFileError(
+            path, f"schema version {found!r} is not a version"
+        )
+    if found == ANALYSIS_SCHEMA_VERSION:
         return document
-    if found > ARTIFACT_SCHEMA_VERSION:
-        raise InvalidArtifactError(
+    if found > ANALYSIS_SCHEMA_VERSION:
+        raise InvalidAnalysisFileError(
             path,
-            f"schema version {found}, newer than the {ARTIFACT_SCHEMA_VERSION} this "
+            f"schema version {found}, newer than the {ANALYSIS_SCHEMA_VERSION} this "
             f"build understands; upgrade fmri-qa-core to read it",
         )
 
     version = found
-    while version < ARTIFACT_SCHEMA_VERSION:
+    while version < ANALYSIS_SCHEMA_VERSION:
         step = _MIGRATIONS.get(version)
         if step is None:
-            raise InvalidArtifactError(
+            raise InvalidAnalysisFileError(
                 path,
                 f"schema version {found}; this build reads "
-                f"{ARTIFACT_SCHEMA_VERSION} and has no migration from {version}",
+                f"{ANALYSIS_SCHEMA_VERSION} and has no migration from {version}",
             )
         document = step(document)
         version += 1
-    document["schema_version"] = ARTIFACT_SCHEMA_VERSION
+    document["schema_version"] = ANALYSIS_SCHEMA_VERSION
 
     warn(
         f"{path}: analysis file written under schema {found}, migrated to "
-        f"{ARTIFACT_SCHEMA_VERSION}; fields the older schema did not carry are "
+        f"{ANALYSIS_SCHEMA_VERSION}; fields the older schema did not carry are "
         f"recorded as unknown, not as measurements.",
     )
     return document

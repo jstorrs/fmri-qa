@@ -11,7 +11,7 @@ from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 from matplotlib.patches import Patch, Rectangle
 
-from fmriqa.analysis import ArtifactImages, QAArtifact, RoiBox
+from fmriqa.analysis import QAAnalysis, RoiBox, SummaryImages
 from fmriqa.types import BoolArray, FloatArray
 
 _GHOST_SRC_RGB = (0.20, 0.85, 1.0)  # PE signal source region (cyan)
@@ -112,7 +112,7 @@ def _overlay(
     ax.imshow(rgba, interpolation="nearest")
 
 
-def _ghost_panel_fig(images: ArtifactImages) -> Figure:
+def _ghost_panel_fig(images: SummaryImages) -> Figure:
     """Build the mean image with region-matched ghost/signal masks for both axes.
 
     Draws the masks the ghost metrics averaged. For each in-plane axis it shows
@@ -165,9 +165,9 @@ def _ghost_panel_fig(images: ArtifactImages) -> Figure:
     return fig
 
 
-def panel_figs(artifact: QAArtifact) -> list[Figure]:
+def panel_figs(analysis: QAAnalysis) -> list[Figure]:
     """Draw the summary image panels, in row order (last: N/2 ghost overlay)."""
-    images = artifact.images
+    images = analysis.images
     hull, roi = images.phantom_hull, images.roi
     return [
         _panel_fig(images.signal, "signal", hull=hull, roi=roi),

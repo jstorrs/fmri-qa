@@ -3,7 +3,7 @@
 # Requires: uv sync --all-packages
 #
 # Imports a DICOM series, analyses it, renders one standalone HTML report per
-# artifact, and checks each is a single self-contained file.
+# analysis, and checks each is a single self-contained file.
 set -euo pipefail
 
 repo_root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
@@ -54,20 +54,20 @@ if (( ${#scans[@]} == 0 )); then
     exit 1
 fi
 
-mkdir "$output_dir/artifacts"
-run fmri-qa "${scans[@]}" --artifact "$output_dir/artifacts"
+mkdir "$output_dir/analyses"
+run fmri-qa "${scans[@]}" --analysis-file "$output_dir/analyses"
 
-artifacts=("$output_dir/artifacts/"*.qa.nc)
-if (( ${#artifacts[@]} == 0 )); then
-    printf 'No artifacts were produced in %s/artifacts\n' "$output_dir" >&2
+analyses=("$output_dir/analyses/"*.qa.nc)
+if (( ${#analyses[@]} == 0 )); then
+    printf 'No analyses were produced in %s/analyses\n' "$output_dir" >&2
     exit 1
 fi
 
-# --html renders one artifact to one file, so standalone reports go one by one.
+# --html renders one analysis to one file, so standalone reports go one by one.
 mkdir "$output_dir/reports"
-for artifact in "${artifacts[@]}"; do
-    name=$(basename -- "$artifact" .qa.nc)
-    run fmri-qa-report "$artifact" --html "$output_dir/reports/$name.html"
+for analysis in "${analyses[@]}"; do
+    name=$(basename -- "$analysis" .qa.nc)
+    run fmri-qa-report "$analysis" --html "$output_dir/reports/$name.html"
 done
 
 failures=0

@@ -44,7 +44,7 @@ _FORBIDDEN_AT_RUNTIME = (
     "dcm2niix",
     "fmriqa_cli",
     "fmriqa_launcher",
-    "fmriqa_io.artifact",
+    "fmriqa_io.analysis_file",
     "fmriqa_io.load",
     "fmriqa_io.rename",
     "fmriqa_io.convert.session",
@@ -122,11 +122,11 @@ def test_every_source_imports_only_the_allowlist() -> None:
 
 
 def test_the_scan_would_catch_a_forbidden_import() -> None:
-    """Negative control: a process, the artifact file, the launcher, a lazy one."""
+    """Negative control: a process, the analysis file, the launcher, a lazy one."""
     tree = ast.parse(
         "import subprocess\n"
         "import json\n"
-        "from fmriqa_io.artifact import save_artifact\n"
+        "from fmriqa_io.analysis_file import save_analysis\n"
         "from fmriqa_io.convert import filing\n"
         "from fmriqa_io.convert import session\n"
         "from fmriqa_launcher import session\n"
@@ -137,7 +137,7 @@ def test_the_scan_would_catch_a_forbidden_import() -> None:
     )
     assert _offenders(tree) == {
         "subprocess",
-        "fmriqa_io.artifact",
+        "fmriqa_io.analysis_file",
         "fmriqa_io.convert",
         "fmriqa_launcher",
         "tempfile",

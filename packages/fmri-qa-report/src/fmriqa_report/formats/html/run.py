@@ -12,7 +12,7 @@ from pathlib import Path
 from string import Template
 from typing import Literal
 
-from fmriqa.analysis import Measurements, QAArtifact
+from fmriqa.analysis import Measurements, QAAnalysis
 
 from ...content import METRIC_DOCS, MetricDoc
 from ...summary import (
@@ -33,48 +33,48 @@ _UNAVAILABLE = "Unavailable — estimator unresolved"
 
 
 def render_run_page(
-    artifact: QAArtifact,
+    analysis: QAAnalysis,
     *,
     title: str | None = None,
     report_version: str | None = None,
     theme: Theme = DEFAULT_THEME,
 ) -> str:
-    """Return one complete, self-contained HTML document for ``artifact``.
+    """Return one complete, self-contained HTML document for ``analysis``.
 
     The stylesheet is inlined and every figure is a ``data:`` URI, so the page
     needs no companion file.
     """
     page_title = (
-        title or artifact.provenance.scan or Path(artifact.provenance.source).name
+        title or analysis.provenance.scan or Path(analysis.provenance.source).name
     )
     version = report_version or package_version()
-    rendered_figures = render_figures(artifact, theme=theme)
+    rendered_figures = render_figures(analysis, theme=theme)
     figures_image, figures_stability = _figures(rendered_figures)
     values = {
         "title": _text(page_title),
         "stylesheet": resources.read_stylesheet(),
-        "subline": _subline(artifact),
-        "idblock": _idblock(artifact),
+        "subline": _subline(analysis),
+        "idblock": _idblock(analysis),
         "nav": _nav(),
-        "metrics": _metrics(artifact),
-        "notices": _notices(artifact),
-        "acquisition": _acquisition(artifact),
+        "metrics": _metrics(analysis),
+        "notices": _notices(analysis),
+        "acquisition": _acquisition(analysis),
         "figures_image": figures_image,
         "figures_stability": figures_stability,
         "methods": _methods(),
-        "provenance": _provenance(artifact, version),
+        "provenance": _provenance(analysis, version),
         "version": _text(version),
     }
     template = Template(resources.read_resource(resources.RUN_TEMPLATE))
     return template.substitute(values)
 
 
-def _subline(artifact: QAArtifact) -> str:
-    return _text(acquisition_line(artifact))
+def _subline(analysis: QAAnalysis) -> str:
+    return _text(acquisition_line(analysis))
 
 
-def _idblock(artifact: QAArtifact) -> str:
-    prov = artifact.provenance
+def _idblock(analysis: QAAnalysis) -> str:
+    prov = analysis.provenance
     rows = (
         ("Scanner", device_line(prov) or "Unknown"),
         ("Coil", prov.coil or "Unknown"),
@@ -104,8 +104,8 @@ def _figure_src(rendered: RenderedFigure) -> str:
     return "data:image/svg+xml;base64," + b64encode(rendered.svg).decode("ascii")
 
 
-def _notices(artifact: QAArtifact) -> str:
-    notes = acquisition_notes(artifact)
+def _notices(analysis: QAAnalysis) -> str:
+    notes = acquisition_notes(analysis)
     if notes:
         return (
             '<p class="note alert"><span class="pill warn">Warning</span> '
@@ -117,8 +117,8 @@ def _notices(artifact: QAArtifact) -> str:
     )
 
 
-def _metrics(artifact: QAArtifact) -> str:
-    measurements = artifact.measurements
+def _metrics(analysis: QAAnalysis) -> str:
+    measurements = analysis.measurements
     return "\n".join(_metric_tile(doc, measurements) for doc in METRIC_DOCS)
 
 
@@ -147,11 +147,11 @@ def _kv_row(label: str, value: object) -> str:
     return f'<tr><th scope="row">{_text(label)}</th><td>{_text(value)}</td></tr>'
 
 
-def _acquisition(artifact: QAArtifact) -> str:
-    settings = artifact.settings
-    provenance = artifact.provenance
+def _acquisition(analysis: QAAnalysis) -> str:
+    settings = analysis.settings
+    provenance = analysis.provenance
     rows = (
-        ("Acquisition", acquisition_line(artifact)),
+        ("Acquisition", acquisition_line(analysis)),
         (
             "Scanner and acquisition details",
             provenance_line(provenance) or "Unavailable",
@@ -205,15 +205,15 @@ def _methods() -> str:
     )
 
 
-def _provenance(artifact: QAArtifact, report_version: str) -> str:
-    provenance = artifact.provenance
+def _provenance(analysis: QAAnalysis, report_version: str) -> str:
+    provenance = analysis.provenance
     rows = (
         ("Source", provenance.source or "Unknown"),
         ("Scan name", provenance.scan or "Unknown"),
         ("Acquired at", provenance.datetime or "Unknown"),
         ("Analyzed at", provenance.created or "Unknown"),
         ("Core version", provenance.core_version or "Unknown"),
-        ("Loaded analysis file schema", str(artifact.schema_version)),
+        ("Loaded analysis file schema", str(analysis.schema_version)),
         ("Report version", report_version or "Unknown"),
     )
     return "\n".join(_kv_row(label, value) for label, value in rows)

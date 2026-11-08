@@ -1,6 +1,6 @@
 """Importing the commands must not load the calculation stack or matplotlib.
 
-`fmri-qa-report` reads an artifact and renders it only when a page is written,
+`fmri-qa-report` reads an analysis and renders it only when a page is written,
 and the other commands reach core through its lazy root. A static scan of import
 text cannot see what an import *executes*; only a fresh interpreter's
 `sys.modules` can. The probe imports the `fmriqa_cli` package, whose root

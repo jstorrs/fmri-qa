@@ -1,7 +1,7 @@
 """Self-contained SVG figures for one rendered QA run.
 
 ``render_figures`` renders the fixed image and stability figure set of a
-completed :class:`fmriqa.analysis.QAArtifact` as standalone SVG documents in
+completed :class:`fmriqa.analysis.QAAnalysis` as standalone SVG documents in
 memory. A run page embeds each as a ``data:`` URI, so nothing is written to
 disk. Rendering only draws values already in the analysis file.
 """
@@ -15,7 +15,7 @@ import matplotlib
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 
-from fmriqa.analysis import QAArtifact
+from fmriqa.analysis import QAAnalysis
 
 from ...panels.images import panel_figs
 from ...panels.timeseries import (
@@ -162,11 +162,11 @@ FIGURE_ASSETS: tuple[FigureAsset, ...] = (
 )
 
 
-def _build_figures(artifact: QAArtifact) -> list[Figure]:
+def _build_figures(analysis: QAAnalysis) -> list[Figure]:
     """Build the fourteen figures in ``FIGURE_ASSETS`` order."""
-    figures = list(panel_figs(artifact))
+    figures = list(panel_figs(analysis))
 
-    curves, measurements = artifact.curves, artifact.measurements
+    curves, measurements = analysis.curves, analysis.measurements
     draws: tuple[Callable[[Axes], object], ...] = (
         lambda ax: plot_weisskoff(ax, curves.weisskoff, measurements.rdc),
         lambda ax: plot_rdc(ax, curves.weisskoff),
@@ -183,7 +183,7 @@ def _build_figures(artifact: QAArtifact) -> list[Figure]:
 
 
 def render_figures(
-    artifact: QAArtifact, *, theme: Theme = DEFAULT_THEME
+    analysis: QAAnalysis, *, theme: Theme = DEFAULT_THEME
 ) -> tuple[RenderedFigure, ...]:
     """Render the fixed inventory as self-contained SVG documents, in order.
 
@@ -198,7 +198,7 @@ def render_figures(
             "svg.hashsalt": _SVG_HASHSALT,
         }
     ):
-        figures = _build_figures(artifact)
+        figures = _build_figures(analysis)
         rendered = []
         for asset, figure in zip(FIGURE_ASSETS, figures, strict=True):
             buffer = io.BytesIO()

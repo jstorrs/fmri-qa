@@ -1,8 +1,8 @@
-"""Shared fixtures for the artifact-file and import tests.
+"""Shared fixtures for the analysis-file and import tests.
 
-`artifact` runs the whole pipeline over `fmriqa.testing.phantom_scan` once per
-session. `read_netcdf` and `encode` reach a stored artifact below
-`load_artifact` and `save_artifact`. `fake_dcm2niix` builds the stub converter
+`analysis` runs the whole pipeline over `fmriqa.testing.phantom_scan` once per
+session. `read_netcdf` and `encode` reach a stored analysis below
+`load_analysis` and `save_analysis`. `fake_dcm2niix` builds the stub converter
 the import tests drive.
 """
 
@@ -17,7 +17,7 @@ import pytest
 
 import fmriqa as q
 from fmriqa.testing import phantom_scan
-from fmriqa_io.artifact import netcdf
+from fmriqa_io.analysis_file import netcdf
 from fmriqa_io.testing import fake_dcm2niix_script
 
 FakeDcm2niix = Callable[..., Path]
@@ -33,10 +33,10 @@ def _arrays(obj: object) -> Iterator[np.ndarray]:
 
 
 @pytest.fixture(scope="session")
-def artifact() -> q.QAArtifact:
-    """An artifact from the synthetic phantom, at a small ROI.
+def analysis() -> q.QAAnalysis:
+    """An analysis from the synthetic phantom, at a small ROI.
 
-    Built once per session and shared. The artifact is frozen with read-only
+    Built once per session and shared. The analysis is frozen with read-only
     arrays, so no test can change it for another. The assertion below checks
     that.
     """
@@ -44,22 +44,22 @@ def artifact() -> q.QAArtifact:
     settings = q.AnalysisSettings(roi_size=9)
     result = q.analyze(scan, settings, name="scan.nii.gz", source="scan.nii.gz")
     assert not any(a.flags.writeable for a in _arrays(result)), (
-        "shared artifact has a writeable array"
+        "shared analysis has a writeable array"
     )
     return result
 
 
 @pytest.fixture
 def read_netcdf() -> Callable[[Path], tuple[dict, dict[str, np.ndarray]]]:
-    """Return a reader of a stored artifact that drives `netCDF4` directly.
+    """Return a reader of a stored analysis that drives `netCDF4` directly.
 
-    Tests that corrupt or inspect a stored artifact use plain netCDF instead of
+    Tests that corrupt or inspect a stored analysis use plain netCDF instead of
     the package's `netcdf` module, since readability that way is why this
     container was chosen.
     """
 
     def read(path: Path) -> tuple[dict, dict[str, np.ndarray]]:
-        """The document and every array of a stored artifact, read with netCDF4 alone.
+        """The document and every array of a stored analysis, read with netCDF4 alone.
 
         Coordinate variables are skipped. They are derived on the way out, so the
         result is what `decompose` produced.
@@ -83,7 +83,7 @@ def read_netcdf() -> Callable[[Path], tuple[dict, dict[str, np.ndarray]]]:
 
 @pytest.fixture
 def encode() -> Callable[[dict, dict[str, np.ndarray]], bytes]:
-    """Return `netcdf.encode` as `save_artifact` calls it: text and its parse."""
+    """Return `netcdf.encode` as `save_analysis` calls it: text and its parse."""
 
     def run(document: dict, arrays: dict[str, np.ndarray]) -> bytes:
         text = json.dumps(document)

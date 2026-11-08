@@ -77,16 +77,16 @@ def analyze_series(
         except Exception as exc:  # noqa: BLE001 - one series' failure, reported as a value
             return _failure(stem, "decode", exc, caught)
         try:
-            artifact = fmriqa.analyze(scan, settings, name=scan_name, source=scan_name)
+            analysis = fmriqa.analyze(scan, settings, name=scan_name, source=scan_name)
         except Exception as exc:  # noqa: BLE001 - one series' failure, reported as a value
             return _failure(stem, "analyze", exc, caught)
     noted = _messages(caught)
 
     try:
-        html = render_run_page(artifact, title=stem)
+        html = render_run_page(analysis, title=stem)
     except Exception as exc:  # noqa: BLE001 - one series' failure, reported as a value
         return SeriesFailure(stem, "render", _reason(exc), noted)
-    return SeriesReport(stem, html, metric_record(artifact), noted)
+    return SeriesReport(stem, html, metric_record(analysis), noted)
 
 
 def _failure(

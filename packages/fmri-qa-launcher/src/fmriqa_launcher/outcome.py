@@ -24,7 +24,7 @@ class Published:
     directory: Path
     scan: Path
     sidecar: Path | None
-    artifact: Path
+    analysis: Path
     report: Path
     warnings: tuple[str, ...] = ()
 

@@ -1,12 +1,12 @@
-"""The seam: the report half may read the artifact, and nothing else.
+"""The seam: the report half may read the analysis, and nothing else.
 
-Presentation depends on the *published artifact*, not on the pipeline that
-produced it, and it does no file IO: an artifact in memory in, a string out.
-Reading the artifact file and writing the page belong to the applications, so
+Presentation depends on the *published analysis*, not on the pipeline that
+produced it, and it does no file IO: an analysis in memory in, a string out.
+Reading the analysis file and writing the page belong to the applications, so
 the report depends on `fmri-qa-core` and matplotlib only. That is easy to
 erode one convenient import at a time, so this file checks it mechanically.
 Every `fmriqa` import in the report package must land in `fmriqa.analysis` (the
-artifact) or `fmriqa.types` (the shared array/option vocabulary). An import of
+analysis) or `fmriqa.types` (the shared array/option vocabulary). An import of
 `fmriqa.metrics`, `fmriqa.pipeline`, `fmriqa.prep` or `fmriqa.load`, of the
 `fmriqa` package as a whole (which pulls all of them), or of anything from
 `fmriqa_io` fails this test.
@@ -95,7 +95,7 @@ def test_the_report_package_has_source_to_check() -> None:
     assert len(_modules()) >= 8
 
 
-def test_report_imports_only_the_artifact_and_the_shared_vocabulary() -> None:
+def test_report_imports_only_the_analysis_and_the_shared_vocabulary() -> None:
     offenders = {}
     for path in _modules():
         imported = _fmriqa_imports(ast.parse(path.read_text()))
@@ -116,7 +116,7 @@ def test_the_check_would_catch_any_io_import() -> None:
     """The same control for `fmriqa_io`, whose name `fmriqa` alone would miss."""
     tree = ast.parse(
         "import fmriqa_io\n"
-        "from fmriqa_io import load_artifact\n"
+        "from fmriqa_io import load_analysis\n"
         "from fmriqa_io.rename import atomic_file\n"
     )
     assert _fmriqa_imports(tree) - ALLOWED == {
@@ -154,7 +154,7 @@ def test_format_agnostic_report_modules_do_not_load_the_drawing_stack(
 
 
 # Everything the report must not load, by top-level package or dotted prefix: the
-# IO layer, the calculation layers behind the artifact, and their libraries.
+# IO layer, the calculation layers behind the analysis, and their libraries.
 _FORBIDDEN = (
     "fmriqa_io",
     "fmriqa.pipeline",

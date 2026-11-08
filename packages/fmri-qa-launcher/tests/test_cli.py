@@ -192,9 +192,9 @@ def test_the_published_run_matches_a_direct_analyze(
     assert rc == 0
 
     published_nifti = output_dir / name / f"{name}.nii.gz"
-    published_artifact = output_dir / name / f"{name}.qa.nc"
+    published_analysis = output_dir / name / f"{name}.qa.nc"
 
-    reloaded = fmriqa_io.load_artifact(published_artifact)
+    reloaded = fmriqa_io.load_analysis(published_analysis)
     direct = fmriqa.analyze(
         fmriqa_io.load_scan(published_nifti), fmriqa.AnalysisSettings()
     )
@@ -271,7 +271,7 @@ def _published(
         directory=directory,
         scan=directory / f"{name}.nii.gz",
         sidecar=None,
-        artifact=directory / f"{name}.qa.nc",
+        analysis=directory / f"{name}.qa.nc",
         report=directory / f"{name}.html",
         warnings=warnings,
     )
@@ -408,7 +408,7 @@ def test_open_results_opens_the_folder_for_several_series(tmp_path: Path) -> Non
             directory=output_dir / "a",
             scan=output_dir / "a" / "a.nii.gz",
             sidecar=None,
-            artifact=output_dir / "a" / "a.qa.nc",
+            analysis=output_dir / "a" / "a.qa.nc",
             report=output_dir / "a" / "a.html",
         ),
         Published(
@@ -416,7 +416,7 @@ def test_open_results_opens_the_folder_for_several_series(tmp_path: Path) -> Non
             directory=output_dir / "b",
             scan=output_dir / "b" / "b.nii.gz",
             sidecar=None,
-            artifact=output_dir / "b" / "b.qa.nc",
+            analysis=output_dir / "b" / "b.qa.nc",
             report=output_dir / "b" / "b.html",
         ),
     )
@@ -436,7 +436,7 @@ def test_open_results_opens_the_one_report_for_a_single_series(tmp_path: Path) -
             directory=output_dir / "a",
             scan=output_dir / "a" / "a.nii.gz",
             sidecar=None,
-            artifact=output_dir / "a" / "a.qa.nc",
+            analysis=output_dir / "a" / "a.qa.nc",
             report=report,
         ),
     )

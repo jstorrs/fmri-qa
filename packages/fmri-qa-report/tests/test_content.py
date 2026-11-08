@@ -8,8 +8,8 @@ from fmriqa.analysis import Measurements
 from fmriqa_report import content
 
 
-def test_metric_docs_keep_their_existing_labels_order_and_formatting(artifact) -> None:
-    m = artifact.measurements
+def test_metric_docs_keep_their_existing_labels_order_and_formatting(analysis) -> None:
+    m = analysis.measurements
     assert [(d.label, d.number(m), d.unit_for(m)) for d in content.METRIC_DOCS] == [
         ("SNR", f"{m.snr:.1f}", ""),
         ("SFNR", f"{m.sfnr:.1f}", ""),
@@ -56,7 +56,7 @@ def test_metric_names_are_stable_unique_measurement_fields() -> None:
     assert len(names) == len(set(names))
 
 
-def test_metric_value_accessors_return_raw_measurement_values(artifact) -> None:
+def test_metric_value_accessors_return_raw_measurement_values(analysis) -> None:
     sentinel_values = {
         "snr": 1.0,
         "sfnr": 2.0,
@@ -74,13 +74,13 @@ def test_metric_value_accessors_return_raw_measurement_values(artifact) -> None:
         "max_com_displacement": 14.0,
         "fwhm": 15.0,
     }
-    measurements = replace(artifact.measurements, **sentinel_values)
+    measurements = replace(analysis.measurements, **sentinel_values)
     values = {doc.name: doc.value(measurements) for doc in content.METRIC_DOCS}
     assert values == sentinel_values
 
 
-def test_metric_value_accessors_keep_unresolved_values_nonfinite(artifact) -> None:
-    measurements = replace(artifact.measurements, ghost_pct=float("nan"))
+def test_metric_value_accessors_keep_unresolved_values_nonfinite(analysis) -> None:
+    measurements = replace(analysis.measurements, ghost_pct=float("nan"))
     ghost = next(doc for doc in content.METRIC_DOCS if doc.name == "ghost_pct")
     assert math.isnan(ghost.value(measurements))
 
@@ -101,8 +101,8 @@ def test_methods_describe_the_implemented_order_of_operations() -> None:
     assert "at the full ROI" in by_label["RDC"].method
 
 
-def test_every_metric_doc_is_documented(artifact) -> None:
-    m = artifact.measurements
+def test_every_metric_doc_is_documented(analysis) -> None:
+    m = analysis.measurements
     for doc in content.METRIC_DOCS:
         assert doc.label and doc.definition and doc.method
         assert doc.number(m)  # the number is a non-empty string
@@ -116,19 +116,19 @@ def test_outlier_method_describes_threshold_tuning() -> None:
 
 
 def test_motn_and_com_tiles_carry_the_displacement_unit(
-    artifact, bare_artifact
+    analysis, bare_analysis
 ) -> None:
     """`motn` and `com` render their unit the way `fwhm` does.
 
-    `artifact` has a known voxel size and reports mm. `bare_artifact` has no
+    `analysis` has a known voxel size and reports mm. `bare_analysis` has no
     sidecar metadata and falls back to voxels, the "mm when known, else voxels"
     rule `_fwhm_unit` applies, read off `displacement_unit`.
     """
     by_label = {doc.label: doc for doc in content.METRIC_DOCS}
-    m = artifact.measurements
+    m = analysis.measurements
     assert by_label["motn"].unit_for(m) == "mm"
     assert by_label["com"].unit_for(m) == "mm"
 
-    bare = bare_artifact.measurements
+    bare = bare_analysis.measurements
     assert by_label["motn"].unit_for(bare) == "vox"
     assert by_label["com"].unit_for(bare) == "vox"

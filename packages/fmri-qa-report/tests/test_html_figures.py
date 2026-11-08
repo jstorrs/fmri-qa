@@ -21,9 +21,9 @@ def _hrefs_bytes(svg: bytes) -> list[str]:
 
 
 @pytest.fixture(scope="module")
-def rendered(artifact):
+def rendered(analysis):
     """One real rendering of the fixed figure inventory, reused across tests."""
-    return figures.render_figures(artifact)
+    return figures.render_figures(analysis)
 
 
 def test_render_figures_returns_standalone_svg_documents(rendered) -> None:
@@ -78,8 +78,8 @@ def test_figure_assets_pin_their_report_sections() -> None:
     ]
 
 
-def test_render_figures_renders_unknown_ghost_and_unresolved_values(artifact) -> None:
-    curves = artifact.curves
+def test_render_figures_renders_unknown_ghost_and_unresolved_values(analysis) -> None:
+    curves = analysis.curves
     unresolved = replace(
         curves,
         translation=np.full_like(curves.translation, np.nan),
@@ -91,10 +91,10 @@ def test_render_figures_renders_unknown_ghost_and_unresolved_values(artifact) ->
         ),
     )
     changed = replace(
-        artifact,
-        images=replace(artifact.images, ghost=None),
+        analysis,
+        images=replace(analysis.images, ghost=None),
         curves=unresolved,
-        measurements=replace(artifact.measurements, rdc=float("nan")),
+        measurements=replace(analysis.measurements, rdc=float("nan")),
     )
 
     rendered = figures.render_figures(changed)
@@ -102,28 +102,28 @@ def test_render_figures_renders_unknown_ghost_and_unresolved_values(artifact) ->
     assert all(len(item.svg) > 0 for item in rendered)
 
 
-def test_render_figures_is_byte_reproducible(artifact) -> None:
-    first = figures.render_figures(artifact)
-    second = figures.render_figures(artifact)
+def test_render_figures_is_byte_reproducible(analysis) -> None:
+    first = figures.render_figures(analysis)
+    second = figures.render_figures(analysis)
 
     assert tuple(item.svg for item in first) == tuple(item.svg for item in second)
 
 
-def test_render_figures_keeps_matplotlib_configuration_local(artifact) -> None:
+def test_render_figures_keeps_matplotlib_configuration_local(analysis) -> None:
     before_backend = matplotlib.get_backend()
     before_rc = matplotlib.rcParams.copy()
 
-    figures.render_figures(artifact)
+    figures.render_figures(analysis)
 
     assert matplotlib.get_backend() == before_backend
     assert matplotlib.rcParams == before_rc
 
 
 def test_render_figures_forces_inline_images_without_leaking_configuration(
-    artifact,
+    analysis,
 ) -> None:
     with matplotlib.rc_context({"svg.image_inline": False}):
-        rendered = figures.render_figures(artifact)
+        rendered = figures.render_figures(analysis)
         assert matplotlib.rcParams["svg.image_inline"] is False
 
     assert all(

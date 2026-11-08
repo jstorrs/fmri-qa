@@ -2,7 +2,7 @@
 
 Reads NIfTI scans, runs the pipeline on each, and prints either the fixed-width
 table (`table`) or a JSON document (`record`), optionally saving each run's
-`QAArtifact` (`destinations`). A batch keeps going after a failed scan and
+`QAAnalysis` (`destinations`). A batch keeps going after a failed scan and
 reports every failure at the end, so one bad file doesn't cost the rest.
 """
 
@@ -25,10 +25,10 @@ from .arguments import (
     positive_int,
 )
 from .destinations import (
-    ARTIFACT_SUFFIX,
-    artifact_destinations,
+    ANALYSIS_SUFFIX,
+    analysis_destinations,
     report_destination_problems,
-    write_artifact,
+    write_analysis,
 )
 from .table import format_row, header_lines
 
@@ -98,7 +98,7 @@ def _parser() -> argparse.ArgumentParser:
         help="Save the full analysis file (settings, provenance, curves, "
         "images) for later reporting. With one scan PATH is the output file, "
         "unless it is a directory that already exists; with several, or into "
-        f"an existing directory, it takes one <scan>{ARTIFACT_SUFFIX} per "
+        f"an existing directory, it takes one <scan>{ANALYSIS_SUFFIX} per "
         "scan. Render one with `fmri-qa-report`.",
     )
     return parser
@@ -116,7 +116,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     # lost collapsing it.
     destinations: dict[str, Path] = {}
     if args.analysis_file:
-        pairs = artifact_destinations(args.analysis_file, args.paths)
+        pairs = analysis_destinations(args.analysis_file, args.paths)
         # Refuse before analyzing anything. A destination that lands on an
         # input or on another scan's analysis file would silently discard a completed
         # analysis or the data it came from, so it is a usage error, not a
@@ -152,25 +152,25 @@ def main(argv: Sequence[str] | None = None) -> int:
     records = []
     for path in args.paths:
         name = Path(path).name
-        artifact: q.QAArtifact | None = None
+        analysis: q.QAAnalysis | None = None
         # The attempt's own ERROR line prints inside the manager, so it comes
         # first. A scan that failed may have warned on the way down, and that
         # warning is part of the diagnosis.
         with attributed_warnings(name):
             try:
                 scan = fmriqa_io.load_scan(path)
-                artifact = q.analyze(scan, settings, name=name, source=str(path))
+                analysis = q.analyze(scan, settings, name=name, source=str(path))
             except Exception as exc:  # noqa: BLE001 - report and continue the batch
                 errors.append({"scan": name, "source": str(path), "error": str(exc)})
                 print(f"{name:40s} ERROR: {exc}", file=sys.stderr)
-        if artifact is None:
+        if analysis is None:
             continue
         if args.json:
-            records.append(metric_record(artifact))
+            records.append(metric_record(analysis))
         else:
-            print(format_row(artifact))
+            print(format_row(analysis))
         if args.analysis_file:
-            problem = write_artifact(artifact, destinations[path], info)
+            problem = write_analysis(analysis, destinations[path], info)
             if problem:
                 errors.append({"scan": name, "source": str(path), "error": problem})
 

@@ -1,7 +1,7 @@
 [project]
 name = "fmri-qa-core"
 version = "0.1.0"
-description = "Phantom fMRI quality-assurance calculation: metrics and analysis artifacts"
+description = "Phantom fMRI quality-assurance calculation: metrics and analysis files"
 readme = "README.md"
 requires-python = ">=3.13"
 license = "MIT"

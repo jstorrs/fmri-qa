@@ -35,7 +35,7 @@ def test_the_browser_path_matches_the_launcher(tmp_path: Path) -> None:
     (outcome,) = launched.outcomes
     assert isinstance(outcome, Published)
     assert outcome.name == STEM
-    native = metric_record(fmriqa_io.load_artifact(outcome.artifact))
+    native = metric_record(fmriqa_io.load_analysis(outcome.analysis))
 
     assert isinstance(browser, SeriesReport)
     assert browser.stem == outcome.name

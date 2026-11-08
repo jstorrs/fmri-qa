@@ -1,9 +1,9 @@
 # Building blocks
 
-## `fmriqa.metrics.artifacts`
+## `fmriqa.metrics.outliers`
 
 ```{eval-rst}
-.. automodule:: fmriqa.metrics.artifacts
+.. automodule:: fmriqa.metrics.outliers
    :exclude-members: OutlierResult, SpikeResult, outlier_fraction, spike_scores
 ```
 

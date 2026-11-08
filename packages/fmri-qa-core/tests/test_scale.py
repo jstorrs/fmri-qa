@@ -8,7 +8,7 @@ from fmriqa.prep.scale import UNKNOWN_VOXEL_SIZE, VoxelSize
 def test_unit_follows_from_whether_the_size_is_known() -> None:
     """One definition of "mm when the voxel size is known, else vox".
 
-    The artifact publishes this twice (`fwhm_unit`, `displacement_unit`) and the
+    The analysis publishes this twice (`fwhm_unit`, `displacement_unit`) and the
     PSF curves label with it a third time. All read it from here, so a length
     and its unit cannot disagree.
     """
@@ -32,7 +32,7 @@ def test_a_numpy_voxel_size_is_stored_as_plain_floats() -> None:
 
     A result that kept them raw would publish a numpy type where its annotation
     promises `float`, which passes every in-process check and fails only when
-    the artifact is serialized.
+    the analysis is serialized.
     """
     size = VoxelSize(tuple(np.array([3.0, 3.5])))  # type: ignore[arg-type]
 

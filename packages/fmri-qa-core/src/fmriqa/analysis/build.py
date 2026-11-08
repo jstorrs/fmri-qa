@@ -1,4 +1,4 @@
-"""Project a finished `QAResult` into the publishable `QAArtifact`.
+"""Project a finished `QAResult` into the publishable `QAAnalysis`.
 
 This is the seam. Everything a reader could want is resolved here, once, while
 the full images and metric results are in hand: derived properties become plain
@@ -23,15 +23,15 @@ from ..prep.geometry import ROI, roi_fits
 from ..settings import AnalysisSettings
 from ..types import BoolArray, FloatArray, PeAxis, PeLabel, readout_axis
 from ..version import core_version
-from .artifact import (
-    ArtifactImages,
+from .values import (
     Curves,
     GhostRegions,
     Measurements,
     Provenance,
     PsfCurves,
-    QAArtifact,
+    QAAnalysis,
     RoiBox,
+    SummaryImages,
     WeisskoffCurve,
 )
 
@@ -45,25 +45,25 @@ def analyze(
     *,
     name: str = "",
     source: str = "",
-) -> QAArtifact:
+) -> QAAnalysis:
     """Run the QA pipeline on one series and publish the analysis file.
 
-    `scan` in, `QAArtifact` out, with the heavy intermediates discarded.
+    `scan` in, `QAAnalysis` out, with the heavy intermediates discarded.
     `settings` is the analysis request and carries the defaults. `name` and
     `source` are recorded as provenance: the display name and the path the
     series was read from.
     """
-    return build_artifact(run_qa(scan, settings), name=name, source=source)
+    return build_analysis(run_qa(scan, settings), name=name, source=source)
 
 
-def build_artifact(result: QAResult, *, name: str = "", source: str = "") -> QAArtifact:
-    """Project a computed `QAResult` into a `QAArtifact`.
+def build_analysis(result: QAResult, *, name: str = "", source: str = "") -> QAAnalysis:
+    """Project a computed `QAResult` into a `QAAnalysis`.
 
     Separate from `analyze` so a result already in hand from `run_qa` can be
     published without recomputing. The settings published are the ones the
     result carries.
     """
-    return QAArtifact(
+    return QAAnalysis(
         settings=result.settings,
         provenance=_provenance(result, name=name, source=source),
         measurements=_measurements(result),
@@ -301,7 +301,7 @@ def _ghost_regions(result: QAResult) -> GhostRegions | None:
     )
 
 
-def _images(result: QAResult) -> ArtifactImages:
+def _images(result: QAResult) -> SummaryImages:
     """Assemble the four FBIRN summary images plus the geometry drawn over them."""
     images, geom, roi = result.images, result.geom, result.roi
     fluctuation_noise = images.fluctuation_noise
@@ -311,7 +311,7 @@ def _images(result: QAResult) -> ArtifactImages:
         geom.phantom_mask, images.mean_image / (fluctuation_noise + 1e-9), 0.0
     )
     rows, cols = roi.index
-    return ArtifactImages(
+    return SummaryImages(
         signal=images.mean_image,
         sfnr=np.asarray(sfnr, dtype=np.float64),
         fluctuation_noise=fluctuation_noise,

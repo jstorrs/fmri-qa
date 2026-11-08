@@ -112,7 +112,7 @@ def outlier_fraction(
         return OutlierResult(fraction=np.full(n_t, np.nan), n_voxels=0, qthr=qthr)
     mad = np.median(np.abs(resid), axis=1)  # (n_vox,)
     # Imported here to keep scipy.special's compiled stack off the --version,
-    # --help and artifact-only import paths. This is its only use in the package.
+    # --help and analysis-only import paths. This is its only use in the package.
     from scipy.special import erfcinv
 
     alpha = float(np.sqrt(2.0) * erfcinv(2.0 * qthr / n_t))  # Q^-1(qthr / n_t)

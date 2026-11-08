@@ -1,7 +1,7 @@
 """Fixture archives: a real file an old build actually wrote still loads.
 
-`test_artifact_archive.py`'s migration tests (see its `_ADDED_IN`) take a
-current artifact, delete the fields a given version predates, and check that
+`test_analysis_file_archive.py`'s migration tests (see its `_ADDED_IN`) take a
+current analysis, delete the fields a given version predates, and check that
 the matching `_vN_to_vN1` restores them as unknown. But `_ADDED_IN` is, by its
 own comment, the reverse of `serialize.migrate._MIGRATIONS`, so those tests
 check one hand-maintained account of the schema history against another. They
@@ -12,7 +12,7 @@ build wrote.
 
 This module is the other half. Each `tests/fixtures/schema_v*` archive is the
 literal file produced by checking out that schema version's last commit before
-the next bump and running that build's `save_artifact` over the same synthetic
+the next bump and running that build's `save_analysis` over the same synthetic
 phantom the rest of the suite uses (`fmriqa.testing.synthetic_series`, seed 0). That
 exercises real historical bytes, including the container, which is why fixtures
 are discovered by either suffix: every committed one so far is a `.qa.npz`, and
@@ -32,13 +32,13 @@ from pathlib import Path
 import pytest
 
 import fmriqa_io
-from fmriqa.analysis import ARTIFACT_SCHEMA_VERSION
+from fmriqa.analysis import ANALYSIS_SCHEMA_VERSION
 from fmriqa.analysis.serialize.migrate import _MIGRATIONS
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
 _FIXTURE_NAME = re.compile(r"schema_v(\d+)\.qa\.(?:npz|nc)$")
 
-# Which section of `QAArtifact` each field named below lives in, so the tables
+# Which section of `QAAnalysis` each field named below lives in, so the tables
 # below can name a field once instead of nesting them by section.
 _SECTION_OF = {
     "snr": "measurements",
@@ -55,8 +55,8 @@ _SECTION_OF = {
 }
 
 # What each version's own writer could not yet record, independent of
-# `serialize.migrate`. Read off the schema history in `analysis/artifact.py`'s
-# `ARTIFACT_SCHEMA_VERSION` comment, not the migration code, so it does not
+# `serialize.migrate`. Read off the schema history in `analysis/values.py`'s
+# `ANALYSIS_SCHEMA_VERSION` comment, not the migration code, so it does not
 # check that code against itself.
 _UNKNOWN_AT: dict[int, tuple[str, ...]] = {
     1: (
@@ -167,18 +167,18 @@ def _is_unknown(value: object) -> bool:
 
 @pytest.mark.parametrize("version", sorted(_FIXTURES), ids=lambda v: f"schema_v{v}")
 def test_a_real_archive_from_an_older_build_still_loads(version: int) -> None:
-    """`load_artifact` reads a file an old build actually wrote.
+    """`load_analysis` reads a file an old build actually wrote.
 
     If a future change silently made one of these unreadable (an array renamed or
     reshaped, a field repurposed, a document key moved), this test notices. The
-    migration steps could still pass against `test_artifact_archive.py`'s own
+    migration steps could still pass against `test_analysis_file_archive.py`'s own
     synthesized documents.
     """
     path = _FIXTURES[version]
     with pytest.warns(UserWarning, match="migrated to"):
-        loaded = fmriqa_io.load_artifact(path)
+        loaded = fmriqa_io.load_analysis(path)
 
-    assert loaded.schema_version == ARTIFACT_SCHEMA_VERSION
+    assert loaded.schema_version == ANALYSIS_SCHEMA_VERSION
 
     # Same phantom, settings and seed on every fixture, so these must never move.
     assert loaded.provenance.scan == "scan.nii.gz"

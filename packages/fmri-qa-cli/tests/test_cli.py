@@ -1,7 +1,7 @@
 """End-to-end smoke tests for the calculation command-line entry points.
 
 These exercise what unit tests skip: argument wiring, the batch loop and its
-error handling, the JSON document and saving artifacts to disk. A tiny phantom
+error handling, the JSON document and saving analyses to disk. A tiny phantom
 is written as a NIfTI + BIDS sidecar (see `conftest`) so `fmriqa_io.load_scan`
 runs its real file-I/O path. Rendering reports is `fmri-qa-report`'s job.
 """
@@ -41,20 +41,20 @@ def test_main_reports_bad_file_and_continues_batch(
     assert "good.nii.gz" in captured.out  # the good scan still ran
 
 
-def test_main_saves_a_loadable_artifact(tmp_path, write_scan, capsys) -> None:
+def test_main_saves_a_loadable_analysis(tmp_path, write_scan, capsys) -> None:
     out = tmp_path / "qa.nc"
     rc = cli.main(
         [write_scan(tmp_path), "--roi-size", "9", "--analysis-file", str(out)]
     )
     assert rc == 0
     assert f"# wrote {out}" in capsys.readouterr().out
-    artifact = fmriqa_io.load_artifact(out)
-    assert artifact.provenance.scan == "scan.nii.gz"
-    assert artifact.settings.roi_size == 9
-    assert artifact.measurements.snr > 0
+    analysis = fmriqa_io.load_analysis(out)
+    assert analysis.provenance.scan == "scan.nii.gz"
+    assert analysis.settings.roi_size == 9
+    assert analysis.measurements.snr > 0
 
 
-def test_main_files_one_scan_into_an_existing_artifact_directory(
+def test_main_files_one_scan_into_an_existing_analysis_directory(
     tmp_path, write_scan, capsys
 ) -> None:
     """`mkdir results` then `--analysis-file results` files the scan, not fails.
@@ -71,7 +71,7 @@ def test_main_files_one_scan_into_an_existing_artifact_directory(
     assert rc == 0
     written = out / "scan.qa.nc"
     assert f"# wrote {written}" in capsys.readouterr().out
-    assert fmriqa_io.load_artifact(written).provenance.scan == "scan.nii.gz"
+    assert fmriqa_io.load_analysis(written).provenance.scan == "scan.nii.gz"
 
 
 def test_main_still_writes_one_scan_to_a_plain_path(
@@ -84,30 +84,30 @@ def test_main_still_writes_one_scan_to_a_plain_path(
     )
     assert rc == 0
     assert out.is_file()
-    assert fmriqa_io.load_artifact(out).provenance.scan == "scan.nii.gz"
+    assert fmriqa_io.load_analysis(out).provenance.scan == "scan.nii.gz"
 
 
-def test_main_saves_one_artifact_per_scan_in_a_batch(
+def test_main_saves_one_analysis_per_scan_in_a_batch(
     tmp_path, write_scan, capsys
 ) -> None:
     first = write_scan(tmp_path, name="first")
     second = write_scan(tmp_path, name="second", seed=3)
-    out = tmp_path / "artifacts"
+    out = tmp_path / "analyses"
     rc = cli.main([first, second, "--roi-size", "9", "--analysis-file", str(out)])
     assert rc == 0
     written = sorted(p.name for p in out.glob("*.nc"))
     assert written == ["first.qa.nc", "second.qa.nc"]
     assert (
-        fmriqa_io.load_artifact(out / "first.qa.nc").provenance.scan == "first.nii.gz"
+        fmriqa_io.load_analysis(out / "first.qa.nc").provenance.scan == "first.nii.gz"
     )
 
 
-def test_main_refuses_a_batch_whose_artifacts_would_collide(
+def test_main_refuses_a_batch_whose_analyses_would_collide(
     tmp_path, write_scan, capsys
 ) -> None:
     """Same-named scans from different directories must not overwrite silently.
 
-    A batch names each artifact after the scan's stem, so `a/scan.nii.gz` and
+    A batch names each analysis after the scan's stem, so `a/scan.nii.gz` and
     `b/scan.nii.gz` land on one file, the second silently replacing the first.
     The run is refused up front, before any analysis.
     """
@@ -115,7 +115,7 @@ def test_main_refuses_a_batch_whose_artifacts_would_collide(
     (tmp_path / "b").mkdir()
     first = write_scan(tmp_path / "a", name="scan")
     second = write_scan(tmp_path / "b", name="scan", seed=3)
-    out = tmp_path / "artifacts"
+    out = tmp_path / "analyses"
 
     rc = cli.main([first, second, "--roi-size", "9", "--analysis-file", str(out)])
 
@@ -125,7 +125,7 @@ def test_main_refuses_a_batch_whose_artifacts_would_collide(
     assert not out.exists()  # refused before analyzing, so nothing was written
 
 
-def test_main_refuses_the_same_scan_named_twice_with_an_artifact_directory(
+def test_main_refuses_the_same_scan_named_twice_with_an_analysis_directory(
     tmp_path, write_scan, capsys
 ) -> None:
     """One scan named twice is two requests for one destination, and is refused.
@@ -134,7 +134,7 @@ def test_main_refuses_the_same_scan_named_twice_with_an_artifact_directory(
     refusal instead of being analyzed twice.
     """
     scan = write_scan(tmp_path)
-    out = tmp_path / "artifacts"
+    out = tmp_path / "analyses"
 
     rc = cli.main([scan, scan, "--roi-size", "9", "--analysis-file", str(out)])
 
@@ -144,13 +144,13 @@ def test_main_refuses_the_same_scan_named_twice_with_an_artifact_directory(
     assert not out.exists()  # refused before analyzing, so nothing was written
 
 
-def test_main_refuses_an_artifact_that_would_overwrite_the_scan(
+def test_main_refuses_an_analysis_that_would_overwrite_the_scan(
     tmp_path, write_scan, capsys, monkeypatch
 ) -> None:
     """`--analysis-file` naming the input must fail before anything is read or written.
 
     The scan is loaded first and the archive moved over its destination last, so
-    without the guard the run succeeds and leaves an artifact where the NIfTI
+    without the guard the run succeeds and leaves an analysis where the NIfTI
     was. The relative spelling a shell produces must not slip past a comparison
     of the literal strings.
     """
@@ -167,7 +167,7 @@ def test_main_refuses_an_artifact_that_would_overwrite_the_scan(
     assert scan.read_bytes() == before
 
 
-def test_main_refuses_an_artifact_that_would_overwrite_the_sidecar(
+def test_main_refuses_an_analysis_that_would_overwrite_the_sidecar(
     tmp_path, write_scan, capsys
 ) -> None:
     """The sidecar is read too, so it is an input the output must not replace."""
@@ -185,7 +185,7 @@ def test_main_refuses_a_batch_destination_that_is_another_input(
 ) -> None:
     """Every destination is checked against every input, not only its own scan.
 
-    A batch names `a.nii.gz`'s artifact `BASE/a.qa.nc`. If that file is itself an
+    A batch names `a.nii.gz`'s analysis `BASE/a.qa.nc`. If that file is itself an
     input, analyzing `a.nii.gz` would replace it, so the whole run is refused
     and the other input is never analyzed either.
     """
@@ -210,13 +210,13 @@ def test_main_allows_a_batch_of_distinctly_named_scans(
     (tmp_path / "b").mkdir()
     first = write_scan(tmp_path / "a", name="run1")
     second = write_scan(tmp_path / "b", name="run2", seed=3)
-    out = tmp_path / "artifacts"
+    out = tmp_path / "analyses"
     rc = cli.main([first, second, "--roi-size", "9", "--analysis-file", str(out)])
     assert rc == 0
     assert sorted(p.name for p in out.glob("*.nc")) == ["run1.qa.nc", "run2.qa.nc"]
 
 
-def test_main_reports_artifact_failure_without_a_traceback(
+def test_main_reports_analysis_failure_without_a_traceback(
     tmp_path, write_scan, capsys
 ) -> None:
     blocked = tmp_path / "blocked"
@@ -236,20 +236,20 @@ def test_main_reports_artifact_failure_without_a_traceback(
     assert "Traceback" not in captured.err
 
 
-def test_main_reports_a_refused_artifact_without_a_traceback(
+def test_main_reports_a_refused_analysis_without_a_traceback(
     tmp_path, write_scan, capsys, monkeypatch
 ) -> None:
-    """An artifact the reader would refuse is a per-scan error, and the run says so.
+    """An analysis the reader would refuse is a per-scan error, and the run says so.
 
     Nothing the CLI computes should trip this, so the analysis is stubbed to
-    return an artifact with a text echo time. The refusal must be reported like
+    return an analysis with a text echo time. The refusal must be reported like
     any other write failure, and the batch goes on.
     """
     real = q.analyze
 
     def broken(*args, **kwargs):
-        artifact = real(*args, **kwargs)
-        return replace(artifact, provenance=replace(artifact.provenance, te="0.03"))
+        analysis = real(*args, **kwargs)
+        return replace(analysis, provenance=replace(analysis.provenance, te="0.03"))
 
     monkeypatch.setattr(q, "analyze", broken)
     out = tmp_path / "qa.nc"
@@ -287,7 +287,7 @@ def test_json_record_says_what_series_the_numbers_describe(
     `outlier_worst_frame` counts from the analyzed series, so alone it names a
     volume nobody can find in the acquisition. `n_trimmed` turns it back into an
     acquired volume number. The source path and TR/frame count let a trend
-    database key and interpret the row without the artifact.
+    database key and interpret the row without the analysis.
     """
     rc = cli.main([write_scan(tmp_path), "--roi-size", "9", "--json"])
     assert rc == 0
@@ -392,15 +392,15 @@ def test_attributed_warnings_reprint_when_the_exception_escapes(capsys) -> None:
     assert capsys.readouterr().err == "bad.nii.gz: warning: odd header\n"
 
 
-def test_localization_flag_names_every_failure(artifact) -> None:
+def test_localization_flag_names_every_failure(analysis) -> None:
     """Both localizations can fail at once, and the cell says so."""
-    m = artifact.measurements
+    m = analysis.measurements
     assert table.localization_flag(m) == "ok"
     assert table.localization_flag(replace(m, phantom_mask_ok=False)) == "MASK"
     assert table.localization_flag(replace(m, roi_inside_phantom=False)) == "ROI"
     both = replace(m, phantom_mask_ok=False, roi_inside_phantom=False)
     assert table.localization_flag(both) == "MASK+ROI"
-    # an artifact migrated from a schema without the check: not a pass
+    # an analysis migrated from a schema without the check: not a pass
     unrecorded = replace(m, phantom_mask_ok=None, roi_inside_phantom=None)
     assert table.localization_flag(unrecorded) == "?"
 
@@ -415,16 +415,16 @@ def test_json_document_is_strict_json(tmp_path, write_scan, capsys) -> None:
     assert doc["scans"][0]["snr"] > 0
 
 
-def test_table_marks_an_unnamed_direction_unknown(artifact) -> None:
+def test_table_marks_an_unnamed_direction_unknown(analysis) -> None:
     """The `fwPE`/`fwRO` cells read `?`, not a plausible number from elsewhere."""
     unnamed = replace(
-        artifact.measurements,
+        analysis.measurements,
         pe_axis=None,
         pe_label="?",
         fwhm_pe=None,
         fwhm_ro=None,
     )
-    row = table.format_row(replace(artifact, measurements=unnamed))
+    row = table.format_row(replace(analysis, measurements=unnamed))
     assert row.endswith("     ?      ?")
 
 
@@ -444,14 +444,14 @@ def test_the_table_header_is_the_one_operators_read() -> None:
     assert rule == "-" * len(header)
 
 
-def test_a_table_row_lines_up_under_the_header(artifact) -> None:
+def test_a_table_row_lines_up_under_the_header(analysis) -> None:
     """The column widths are spelled in the header and again in the row.
 
     Nothing else holds the two together, so a column added or resized in one but
     not the other would misalign the table without failing anything.
     """
     header, _ = table.header_lines()
-    row = table.format_row(artifact)
+    row = table.format_row(analysis)
     assert len(row) == len(header)
     assert len(row.split()) == len(header.split())
 
@@ -460,7 +460,7 @@ def _reject_json_constant(value: str) -> None:
     raise ValueError(f"non-standard JSON constant: {value}")
 
 
-def test_json_stdout_stays_pure_with_an_artifact(tmp_path, write_scan, capsys) -> None:
+def test_json_stdout_stays_pure_with_an_analysis(tmp_path, write_scan, capsys) -> None:
     out = tmp_path / "qa.nc"
     rc = cli.main(
         [write_scan(tmp_path), "--roi-size", "9", "--json", "--analysis-file", str(out)]
@@ -519,7 +519,7 @@ def test_a_bare_command_line_asks_for_the_records_defaults() -> None:
     assert asked == (d.trim_sec, d.detrend, d.center, d.roi_size, d.pe_axis_override)
 
 
-def test_main_rejects_an_empty_artifact_path(capsys) -> None:
+def test_main_rejects_an_empty_analysis_path(capsys) -> None:
     with pytest.raises(SystemExit) as info:
         cli.main(["scan.nii.gz", "--analysis-file", ""])
     assert info.value.code == 2
@@ -613,7 +613,7 @@ def test_a_wildcard_matching_one_scan_is_not_a_batch(
     )
     assert rc == 0
     assert out.is_file()
-    assert fmriqa_io.load_artifact(out).provenance.scan == "only.nii.gz"
+    assert fmriqa_io.load_analysis(out).provenance.scan == "only.nii.gz"
 
 
 def test_a_wildcard_matching_nothing_is_reported_not_dropped(tmp_path, capsys) -> None:

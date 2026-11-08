@@ -289,7 +289,7 @@ def _publish_series(
     name = planned.target.name
     work_dir = staging / name
     scan_path = work_dir / planned.series.path.name
-    artifact_path = work_dir / f"{name}.qa.nc"
+    analysis_path = work_dir / f"{name}.qa.nc"
     report_path = work_dir / f"{name}.html"
 
     try:
@@ -305,7 +305,7 @@ def _publish_series(
             scan = fmriqa_io.load_scan(scan_path)
             # Use the published path: it goes into the analysis file's provenance
             # and the report's "Source" row, and the staging path vanishes.
-            artifact = fmriqa.analyze(
+            analysis = fmriqa.analyze(
                 scan,
                 request.settings,
                 name=scan_path.name,
@@ -316,13 +316,13 @@ def _publish_series(
     noted = _messages(caught)
 
     try:
-        fmriqa_io.save_artifact(artifact, artifact_path)
+        fmriqa_io.save_analysis(analysis, analysis_path)
     except Exception as exc:  # noqa: BLE001 - one series' failure, reported and skipped
         return _failed(name, exc, noted)
 
     progress(Progress(Stage.REPORT, planned.index, planned.total, name))
     try:
-        write_text_atomically(report_path, render_run_page(artifact, title=name))
+        write_text_atomically(report_path, render_run_page(analysis, title=name))
     except Exception as exc:  # noqa: BLE001 - one series' failure, reported and skipped
         return _failed(name, exc, noted)
 
@@ -343,7 +343,7 @@ def _publish_series(
         directory=planned.target,
         scan=planned.target / scan_path.name,
         sidecar=planned.target / sidecar_name if has_sidecar else None,
-        artifact=planned.target / artifact_path.name,
+        analysis=planned.target / analysis_path.name,
         report=planned.target / report_path.name,
         warnings=noted,
     )
@@ -404,7 +404,7 @@ def _publish(
 def _copy_durably(source: Path, destination: Path) -> None:
     """Copy one file, syncing its contents before returning.
 
-    Like `save_artifact`, this syncs the file before it can be renamed, so a
+    Like `save_analysis`, this syncs the file before it can be renamed, so a
     crash soon after cannot leave a truncated file under a finished name. It
     does not sync the directory, so the guarantee goes no further. The file is
     created exclusively with default permissions, so it follows the umask, not

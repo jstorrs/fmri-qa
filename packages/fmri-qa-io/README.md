@@ -18,9 +18,9 @@ import fmriqa as q
 import fmriqa_io
 
 scan = fmriqa_io.load_scan("scan.nii.gz")  # NIfTI + BIDS sidecar beside it
-artifact = q.analyze(scan, name="scan.nii.gz")
-fmriqa_io.save_artifact(artifact, "qa.nc")  # netCDF-4
-same = fmriqa_io.load_artifact("qa.nc")
+analysis = q.analyze(scan, name="scan.nii.gz")
+fmriqa_io.save_analysis(analysis, "qa.nc")  # netCDF-4
+same = fmriqa_io.load_analysis("qa.nc")
 ```
 
 ## What it exports
@@ -30,7 +30,7 @@ same = fmriqa_io.load_artifact("qa.nc")
 - `scan_from_bytes(nifti, sidecar)`: the same decode from bytes. It is what a
   browser page calls with the bytes of a dropped file. `fmriqa_io.decode` imports
   only the standard library, numpy, nibabel and core, so it works under Pyodide.
-- `save_artifact(artifact, path)` and `load_artifact(path)`: the analysis file as one
+- `save_analysis(analysis, path)` and `load_analysis(path)`: the analysis file as one
   netCDF-4 file, written through `netCDF4`. The analysis file's schema (compose,
   decompose, migrate, validation) is core's. This package is only the container.
   Files an earlier build wrote as `.qa.npz` still load, and nothing writes one.

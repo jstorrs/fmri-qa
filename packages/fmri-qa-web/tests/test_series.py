@@ -34,11 +34,11 @@ def test_a_phantom_gives_the_record_the_cli_would_write(phantom_bytes) -> None:
     scan = scan_from_bytes(
         nifti, sidecar, name="phantom.nii.gz", sidecar_name="phantom.json"
     )
-    artifact = fmriqa.analyze(
+    analysis = fmriqa.analyze(
         scan, _SMALL_ROI, name="phantom.nii.gz", source="phantom.nii.gz"
     )
     assert isinstance(result, SeriesReport)
-    assert result.record == metric_record(artifact)
+    assert result.record == metric_record(analysis)
     assert result.stem == "phantom"
     assert result.warnings == ()
 

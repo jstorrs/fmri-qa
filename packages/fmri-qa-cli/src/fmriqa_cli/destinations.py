@@ -22,10 +22,10 @@ from fmriqa_io.path_arguments import same_file
 from fmriqa_io.paths import nifti_stem, sidecar_path
 
 # Suffix for a saved analysis file, so a batch's files are recognizable at a glance.
-ARTIFACT_SUFFIX = ".qa.nc"
+ANALYSIS_SUFFIX = ".qa.nc"
 
 
-def artifact_destinations(base: str, paths: Sequence[str]) -> list[tuple[str, Path]]:
+def analysis_destinations(base: str, paths: Sequence[str]) -> list[tuple[str, Path]]:
     """Return `(input, destination)` pairs for every requested scan, in order.
 
     A batch can't share one file, so `BASE` is a directory and each scan gets
@@ -41,12 +41,12 @@ def artifact_destinations(base: str, paths: Sequence[str]) -> list[tuple[str, Pa
 
     An input named twice keeps both pairs. Collapsing them would silently
     forgive `fmri-qa a.nii.gz a.nii.gz --analysis-file out/`, which
-    `artifact_collisions` below must refuse.
+    `analysis_collisions` below must refuse.
     """
     batch = len(paths) > 1
     if batch or Path(base).is_dir():
         return [
-            (path, Path(base) / f"{nifti_stem(path)}{ARTIFACT_SUFFIX}")
+            (path, Path(base) / f"{nifti_stem(path)}{ANALYSIS_SUFFIX}")
             for path in paths
         ]
     return [(path, Path(base)) for path in paths]
@@ -68,7 +68,7 @@ def overwritten_inputs(
     return [(dest, src) for dest in dests for src in inputs if same_file(dest, src)]
 
 
-def artifact_collisions(
+def analysis_collisions(
     destinations: Sequence[tuple[str, Path]],
 ) -> dict[Path, list[str]]:
     """Return destinations that more than one input scan would be written to.
@@ -102,7 +102,7 @@ def report_destination_problems(destinations: Sequence[tuple[str, Path]]) -> boo
         stop = True
     if stop:  # a destination that eats an input is fatal on its own
         return True
-    collisions = artifact_collisions(destinations)
+    collisions = analysis_collisions(destinations)
     for destination, sources in sorted(collisions.items()):
         print(
             f"ERROR: {' and '.join(sources)} would both be saved as {destination}",
@@ -118,11 +118,11 @@ def report_destination_problems(destinations: Sequence[tuple[str, Path]]) -> boo
     return bool(collisions)
 
 
-def write_artifact(artifact: q.QAArtifact, out: Path, info: TextIO) -> str | None:
+def write_analysis(analysis: q.QAAnalysis, out: Path, info: TextIO) -> str | None:
     """Write one analysis file; return None if written, else the error as reported."""
     try:
-        fmriqa_io.save_artifact(artifact, out)
-    except (OSError, q.InvalidArtifactError) as exc:
+        fmriqa_io.save_analysis(analysis, out)
+    except (OSError, q.InvalidAnalysisFileError) as exc:
         # A bad destination is a user error, and an analysis file the reader would
         # refuse is a defect worth a line, not a traceback. Either way the
         # batch goes on.

@@ -144,7 +144,7 @@ bin and a plot needs no windowing of its own.
 
    import phantom
 
-   curves = phantom.artifact().curves
+   curves = phantom.analysis().curves
 
    fig, (signal, residual, spectrum) = plt.subplots(
        3, 1, figsize=(6.6, 6.4), layout="constrained"
@@ -178,8 +178,8 @@ independent voxel to voxel. The gap at the right-hand end is the RDC.
 
    import phantom
 
-   artifact = phantom.artifact()
-   weisskoff = artifact.curves.weisskoff
+   analysis = phantom.analysis()
+   weisskoff = analysis.curves.weisskoff
 
    fig, axes = plt.subplots(figsize=(5.2, 4.0), layout="constrained")
    axes.loglog(weisskoff.roi_sizes, 100 * weisskoff.cv, "o-", ms=4, label="measured")
@@ -188,7 +188,7 @@ independent voxel to voxel. The gap at the right-hand end is the RDC.
    )
    axes.set_xlabel("ROI width (voxels)")
    axes.set_ylabel("coefficient of variation (%)")
-   axes.set_title(f"RDC = {artifact.measurements.rdc:.1f} voxels")
+   axes.set_title(f"RDC = {analysis.measurements.rdc:.1f} voxels")
    axes.legend(fontsize="small")
    axes.grid(True, which="both", lw=0.3, alpha=0.5)
 ```
@@ -205,7 +205,7 @@ SFNR, the fluctuation noise, and the static (odd/even difference) noise.
 
    import phantom
 
-   images = phantom.artifact().images
+   images = phantom.analysis().images
 
    panels = [
        ("signal", images.signal, "a.u."),

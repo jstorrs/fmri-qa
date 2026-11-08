@@ -16,12 +16,6 @@ from skimage.morphology import isotropic_dilation
 
 from .load.metadata import ScanMeta
 from .load.scan import QAScan
-from .metrics.artifacts import (
-    OutlierResult,
-    SpikeResult,
-    outlier_fraction,
-    spike_scores,
-)
 from .metrics.center_of_mass import CenterOfMassResult, estimate_center_of_mass
 from .metrics.fbirn import (
     WeisskoffResult,
@@ -33,6 +27,12 @@ from .metrics.fbirn import (
 )
 from .metrics.ghost import GhostResult, estimate_ghost, estimate_pe_axis
 from .metrics.motion import MOTION_MASK_DILATION, MotionResult, estimate_motion
+from .metrics.outliers import (
+    OutlierResult,
+    SpikeResult,
+    outlier_fraction,
+    spike_scores,
+)
 from .metrics.saturation import SaturationResult, detect_saturation
 from .metrics.smoothness import SmoothnessResult, estimate_smoothness
 from .prep.detrend import Detrender

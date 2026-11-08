@@ -12,7 +12,7 @@ applications sit on top.
 | Package | Import | Does | Needs |
 | --- | --- | --- | --- |
 | `fmri-qa-core` | `fmriqa` | the metrics, the pipeline, and the analysis file they produce. Pure calculation: it reads no files | numpy, scipy, scikit-image |
-| `fmri-qa-io` | `fmriqa_io` | scans (`load_scan`), the analysis file's netCDF-4 file (`save_artifact`, `load_artifact`), and DICOM import through dcm2niix (`import_dicom`) | core, nibabel, numpy; netCDF4 and dcm2niix outside a browser |
+| `fmri-qa-io` | `fmriqa_io` | scans (`load_scan`), the analysis file's netCDF-4 file (`save_analysis`, `load_analysis`), and DICOM import through dcm2niix (`import_dicom`) | core, nibabel, numpy; netCDF4 and dcm2niix outside a browser |
 | `fmri-qa-cli` | `fmriqa_cli` | the `fmri-qa`, `fmri-qa-hilo`, `fmri-qa-import` and `fmri-qa-report` commands | core, io, report |
 | `fmri-qa-report` | `fmriqa_report` | the figures and the HTML report, rendered from an analysis file. A library: its command is in `fmri-qa-cli` | core, matplotlib |
 | `fmri-qa-launcher` | `fmriqa_launcher` | `fmri-qa-run` and the desktop panel | cli, core, io, report; the standard library's `tkinter` for the panel |
@@ -27,7 +27,7 @@ subdirectory. This brings `fmri-qa-core` with it:
 $ uv pip install "fmri-qa-io @ git+https://github.com/jstorrs/fmri-qa#subdirectory=packages/fmri-qa-io"
 ```
 
-Only a `QAArtifact` passes from calculating to presenting. It holds the run's
+Only a `QAAnalysis` passes from calculating to presenting. It holds the run's
 settings, provenance, measurements, curves and summary images: everything a
 report needs, and none of the scan data. It saves to one netCDF-4 file, so a
 report can be rendered later, elsewhere, with no access to the scan.
@@ -39,11 +39,11 @@ import fmriqa
 import fmriqa_io
 
 scan = fmriqa_io.load_scan("scan.nii.gz")
-artifact = fmriqa.analyze(scan, name="scan.nii.gz")
-m = artifact.measurements
+analysis = fmriqa.analyze(scan, name="scan.nii.gz")
+m = analysis.measurements
 print(m.snr, m.sfnr, m.rdc, m.drift_pct)
 
-fmriqa_io.save_artifact(artifact, "qa.nc")
+fmriqa_io.save_analysis(analysis, "qa.nc")
 ```
 
 `analyze` is the entry point. Beneath it the pipeline is a chain of small
@@ -52,7 +52,7 @@ functions, each usable on its own:
 ```text
 QAScan → preprocess → QAImages → detect_phantom → resolve_roi
        → {weisskoff, snr, sfnr, estimate_ghost}
-       → QAResult → build_artifact → QAArtifact
+       → QAResult → build_analysis → QAAnalysis
 ```
 
 - `preprocess` trims the series, selects the slice and detrends each voxel. It
@@ -61,7 +61,7 @@ QAScan → preprocess → QAImages → detect_phantom → resolve_roi
   trend) as derived properties. The full volume can be discarded once it exists.
 - `run_qa` gathers the metrics into a `QAResult`, the pipeline's working output,
   with the images attached and the requested settings recorded.
-- `build_artifact` turns that into the `QAArtifact` everything downstream reads.
+- `build_analysis` turns that into the `QAAnalysis` everything downstream reads.
   Its five sections are `settings`, `provenance`, `measurements`, `curves` and
   `images`. Every value is computed, so a reader never recomputes a metric.
 

@@ -13,8 +13,8 @@ ships a synthetic phantom, so the quick start needs no data:
 import fmriqa as q
 from fmriqa.testing import phantom_scan
 
-artifact = q.analyze(phantom_scan(), name="phantom")
-print(artifact.measurements.snr)
+analysis = q.analyze(phantom_scan(), name="phantom")
+print(analysis.measurements.snr)
 ```
 
 With a file on disk, load it with `fmri-qa-io` instead:
@@ -24,11 +24,11 @@ import fmriqa as q
 import fmriqa_io
 
 scan = fmriqa_io.load_scan("qa.nii.gz")
-artifact = q.analyze(scan, name="qa.nii.gz")
-fmriqa_io.save_artifact(artifact, "qa.nc")
+analysis = q.analyze(scan, name="qa.nii.gz")
+fmriqa_io.save_analysis(analysis, "qa.nc")
 ```
 
-A `QAArtifact` carries the run's settings, provenance, scalar measurements,
+A `QAAnalysis` carries the run's settings, provenance, scalar measurements,
 stability curves, and the four FBIRN summary images. That is everything a report
 or a trend database needs, and nothing only the pipeline needs.
 [`fmri-qa-io`](../fmri-qa-io) saves it as a netCDF-4 file, written through

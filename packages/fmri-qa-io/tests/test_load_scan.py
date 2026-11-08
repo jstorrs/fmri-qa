@@ -176,7 +176,7 @@ def test_a_malformed_sidecar_field_is_unknown_and_named(
     schema promises a number saves fine and fails when the report opens it,
     months later and far from the sidecar. The value is not coerced: "0.03" may
     be 30 ms, but deciding so is guessing. fmri-qa-io's
-    `test_artifact_roundtrip.py` checks that what it produces reads back.
+    `test_analysis_file_roundtrip.py` checks that what it produces reads back.
     """
     nifti = _write_scan(tmp_path, {"PhaseEncodingDirection": "j", key: value})
     with pytest.warns(UserWarning, match=f"sidecar {key} .* recording it as unknown"):

@@ -1,6 +1,6 @@
 """Shared fixtures for the presentation-half tests.
 
-Every fixture stops at a `QAArtifact`, the report package's only input. It is
+Every fixture stops at a `QAAnalysis`, the report package's only input. It is
 built in memory from a synthetic phantom, so no NIfTI on disk or file-I/O layer
 is needed. `QAScan` is constructed directly, which also shows the seam holds.
 """
@@ -40,15 +40,15 @@ def _phantom(n: int = 32, z: int = 3, t: int = 40, seed: int = 0) -> q.QAScan:
 
 
 @pytest.fixture(scope="session")
-def artifact() -> q.QAArtifact:
-    """One analyzed artifact, shared across the session (analysis is not cheap)."""
+def analysis() -> q.QAAnalysis:
+    """One analyzed analysis, shared across the session (analysis is not cheap)."""
     return q.analyze(
         _phantom(), q.AnalysisSettings(roi_size=9), name="scan.nii.gz", source="scan"
     )
 
 
 @pytest.fixture(scope="session")
-def bare_artifact() -> q.QAArtifact:
-    """An artifact with no sidecar metadata, to exercise the missing-field paths."""
+def bare_analysis() -> q.QAAnalysis:
+    """An analysis with no sidecar metadata, to exercise the missing-field paths."""
     scan = q.QAScan(data=_phantom(seed=7).data, tr=2.0, pe_axis=1)
     return q.analyze(scan, q.AnalysisSettings(roi_size=9), name="bare.nii.gz")

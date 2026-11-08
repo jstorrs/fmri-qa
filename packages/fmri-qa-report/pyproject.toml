@@ -1,7 +1,7 @@
 [project]
 name = "fmri-qa-report"
 version = "0.1.0"
-description = "Self-contained offline HTML reports for fmri-qa phantom QA analysis artifacts"
+description = "Self-contained offline HTML reports for fmri-qa phantom QA analysis files"
 readme = "README.md"
 requires-python = ">=3.13"
 license = "MIT"
@@ -23,8 +23,8 @@ classifiers = [
     "Programming Language :: Python :: 3.13",
     "Typing :: Typed",
 ]
-# fmri-qa-core supplies the QAArtifact value objects. This package takes an
-# artifact in memory and returns a string: it reads and writes no file, and it
+# fmri-qa-core supplies the QAAnalysis value objects. This package takes an
+# analysis in memory and returns a string: it reads and writes no file, and it
 # never runs the pipeline, so nibabel, netCDF4 and scikit-image are not needed
 # here.
 dependencies = [

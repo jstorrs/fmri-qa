@@ -9,7 +9,7 @@
 ```{eval-rst}
 .. automodule:: fmriqa.types
    :exclude-members: readout_axis
-.. autodata:: fmriqa.analysis.artifact.ARTIFACT_SCHEMA_VERSION
+.. autodata:: fmriqa.analysis.values.ANALYSIS_SCHEMA_VERSION
 .. autodata:: fmriqa.metrics.ghost.GHOST_RADIUS
 .. autodata:: fmriqa.hilo.mask.HILO_ERODE
 ```

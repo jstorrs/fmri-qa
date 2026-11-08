@@ -15,11 +15,11 @@ import numpy as np
 import pytest
 
 from fmriqa._arrays import ArrayValue, readonly
-from fmriqa.metrics.artifacts import OutlierResult
 from fmriqa.metrics.center_of_mass import CenterOfMassResult
 from fmriqa.metrics.fbirn import WeisskoffResult
 from fmriqa.metrics.ghost import GhostResult
 from fmriqa.metrics.motion import MotionResult
+from fmriqa.metrics.outliers import OutlierResult
 from fmriqa.metrics.smoothness import SmoothnessResult
 from fmriqa.prep.geometry import ROI, PhantomGeometry
 

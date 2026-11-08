@@ -2,13 +2,13 @@
 # distributions and one private one:
 #
 #   packages/fmri-qa-core     the calculation half: metrics, pipeline, and the
-#                             QAArtifact it publishes
+#                             QAAnalysis it publishes
 #   packages/fmri-qa-io       file formats and filesystem IO: scans, the `.qa.nc`
-#                             artifact file, DICOM import (keeps core pure)
+#                             analysis file, DICOM import (keeps core pure)
 #   packages/fmri-qa-cli      the command-line shell over core and io (`fmri-qa`,
 #                             `fmri-qa-hilo`, `fmri-qa-import`)
 #   packages/fmri-qa-report   the presentation half: a self-contained HTML report
-#                             built from an artifact (`fmri-qa-report`)
+#                             built from an analysis (`fmri-qa-report`)
 #   packages/fmri-qa-launcher the application shell: a one-step DICOM-directory-in,
 #                             report-directory-out pipeline over the packages above
 #   packages/fmri-qa-web      private, never published: the Python glue of the
@@ -35,7 +35,7 @@ dev = [
     "pytest>=8.0",
     "pytest-cov>=6.0",
     "ruff>=0.13",
-    # Only the artifact tests use it. xarray is the one-line path from a
+    # Only the analysis tests use it. xarray is the one-line path from a
     # notebook to a `.qa.nc`, so the gate checks that it opens one cleanly.
     # Nothing either package ships imports it.
     "xarray>=2024.1",

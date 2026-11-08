@@ -68,7 +68,7 @@ acquired volume number is the index plus `provenance.n_trimmed`, and
 
 All coordinates are derived at encode time and **none is ever read back**. The
 dotted arrays and the JSON document remain the single source of truth for
-`load_artifact`, so a coordinate cannot drift from what it was derived from.
+`load_analysis`, so a coordinate cannot drift from what it was derived from.
 
 ## Masks are flagged bytes
 
@@ -111,7 +111,7 @@ space-separated text, the way CF spells `flag_meanings`: `curves.psf.labels` rea
 `PE RO`.
 
 These attributes are a convenience for foreign readers. The JSON document is the
-single source of truth for `load_artifact`, which never consults them. So the two can only disagree if the document does.
+single source of truth for `load_analysis`, which never consults them. So the two can only disagree if the document does.
 
 ### The settings
 
@@ -256,7 +256,7 @@ The container is recognized from the file's leading bytes, not its name, so a
 directory filled before the netCDF change keeps opening. Nothing writes an `.npz`
 any more.
 
-`ARTIFACT_SCHEMA_VERSION` pins the layout of the *document* (which fields exist
+`ANALYSIS_SCHEMA_VERSION` pins the layout of the *document* (which fields exist
 and what they mean), not the envelope. The move from `.npz` to netCDF changed no
 field, so it bumped no version. Bumping it would have made older builds refuse
 files as "from the future" when they understand the document perfectly.

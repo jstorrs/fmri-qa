@@ -113,9 +113,9 @@ Verify them per protocol.
 
    import phantom
 
-   artifact = phantom.artifact()
-   images = artifact.images
-   measurements = artifact.measurements
+   analysis = phantom.analysis()
+   images = analysis.images
+   measurements = analysis.measurements
    regions = images.ghost
 
    pairs = [

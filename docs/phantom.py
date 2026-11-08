@@ -15,7 +15,7 @@ documents. The docs build it larger than the tests do.
 path a real run takes. The phase-encode axis comes from the sidecar, the voxel
 size from the header (so lengths are in mm), and the integer storage lets the
 saturation check run.
-`artifact()` analyzes the scan once and caches it, so one analysis serves every
+`analysis()` analyzes the scan once and caches it, so one analysis serves every
 figure in the build.
 """
 
@@ -74,7 +74,7 @@ def scan() -> q.QAScan:
 
 
 @cache
-def artifact() -> q.QAArtifact:
+def analysis() -> q.QAAnalysis:
     """Return the analyzed phantom, computed once per documentation build.
 
     Cached so every figure reads the same analysis. The curves on a page and

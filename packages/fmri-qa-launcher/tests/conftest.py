@@ -159,7 +159,7 @@ def fast_render(monkeypatch: pytest.MonkeyPatch) -> Callable[..., str]:
     `Published.report` points at a file. It is returned for a test that wraps it.
     """
 
-    def render(artifact: object, **_kwargs: object) -> str:
+    def render(analysis: object, **_kwargs: object) -> str:
         return "<html><body>stub report</body></html>"
 
     monkeypatch.setattr("fmriqa_launcher.session.render_run_page", render)

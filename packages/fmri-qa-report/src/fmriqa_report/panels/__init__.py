@@ -1,4 +1,4 @@
-"""Format-agnostic report figures: matplotlib panels from a `QAArtifact`.
+"""Format-agnostic report figures: matplotlib panels from a `QAAnalysis`.
 
 `images` builds the labeled phantom-image panels (signal, SFNR, noise, N/2
 ghost overlay); `timeseries` builds the stability plots (Weisskoff/RDC, signal,

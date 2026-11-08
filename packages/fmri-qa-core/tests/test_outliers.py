@@ -9,7 +9,7 @@ the ROI-mean residual and its DC-dropped spectrum.
 import numpy as np
 import pytest
 
-from fmriqa.metrics.artifacts import (
+from fmriqa.metrics.outliers import (
     MAD_SCALE,
     _spike_ratio,
     outlier_fraction,

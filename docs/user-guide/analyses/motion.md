@@ -115,9 +115,9 @@ displacement exists, including when a reference axis is ambiguous.
 
    import phantom
 
-   artifact = phantom.artifact()
-   curves = artifact.curves
-   unit = artifact.measurements.displacement_unit
+   analysis = phantom.analysis()
+   curves = analysis.curves
+   unit = analysis.measurements.displacement_unit
 
    fig, axes = plt.subplots(4, 1, figsize=(6.6, 7.4), layout="constrained", sharex=True)
 

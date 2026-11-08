@@ -134,7 +134,7 @@ def _published(name: str, output_dir: Path) -> Published:
         directory=output_dir / name,
         scan=output_dir / name / f"{name}.nii.gz",
         sidecar=None,
-        artifact=output_dir / name / f"{name}.qa.nc",
+        analysis=output_dir / name / f"{name}.qa.nc",
         report=output_dir / name / f"{name}.html",
     )
 

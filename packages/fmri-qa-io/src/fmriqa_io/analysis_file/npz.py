@@ -9,7 +9,7 @@ because an analysis file outlives the build that wrote it. A trend database fill
 over months is a directory of these files, and they must keep opening.
 
 A file's container is decided by its leading bytes, not its name (see
-`fmriqa_io.artifact`), so a renamed `.qa.npz` still reads here, and a file
+`fmriqa_io.analysis_file`), so a renamed `.qa.npz` still reads here, and a file
 written under any name reads as what it is.
 """
 
@@ -19,9 +19,9 @@ from typing import Any, Final
 import numpy as np
 from numpy.typing import NDArray
 
-from fmriqa.exceptions import InvalidArtifactError
+from fmriqa.exceptions import InvalidAnalysisFileError
 
-# What an `.npz` starts with, and so how `artifact` recognizes one. The archive
+# What an `.npz` starts with, and so how `analysis` recognizes one. The archive
 # is a zip, and a zip opens on its local file header's signature.
 MAGIC: Final = b"PK\x03\x04"
 
@@ -34,7 +34,7 @@ def read(path: Path) -> tuple[str, dict[str, NDArray[Any]]]:
 
     Raises
     ------
-    InvalidArtifactError
+    InvalidAnalysisFileError
         If the file is not a readable NumPy archive, or carries no
         `__document__` member.
     """
@@ -42,10 +42,10 @@ def read(path: Path) -> tuple[str, dict[str, NDArray[Any]]]:
         with np.load(path, allow_pickle=False) as archive:
             names = list(archive.files)
             if _DOCUMENT not in names:
-                raise InvalidArtifactError(path, "not an fmri-qa analysis file")
+                raise InvalidAnalysisFileError(path, "not an fmri-qa analysis file")
             text = _document_text(archive[_DOCUMENT])
             arrays = {name: archive[name] for name in names if name != _DOCUMENT}
-    except InvalidArtifactError:
+    except InvalidAnalysisFileError:
         raise
     except Exception as exc:
         # Broad on purpose, and only around the library calls. A damaged archive
@@ -53,7 +53,9 @@ def read(path: Path) -> tuple[str, dict[str, NDArray[Any]]]:
         # from the inflater, `NotImplementedError` and `tokenize.TokenError` from
         # the `.npy` header parser, and `EOFError` from a truncated member.
         # They all mean the same thing here.
-        raise InvalidArtifactError(path, f"unreadable NumPy archive: {exc}") from exc
+        raise InvalidAnalysisFileError(
+            path, f"unreadable NumPy archive: {exc}"
+        ) from exc
     return text, arrays
 
 

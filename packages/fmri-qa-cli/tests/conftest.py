@@ -1,7 +1,7 @@
 """Shared fixtures for the command-line tests.
 
-`write_scan` writes the synthetic phantom to disk, `artifact` runs the pipeline
-over it once per session, `bare_artifact` does the same without sidecar
+`write_scan` writes the synthetic phantom to disk, `analysis` runs the pipeline
+over it once per session, `bare_analysis` does the same without sidecar
 metadata, and `fake_dcm2niix` builds the stub converter the import tests drive.
 """
 
@@ -32,8 +32,8 @@ def write_scan() -> WriteScan:
 
 
 @pytest.fixture(scope="session")
-def artifact() -> q.QAArtifact:
-    """An artifact from the synthetic phantom, at a small ROI."""
+def analysis() -> q.QAAnalysis:
+    """An analysis from the synthetic phantom, at a small ROI."""
     return q.analyze(
         phantom_scan(),
         q.AnalysisSettings(roi_size=9),
@@ -43,8 +43,8 @@ def artifact() -> q.QAArtifact:
 
 
 @pytest.fixture(scope="session")
-def bare_artifact() -> q.QAArtifact:
-    """An artifact with no sidecar metadata, to exercise the missing-field paths."""
+def bare_analysis() -> q.QAAnalysis:
+    """An analysis with no sidecar metadata, to exercise the missing-field paths."""
     scan = q.QAScan(data=phantom_scan(seed=7).data, tr=2.0, pe_axis=1)
     return q.analyze(scan, q.AnalysisSettings(roi_size=9), name="bare.nii.gz")
 

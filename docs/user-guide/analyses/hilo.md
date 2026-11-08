@@ -103,7 +103,7 @@ There is no figure. The analysis reduces a pair of runs to ten scalars.
 ## What it contributes to the analysis file
 
 **Nothing.** `fmri-qa-hilo` writes no analysis file. It has no `--analysis-file` flag,
-it produces a `HiLoResult` instead of a `QAArtifact`, and none of the
+it produces a `HiLoResult` instead of a `QAAnalysis`, and none of the
 quantities above appears in a `.qa.nc` file. Its output is the text table above,
 on stdout.
 
