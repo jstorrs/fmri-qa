@@ -51,7 +51,7 @@ def write_phantom(
 
     `smoothing` blurs the series in-plane, `ghost` adds an N/2 ghost along the
     phase-encode axis and `drift` a linear signal drift (see
-    `synthetic_series`). The docs use `smoothing`. `fmriqa.testing.phantom_scan`
+    `synthetic_series`). The docs use all three. `fmriqa.testing.phantom_scan`
     describes only the unblurred phantom with neither.
     """
     data = synthetic_series(

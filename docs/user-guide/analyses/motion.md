@@ -150,6 +150,10 @@ The traces are stored in voxels. The *peak* measurements are converted to
 millimeters when the header gave a voxel size, and
 `measurements.displacement_unit` records which.
 
+The synthetic phantom does not move, so the traces are the registration's noise
+floor: translations of a few thousandths of a voxel at most, and scale and shear
+of a few hundredths of a percent.
+
 ## What it contributes to the analysis file
 
 | Name | Where it lives | Meaning |

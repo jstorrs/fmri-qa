@@ -142,8 +142,10 @@ Verify them per protocol.
 ```
 
 Blue is the signal region, red the ghost region matched to it. The synthetic
-phantom has no real N/2 ghost, so both directions measure the background floor
-and the ACR difference is near zero, as in a well-calibrated acquisition.
+phantom carries a 2% N/2 ghost along the phase-encode axis and none along the
+readout axis. The phase-encode ghost reads about 2% and the readout ratio
+measures only the background, a fraction of a percent, so the ACR difference is
+about the size of the phase-encode ghost.
 
 ## What it contributes to the analysis file
 

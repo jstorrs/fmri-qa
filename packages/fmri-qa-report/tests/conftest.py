@@ -5,38 +5,34 @@ built in memory from a synthetic phantom, so no NIfTI on disk or file-I/O layer
 is needed. `QAScan` is constructed directly, which also shows the seam holds.
 """
 
-import numpy as np
+from dataclasses import replace
+
 import pytest
 
 import fmriqa as q
+from fmriqa.testing import phantom_scan
 
 
 def _phantom(n: int = 32, z: int = 3, t: int = 40, seed: int = 0) -> q.QAScan:
-    """Build a synthetic bright-disk phantom series with seeded temporal noise.
+    """Build the shared synthetic phantom with report-page metadata.
 
-    The background gets a magnitude noise floor, as in the calculation half's
-    fixture. A constant background collapses the intensity quantiles that seed
-    the phantom segmentation, and the report would be full of NaNs.
+    The scan is `fmriqa.testing.phantom_scan`, the calculation half's fixture,
+    which the docs draw a variant of. Only the sidecar fields a report page
+    shows are added, so the geometry, TR and phase-encode axis cannot drift from
+    the data. Its Rayleigh background keeps the intensity quantiles that seed
+    the phantom segmentation from collapsing, which would fill the report with
+    NaNs.
     """
-    rng = np.random.default_rng(seed)
-    yy, xx = np.mgrid[0:n, 0:n]
-    disk = ((xx - n / 2) ** 2 + (yy - n / 2) ** 2) < (n / 4) ** 2
-    noise = rng.normal(scale=5.0, size=(n, n, z, t)) * disk[:, :, None, None]
-    floor = np.abs(rng.normal(scale=8.0, size=(n, n, z, t)))
-    data = np.where(disk, 1000.0, 0.0)[:, :, None, None] + noise + floor
-    meta = q.ScanMeta(
-        voxel_mm=(3.0, 3.0, 3.0),
-        matrix=(n, n),
-        tr=2.0,
-        flip_angle=77.0,
-        pe_dir="col",
+    scan = phantom_scan(n=n, z=z, t=t, seed=seed)
+    meta = replace(
+        scan.meta,
         manufacturer="Acme",
         model="Scanner 3T",
         field_strength=3.0,
         serial="12345",
         datetime="2026-01-02 03:04:05",
     )
-    return q.QAScan(data=data, tr=2.0, pe_axis=1, meta=meta)
+    return replace(scan, meta=meta)
 
 
 @pytest.fixture(scope="session")

@@ -6,9 +6,13 @@ metric and the curve on its page changes, or the build fails (`make docs`
 passes `-W`).
 
 The series is the one the test suite uses, `fmriqa.testing.synthetic_series`:
-a bright disk over a Rician-like background floor, seeded, 3 mm isotropic
-voxels, TR 2 s, stored as `uint16`, plus the blur that `SMOOTHING_VOXELS`
-documents. The docs build it larger than the tests do.
+a uniform disk rendered from exact k-space, so its edges are band-limited and
+its background is Rayleigh noise. Seeded, 3 mm isotropic voxels, TR 2 s, stored
+as `uint16`. The docs draw a variant of it. On top of the tests' series they add
+the small N/2 ghost and signal drift that `GHOST` and `DRIFT` document, and the
+blur that `SMOOTHING_VOXELS` documents. The tests' unblurred series rings at the
+edges (Gibbs); the docs' blur smooths the ringing away. The docs build it larger
+than the tests do.
 
 `scan()` writes that series to a temporary directory with
 `fmriqa_io.testing.write_phantom` and loads it back, so the figures take the same
@@ -37,13 +41,24 @@ N_SLICES = 3
 N_FRAMES = 120
 ROI_SIZE = 21
 
-# In-plane Gaussian blur (voxels) per frame, standing in for an acquisition's
-# point spread. The unit fixture has none. Without it the hard-edged disk gives
-# the registration (`analyses/motion.md`) no gradients to lock onto, every fit
-# comes back unidentifiable, and the motion figure shows only NaN. The blur also
-# gives the noise a correlation length for `analyses/smoothness.md` to measure.
-# A smoothing of zero is the tests' series exactly.
+#: In-plane Gaussian blur (voxels), standing in for the smoothing a scanner's
+#: reconstruction filter and interpolation apply to signal and noise alike. The
+#: blur is for `analyses/smoothness.md`: unblurred, the noise is white, its FWHM
+#: estimate sits at the edge of what the estimator resolves (about 0.6 voxel) and
+#: the point-spread figure is a single spike. The registration
+#: (`analyses/motion.md`) does not need it. A zero is the tests' series.
 SMOOTHING_VOXELS = 0.8
+
+#: N/2 ghost along the phase-encode axis, as a noise-free ghost-to-signal ratio.
+#: A stable EPI scanner shows a ghost of a percent or two, so the ghosting page
+#: has a real ghost to measure instead of the background.
+GHOST = 0.02
+
+#: Signal drift over the run, first frame to last, as a fraction of the mean.
+#: One percent over the four minutes is a stable scanner's slow drift. The run
+#: is long enough (`N_FRAMES` at TR 2 s is 240 s) for the detrend to fit a
+#: line, so `drift_pct` reads about 1.
+DRIFT = 0.01
 
 
 @cache
@@ -65,6 +80,8 @@ def _written() -> Path:
         z=N_SLICES,
         t=N_FRAMES,
         smoothing=SMOOTHING_VOXELS,
+        ghost=GHOST,
+        drift=DRIFT,
     )
 
 

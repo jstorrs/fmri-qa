@@ -74,10 +74,10 @@ stands above the background it was cut from,
 $$c = \frac{\langle M \rangle_{\text{inside}}}
 {\langle M \rangle_{\text{outside}}}$$
 
-which a partition of pure noise never passes: air segments at about 1.5–1.9, a
-faint phantom at about 10, an ordinary one at about 160. An exactly-zero
-background makes $c$ infinite. A mask that partitions nothing, whether empty or
-the whole frame, scores 0. The verdict is
+which a partition of pure noise never passes: air segments at about 1.5–1.9,
+and the synthetic phantom below, whose background is Rayleigh noise, scores
+about 46. An exactly-zero background makes $c$ infinite. A mask that partitions
+nothing, whether empty or the whole frame, scores 0. The verdict is
 
 $$\text{mask ok} \iff 0 < f < 0.95 \;\wedge\; c \ge 4$$
 

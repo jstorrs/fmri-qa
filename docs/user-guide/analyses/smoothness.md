@@ -122,9 +122,9 @@ full 2-D array, not a shared axis.
    axes.legend(fontsize="small")
 ```
 
-The synthetic phantom is blurred isotropically, so its two directions nearly
-coincide. On a real acquisition they separate by however much the reconstruction
-filters the two axes differently.
+The synthetic phantom is smoothed isotropically in k-space, so its two
+directions nearly coincide. On a real acquisition they separate by however much
+the reconstruction filters the two axes differently.
 
 ## What it contributes to the analysis file
 

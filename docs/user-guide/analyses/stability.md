@@ -166,6 +166,9 @@ bin and a plot needs no windowing of its own.
    spectrum.set_xlabel("frequency (Hz)")
 ```
 
+The synthetic phantom's signal drifts linearly by 1% over the run, so the
+fitted trend is a straight line and `drift_pct` reads about 1.
+
 The Weisskoff plot, against the line the noise would follow if it were
 independent voxel to voxel. The gap at the right-hand end is the RDC.
 
