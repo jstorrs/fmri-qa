@@ -1,5 +1,8 @@
-"""Local partial stub for scipy.special — only `erfcinv`, called on a scalar."""
+"""Local partial stub for scipy.special: `erfcinv` on a scalar, `j0`/`j1` on arrays."""
 
 import numpy as np
+import numpy.typing as npt
 
 def erfcinv(x: float) -> np.float64: ...
+def j1(x: npt.NDArray[np.float64]) -> npt.NDArray[np.float64]: ...
+def j0(x: npt.NDArray[np.float64]) -> npt.NDArray[np.float64]: ...

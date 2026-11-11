@@ -7,16 +7,15 @@ floor, seeded. `synthetic_series` is the raw array. `phantom_scan` is the
 back, built without touching a file. A parity test in `fmri-qa-io` pins the two
 together.
 
-Pure: no file IO. Import it as `fmriqa.testing`. It is not part of the
-`fmriqa` public surface.
+Pure: no file IO. Re-exported by `fmriqa.testing`.
 """
 
 import numpy as np
 from scipy.ndimage import gaussian_filter
 
-from .load.metadata import ScanMeta
-from .load.scan import QAScan
-from .types import FloatArray
+from ..load.metadata import ScanMeta
+from ..load.scan import QAScan
+from ..types import FloatArray
 
 # Background noise floor, as a fraction of phantom signal. Real magnitude images
 # have a Rician air background. A constant one makes the intensity quantiles

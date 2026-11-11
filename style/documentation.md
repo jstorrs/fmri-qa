@@ -141,7 +141,7 @@ If someone runs `ls` on this directory, will they understand what's here?
 # Passes the ls test - clear purpose for each file
 $ ls packages/fmri-qa-core/src/fmriqa/
 __init__.py  analysis/  convert/  exceptions.py  hilo/  load/  metrics/
-pipeline.py  prep/  settings.py  testing.py  types.py  validation.py
+pipeline.py  prep/  settings.py  testing/  types.py  validation.py
 version.py  warn.py
 
 # Fails the ls test - requires reading code to understand
