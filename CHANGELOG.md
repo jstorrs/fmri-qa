@@ -16,7 +16,12 @@ versioning when the first stable public interface is released.
   calculation alone and can run in the browser under Pyodide.
 - **`fmriqa.testing`, the synthetic phantom the tests and docs measure
   against.** `synthetic_series` builds the array and `phantom_scan` the scan;
-  `fmriqa_io.testing.write_phantom` writes it as a NIfTI + sidecar.
+  `fmriqa_io.testing.write_phantom` writes it as a NIfTI + sidecar. The disk is
+  rendered from its exact k-space (Guerquin-Kern et al. 2012) with complex
+  k-space noise, so it has a scanner's edges, Gibbs ringing and Rayleigh air
+  background (`NOISE_SIGMA`), and `ghost` and `drift` add an N/2 ghost of a
+  given ghost-to-signal ratio and a linear signal drift the way an acquisition
+  makes them.
 - **`fmriqa_io.convert.filing.plan_names`, the import's file naming as a pure
   function.** It maps the filenames dcm2niix wrote, and their sidecars, to the
   names `import_dicom` files them under, with no filesystem, so a browser can

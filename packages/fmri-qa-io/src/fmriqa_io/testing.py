@@ -30,16 +30,18 @@ def write_phantom(
     seed: int = 0,
     flip: float = 77.0,
     smoothing: float = 0.0,
+    ghost: float = 0.0,
+    drift: float = 0.0,
 ) -> Path:
     """Write a synthetic phantom NIfTI + sidecar; return the NIfTI path.
 
-    A bright central disk with seeded temporal noise, 3 mm isotropic voxels and
-    TR 2 s. The sidecar sets `PhaseEncodingDirection`, so no ghost-estimate
-    fallback warning fires.
+    The disk of `fmriqa.testing.synthetic_series`, rendered from k-space with
+    seeded noise, 3 mm isotropic voxels and TR 2 s. The sidecar sets
+    `PhaseEncodingDirection`, so no ghost-estimate fallback warning fires.
 
-    The background has a Rician-like noise floor, as a real magnitude image
-    does. A constant background would make the quantiles that seed
-    `segment_phantom` degenerate.
+    The background is Rayleigh noise, as a real magnitude image's is. A
+    constant background would make the quantiles that seed `segment_phantom`
+    degenerate.
 
     Stored as `uint16`, like a properly converted acquisition. The saturation
     check needs integer data (see `metrics.saturation`), and floats would add a
@@ -47,10 +49,14 @@ def write_phantom(
     nibabel stores the values directly. Rescaling them onto the type's maximum
     would create a false `2**16 - 1` rail.
 
-    `smoothing` blurs the series in-plane (see `synthetic_series`). The docs use
-    it. `fmriqa.testing.phantom_scan` describes only the unblurred phantom.
+    `smoothing` blurs the series in-plane, `ghost` adds an N/2 ghost along the
+    phase-encode axis and `drift` a linear signal drift (see
+    `synthetic_series`). The docs use `smoothing`. `fmriqa.testing.phantom_scan`
+    describes only the unblurred phantom with neither.
     """
-    data = synthetic_series(n=n, z=z, t=t, seed=seed, smoothing=smoothing)
+    data = synthetic_series(
+        n=n, z=z, t=t, seed=seed, smoothing=smoothing, ghost=ghost, drift=drift
+    )
 
     img = nib.Nifti1Image(data.astype(np.uint16), affine=np.eye(4))
     img.header.set_zooms((VOXEL_MM, VOXEL_MM, VOXEL_MM, TR_SEC))

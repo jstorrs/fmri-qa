@@ -17,20 +17,18 @@ from fmriqa.testing import synthetic_series
 
 from .conftest import MakeScan
 
-# Fraction of the phantom injected at its N/2-shifted location, big enough for
-# the ghost estimate to separate the two candidate axes on a noisy series.
+# Ghost-to-signal ratio of the phantom's N/2 ghost, big enough for the ghost
+# estimate to separate the two candidate axes on a noisy series.
 GHOST_FRACTION = 0.08
 
 
 def _scan_with_ghost_on_axis1(seed: int = 0) -> q.QAScan:
-    """A synthetic phantom carrying an injected N/2 ghost along axis 1.
+    """A synthetic phantom carrying an N/2 ghost along axis 1.
 
     No `pe_axis`: the scan the loader hands over when neither the sidecar nor
     `dim_info` names an axis, so `run_qa` has to find it.
     """
-    data = synthetic_series(seed=seed)
-    ghosted = data + GHOST_FRACTION * np.roll(data, data.shape[1] // 2, axis=1)
-    return q.QAScan(data=ghosted, tr=2.0)
+    return q.QAScan(data=synthetic_series(seed=seed, ghost=GHOST_FRACTION), tr=2.0)
 
 
 def test_run_qa_returns_finite_core_metrics(make_scan: MakeScan) -> None:
