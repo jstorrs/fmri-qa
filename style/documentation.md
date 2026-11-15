@@ -379,7 +379,9 @@ for _ in range(3):
 ## Voice
 
 Write the way you would explain it to a colleague: plainly, in few words. This applies
-to prose in docs, comments and docstring text. The numpydoc section structure stays as is.
+to comments, docstring text, READMEs, notes and these style guides. The numpydoc section
+structure stays as is. The user guide has a register of its own, described
+[below](#the-user-guide).
 
 - Keep every fact: numbers, units, defaults, constraints, failure modes, warnings,
   citations, and any "why" that prevents a mistake.
@@ -402,6 +404,34 @@ After:
 # Show the figure, not the code that drew it: readers want the result.
 # PNG at 150 dpi works on screen and in print.
 ```
+
+### The User Guide
+
+The pages under `docs/` (the landing page and `docs/user-guide/`) are written in a formal,
+academic register. The first two rules above still hold: keep every fact, and cut what
+adds nothing. The rest differ.
+
+- **Third person, impersonal.** Write "the series is trimmed", not "you trim the series"
+  or "we trim". Numbered steps a reader carries out may use the imperative.
+- **Connected sentences.** State a result with its reason or condition in one sentence
+  ("The fit is refused, because it would leave no residual"). A run of short fragments
+  reads as a list. A semicolon is acceptable where it joins two parallel statements.
+- **Precise vocabulary.** No colloquialisms or metaphors ("buys precision", "quietly
+  wrong", "knobs", "in one go"). Still no em-dash asides, aphorisms or filler.
+- **Terms defined on first use** on each page: "signal-to-fluctuation-noise ratio (SFNR)".
+- **Citations.** Cite in the text by author and year, "(Friedman & Glover, 2006)", and
+  list the full reference with its DOI under "References" at the end of the page. A
+  References list holds only things that can be cited. A remark belongs in the prose.
+  Never invent a DOI. Check it resolves.
+- **Structure follows the content.** A page opens with an unheaded overview, and its
+  headings name what that page covers ("Validity of the segmentation"), not a slot in a
+  template ("Method"). An analysis page ends with "Example", "Stored quantities" and
+  "References", and leaves out any that do not apply.
+  `packages/fmri-qa-io/tests/test_analysis_docs.py` finds each page's table by the
+  "Stored quantities" heading, so keep that one as it is.
+
+Equations, plot code, console examples and data tables are content, not prose. Reword the
+text around them and leave them alone.
 
 ## Self-Documenting Code Techniques
 
