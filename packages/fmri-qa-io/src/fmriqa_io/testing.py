@@ -30,6 +30,8 @@ def write_phantom(
     seed: int = 0,
     flip: float = 77.0,
     smoothing: float = 0.0,
+    instability: float = 0.0,
+    diameter: float = 0.5,
 ) -> Path:
     """Write a synthetic phantom NIfTI + sidecar; return the NIfTI path.
 
@@ -47,10 +49,20 @@ def write_phantom(
     nibabel stores the values directly. Rescaling them onto the type's maximum
     would create a false `2**16 - 1` rail.
 
-    `smoothing` blurs the series in-plane (see `synthetic_series`). The docs use
-    it. `fmriqa.testing.phantom_scan` describes only the unblurred phantom.
+    `smoothing` blurs the series in-plane, `instability` adds a per-frame gain
+    fluctuation and `diameter` sizes the disk (see `synthetic_series`). The docs
+    use all three.
+    `fmriqa.testing.phantom_scan` describes only the phantom without them.
     """
-    data = synthetic_series(n=n, z=z, t=t, seed=seed, smoothing=smoothing)
+    data = synthetic_series(
+        n=n,
+        z=z,
+        t=t,
+        seed=seed,
+        smoothing=smoothing,
+        instability=instability,
+        diameter=diameter,
+    )
 
     img = nib.Nifti1Image(data.astype(np.uint16), affine=np.eye(4))
     img.header.set_zooms((VOXEL_MM, VOXEL_MM, VOXEL_MM, TR_SEC))

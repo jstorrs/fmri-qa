@@ -37,6 +37,8 @@ def synthetic_series(
     t: int = 40,
     seed: int = 0,
     smoothing: float = 0.0,
+    instability: float = 0.0,
+    diameter: float = 0.5,
 ) -> FloatArray:
     """Build a bright central disk over a noisy background: (n, n, z, t), float64.
 
@@ -44,14 +46,26 @@ def synthetic_series(
     (see `BACKGROUND_SCALE`) so the phantom is separable from it. `smoothing`
     blurs each frame in-plane by that many voxels, the point spread a real
     acquisition has. Zero leaves the hard-edged disk.
+
+    `instability` is the SD of a gain fluctuation, as a fraction of the signal,
+    drawn once per frame and applied to the whole frame. It is the
+    multiplicative noise a real scanner has, coherent across the image, which
+    averaging over an ROI cannot reduce. Zero leaves the series without one.
+
+    `diameter` is the disk's diameter as a fraction of the frame side. The
+    default half-frame disk puts its N/2 ghost region beside it with no overlap.
+    The FBIRN sphere fills about 0.8 of the field of view.
     """
     rng = np.random.default_rng(seed)
     yy, xx = np.mgrid[0:n, 0:n]
-    disk = ((xx - n / 2) ** 2 + (yy - n / 2) ** 2) < (n / 4) ** 2
+    disk = ((xx - n / 2) ** 2 + (yy - n / 2) ** 2) < (n * diameter / 2) ** 2
     base = np.where(disk, PHANTOM_SIGNAL, 0.0)
     floor = np.abs(rng.normal(scale=BACKGROUND_SCALE, size=(n, n, z, t)))
     noise = rng.normal(scale=5.0, size=(n, n, z, t)) * disk[:, :, None, None]
     series = base[:, :, None, None] + noise + floor
+    if instability > 0.0:
+        # Drawn last, so the default series is the same with or without it.
+        series *= 1.0 + rng.normal(scale=instability, size=t)
     if smoothing > 0.0:
         series = gaussian_filter(series, (smoothing, smoothing, 0, 0), mode="nearest")
     return np.asarray(series, dtype=np.float64)
