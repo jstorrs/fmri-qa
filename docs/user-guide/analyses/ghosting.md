@@ -1,79 +1,80 @@
 # Nyquist ghosting
 
-## What it is for
+EPI traverses k-space in alternating directions. A mismatch between the even and
+odd echo trains, whether from eddy currents, gradient delays, or an inadequate
+phase-correction scan, produces a copy of the phantom displaced by half a field
+of view along the phase-encode axis. This Nyquist, or N/2, ghost is among the
+most sensitive routine indicators of EPI calibration.
 
-EPI reads k-space in alternating directions. A mismatch between the even and odd
-echo trains (eddy currents, gradient delays, a poor phase-correction scan) puts
-a copy of the phantom half a field of view away along the phase-encode axis.
-This Nyquist, or N/2, ghost is one of the most sensitive routine checks of EPI
-calibration.
+A single region-mean ratio conflates two distinct cases: a ghost that is bright
+but small, and an apparent ghost that is only background. The package therefore
+reports four quantities: the FBIRN region-mean percent ghost (Friedman & Glover,
+2006), a localized variant computed from the brightest tenth of the ghost
+region, the same measurement along the readout axis as a baseline, and a
+difference of the two directions in the manner of the ACR and AAPM.
 
-A single region-mean ratio hides two different things: a ghost that is bright but
-small, and a "ghost" that is really just background. So the package reports four
-numbers: the FBIRN region-mean percent ghost, its localized top-10% companion,
-the same measurement along the readout axis as a baseline, and the ACR/AAPM-style
-difference of the two directions.
-
-## Method
-
-### Resolving the phase-encode axis
+## The phase-encode axis
 
 Every ghost statistic is defined relative to an axis, so the axis is resolved
-first, from the best source available:
+first, from the most authoritative source available:
 
-1. the BIDS sidecar's `PhaseEncodingDirection`, then `PhaseEncodingAxis`, then
-   `InPlanePhaseEncodingDirectionDICOM`, moving on only when a field is absent;
-2. the NIfTI header's `dim_info` phase field;
-3. only if both are missing, an estimate from the data. Ghost masks are built
-   for both in-plane axes and the axis with the brighter ghost region wins,
-   because rolling along the true axis lands on ghost signal and the wrong axis
-   lands on background. Only finite ratios count. One measurable axis wins.
-   Equal finite ratios (including two zeros) or no measurable axis leave the
-   estimate unresolved. There is no near-tie tolerance.
+1. the BIDS sidecar fields `PhaseEncodingDirection`, `PhaseEncodingAxis` and
+   `InPlanePhaseEncodingDirectionDICOM`, in that order, each consulted only
+   when the preceding field is absent;
+2. the `dim_info` phase field of the NIfTI header;
+3. an estimate from the data, used only when both of the above are missing.
+   Ghost masks are constructed for both in-plane axes, and the axis with the
+   brighter ghost region is selected, because a shift along the true axis lands
+   on ghost signal and a shift along the other lands on background. Only finite
+   ratios are considered, and a single measurable axis is selected outright.
+   Equal finite ratios (two zeros included), or the absence of any measurable
+   axis, leave the estimate unresolved. No tolerance is applied for near-ties.
 
-The first sidecar phase-encoding field present must be valid. A malformed value
-raises an input error naming the field, including an empty string, null, boolean,
-number, or any string outside `i`/`i-`/`j`/`j-`/`k`/`k-`. The error is raised
-even if a weaker source could supply the axis. A valid authoritative field takes
-precedence over the weaker ones.
+The first phase-encoding field present in the sidecar must be valid. A malformed
+value (an empty string, null, a boolean, a number, or any string other than
+`i`, `i-`, `j`, `j-`, `k` or `k-`) raises an input error that names the field,
+even when a weaker source could have supplied the axis. A valid authoritative
+field takes precedence over the weaker sources.
 
-`--pe-axis` overrides all three. Polarity is dropped. The metrics work on one
-plane, so the direction must be in-plane (NIfTI axis `0`/`i` or `1`/`j`). A
-through-plane (`2`/`k`) acquisition raises an input error. When no axis
-resolves, all four ghost measurements are NaN and the region masks are absent
-from the analysis file.
+The `--pe-axis` option overrides all three sources. Polarity is discarded. The
+metrics are computed on a single plane, so the direction must lie in that plane
+(NIfTI axis `0`/`i` or `1`/`j`), and a through-plane (`2`/`k`) acquisition
+raises an input error. When no axis can be resolved, all four ghost measurements
+are NaN and the region masks are absent from the analysis file.
 
-### The region-matched masks
+## Region-matched masks
 
-Write $P$ for the phantom mask, $a$ for a candidate axis, and $S$ for a roll of
-half the field of view along it, $S = \lfloor N_a / 2 \rfloor$. The ghost
-region is the phantom rolled by $S$, eroded, with the dilated phantom and any
-nulled image edge removed:
+Let $P$ denote the phantom mask, $a$ a candidate axis, and
+$S = \lfloor N_a / 2 \rfloor$ a shift of half the field of view along it. The
+ghost region is the phantom shifted circularly by $S$ and eroded, with the
+dilated phantom and any nulled image edge removed:
 
 $$G_a = \operatorname{erode}_\rho(\operatorname{roll}_a(P, S))
 \;\cap\; \overline{\operatorname{dilate}_\rho(P)}
 \;\cap\; V$$
 
-with $\rho = 3$ voxels the erosion/dilation radius and $V$ the valid-data mask.
-The matching signal region is that same region rolled *back*:
+where $\rho = 3$ voxels is the radius of erosion and dilation and $V$ is the
+mask of valid data. The matching signal region is the same region shifted
+*back*:
 
 $$\Sigma_a = \operatorname{roll}_a(G_a, -S)$$
 
-so each ghost patch is compared against the tissue that produced it. Where
-phantom and ghost overlap they cannot be separated, so that zone is excluded
-from both. The masks are built once per in-plane axis and every ratio comes from
-them. No two members of the family can disagree, and a report that draws the
-regions draws what was measured.
+so that each ghost patch is compared with the part of the phantom that produced
+it. Where the phantom and its ghost overlap they cannot be separated, and that
+zone is excluded from both regions. The masks are constructed once per in-plane
+axis, and every ratio is derived from them. The four measurements are
+consequently consistent with one another, and a report that draws the regions
+draws exactly what was measured.
 
-### The four measurements
+## Measures
 
 With $\bar S_v$ the signal (temporal mean) image, the region-mean ratio along
 an axis is
 
 $$g_a = \frac{\langle \bar S \rangle_{G_a}}{\langle \bar S \rangle_{\Sigma_a}}$$
 
-and the four published percentages are, writing $p$ for the phase-encode axis
-and $r$ for the readout axis:
+Writing $p$ for the phase-encode axis and $r$ for the readout axis, the four
+reported percentages are
 
 $$\text{ghost \%} = 100\,g_p, \qquad
 \text{RO \%} = 100\,g_r, \qquad
@@ -83,26 +84,31 @@ $$\text{ghT \%} = 100\,
 \frac{\operatorname{mean}\big(\text{top } 10\% \text{ of } \bar S|_{G_p}\big)}
 {\langle \bar S \rangle_{\Sigma_p}}$$
 
-**ghost %** is the FBIRN percent ghost. **ghT %** is its localized companion
-(Greve's `fmriqa_ghostiness` in bxh). Its numerator is the mean of the brightest
-tenth of the ghost voxels (at least one voxel), so it is never below the region
-mean, and a bright concentrated ghost that the region mean dilutes still shows.
-**RO %** is the same measurement along the readout axis, where no N/2 ghost
-lands, so it is a background baseline on the same scale. **ACRg %** follows the
-ACR/AAPM percent-signal-ghosting idea (subtract a background estimate from the
-phase-encode ghost, normalize by the signal) in region-matched space. Each
-direction has its own matched denominator, so subtracting the readout ratio
-cancels the background without ACR's single-signal assumption. For a uniform
-phantom the denominators coincide and it reduces to the classic form.
+**ghost %** is the FBIRN percent ghost. **ghT %** is its localized counterpart,
+taken from Greve's `fmriqa_ghostiness` in the BXH/XCEDE tools. Its numerator is
+the mean of the brightest tenth of the ghost voxels (at least one voxel), so it
+is never smaller than the region mean, and it reveals a bright, concentrated
+ghost that the region mean dilutes. **RO %** is the same measurement along the
+readout axis. No N/2 ghost falls there, so it serves as a background baseline on
+the same scale.
 
-A ratio is NaN when its region is empty (the phantom spans the field of view
-along that axis, or the segmentation collapsed). That differs from a low ratio,
-which matters when the axis estimate uses these values to pick a winner.
+**ACRg %** adapts the percent-signal-ghosting measure of the ACR and AAPM
+(American College of Radiology, 2015; Jackson et al., 2010), which subtracts a
+background estimate from the phase-encode ghost and normalizes by the signal, to
+region-matched space. Each direction has its own matched denominator, so
+subtracting the readout ratio cancels the background without the ACR assumption
+of a single signal level. For a uniform phantom the denominators coincide and
+the measure reduces to the classical form.
 
-The band width $\rho$ and the top fraction are acquisition-dependent defaults.
-Verify them per protocol.
+A ratio is NaN when its region is empty, which occurs when the phantom spans the
+field of view along that axis or the segmentation has collapsed. This is
+distinct from a low ratio, and the distinction matters when the axis estimate
+compares these values.
 
-## What it looks like
+The band width $\rho$ and the top fraction are defaults that depend on the
+acquisition and should be verified for each protocol.
+
+## Example
 
 ```{eval-rst}
 .. plot::
@@ -141,13 +147,18 @@ Verify them per protocol.
    )
 ```
 
-Blue is the signal region, red the ghost region matched to it. The synthetic
-phantom carries a 2% N/2 ghost along the phase-encode axis and none along the
-readout axis. The phase-encode ghost reads about 2% and the readout ratio
-measures only the background, a fraction of a percent, so the ACR difference is
-about the size of the phase-encode ghost.
+The signal region is outlined in blue and the ghost region matched to it in red.
+The synthetic phantom fills about 0.8 of the field of view, as the FBIRN phantom
+does, so it overlaps its own ghost. The ghost regions are the parts of the
+shifted phantom that fall outside the overlap, and the signal regions are the
+parts of the phantom that produce them.
 
-## What it contributes to the analysis file
+The phantom carries a 2% N/2 ghost along the phase-encode axis and none along
+the readout axis. The phase-encode ghost accordingly reads about 2%, whereas the
+readout ratio measures only the background, a fraction of a percent, and the ACR
+difference is close to the size of the phase-encode ghost.
+
+## Stored quantities
 
 | Name | Where it lives | Meaning |
 | --- | --- | --- |
@@ -163,19 +174,24 @@ about the size of the phase-encode ghost.
 | `images.ghost.ro_ghost` | variable `(row, col)`, mask | readout ghost region |
 | `images.has_ghost` | attribute, ubyte flag | whether the four masks above are present |
 
-The four masks are present together or not at all. With no resolved
-phase-encode axis there are no ghost regions and `images.has_ghost` is 0. The
-four percentages are NaN, and `measurements.pe_axis` is *absent* rather than
-NaN. "No axis" is not a value the estimator failed to resolve. The quantity does
-not exist for that run. `pe_label` is always
-present and reads `?` when nothing named a direction.
+The four masks are present together or not at all. When no phase-encode axis is
+resolved, there are no ghost regions and `images.has_ghost` is 0. The four
+percentages are then NaN, whereas `measurements.pe_axis` is *absent*: the lack
+of an axis is not a value that an estimator failed to resolve, because the
+quantity does not exist for that run. `pe_label` is always present and reads
+`?` when no source named a direction.
 
 ## References
 
-- Friedman L, Glover GH. J Magn Reson Imaging 2006;23:827–839. The
-  region-matched percent ghost.
-- Greve DN, bxh/XCEDE `fmriqa_ghostiness`. The top-10% localized ghost, and
-  the readout direction as a background baseline.
-- ACR MRI Quality Control Manual / AAPM Report 100. Percent-signal ghosting,
-  $\lvert \text{ghost}_{\text{PE}} - \text{ghost}_{\text{freq}} \rvert /
-  \text{signal}$.
+- American College of Radiology. *Magnetic Resonance Imaging Quality Control
+  Manual.* Reston, VA: ACR; 2015.
+- Friedman L, Glover GH. Report on a multicenter fMRI quality assurance
+  protocol. *J Magn Reson Imaging* 2006;23:827–839.
+  [doi:10.1002/jmri.20583](https://doi.org/10.1002/jmri.20583)
+- Greve DN. `fmriqa_ghostiness`, in the BXH/XCEDE tools. The source of the
+  localized top-10% ghost and of the readout direction as a background
+  baseline.
+- Jackson EF, Bronskill MJ, Drost DJ, et al. *Acceptance Testing and Quality
+  Assurance Procedures for Magnetic Resonance Imaging Facilities.* AAPM Report
+  No. 100. College Park, MD: American Association of Physicists in Medicine;
+  2010.

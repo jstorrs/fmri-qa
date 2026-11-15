@@ -1,49 +1,50 @@
-# Installing
+# Installation
 
-You do not need to install anything to try fmri-qa. The
-{doc}`browser version <browser>` runs from a web page or a saved HTML file.
-Install it to get the desktop panel and the commands, to run it from scripts,
-or to keep the analysis files for trending.
+No installation is needed to try fmri-qa: the {doc}`browser version <browser>`
+runs from a web page or from a saved HTML file. Installation provides the
+desktop panel and the commands, allows the analysis to be scripted, and makes it
+possible to retain the analysis files for trending.
 
-## With uv
+## Installation with uv
 
-fmri-qa is not on PyPI yet. Install it from GitHub with
+fmri-qa is not yet published on PyPI. It is installed from GitHub with
 [uv](https://docs.astral.sh/uv/getting-started/installation/), which also
-fetches Python 3.13 if you do not have it:
+obtains Python 3.13 when it is not already present:
 
 ```console
 $ uv tool install "fmri-qa-launcher @ git+https://github.com/jstorrs/fmri-qa#subdirectory=packages/fmri-qa-launcher" --with-executables-from fmri-qa-cli
 ```
 
-This installs six commands:
+Six commands are installed:
 
-| Command | What it does |
+| Command | Function |
 | --- | --- |
-| `fmri-qa-run` | DICOM in, one report folder per series out ({doc}`fmri-qa-run`) |
-| `fmri-qa-panel` | the same run from a desktop window ({doc}`panel`) |
-| `fmri-qa-import` | DICOM to NIfTI, with QA-safe settings and sortable names ({doc}`fmri-qa-import`) |
-| `fmri-qa` | analyze NIfTI scans: a table, JSON, or analysis files ({doc}`fmri-qa`) |
-| `fmri-qa-hilo` | split thermal from instability noise with a flip-angle pair ({doc}`fmri-qa`) |
-| `fmri-qa-report` | render an analysis file as an HTML report ({doc}`fmri-qa-report`) |
+| `fmri-qa-run` | converts and analyzes a DICOM folder into one report folder per series ({doc}`fmri-qa-run`) |
+| `fmri-qa-panel` | performs the same run from a desktop window ({doc}`panel`) |
+| `fmri-qa-import` | converts DICOM to NIfTI, with settings suited to QA and sortable names ({doc}`fmri-qa-import`) |
+| `fmri-qa` | analyzes NIfTI scans into a table, JSON, or analysis files ({doc}`fmri-qa`) |
+| `fmri-qa-hilo` | separates thermal from instability noise with a flip-angle pair ({doc}`fmri-qa`) |
+| `fmri-qa-report` | renders an analysis file as an HTML report ({doc}`fmri-qa-report`) |
 
-Run any of them with `--version` to check the install. To update, run
+Running any of them with `--version` verifies the installation. To update, run
 `uv tool upgrade fmri-qa-launcher`.
 
 ## dcm2niix
 
-DICOM conversion uses [dcm2niix](https://github.com/rordenlab/dcm2niix). The
-install includes a copy, so there is nothing else to set up. To use another
-build (a newer one, or one with vendor patches), pass its path with
-`--dcm2niix`. You have to name it: the included copy is used before any
-dcm2niix on `PATH`.
+DICOM conversion relies on [dcm2niix](https://github.com/rordenlab/dcm2niix).
+The installation includes a copy, so no further setup is required. Another
+build, such as a newer release or one carrying vendor patches, is selected by
+passing its path with `--dcm2niix`. The path must be given explicitly, because
+the included copy takes precedence over any dcm2niix on `PATH`.
 
 ## The desktop panel
 
-The panel needs `tkinter` and a graphical display. The Python that uv installs
-includes `tkinter`. A system Python on Linux may not: install your
-distribution's `python3-tk` package, or let uv manage Python.
+The panel requires `tkinter` and a graphical display. The Python that uv
+installs includes `tkinter`. A system Python on Linux may not, in which case
+either the distribution's `python3-tk` package should be installed or Python
+should be left to uv.
 
-## Without Python
+## Use without Python
 
-A single executable with Python, fmri-qa and dcm2niix inside can be built for
-machines where nothing can be installed. See {doc}`developers`.
+For computers on which nothing can be installed, a single executable containing
+Python, fmri-qa and dcm2niix can be built. See {doc}`developers`.

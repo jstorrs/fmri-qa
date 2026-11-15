@@ -1,39 +1,42 @@
-# What the report shows
+# The report
 
-A report is one page, read top to bottom. A masthead gives the scan's title, its
-acquisition in a line, and the scanner, coil and acquisition time. A bar beneath
-it links to each section.
+A report is a single page, intended to be read from top to bottom. A masthead
+gives the title of the scan, a one-line summary of its acquisition, and the
+scanner, coil and acquisition time. A bar beneath it links to each section.
 
-## The sections
+## Sections
 
-In the order they appear:
+The sections appear in the following order.
 
-1. **Metrics**: a tile for each of the fifteen headline metrics (SNR, SFNR, RDC,
-   the four ghost measures, drift, percent fluctuation, the three outlier and
-   spike scores, the largest translation and center-of-mass displacement, and
-   FWHM), each with its recorded unit and a one-line definition. A measurement
-   whose estimator could not be resolved shows a dash and says so instead of a
-   number. The values are descriptive, and the report applies no acceptance
-   thresholds. Beneath the tiles, a note carries any
+1. **Metrics.** A tile is shown for each of the fifteen headline metrics: SNR,
+   SFNR, RDC, the four ghost measures, drift, percent fluctuation, the three
+   outlier and spike scores, the largest translation and center-of-mass
+   displacement, and FWHM. Each tile gives the recorded unit and a one-line
+   definition. A measurement whose estimator could not resolve a value shows a
+   dash and a statement to that effect in place of a number. The values are
+   descriptive, and the report applies no acceptance thresholds. Beneath the
+   tiles, a note carries any
    {doc}`localization </user-guide/analyses/localization>` or
-   {doc}`clipping </user-guide/analyses/saturation>` warning the analysis file
-   recorded, or says that none was.
-2. **Acquisition and analysis settings**: what was acquired (series, times,
-   trimmed frames, recorded phase-encode direction) and how the analysis was
-   configured (trim, detrending, ROI center and size, any phase-encode override).
-3. **Figures**, in two groups, listed below.
-4. **Definitions and methods**: each metric's definition and method, one
-   collapsible entry per metric.
-5. **Source and provenance**: the source, scan name, acquisition and analysis
-   times, the core version that wrote the analysis file, the analysis file schema version
-   loaded, and the report version.
+   {doc}`clipping </user-guide/analyses/saturation>` warning recorded in the
+   analysis file, or states that there was none.
+2. **Acquisition and analysis settings.** These describe what was acquired
+   (series, times, trimmed frames, recorded phase-encode direction) and how the
+   analysis was configured (trim, detrending, ROI center and size, and any
+   phase-encode override).
+3. **Figures**, in the two groups listed below.
+4. **Definitions and methods.** The definition and method of each metric, as
+   one collapsible entry per metric.
+5. **Source and provenance.** The source, the scan name, the acquisition and
+   analysis times, the version of the core package that wrote the analysis file,
+   the schema version of the analysis file as loaded, and the report version.
 
-## The figures
+## Figures
 
-Every figure is drawn from values stored in the analysis file, and each is listed with
-the analysis that computes what it plots. The phantom outline and summary ROI on
-the image figures, and the invalid image edge marked on the ghost figure when
-there is one, come from {doc}`/user-guide/analyses/localization`.
+Every figure is drawn from values stored in the analysis file. The tables below
+list each figure with the analysis that computes what it plots. The phantom
+outline and the summary ROI on the image figures, and the invalid image edge
+marked on the ghost figure when one is present, are provided by
+{doc}`/user-guide/analyses/localization`.
 
 **Image diagnostics** are per-frame and static spatial views of the phantom,
 noise and ghost regions:
@@ -46,8 +49,8 @@ noise and ghost regions:
 | Static noise | odd–even static-noise image, with outline and ROI | {doc}`/user-guide/analyses/stability` |
 | N/2 ghost regions | mean image with the phase-encode and readout ghost sampling regions | {doc}`/user-guide/analyses/ghosting` |
 
-**Temporal and spatial diagnostics** show time-series stability, motion and
-spatial resolution across the run:
+**Temporal and spatial diagnostics** show the stability of the time series, the
+motion, and the spatial resolution over the run:
 
 | Figure | What it draws | Computed by |
 | --- | --- | --- |
@@ -63,24 +66,24 @@ spatial resolution across the run:
 
 ## The page as a file
 
-A report is a single HTML file that needs nothing beside it, so you can email it,
-attach it to a QA record, or drop it into an existing website.
+A report is a single HTML file with no external dependencies. It can be sent by
+email, attached to a QA record, or placed on an existing website.
 
-- **Self-contained.** The stylesheet is inlined in a `<style>` element and every
-  figure is an SVG embedded as a `data:` URI. The page makes no network request
-  and refers to no sibling file.
-- **No JavaScript.** The page has no script at all and sets no
-  Content-Security-Policy of its own. A site that serves it under one needs to
-  allow only inline styles (`style-src 'unsafe-inline'`, or the stylesheet's
-  hash) and `data:` images (`img-src data:`).
-- **Click to enlarge.** Clicking a figure fills the window with it, and clicking
-  again closes it. This uses the CSS `:target` selector, so it works where
-  scripts are blocked, and each figure also has a fragment address (`#fig-sfnr`,
-  `#fig-motion`, …).
-- **Dark mode** follows the reader's operating-system setting. There is no
-  toggle. The figures stay on a white plate in both modes, so plotted data keeps
-  its colors.
-- **Print-ready.** A print stylesheet drops the section bar, lays figures out two
-  or three to a row, keeps each figure, tile and definition whole on one page,
-  and prints every collapsed definition open. An enlarged figure prints in place
-  like the rest.
+- **Self-contained.** The stylesheet is inlined in a `<style>` element, and
+  every figure is an SVG embedded as a `data:` URI. The page makes no network
+  request and refers to no accompanying file.
+- **No JavaScript.** The page contains no script and sets no
+  Content-Security-Policy of its own. A site that serves it under such a policy
+  needs to allow only inline styles (`style-src 'unsafe-inline'`, or the hash of
+  the stylesheet) and `data:` images (`img-src data:`).
+- **Enlargeable figures.** Clicking a figure enlarges it to fill the window, and
+  clicking again closes it. The behavior relies on the CSS `:target` selector,
+  so it works where scripts are blocked, and each figure also has a fragment
+  address (`#fig-sfnr`, `#fig-motion`, …).
+- **Dark mode** follows the setting of the reader's operating system, and there
+  is no toggle. The figures remain on a white background in both modes, so that
+  plotted data keep their colors.
+- **Print layout.** A print stylesheet omits the section bar, arranges the
+  figures two or three to a row, keeps each figure, tile and definition whole on
+  one page, and prints every collapsed definition expanded. An enlarged figure
+  prints in its normal position.

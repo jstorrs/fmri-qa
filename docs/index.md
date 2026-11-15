@@ -1,17 +1,20 @@
 # fmri-qa
 
-fmri-qa measures how stable an MRI scanner is during an fMRI acquisition, from
-a phantom series. It follows the Glover/FBIRN stability protocol (Friedman &
-Glover, 2006) and reports SNR, SFNR, the Weisskoff radius of decorrelation,
-drift and fluctuation, with Nyquist ghosting, receiver clipping, outlier volumes
-and spikes, gradient-heating motion, and noise smoothness beside them. Each
-series gets a self-contained HTML report, and its numbers are saved in a file
-that MATLAB, R, Python or a trend database can read.
+fmri-qa quantifies the stability of an MRI scanner during functional imaging
+from a phantom time series. It implements the Glover/FBIRN stability protocol
+(Friedman & Glover, 2006), which reports the signal-to-noise ratio (SNR), the
+signal-to-fluctuation-noise ratio (SFNR), the Weisskoff radius of decorrelation,
+drift, and fluctuation. To these it adds measures of Nyquist ghosting, receiver
+clipping, outlier volumes and spikes, apparent motion caused by gradient
+heating, and noise smoothness. Each series yields a self-contained HTML report,
+and its numerical results are saved in a file that MATLAB, R, Python, or a trend
+database can read.
 
-**[Open fmri-qa in your browser](https://jstorrs.github.io/fmri-qa/app/)** to try
-it with nothing to install. Give it DICOM, choose the series, and it converts
-and analyzes them on your own computer, sending nothing anywhere. You can save
-the page and run it offline. The source is
+The analysis can also be
+**[run in a web browser](https://jstorrs.github.io/fmri-qa/app/)** with no
+installation. The page accepts DICOM, lists the series it contains, and converts
+and analyzes the selected series on the user's own computer. No data leave that
+computer, and the page can be saved and used offline. The source code is
 [on GitHub](https://github.com/jstorrs/fmri-qa).
 
 ```{toctree}
@@ -21,20 +24,27 @@ user-guide/index
 api/index
 ```
 
-## Where to start
+## Organization of the documentation
 
-- **"How do I run QA on a phantom series?"**:
+- **Running an analysis.** A phantom series can be analyzed
   {doc}`in the browser </user-guide/browser>`,
   {doc}`from the desktop panel </user-guide/panel>`, or
   {doc}`from a terminal </user-guide/fmri-qa-run>`. The panel and the commands
-  need {doc}`installing </user-guide/install>`.
-- **"What does this number mean?"**: {doc}`/user-guide/analyses/index` lists
-  every measurement, with a page per analysis giving its method and equations.
-- **"What is in the report?"**: {doc}`/user-guide/report-page`.
-- **"How do I track the numbers over time?"**: {doc}`/user-guide/fmri-qa`
-  writes JSON for a trend database, and {doc}`/user-guide/analysis-file` shows how to
-  open an analysis file in MATLAB, R or Python.
-- **"Can I put a report on our website?"**: {doc}`/user-guide/report-page`
-  says what the file contains and what an embedding site has to allow.
-- **"Calling it from Python?"**: {doc}`/user-guide/developers`, and the
-  {doc}`API reference </api/index>`.
+  require {doc}`installation </user-guide/install>`.
+- **Definitions of the measurements.** {doc}`/user-guide/analyses/index` lists
+  every measurement, and the page for each analysis gives its method and
+  equations.
+- **Contents of the report.** {doc}`/user-guide/report-page` describes each
+  section and figure, the contents of the HTML file, and what a website that
+  embeds it must permit.
+- **Longitudinal tracking.** {doc}`/user-guide/fmri-qa` writes JSON suitable for
+  a trend database, and {doc}`/user-guide/analysis-file` shows how to open an
+  analysis file in MATLAB, R or Python.
+- **Use from Python.** {doc}`/user-guide/developers` introduces the packages,
+  and the {doc}`API reference </api/index>` documents every public name.
+
+## Reference
+
+- Friedman L, Glover GH. Report on a multicenter fMRI quality assurance
+  protocol. *J Magn Reson Imaging* 2006;23:827–839.
+  [doi:10.1002/jmri.20583](https://doi.org/10.1002/jmri.20583)

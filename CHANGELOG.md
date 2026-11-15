@@ -21,7 +21,8 @@ versioning when the first stable public interface is released.
   k-space noise, so it has a scanner's edges, Gibbs ringing and Rayleigh air
   background (`NOISE_SIGMA`), and `ghost` and `drift` add an N/2 ghost of a
   given ghost-to-signal ratio and a linear signal drift the way an acquisition
-  makes them.
+  makes them. `instability` adds a per-frame gain fluctuation shared by the
+  whole frame, and `diameter` sizes the disk.
 - **`fmriqa_io.convert.filing.plan_names`, the import's file naming as a pure
   function.** It maps the filenames dcm2niix wrote, and their sidecars, to the
   names `import_dicom` files them under, with no filesystem, so a browser can

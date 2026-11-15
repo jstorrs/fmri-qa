@@ -32,6 +32,8 @@ def write_phantom(
     smoothing: float = 0.0,
     ghost: float = 0.0,
     drift: float = 0.0,
+    instability: float = 0.0,
+    diameter: float = 0.5,
 ) -> Path:
     """Write a synthetic phantom NIfTI + sidecar; return the NIfTI path.
 
@@ -50,12 +52,21 @@ def write_phantom(
     would create a false `2**16 - 1` rail.
 
     `smoothing` blurs the series in-plane, `ghost` adds an N/2 ghost along the
-    phase-encode axis and `drift` a linear signal drift (see
-    `synthetic_series`). The docs use all three. `fmriqa.testing.phantom_scan`
-    describes only the unblurred phantom with neither.
+    phase-encode axis, `drift` a linear signal drift and `instability` a
+    per-frame gain fluctuation, and `diameter` sizes the disk (see
+    `synthetic_series`). The docs use all five. `fmriqa.testing.phantom_scan`
+    describes only the default phantom with none of them.
     """
     data = synthetic_series(
-        n=n, z=z, t=t, seed=seed, smoothing=smoothing, ghost=ghost, drift=drift
+        n=n,
+        z=z,
+        t=t,
+        seed=seed,
+        smoothing=smoothing,
+        ghost=ghost,
+        drift=drift,
+        instability=instability,
+        diameter=diameter,
     )
 
     img = nib.Nifti1Image(data.astype(np.uint16), affine=np.eye(4))

@@ -146,6 +146,47 @@ def test_a_drift_that_zeroes_the_gain_or_is_not_finite_is_rejected(
         synthetic_series(drift=drift)
 
 
+def test_instability_is_a_gain_shared_by_the_whole_frame() -> None:
+    """Noise-free, every disk voxel follows one gain, of the requested std."""
+    series = synthetic_series(n=32, z=2, t=400, instability=0.01, noise=0.0)
+    centre, off_centre = series[16, 16, 0], series[12, 19, 1]
+    assert off_centre / centre == pytest.approx(off_centre[0] / centre[0], rel=1e-9)
+    assert centre.std() / centre.mean() == pytest.approx(0.01, rel=0.1)
+
+
+def test_instability_leaves_the_noise_draws_unchanged() -> None:
+    """The gain has its own generator, so the air background barely moves."""
+    plain = synthetic_series(n=32, z=1, t=4)
+    unstable = synthetic_series(n=32, z=1, t=4, instability=0.01)
+    assert np.allclose(plain[:4, :4], unstable[:4, :4], atol=0.05)
+    assert not np.array_equal(plain, unstable)
+
+
+@pytest.mark.parametrize("instability", [-0.01, float("inf"), float("nan")])
+def test_a_negative_or_non_finite_instability_is_rejected(instability: float) -> None:
+    with pytest.raises(ValueError, match=f"got {instability}"):
+        synthetic_series(instability=instability)
+
+
+def test_the_diameter_sets_the_disk_size() -> None:
+    """Noise-free, the area above half signal is the disk of that diameter."""
+    series = synthetic_series(n=64, z=1, t=1, diameter=0.8, noise=0.0)
+    area = (series[:, :, 0, 0] > PHANTOM_SIGNAL / 2).sum()
+    assert area == pytest.approx(np.pi * (0.8 * 64 / 2) ** 2, rel=0.02)
+
+
+def test_the_default_diameter_is_the_half_frame_disk() -> None:
+    assert np.array_equal(
+        synthetic_series(n=32, z=1, t=2), synthetic_series(n=32, z=1, t=2, diameter=0.5)
+    )
+
+
+@pytest.mark.parametrize("diameter", [0.0, 1.0, -0.5, float("nan")])
+def test_a_diameter_outside_the_frame_is_rejected(diameter: float) -> None:
+    with pytest.raises(ValueError, match=f"got {diameter}"):
+        synthetic_series(diameter=diameter)
+
+
 def test_the_background_is_rayleigh_at_the_noise_sigma() -> None:
     """The air's mean magnitude is NOISE_SIGMA·√(π/2), the Rayleigh mean.
 

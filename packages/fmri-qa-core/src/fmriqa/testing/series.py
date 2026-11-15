@@ -4,8 +4,9 @@ This is the deterministic test and doc phantom, shipped so they all measure
 against one definition. It is a uniform disk rendered from its exact k-space
 (see `kspace`, after Guerquin-Kern et al. [1]_), with seeded complex k-space
 noise, so its magnitude image has the edges, Gibbs ringing and Rayleigh air
-background a scanner gives. An N/2 ghost and a linear signal drift can be added
-the way an acquisition produces them. `synthetic_series` is the raw array.
+background a scanner gives. An N/2 ghost, a linear signal drift and a
+frame-to-frame gain fluctuation can be added the way an acquisition produces
+them, and the disk can be resized. `synthetic_series` is the raw array.
 `phantom_scan` is the `QAScan` that loading the file
 `fmriqa_io.testing.write_phantom` writes gives back, built without touching a
 file. A parity test in `fmri-qa-io` pins the two together.
@@ -53,12 +54,15 @@ def synthetic_series(
     *,
     ghost: float = 0.0,
     drift: float = 0.0,
+    instability: float = 0.0,
+    diameter: float = 0.5,
     noise: float = NOISE_SIGMA,
 ) -> FloatArray:
     r"""Render a uniform disk phantom from exact k-space, with seeded noise.
 
     The disk is centred on voxel ``n // 2`` along both in-plane axes, with
-    radius ``n / 4`` voxels and signal `PHANTOM_SIGNAL`, under a uniform coil.
+    diameter ``diameter·n`` voxels and signal `PHANTOM_SIGNAL`, under a uniform
+    coil.
     Every slice and frame samples the same analytic spectrum [1]_, adds fresh
     complex white noise and takes the magnitude, so the background is Rayleigh
     and, unsmoothed, the disk carries temporal noise of std about `noise`.
@@ -84,6 +88,15 @@ def synthetic_series(
     drift : float
         Signal change from the first frame to the last, as a fraction of the
         series mean signal. Linear in frame index. Within (-2, 2).
+    instability : float
+        Std of a gain fluctuation, as a fraction of the signal, drawn once per
+        frame and shared by every slice. It is the multiplicative noise a
+        scanner has, coherent across the image, which averaging over an ROI
+        cannot reduce. Finite and non-negative; zero adds none.
+    diameter : float
+        Disk diameter, as a fraction of the frame side. Within (0, 1). The
+        default half-frame disk puts its N/2 ghost region beside it with no
+        overlap. The FBIRN sphere fills about 0.8 of the field of view.
     noise : float
         Image noise std per real and imaginary part, in signal units, before
         `smoothing` (which lowers it). Finite and non-negative; zero gives the
@@ -97,8 +110,9 @@ def synthetic_series(
     Raises
     ------
     ValueError
-        If `smoothing`, `noise` or `ghost` is negative or not finite, `ghost`
-        is positive and `n` odd, or `drift` is not finite or outside (-2, 2).
+        If `smoothing`, `noise`, `ghost` or `instability` is negative or not
+        finite, `ghost` is positive and `n` odd, `drift` is not finite or
+        outside (-2, 2), or `diameter` is not within (0, 1).
 
     Notes
     -----
@@ -122,6 +136,11 @@ def synthetic_series(
     ``drift`` times it: `fmriqa.drift_percent` reads ``100·drift`` on an
     untrimmed, noise-free series whose detrend fits at least a line.
 
+    Instability: frame ``i`` also scales the object's k-space (not the noise)
+    by ``1 + instability·e_i``, with ``e_i`` standard normal. The draws come
+    from a generator of their own, so a series is the same noise with or
+    without them.
+
     References
     ----------
     .. [1] M. Guerquin-Kern, L. Lejeune, K. P. Pruessmann, M. Unser,
@@ -141,10 +160,16 @@ def synthetic_series(
     if not (math.isfinite(drift) and abs(drift) < 2.0):
         # At |drift| >= 2 the gain reaches zero or flips sign.
         raise ValueError(f"drift must be finite and within (-2, 2), got {drift}")
+    if not (math.isfinite(instability) and instability >= 0.0):
+        raise ValueError(
+            f"instability must be finite and non-negative, got {instability}"
+        )
+    if not 0.0 < diameter < 1.0:
+        raise ValueError(f"diameter must be within (0, 1), got {diameter}")
 
     grid = Grid((n, n), (VOXEL_MM, VOXEL_MM))
     ky, kx = grid.k()
-    disk = Component(Disk((0.0, 0.0), n / 4 * VOXEL_MM), PHANTOM_SIGNAL)
+    disk = Component(Disk((0.0, 0.0), n * diameter / 2 * VOXEL_MM), PHANTOM_SIGNAL)
     # One noise-free spectrum serves every slice and frame.
     signal = object_spectrum([disk], ky, kx)
 
@@ -156,6 +181,11 @@ def synthetic_series(
     # clean, unblurred series takes no rounding from them.
     weight = apodization * phase[None, :]
     gain = 1.0 + drift * (np.arange(t) - (t - 1) / 2) / max(t - 1, 1)
+    if instability > 0.0:
+        # A generator of its own: the noise draws below are unchanged by it.
+        gain = gain * (
+            1.0 + np.random.default_rng([seed, 1]).normal(0.0, instability, t)
+        )
 
     rng = np.random.default_rng(seed)
     series = np.empty((n, n, z, t), dtype=np.float64)
