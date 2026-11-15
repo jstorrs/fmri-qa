@@ -1,17 +1,18 @@
 # User guide
 
-## Running QA
+## Running an analysis
 
-fmri-qa takes a phantom fMRI series as DICOM and gives back a report and its
-numbers. Three ways to run it:
+fmri-qa takes a phantom fMRI series in DICOM format and produces a report
+together with its numerical results. It can be run in three ways:
 
-- **{doc}`In the browser <browser>`**, with nothing to install. Good for trying
-  it, or for a machine where nothing can be installed.
-- **{doc}`The desktop panel <panel>`**, a window that runs a DICOM folder into
-  one report folder per series.
-- **{doc}`fmri-qa-run`**, the same run from a terminal or a script.
+- **{doc}`In the browser <browser>`**, with no installation. This suits a first
+  trial, or a computer on which software cannot be installed.
+- **{doc}`From the desktop panel <panel>`**, a window that processes a DICOM
+  folder into one report folder per series.
+- **{doc}`With fmri-qa-run <fmri-qa-run>`**, which performs the same run from a
+  terminal or a script.
 
-The panel and the commands need {doc}`installing <install>` first.
+The panel and the commands require {doc}`installation <install>`.
 
 ```{toctree}
 :maxdepth: 1
@@ -23,12 +24,13 @@ fmri-qa-run
 run-output
 ```
 
-## Reading the results
+## Interpreting the results
 
-The report is one HTML page per series: the headline numbers, any localization
-or clipping warning, the settings, the figures, and how each metric is defined.
-It applies no pass or fail thresholds. Each analysis has a page with its
-purpose, method and equations, and a figure from a synthetic phantom.
+The report is a single HTML page per series. It presents the headline
+measurements, any localization or clipping warning, the settings, the figures,
+and the definition of each metric. It applies no pass or fail thresholds. Each
+analysis is documented on a page of its own, which states its purpose, method
+and equations and includes a figure computed from a synthetic phantom.
 
 ```{toctree}
 :maxdepth: 2
@@ -37,17 +39,16 @@ report-page
 analyses/index
 ```
 
-- **"What does this number mean?"**: find it in the
-  [list of analyses](analyses/index.md), which names every measurement.
-- **"Can I trust this figure?"**: every figure on these pages is drawn when the
-  documentation is built, by running the pipeline on a synthetic phantom. A
-  figure that stopped matching the code would fail the build.
+The [list of analyses](analyses/index.md) names every measurement and links to
+the page that defines it. The figures on those pages are generated when the
+documentation is built, by running the pipeline on a synthetic phantom. A figure
+that no longer agreed with the code would cause the build to fail.
 
-## Step by step, and trending
+## Individual stages and longitudinal tracking
 
-`fmri-qa-run` converts, analyzes and reports in one go. The steps are also
-commands of their own, for keeping the numbers over time or building your own
-workflow:
+`fmri-qa-run` converts, analyzes and reports in a single step. Each stage is
+also available as a separate command, for retaining the results over time or for
+constructing a custom workflow:
 
 ```{toctree}
 :maxdepth: 1
@@ -58,15 +59,16 @@ fmri-qa-report
 analysis-file
 ```
 
-- **{doc}`fmri-qa-import`** converts DICOM to NIfTI with QA-safe dcm2niix
-  settings and names that sort.
-- **{doc}`fmri-qa`** analyzes NIfTI scans into a table, JSON for a trend
-  database, or analysis files. `fmri-qa-hilo` is on the same page.
+- **{doc}`fmri-qa-import`** converts DICOM to NIfTI with dcm2niix settings that
+  preserve the validity of the QA checks, and assigns names that sort
+  chronologically.
+- **{doc}`fmri-qa`** analyzes NIfTI scans and produces a table, JSON for a trend
+  database, or analysis files. `fmri-qa-hilo` is described on the same page.
 - **{doc}`fmri-qa-report`** renders an analysis file as a report.
-- **{doc}`The analysis file <analysis-file>`** (`.qa.nc`) holds every number, curve and
-  image, and opens in MATLAB, R and Python.
+- **{doc}`The analysis file <analysis-file>`** (`.qa.nc`) contains every number,
+  curve and image, and can be opened in MATLAB, R and Python.
 
-## From Python
+## Use from Python
 
 ```{toctree}
 :maxdepth: 1
@@ -75,7 +77,7 @@ report-library
 developers
 ```
 
-- **{doc}`report-library`**: render a report from your own code, in your own
-  colors.
-- **{doc}`developers`**: the packages, calculating from Python, building the
-  project, and the design notes.
+- **{doc}`report-library`** describes how to render a report from user code,
+  with custom colors.
+- **{doc}`developers`** covers the packages, calculation from Python, building
+  the project, and the design notes.

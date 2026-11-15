@@ -19,8 +19,8 @@ public then.
 
 Two spellings are checked, for two different mistakes:
 
-* **The contribution tables** (the first column of the table under "What it
-  contributes to the analysis file") are the ownership claim, so coverage and
+* **The contribution tables** (the first column of the table under "Stored
+  quantities") are the ownership claim, so coverage and
   uniqueness are measured there. A dimension name like `frame` is an ordinary
   word that appears in half the prose, so only the table column can say which
   page owns it.
@@ -46,7 +46,7 @@ DOCS = Path(fmriqa_io.__file__).parents[4] / "docs" / "user-guide"
 ANALYSES = DOCS / "analyses"
 
 # The heading whose table is the page's ownership claim.
-CONTRIBUTION_HEADING = "## What it contributes to the analysis file"
+CONTRIBUTION_HEADING = "## Stored quantities"
 
 # A dotted name in backticks, anywhere on a page. The four prefixes are the ones
 # that name something the analysis file actually holds.
@@ -67,7 +67,7 @@ def _contribution_names(page: Path) -> list[str]:
     """The backticked names in the first column of `page`'s contribution table.
 
     An analysis that contributes nothing to the analysis file (the hi/lo flip-angle
-    pair) has the heading and no table, and yields nothing.
+    pair) has no such heading, and yields nothing.
     """
     body = page.read_text().split(CONTRIBUTION_HEADING, 1)
     if len(body) != 2:

@@ -56,7 +56,7 @@ fetches Python 3.13 if needed. dcm2niix is included:
 $ uv tool install "fmri-qa-launcher @ git+https://github.com/jstorrs/fmri-qa#subdirectory=packages/fmri-qa-launcher" --with-executables-from fmri-qa-cli
 ```
 
-[Installing](https://jstorrs.github.io/fmri-qa/user-guide/install.html) has the
+[Installation](https://jstorrs.github.io/fmri-qa/user-guide/install.html) has the
 details, including using your own dcm2niix build.
 
 ## What you get
@@ -66,7 +66,7 @@ details, including using your own dcm2niix build.
   fourteen figures, and each metric's definition. It applies no pass or fail
   thresholds. It needs no network or other file, so you can email it, attach it
   to a QA record or put it on a website, and it prints well.
-  [What the report shows](https://jstorrs.github.io/fmri-qa/user-guide/report-page.html).
+  [The report](https://jstorrs.github.io/fmri-qa/user-guide/report-page.html).
 - **The numbers**: `fmri-qa` prints a table, or JSON for a trend database, and
   the `.qa.nc` analysis file holds every number, curve and image for MATLAB, R
   or Python. [Analyzing NIfTI scans](https://jstorrs.github.io/fmri-qa/user-guide/fmri-qa.html)

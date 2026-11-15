@@ -1,41 +1,40 @@
 # Smoothness and point spread
 
-## What it is for
-
 The Weisskoff RDC on the [stability](stability.md) page is confounded by spatial
 smoothness. A smoother noise field decorrelates more slowly, so an otherwise
-identical scanner scores a larger RDC if its reconstruction filters more. So
-this page measures smoothness directly, per axis: the phase-encode and readout
-axes are filtered differently, and one combined number would hide that.
+identical scanner obtains a larger RDC when its reconstruction applies more
+filtering. This analysis therefore measures smoothness directly and separately
+for each axis. The phase-encode and readout axes are filtered differently, and a
+single combined figure would conceal the difference.
 
-It publishes two things. One is the Gaussian FWHM of the noise field along each
-in-plane axis, following AFNI's `3dFWHMx`. The other is a directional
-point-spread profile, the empirical shape of the blur at each lag. It shows
-whether the point spread is Gaussian or has the long tails a reconstruction
-filter or interpolation can leave.
+Two results are reported. The first is the Gaussian full width at half maximum
+(FWHM) of the noise field along each in-plane axis, following AFNI's `3dFWHMx`
+(Cox, 1996). The second is a directional point-spread profile, the empirical
+shape of the blur as a function of lag, which shows whether the point-spread
+function (PSF) is Gaussian or has the long tails that a reconstruction filter or
+interpolation can introduce.
 
-## Method
+## Preparation of the noise field
 
-### Preparing the noise field
-
-The estimate runs on the pipeline's detrended fluctuations (the residual field
-every other noise measurement uses), restricted to the phantom mask. Each voxel
-is first robustly standardized over time:
+The estimate is computed from the detrended fluctuations of the pipeline, the
+residual field on which every other noise measurement is based, restricted to
+the phantom mask. Each voxel is first standardized robustly over time:
 
 $$\hat r_v(t) = \frac{r_v(t) - \operatorname{median}_t r_v}
 {\operatorname{median}_t \lvert r_v - \operatorname{median}_t r_v \rvert}$$
 
-This is AFNI's `-unif`, which its `-detrend` path forces on. Without it, raw
-fluctuation amplitude that varies across the phantom would be reported as
-varying *correlation*. A voxel constant over time has no MAD to divide by and is
-dropped from the working mask.
+This corresponds to AFNI's `-unif` option, which its `-detrend` path enforces.
+Without it, a fluctuation amplitude that varies across the phantom would be
+reported as a variation in *correlation*. A voxel that is constant over time has
+no median absolute deviation (MAD) by which to divide and is removed from the
+working mask.
 
-### The Classic FWHM
+## The FWHM estimate
 
-For a smoothed white-noise field, the smoothing kernel width ties the variance
-of forward first differences along an axis to the voxel variance. This is AFNI's
-Classic `mri_estimate_FWHM_1dif` estimator. Over neighbor pairs that are *both*
-in the mask,
+For a white-noise field that has been smoothed, the width of the smoothing
+kernel relates the variance of forward first differences along an axis to the
+variance of the voxels. This is AFNI's Classic estimator,
+`mri_estimate_FWHM_1dif`. Over pairs of neighbors that are *both* in the mask,
 
 $$\mathrm{arg} = 1 - \frac{1}{2}\,
 \frac{\operatorname{var}(\hat r_{i+1} - \hat r_i)}{\operatorname{var}(\hat r)},
@@ -44,46 +43,50 @@ $$\mathrm{arg} = 1 - \frac{1}{2}\,
 \qquad
 \mathrm{FWHM} = \sqrt{8 \ln 2}\;\sigma$$
 
-in voxels, multiplied by the voxel size for millimeters. An axis whose
-$\mathrm{arg}$ leaves $(0, 1)$ (too little correlation to resolve, or too few
-in-mask pairs) gives NaN, not the logarithm of a non-positive value.
+in voxels, and multiplied by the voxel size to give millimeters. An axis for
+which $\mathrm{arg}$ falls outside $(0, 1)$, through too little correlation to
+resolve or too few in-mask pairs, yields NaN and not the logarithm of a
+non-positive value.
 
-Each fluctuation frame is estimated independently and the frames are combined
-by geometric mean (AFNI's `-geom`), as AFNI does for scale-like quantities. The
-axes are labeled by direction: `fwPE` along phase-encode, `fwRO` along readout.
-A combined figure (AFNI's `ccomb`, the geometric mean of the two directions) is
-published too. It is the one number left when no phase-encode axis resolved, in
-which case the two directional fields are absent and the axes are named
-`axis0`/`axis1` instead of `PE`/`RO`.
+Each fluctuation frame is estimated independently, and the frames are combined
+by their geometric mean (AFNI's `-geom`), the convention AFNI adopts for
+scale-like quantities. The axes are labeled by direction: `fwPE` along the
+phase-encode axis and `fwRO` along the readout axis. A combined value, the
+geometric mean of the two directions (AFNI's `ccomb`), is also stored. It is the
+only value that remains when no phase-encode axis has been resolved, in which
+case the two directional fields are absent and the axes are named `axis0` and
+`axis1` in place of `PE` and `RO`.
 
-### The point-spread curves
+## The point-spread profiles
 
-The noise field is a point-spread function convolved with white noise, so its
+The noise field is white noise convolved with a point-spread function, so its
 normalized spatial autocorrelation is the autocorrelation of the PSF. For a
-Gaussian PSF that equals the PSF squared, so squaring the measured
+Gaussian PSF this equals the square of the PSF, so the square of the measured
 autocorrelation at each lag gives the empirical point-spread profile:
 
 $$\mathrm{PSF}_{\text{emp}}(d) = \rho(d)^2, \qquad
 \rho(d) = \frac{\langle (\hat r_{i+d} - \bar{\hat r})
 (\hat r_i - \bar{\hat r}) \rangle}{\operatorname{var}(\hat r)}$$
 
-taken over in-mask neighbor pairs, for lags $d = 0 \dots 10$ voxels (truncated
-to the image if it is smaller). Against it the analysis samples the Gaussian the
-measured FWHM implies,
+evaluated over in-mask neighbor pairs for lags $d = 0 \dots 10$ voxels, or fewer
+if the image is smaller. For comparison, the analysis samples the Gaussian
+implied by the measured FWHM,
 
 $$\mathrm{PSF}_{\text{model}}(x) = \exp\!\left(-\frac{x^2}{2\sigma^2}\right),
 \qquad \sigma = \frac{\mathrm{FWHM}}{\sqrt{8 \ln 2}}$$
 
-on a grid of 100 points over a plotting range the *analysis* chooses, so a
-report draws the intended curve and does not re-derive it. A narrower curve is a
-sharper direction. Empirical points that fall off the Gaussian flag a
-non-Gaussian, typically long-tailed, point spread.
+on a grid of 100 points spanning a plotting range that the *analysis* selects,
+so that a report draws the intended curve without deriving it again. A narrower
+curve indicates a sharper direction. Empirical points that depart from the
+Gaussian indicate a non-Gaussian, typically long-tailed, point spread. This
+construction follows from the Gaussian random-field model that the FWHM estimate
+already assumes.
 
-The lag abscissas are lengths in the FWHM's unit, so they differ between the two
-directions whenever the voxel is anisotropic. That is why they are stored as a
-full 2-D array, not a shared axis.
+The lag abscissas are lengths in the unit of the FWHM, so they differ between
+the two directions whenever the voxel is anisotropic. For this reason they are
+stored as a full two-dimensional array and not as a shared axis.
 
-## What it looks like
+## Example
 
 ```{eval-rst}
 .. plot::
@@ -123,10 +126,10 @@ full 2-D array, not a shared axis.
 ```
 
 The synthetic phantom is blurred isotropically, so its two directions nearly
-coincide. On a real acquisition they separate by however much the reconstruction
-filters the two axes differently.
+coincide. In a real acquisition they separate to the extent that the
+reconstruction filters the two axes differently.
 
-## What it contributes to the analysis file
+## Stored quantities
 
 | Name | Where it lives | Meaning |
 | --- | --- | --- |
@@ -147,18 +150,20 @@ filters the two axes differently.
 | `curves.psf.xmax` | attribute, double | the plotting range the analysis chose, so a plot draws the curve it meant |
 
 The two PSF abscissas carry no `units` attribute, because the unit depends on
-the analysis file's header (millimeters or voxels), and `curves.psf.unit` records it.
+the header of the analyzed scan (millimeters or voxels). `curves.psf.unit`
+records it.
 
-`measurements.fwhm` is NaN when the estimator could not resolve smoothness at
-all. `fwhm_pe` and `fwhm_ro` go *absent* rather than NaN only when no
-phase-encode axis resolved, because "along PE" and "along RO" do not exist then. The metrics table
-prints `?` for them and the JSON record spells them `null`. The arrays are still
-published, under the `axis0`/`axis1` labels.
+`measurements.fwhm` is NaN when the estimator could not resolve the smoothness
+at all. `fwhm_pe` and `fwhm_ro` are *absent*, and not NaN, only when no
+phase-encode axis was resolved, because the phase-encode and readout directions
+are then undefined. The metrics table prints `?` for them and the JSON record
+gives `null`. The arrays are still stored, under the `axis0` and `axis1` labels.
 
 ## References
 
-- AFNI `3dFWHMx`. The Classic first-difference estimator, `-unif`
-  standardization, `-geom` aggregation across frames, and the `ccomb` combined
-  figure. See also `notes/3dFWHMx_algorithms.md` in this repository.
-- The point-spread construction (squaring the measured autocorrelation) follows
-  from the Gaussian random-field model the FWHM estimate already assumes.
+- Cox RW. AFNI: software for analysis and visualization of functional magnetic
+  resonance neuroimages. *Comput Biomed Res* 1996;29:162–173.
+  [doi:10.1006/cbmr.1996.0014](https://doi.org/10.1006/cbmr.1996.0014)
+  `3dFWHMx` supplies the Classic first-difference estimator, the `-unif`
+  standardization, the `-geom` aggregation across frames, and the `ccomb`
+  combined value. See also `notes/3dFWHMx_algorithms.md` in the repository.

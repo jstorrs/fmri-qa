@@ -1,10 +1,11 @@
 # Importing DICOM
 
 `fmri-qa` analyzes NIfTI. `fmri-qa-import` converts a DICOM directory with
-[dcm2niix](https://github.com/rordenlab/dcm2niix), using settings that keep the
-QA checks valid, and names each series so a QA archive reads and sorts well.
-{doc}`fmri-qa-run` runs it for you. Use it on its own when you analyze with
-`fmri-qa` yourself.
+[dcm2niix](https://github.com/rordenlab/dcm2niix) (Li et al., 2016), under
+settings that keep the QA checks valid, and it names each series so that a QA
+archive is legible and sorts chronologically. {doc}`fmri-qa-run` performs the
+import automatically. The command is used on its own when the analysis is run
+separately with `fmri-qa`.
 
 ```console
 $ fmri-qa-import /path/to/dicom/dir -o session_nifti
@@ -35,10 +36,10 @@ series  acquired             file
 | `--log` | — | print everything dcm2niix said |
 | `--version` | — | print the version and exit |
 
-## The dcm2niix settings it fixes
+## Fixed dcm2niix settings
 
-Four dcm2niix settings decide whether a conversion can be checked, so the import
-always sets them:
+Four dcm2niix settings determine whether a conversion can be checked, so the
+import always sets them:
 
 | Flag | Why |
 | --- | --- |
@@ -47,59 +48,70 @@ always sets them:
 | `-w 2` | adds a suffix on a name conflict instead of overwriting |
 | `-g i` | ignores `~/.dcm2nii.ini`, so the other three hold |
 
-dcm2niix reads `~/.dcm2nii.ini` before its own defaults, so a file another tool
-wrote months ago could change a QA conversion without showing on any command
-line. `-g i` rules that out.
+dcm2niix reads `~/.dcm2nii.ini` before applying its own defaults. A file written
+by another tool months earlier could therefore alter a QA conversion without
+appearing on any command line, and `-g i` excludes that possibility.
 
-`-l o` matters most. Without it dcm2niix may rescale the values, which hides the
-receiver's ceiling, and the {doc}`ADC-saturation check <analyses/saturation>`
-then reports a clipped run as clean.
+Of the four, `-l o` is the most important. Without it dcm2niix may rescale the
+values, which conceals the ceiling of the receiver, and the
+{doc}`ADC-saturation check <analyses/saturation>` then reports a clipped run as
+clean.
 
-`--dcm2niix-arg` is for anything else dcm2niix can do. A value that starts with
-`-` needs the `=` form: `--dcm2niix-arg=-i --dcm2niix-arg=y`. Overriding `-l`
-prints a warning, because it disables the saturation check without any other
-visible sign.
+`--dcm2niix-arg` passes any other dcm2niix option. A value that begins with `-`
+requires the `=` form: `--dcm2niix-arg=-i --dcm2niix-arg=y`. Overriding `-l`
+produces a warning, because doing so disables the saturation check with no other
+visible indication.
 
 ## Series names
 
-The default names are `<date>_<time>_s<NNN>_<description>`, for example
-`20260909_143012_s002_QA_EPI_ISO.nii.gz`, built from the series' sidecar. Time
-comes before the series number because series numbers restart in each study, so
-a directory holding several sessions still sorts in acquisition order.
-dcm2niix's own template cannot build these names:
+The default names have the form `<date>_<time>_s<NNN>_<description>`, for
+example `20260909_143012_s002_QA_EPI_ISO.nii.gz`, and are constructed from the
+sidecar of the series. The time precedes the series number because series
+numbers restart in each study, so that a directory holding several sessions
+still sorts in order of acquisition. The filename template of dcm2niix cannot
+produce these names, for three reasons:
 
-- `%t` is the **study** date and time, the same for every series in a session.
-  There is no series-time token.
+- `%t` is the date and time of the **study**, which is the same for every
+  series in a session. No token gives the time of the series.
 - `%s` is not zero-padded, so series 11 sorts before series 2.
-- `%d` keeps the protocol's punctuation, so `QA EPI 32ch (rep)` needs quoting in
-  a shell.
+- `%d` retains the punctuation of the protocol name, so `QA EPI 32ch (rep)`
+  must be quoted in a shell.
 
-Some exports leave out a field, and a name is then built from the fields there
-are. A series whose sidecar has none of them keeps dcm2niix's name. So does a
-series whose name would collide with another's, such as the echoes of a
-multi-echo series or the magnitude and phase of one acquisition, which share all
-four fields. The command lists every file it left with dcm2niix's name.
+Some exports omit a field, and the name is then constructed from the fields
+that are present. A series whose sidecar contains none of them keeps the name
+dcm2niix gave it. So does a series whose name would collide with that of
+another, such as the echoes of a multi-echo series or the magnitude and phase
+of one acquisition, which share all four fields. The command lists every file
+that retains its dcm2niix name.
 
-`--names dcm2niix` keeps dcm2niix's naming throughout, from the `--filename`
-template.
+`--names dcm2niix` retains the dcm2niix naming throughout, as given by the
+`--filename` template.
 
-## A failed import leaves nothing behind
+## Atomicity of the import
 
-The import is all or nothing. It converts into a staging directory, and moves
-the result into place only once every file has its name and none would replace
-an existing file. A move that fails partway (a sync client holding a file open,
-a disk error) is undone. With `--force`, the files being replaced are set aside
-until the import succeeds, so a failure puts them back instead of leaving a new
-scan beside an old sidecar.
+An import either completes or leaves nothing behind. The conversion is written
+to a staging directory, and the result is moved into place only once every file
+has been named and none would replace an existing file. A move that fails
+partway, for example because a synchronization client holds a file open or the
+disk reports an error, is reversed. Under `--force`, the files being replaced
+are set aside until the import succeeds, so that a failure restores them and
+never leaves a new scan beside an old sidecar.
 
-## Why it converts instead of reading DICOM
+## Rationale for conversion
 
-Reading DICOM directly would mean handling each vendor's own layout: Siemens
-mosaics and CSA headers, GE private tags, Philips' two rescale conventions,
-enhanced multi-frame against classic, and grouping frames into volumes across
-echoes, coils and dynamics. dcm2niix handles all of these and keeps up as
-scanners change.
+Reading DICOM directly would require handling the layout of each vendor:
+Siemens mosaics and CSA headers, GE private tags, the two rescale conventions of
+Philips, enhanced multi-frame as opposed to classic objects, and the grouping of
+frames into volumes across echoes, coils and dynamics. dcm2niix handles all of
+these and is maintained as scanners change.
 
-The analysis also needs something dcm2niix works out. The phase-encode direction
-it reads, `PhaseEncodingDirection` in the sidecar, is not a DICOM tag. dcm2niix
-derives it from vendor private data.
+The analysis also depends on a quantity that dcm2niix derives. The phase-encode
+direction it reports, `PhaseEncodingDirection` in the sidecar, is not a DICOM
+tag. dcm2niix infers it from vendor-private data.
+
+## Reference
+
+- Li X, Morgan PS, Ashburner J, Smith J, Rorden C. The first step for
+  neuroimaging data analysis: DICOM to NIfTI conversion. *J Neurosci Methods*
+  2016;264:47–56.
+  [doi:10.1016/j.jneumeth.2016.03.001](https://doi.org/10.1016/j.jneumeth.2016.03.001)
